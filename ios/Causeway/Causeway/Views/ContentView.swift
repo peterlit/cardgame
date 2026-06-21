@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @State private var showWins = false
     @State private var showDeal = false
+    @State private var showRules = false
     @State private var dealText = ""
 
     private let outerPad: CGFloat = 8
@@ -34,6 +35,7 @@ struct ContentView: View {
             .foregroundStyle(Theme.ink)
         }
         .sheet(isPresented: $showWins) { WinsView(game: game) }
+        .sheet(isPresented: $showRules) { RulesView() }
         .alert("Play a deal", isPresented: $showDeal) {
             TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
             Button("Play") {
@@ -66,17 +68,16 @@ struct ContentView: View {
     }
 
     private var toolbar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
-                pill("Undo") { withAnimation { game.undo() } }.disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
-                pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-                pill("Auto-finish") { game.autoFinish() }
-                pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                    dealText = "\(game.seed)"; showDeal = true
-                }
-                pill("Wins") { showWins = true }
+        FlowLayout(spacing: 8) {
+            pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+            pill("Undo") { withAnimation { game.undo() } }.disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+            pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+            pill("Auto-finish") { game.autoFinish() }
+            pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
+                dealText = "\(game.seed)"; showDeal = true
             }
+            pill("Wins") { showWins = true }
+            pill("How to play") { showRules = true }
         }
     }
     private func pill(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
