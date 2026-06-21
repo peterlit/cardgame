@@ -18,7 +18,7 @@ struct ContentView: View {
             let overlap = (cardW * 92 / 66 * 0.36).rounded()
 
             ZStack {
-                Theme.background.ignoresSafeArea()
+                SummerBackground()
 
                 VStack(alignment: .leading, spacing: 12) {
                     header
