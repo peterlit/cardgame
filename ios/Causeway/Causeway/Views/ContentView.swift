@@ -14,8 +14,8 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let cardW = (geo.size.width - outerPad * 2 - gap * 7) / 8
-            let overlap = cardW * 92 / 66 * 0.32
+            let cardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
+            let overlap = (cardW * 92 / 66 * 0.32).rounded()
 
             ZStack {
                 Theme.background.ignoresSafeArea()

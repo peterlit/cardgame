@@ -33,15 +33,12 @@ struct CardView: View {
             .padding(.horizontal, width * 0.09)
             .padding(.top, width * 0.07)
 
-            // centre figure
-            if card.rank >= 11 {
-                courtFigure
-            } else {
-                Image(systemName: card.suit.sfSymbol)
-                    .font(.system(size: width * 0.5))
-                    .foregroundStyle(color)
-                    .offset(y: height * 0.12)
-            }
+            // centre figure — court symbol for J/Q/K, otherwise a single large pip.
+            // Both sit low-centre so they never overlap the top-left index.
+            Image(systemName: card.rank >= 11 ? courtSymbol : card.suit.sfSymbol)
+                .font(.system(size: width * (card.rank >= 11 ? 0.46 : 0.5)))
+                .foregroundStyle(color)
+                .offset(y: height * 0.12)
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.28), radius: 1, x: 0, y: 1)
@@ -51,18 +48,9 @@ struct CardView: View {
         .offset(y: selected ? -width * 0.05 : 0)
     }
 
-    /// J / Q / K — framed figure (crown for K/Q, person for J) in the suit colour.
-    private var courtFigure: some View {
-        let symbol: String = card.rank == 13 ? "crown.fill"
-                           : card.rank == 12 ? "crown"
-                           : "person.fill"
-        return RoundedRectangle(cornerRadius: width * 0.09, style: .continuous)
-            .fill(color.opacity(0.06))
-            .overlay(RoundedRectangle(cornerRadius: width * 0.09, style: .continuous)
-                .strokeBorder(color, lineWidth: 1.5))
-            .overlay(Image(systemName: symbol).font(.system(size: width * 0.4)).foregroundStyle(color))
-            .padding(.horizontal, width * 0.16)
-            .padding(.vertical, height * 0.22)
+    /// J / Q / K figure symbol (crown for K, open crown for Q, person for J).
+    private var courtSymbol: String {
+        card.rank == 13 ? "crown.fill" : card.rank == 12 ? "crown" : "person.fill"
     }
 }
 
