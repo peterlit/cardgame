@@ -25,9 +25,7 @@ struct CardView: View {
                 HStack(spacing: width * 0.04) {
                     rankText
                     Spacer(minLength: 0)
-                    Image(systemName: card.suit.sfSymbol)
-                        .resizable().scaledToFit()
-                        .frame(height: width * 0.36)
+                    suitPip(card.suit, height: width * 0.36)
                 }
                 Spacer(minLength: 0)
             }
@@ -37,11 +35,15 @@ struct CardView: View {
 
             // centre pip — noticeably larger than the value glyphs, seated low so
             // it never overlaps the banner. (court figure for J/Q/K)
-            Image(systemName: card.rank >= 11 ? courtSymbol : card.suit.sfSymbol)
-                .resizable().scaledToFit()
-                .frame(height: width * (card.rank >= 11 ? 0.58 : 0.66))
-                .foregroundStyle(color)
-                .offset(y: height * 0.17)
+            Group {
+                if card.rank >= 11 {
+                    Image(systemName: courtSymbol).resizable().scaledToFit().frame(height: width * 0.58)
+                } else {
+                    suitPip(card.suit, height: width * 0.66)
+                }
+            }
+            .foregroundStyle(color)
+            .offset(y: height * 0.17)
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.28), radius: 1, x: 0, y: 1)
@@ -57,6 +59,17 @@ struct CardView: View {
     }
 
     private var rankFont: Font { .system(size: width * 0.50, weight: .heavy, design: .rounded) }
+
+    /// Suit pip sized to a consistent visual width. The diamond symbol is
+    /// intrinsically narrow (aspect ~0.84), so it's stretched to ~square to
+    /// match the width of the other suits; the rest keep their natural aspect.
+    @ViewBuilder private func suitPip(_ s: Suit, height h: CGFloat) -> some View {
+        if s == .diamond {
+            Image(systemName: s.sfSymbol).resizable().frame(width: h, height: h)
+        } else {
+            Image(systemName: s.sfSymbol).resizable().scaledToFit().frame(height: h)
+        }
+    }
 
     /// Rank glyph. "10" is rendered at full height but condensed horizontally so
     /// it stays as tall as single-digit ranks while keeping a single-digit width.
