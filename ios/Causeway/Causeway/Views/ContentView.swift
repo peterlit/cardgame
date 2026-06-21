@@ -15,7 +15,7 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
             let cardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
-            let overlap = (cardW * Theme.cardAspect * 0.30).rounded()
+            let overlap = (cardW * Theme.cardAspect * 0.33).rounded()
 
             ZStack {
                 SummerBackground()

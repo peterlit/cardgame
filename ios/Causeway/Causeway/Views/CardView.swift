@@ -18,28 +18,32 @@ struct CardView: View {
                     RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
                         .strokeBorder(Theme.cardEdge, lineWidth: 1))
 
-            // rank + suit spanning the full card width, like a bold banner
+            // rank + suit value banner across the full card width.
+            // The suit is a fixed-height image; the rank font is sized so its
+            // cap-height matches that height (~0.72 cap ratio) — equal heights.
             VStack(spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: width * 0.04) {
+                HStack(spacing: width * 0.04) {
                     Text(card.rankLabel)
-                        .font(.system(size: width * 0.52, weight: .heavy, design: .rounded))
-                        .lineLimit(1).minimumScaleFactor(0.5)
+                        .font(.system(size: width * 0.58, weight: .heavy, design: .rounded))
+                        .lineLimit(1).minimumScaleFactor(0.45)
                     Spacer(minLength: 0)
                     Image(systemName: card.suit.sfSymbol)
-                        .font(.system(size: width * 0.44, weight: .bold))
+                        .resizable().scaledToFit()
+                        .frame(height: width * 0.42)
                 }
                 Spacer(minLength: 0)
             }
             .foregroundStyle(color)
-            .padding(.horizontal, width * 0.1)
+            .padding(.horizontal, width * 0.09)
             .padding(.top, width * 0.08)
 
-            // centre figure — court symbol for J/Q/K, otherwise a single large pip.
-            // Both sit low-centre so they never overlap the top-left index.
+            // centre pip — noticeably larger than the value glyphs, seated low so
+            // it never overlaps the banner. (court figure for J/Q/K)
             Image(systemName: card.rank >= 11 ? courtSymbol : card.suit.sfSymbol)
-                .font(.system(size: width * (card.rank >= 11 ? 0.46 : 0.5)))
+                .resizable().scaledToFit()
+                .frame(height: width * (card.rank >= 11 ? 0.58 : 0.66))
                 .foregroundStyle(color)
-                .offset(y: height * 0.12)
+                .offset(y: height * 0.17)
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.28), radius: 1, x: 0, y: 1)
