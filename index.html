@@ -162,7 +162,7 @@
   .deal-row:hover { background:rgba(255,255,255,.16); }
   .deal-row.cur { outline:2px solid var(--gold); }
   .deal-row .dm { opacity:.65; font-weight:500; font-variant-numeric:tabular-nums; }
-  .wins-actions { display:flex; gap:8px; justify-content:center; }
+  .wins-actions { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
   #seedWon { color: var(--gold); }
 
   .deal-input {
@@ -244,7 +244,11 @@
   <div class="panel">
     <h2 id="winTitle">You solved it! 🎉</h2>
     <p id="winMsg"></p>
-    <button class="btn primary" id="winNew">New game</button>
+    <div class="wins-actions">
+      <button class="btn primary" id="winNext">Play next deal</button>
+      <button class="btn" id="winRandom">Random</button>
+      <button class="btn" id="winClose">Close</button>
+    </div>
   </div>
 </div>
 
@@ -761,6 +765,10 @@ function onWin(){
   document.getElementById("winMsg").textContent =
     `Deal #${seed} · ${moveCount} moves · ${fmtTime(secs)}.` +
     (prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
+  const next = seed>=1000000 ? 1 : seed+1;          // suggest the next deal number
+  const nextBtn = document.getElementById("winNext");
+  nextBtn.textContent = `Play deal #${next}`;
+  nextBtn.onclick = ()=>deal(next);
   document.getElementById("overlay").classList.add("show");
 }
 function hideWin(){ document.getElementById("overlay").classList.remove("show"); }
@@ -846,7 +854,8 @@ function goDeal(){
 
 /* ---------- wiring ---------- */
 document.getElementById("newBtn").onclick=()=>deal(randomSeed());
-document.getElementById("winNew").onclick=()=>deal(randomSeed());
+document.getElementById("winRandom").onclick=()=>deal(randomSeed());
+document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=undo;
 document.getElementById("autoBtn").onclick=autoFinish;
 document.getElementById("winsBtn").onclick=openWins;
