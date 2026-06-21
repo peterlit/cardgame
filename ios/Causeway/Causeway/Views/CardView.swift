@@ -23,9 +23,7 @@ struct CardView: View {
             // cap-height matches that height (~0.72 cap ratio) — equal heights.
             VStack(spacing: 0) {
                 HStack(spacing: width * 0.04) {
-                    Text(card.rankLabel)
-                        .font(.system(size: width * 0.58, weight: .heavy, design: .rounded))
-                        .lineLimit(1).minimumScaleFactor(0.45)
+                    rankText
                     Spacer(minLength: 0)
                     Image(systemName: card.suit.sfSymbol)
                         .resizable().scaledToFit()
@@ -56,6 +54,20 @@ struct CardView: View {
     /// J / Q / K figure symbol (crown for K, open crown for Q, person for J).
     private var courtSymbol: String {
         card.rank == 13 ? "crown.fill" : card.rank == 12 ? "crown" : "person.fill"
+    }
+
+    private var rankFont: Font { .system(size: width * 0.58, weight: .heavy, design: .rounded) }
+
+    /// Rank glyph. "10" is rendered at full height but condensed horizontally so
+    /// it stays as tall as single-digit ranks while keeping a single-digit width.
+    @ViewBuilder private var rankText: some View {
+        if card.rank == 10 {
+            Text("10").font(rankFont).fixedSize()
+                .scaleEffect(x: 0.6, y: 1, anchor: .leading)
+                .frame(width: width * 0.36, alignment: .leading)
+        } else {
+            Text(card.rankLabel).font(rankFont).lineLimit(1)
+        }
     }
 }
 
