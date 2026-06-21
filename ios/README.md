@@ -52,6 +52,20 @@ Causeway/Causeway/
   Assets.xcassets/         AppIcon (placeholder) + AccentColor
 ```
 
+## Privacy & security
+
+Causeway is fully offline and self-contained:
+
+- **No networking** — no `URLSession`, URLs, or sockets; nothing leaves the device.
+- **No web view or dynamic code execution.**
+- **No permissions** — no camera, location, contacts, notifications, pasteboard, or
+  device identifiers are requested.
+- **No third-party dependencies** — Apple frameworks only (no supply-chain surface).
+- **Storage** — only the win history (deal numbers, moves, times) in `UserDefaults`,
+  inside the app sandbox and encrypted at rest by iOS.
+- A **Privacy Manifest** (`Causeway/PrivacyInfo.xcprivacy`) declares no tracking, no
+  data collection, and the required-reason for `UserDefaults` (CA92.1).
+
 ## Status / known follow-ups
 
 - Built and verified only by syntax parse here (no Xcode on this machine). On first
