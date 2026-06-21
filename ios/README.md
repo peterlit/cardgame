@@ -70,7 +70,9 @@ Causeway is fully offline and self-contained:
 
 - Built and verified only by syntax parse here (no Xcode on this machine). On first
   build, report any compiler errors and they'll be fixed.
-- App icon is a placeholder — add artwork to `Assets.xcassets/AppIcon.appiconset`.
+- App icon: a 1024px icon (two fanned cards, A♥/K♠ on misty teal) lives in
+  `Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`. Regenerate it with
+  `swift tools/make_icon.swift Causeway/Causeway/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
 - Court cards (J/Q/K) use SF Symbols (crown / person); could be replaced with custom
   artwork to match the web build's fleur-de-lis/crown figures.
 - Card-move animations use `matchedGeometryEffect`; fine-tune timing/feel after a device test.
