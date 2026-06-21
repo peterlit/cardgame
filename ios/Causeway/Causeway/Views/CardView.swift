@@ -65,21 +65,23 @@ struct SlotView: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
-            .fill(Color.white.opacity(0.16))
+            .fill(Color.white.opacity(0.22))
             .overlay(RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.72), lineWidth: 2))
+                .strokeBorder(Theme.ink.opacity(0.28), lineWidth: 2))
             .overlay(glyphView)
             .frame(width: width, height: height)
     }
 
+    // Watermarks read on the light summer background (and over clouds):
+    // suit-coloured pips for foundations, soft ink for any text glyph.
     @ViewBuilder private var glyphView: some View {
         if let suit = glyphSuit {
             Image(systemName: suit.sfSymbol)
                 .font(.system(size: width * 0.4))
-                .foregroundStyle(Color.white.opacity(0.3))
+                .foregroundStyle(Theme.suitColor(suit).opacity(0.4))
         } else if let g = glyph {
             Text(g).font(.system(size: width * 0.42, weight: .bold, design: .serif))
-                .foregroundStyle(Color.white.opacity(0.3))
+                .foregroundStyle(Theme.ink.opacity(0.3))
         }
     }
 }
