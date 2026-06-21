@@ -18,20 +18,21 @@ struct CardView: View {
                     RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
                         .strokeBorder(Theme.cardEdge, lineWidth: 1))
 
-            // top-left rank + suit index
+            // top-left rank + suit index (large, like a physical card)
             VStack(alignment: .leading) {
-                HStack(spacing: width * 0.04) {
+                HStack(alignment: .firstTextBaseline, spacing: width * 0.03) {
                     Text(card.rankLabel)
-                        .font(.system(size: width * 0.30, weight: .heavy, design: .rounded))
+                        .font(.system(size: width * 0.42, weight: .heavy, design: .rounded))
+                        .lineLimit(1).minimumScaleFactor(0.5)
                     Image(systemName: card.suit.sfSymbol)
-                        .font(.system(size: width * 0.22, weight: .bold))
+                        .font(.system(size: width * 0.30, weight: .bold))
                     Spacer(minLength: 0)
                 }
                 Spacer(minLength: 0)
             }
             .foregroundStyle(color)
-            .padding(.horizontal, width * 0.09)
-            .padding(.top, width * 0.07)
+            .padding(.horizontal, width * 0.08)
+            .padding(.top, width * 0.06)
 
             // centre figure — court symbol for J/Q/K, otherwise a single large pip.
             // Both sit low-centre so they never overlap the top-left index.
