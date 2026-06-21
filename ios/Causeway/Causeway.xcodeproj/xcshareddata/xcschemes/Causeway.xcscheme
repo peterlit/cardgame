@@ -41,16 +41,19 @@
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES"
       queueDebuggingEnableBacktraceRecording = "Yes">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
+      <PathRunnable
+         runnableDebuggingMode = "0"
+         FilePath = "/Users/plit/Library/Developer/Xcode/DerivedData/Causeway-fbjfryogzyxfdjeniutxntdttrrq/Build/Products/Debug-iphoneos/Causeway.app">
+      </PathRunnable>
+      <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-            BuildableName = "Causeway.app"
+            BuildableName = "Causeway"
             BlueprintName = "Causeway"
             ReferencedContainer = "container:Causeway.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
