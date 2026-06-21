@@ -152,6 +152,17 @@
   .range-chip:hover { background:rgba(255,255,255,.2); }
   .range-chip.cur { outline:2px solid var(--gold); }
   .wins-empty { opacity:.7; padding:14px 0; width:100%; text-align:center; }
+
+  .deal-list { max-height: 52vh; overflow:auto; margin: 6px 0 14px; text-align:left; }
+  .deal-row {
+    display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); color:#f1ece0;
+    padding:7px 11px; border-radius:8px; margin-bottom:5px; cursor:pointer; font-size:13px; font-weight:600;
+  }
+  .deal-row:hover { background:rgba(255,255,255,.16); }
+  .deal-row.cur { outline:2px solid var(--gold); }
+  .deal-row .dm { opacity:.65; font-weight:500; font-variant-numeric:tabular-nums; }
+  .wins-actions { display:flex; gap:8px; justify-content:center; }
   #seedWon { color: var(--gold); }
 
   .deal-input {
@@ -252,10 +263,13 @@
 
 <div class="overlay" id="winsOverlay">
   <div class="panel wide">
-    <h2>Deals won</h2>
+    <h2 id="winsTitle">Deals won</h2>
     <p id="winsSummary"></p>
     <div id="winsList" class="wins-list"></div>
-    <button class="btn primary" id="winsClose">Close</button>
+    <div class="wins-actions">
+      <button class="btn" id="winsBack" style="display:none">‹ Ranges</button>
+      <button class="btn primary" id="winsClose">Close</button>
+    </div>
   </div>
 </div>
 
@@ -763,28 +777,56 @@ function wonRanges(){
   return ranges;
 }
 const rangeLabel = ([a,b]) => a===b ? String(a) : a+"–"+b;
+function fmtDate(ms){ try{ return new Date(ms).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }catch(e){ return ""; } }
 
+// Ranges view: compact chips; tap a chip to drill into its individual deals.
 function openWins(){
   const total = Object.keys(wins).map(Number).filter(n=>!isNaN(n)).length;
   const ranges = wonRanges();
+  document.getElementById("winsTitle").textContent = "Deals won";
+  document.getElementById("winsBack").style.display = "none";
   document.getElementById("winsSummary").innerHTML = total
     ? `<b>${total}</b> deal${total!==1?"s":""} solved &nbsp;·&nbsp; <b>${ranges.length}</b> range${ranges.length!==1?"s":""}`
     : "";
   const list=document.getElementById("winsList");
+  list.className="wins-list";
   if(!total){
     list.innerHTML = `<div class="wins-empty">No wins yet — go solve one!</div>`;
   } else {
     list.innerHTML = ranges.map(rg=>{
       const [a,b]=rg, n=b-a+1;
       const cur = (seed>=a && seed<=b) ? " cur" : "";
-      const title = a===b ? `Deal ${a} — tap to replay`
-                          : `Deals ${a}–${b} (${n} deals) — tap to replay #${a}`;
-      return `<button class="range-chip${cur}" data-seed="${a}" title="${title}">${rangeLabel(rg)}</button>`;
+      const title = a===b ? `Deal ${a} — tap for details`
+                          : `Deals ${a}–${b} (${n} deals) — tap for details`;
+      return `<button class="range-chip${cur}" data-a="${a}" data-b="${b}" title="${title}">${rangeLabel(rg)}</button>`;
     }).join("");
-    list.querySelectorAll(".range-chip").forEach(b=>
-      b.onclick=()=>{ closeWins(); deal(+b.dataset.seed); });
+    list.querySelectorAll(".range-chip").forEach(el=>
+      el.onclick=()=>openWinsDetail(+el.dataset.a, +el.dataset.b));
   }
   document.getElementById("winsOverlay").classList.add("show");
+}
+
+// Detail view: every won deal in [a,b] with stats; tap a row to replay it.
+function openWinsDetail(a,b){
+  const rows=[];
+  for(let n=a;n<=b;n++){ const w=wins[n]; if(w) rows.push({seed:n,...w}); }
+  document.getElementById("winsTitle").textContent = a===b ? `Deal #${a}` : `Deals ${a}–${b}`;
+  document.getElementById("winsSummary").innerHTML =
+    `<b>${rows.length}</b> deal${rows.length!==1?"s":""} &nbsp;·&nbsp; tap to replay`;
+  const list=document.getElementById("winsList");
+  list.className="deal-list";
+  list.innerHTML = rows.map(r=>{
+    const cur = r.seed===seed ? " cur" : "";
+    const date = r.date ? ` · ${fmtDate(r.date)}` : "";
+    return `<button class="deal-row${cur}" data-seed="${r.seed}">`+
+      `<span>Deal #${r.seed}</span>`+
+      `<span class="dm">${r.moves} moves · ${fmtTime(r.secs)}${date}</span></button>`;
+  }).join("");
+  list.querySelectorAll(".deal-row").forEach(el=>
+    el.onclick=()=>{ closeWins(); deal(+el.dataset.seed); });
+  const back=document.getElementById("winsBack");
+  back.style.display="";
+  back.onclick=openWins;
 }
 function closeWins(){ document.getElementById("winsOverlay").classList.remove("show"); }
 
