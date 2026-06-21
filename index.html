@@ -569,38 +569,50 @@ function tryDestFoundation(suit,dir){
   commitMove(); return true;
 }
 
-function removeFrom(src){
-  if(src.kind==="cell") state.cells[src.idx]=null; else state.tableau[src.col].pop();
+function removeRun(src){
+  if(src.kind==="cell") state.cells[src.idx]=null;
+  else state.tableau[src.col].length = src.idx;   // drop idx..end
 }
-/* Double-tap = smart move for a single top/cell card. Priority:
-   1) foundation  2) onto another card  3) empty column  4) free cell. */
-function smartMove(card, src){
-  // 1) foundation (prefer up; only the final card of a suit is ever legal both ways)
-  if(canFoundationUp(card) || canFoundationDown(card)){
-    snapshot(); removeFrom(src);
-    if(canFoundationUp(card)) state.up[card.suit]=card.rank; else state.down[card.suit]=card.rank;
+/* Double-tap = smart move. Works on any card heading a valid run (the card and
+   the sub-stack below it). Priority: foundation → onto another card → empty
+   column → free cell. Foundation/free cell apply to single cards only. */
+function smartMove(src){
+  let run;
+  if(src.kind==="cell"){ const c=state.cells[src.idx]; if(!c) return false; run=[c]; }
+  else {
+    if(!isSeqHead(src.col, src.idx)) return false;   // card + cards below must form a run
+    run = state.tableau[src.col].slice(src.idx);
+  }
+  if(!run.length) return false;
+  const head=run[0], n=run.length;
+
+  // 1) foundation (single card only)
+  if(n===1 && (canFoundationUp(head) || canFoundationDown(head))){
+    snapshot(); removeRun(src);
+    if(canFoundationUp(head)) state.up[head.suit]=head.rank; else state.down[head.suit]=head.rank;
     commitMove(); return true;
   }
   // 2) onto another (non-empty) column
   for(let col=0; col<NCOLS; col++){
     if(src.kind==="tableau" && src.col===col) continue;
-    if(state.tableau[col].length>0 && canStackTableau([card],col)){
-      snapshot(); removeFrom(src); state.tableau[col].push(card); commitMove(); return true;
+    if(state.tableau[col].length>0 && canStackTableau(run,col) && n<=maxMovable(false)){
+      snapshot(); removeRun(src); state.tableau[col].push(...run); commitMove(); return true;
     }
   }
-  // 3) an empty column (skip a pointless empty->empty shuffle from a lone tableau card)
-  if(!(src.kind==="tableau" && state.tableau[src.col].length===1)){
+  // 3) an empty column (skip if the run is already the whole source column)
+  const wholeCol = src.kind==="tableau" && src.idx===0;
+  if(!wholeCol){
     for(let col=0; col<NCOLS; col++){
-      if(state.tableau[col].length===0){
-        snapshot(); removeFrom(src); state.tableau[col].push(card); commitMove(); return true;
+      if(state.tableau[col].length===0 && n<=maxMovable(true)){
+        snapshot(); removeRun(src); state.tableau[col].push(...run); commitMove(); return true;
       }
     }
   }
-  // 4) a free cell (not if it's already in one)
-  if(src.kind!=="cell"){
+  // 4) a free cell (single card, not already in a cell)
+  if(n===1 && src.kind!=="cell"){
     for(let i=0;i<NCELLS;i++){
       if(state.cells[i]===null){
-        snapshot(); removeFrom(src); state.cells[i]=card; commitMove(); return true;
+        snapshot(); state.cells[i]=head; removeRun(src); commitMove(); return true;
       }
     }
   }
@@ -727,7 +739,7 @@ function render(animate=true){
       const loc={kind:"cell",idx:i};
       const el=cardEl(c, isSelected(loc)?"sel":"");
       el.onclick=()=>handleCardTap(loc);
-      el.ondblclick=()=>smartMove(c,loc);
+      el.ondblclick=()=>smartMove(loc);
       slot.appendChild(el);
     } else {
       slot.onclick=()=>{ if(selection) tryDestCell(i); };
@@ -772,7 +784,7 @@ function render(animate=true){
         el.style.top=(idx*overlap)+"px";
         el.style.zIndex=idx+1;
         el.onclick=()=>handleCardTap(loc);
-        if(idx===t.length-1) el.ondblclick=()=>smartMove(card,loc);
+        el.ondblclick=()=>smartMove(loc);   // works on any card heading a valid run
         colEl.appendChild(el);
       });
       colEl.style.height=((t.length-1)*overlap + parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ch")))+"px";

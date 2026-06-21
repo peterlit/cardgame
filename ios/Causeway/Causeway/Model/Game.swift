@@ -263,43 +263,55 @@ final class Game: ObservableObject {
     }
 
     /// Double-tap: foundation → onto another card → empty column → free cell.
+    /// Double-tap. Works on any card heading a valid run (the card plus the
+    /// sub-stack below it), moving the whole run. Priority: foundation → onto
+    /// another card → empty column → free cell (foundation/free cell single-card only).
     func smartMove(_ spot: Spot) {
-        let card: Card
+        let run: [Card]
         switch spot {
-        case .cell(let i): guard let c = cells[i] else { return }; card = c
+        case .cell(let i): guard let c = cells[i] else { return }; run = [c]
         case .tableau(let col, let idx):
-            guard idx == tableau[col].count - 1 else { return }
-            card = tableau[col][idx]
+            guard isSeqHead(col: col, idx: idx) else { return }   // card + cards below must form a run
+            run = Array(tableau[col][idx...])
         }
-        // 1) foundation
-        if canFoundationUp(card) || canFoundationDown(card) {
-            snapshot(); remove(from: spot)
-            if canFoundationUp(card) { up[card.suit.rawValue] = card.rank }
-            else { down[card.suit.rawValue] = card.rank }
+        guard let head = run.first else { return }
+        let n = run.count
+
+        // 1) foundation (single card only)
+        if n == 1, canFoundationUp(head) || canFoundationDown(head) {
+            snapshot(); removeRun(spot)
+            if canFoundationUp(head) { up[head.suit.rawValue] = head.rank }
+            else { down[head.suit.rawValue] = head.rank }
             commit(); return
         }
         // 2) onto another (non-empty) column
         for col in 0..<Game.colCount {
             if case .tableau(let sc, _) = spot, sc == col { continue }
-            if !tableau[col].isEmpty && canStackTableau([card], onto: col) {
-                snapshot(); remove(from: spot); tableau[col].append(card); commit(); return
+            if !tableau[col].isEmpty, canStackTableau(run, onto: col), n <= maxMovable(targetEmpty: false) {
+                snapshot(); removeRun(spot); tableau[col].append(contentsOf: run); commit(); return
             }
         }
-        // 3) an empty column (skip pointless empty->empty shuffle of a lone card)
-        let loneTableau: Bool = {
-            if case .tableau(let col, _) = spot { return tableau[col].count == 1 }
-            return false
-        }()
-        if !loneTableau {
+        // 3) an empty column (skip if the run is already the whole source column)
+        let wholeCol: Bool = { if case .tableau(_, let idx) = spot { return idx == 0 }; return false }()
+        if !wholeCol {
             for col in 0..<Game.colCount where tableau[col].isEmpty {
-                snapshot(); remove(from: spot); tableau[col].append(card); commit(); return
+                if n <= maxMovable(targetEmpty: true) {
+                    snapshot(); removeRun(spot); tableau[col].append(contentsOf: run); commit(); return
+                }
             }
         }
-        // 4) a free cell (not if already in one)
-        if case .cell = spot {} else {
+        // 4) a free cell (single card, and not already in a cell)
+        if n == 1, case .tableau = spot {
             for i in 0..<Game.cellCount where cells[i] == nil {
-                snapshot(); cells[i] = card; remove(from: spot); commit(); return
+                snapshot(); cells[i] = head; removeRun(spot); commit(); return
             }
+        }
+    }
+
+    private func removeRun(_ spot: Spot) {
+        switch spot {
+        case .cell(let i): cells[i] = nil
+        case .tableau(let col, let idx): tableau[col].removeSubrange(idx...)
         }
     }
 
