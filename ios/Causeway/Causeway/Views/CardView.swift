@@ -27,13 +27,13 @@ struct CardView: View {
                     Spacer(minLength: 0)
                     Image(systemName: card.suit.sfSymbol)
                         .resizable().scaledToFit()
-                        .frame(height: width * 0.42)
+                        .frame(height: width * 0.36)
                 }
                 Spacer(minLength: 0)
             }
             .foregroundStyle(color)
             .padding(.horizontal, width * 0.09)
-            .padding(.top, width * 0.08)
+            .padding(.top, width * 0.05)
 
             // centre pip — noticeably larger than the value glyphs, seated low so
             // it never overlaps the banner. (court figure for J/Q/K)
@@ -56,7 +56,7 @@ struct CardView: View {
         card.rank == 13 ? "crown.fill" : card.rank == 12 ? "crown" : "person.fill"
     }
 
-    private var rankFont: Font { .system(size: width * 0.58, weight: .heavy, design: .rounded) }
+    private var rankFont: Font { .system(size: width * 0.50, weight: .heavy, design: .rounded) }
 
     /// Rank glyph. "10" is rendered at full height but condensed horizontally so
     /// it stays as tall as single-digit ranks while keeping a single-digit width.
