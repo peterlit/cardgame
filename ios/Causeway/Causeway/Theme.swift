@@ -12,6 +12,9 @@ extension Color {
 
 /// Palette ported from the MobilityWare-style web theme.
 enum Theme {
+    /// Card height ÷ width. Standard playing-card ratio (92/66), made ~20% taller.
+    static let cardAspect: CGFloat = (92.0 / 66.0) * 1.2
+
     static let cardCream = Color(hex: 0xF3ECD9)
     static let cardCreamTop = Color(hex: 0xF8F2E2)
     static let cardEdge = Color(hex: 0xCDBF9D)

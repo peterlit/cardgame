@@ -6,7 +6,7 @@ struct CardView: View {
     let width: CGFloat
     var selected: Bool = false
 
-    private var height: CGFloat { width * 92 / 66 }
+    private var height: CGFloat { width * Theme.cardAspect }
     private var color: Color { Theme.suitColor(card.suit) }
 
     var body: some View {
@@ -18,21 +18,21 @@ struct CardView: View {
                     RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
                         .strokeBorder(Theme.cardEdge, lineWidth: 1))
 
-            // top-left rank + suit index (large, like a physical card)
-            VStack(alignment: .leading) {
-                HStack(alignment: .firstTextBaseline, spacing: width * 0.03) {
+            // rank + suit spanning the full card width, like a bold banner
+            VStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: width * 0.04) {
                     Text(card.rankLabel)
-                        .font(.system(size: width * 0.42, weight: .heavy, design: .rounded))
+                        .font(.system(size: width * 0.52, weight: .heavy, design: .rounded))
                         .lineLimit(1).minimumScaleFactor(0.5)
-                    Image(systemName: card.suit.sfSymbol)
-                        .font(.system(size: width * 0.30, weight: .bold))
                     Spacer(minLength: 0)
+                    Image(systemName: card.suit.sfSymbol)
+                        .font(.system(size: width * 0.44, weight: .bold))
                 }
                 Spacer(minLength: 0)
             }
             .foregroundStyle(color)
-            .padding(.horizontal, width * 0.08)
-            .padding(.top, width * 0.06)
+            .padding(.horizontal, width * 0.1)
+            .padding(.top, width * 0.08)
 
             // centre figure — court symbol for J/Q/K, otherwise a single large pip.
             // Both sit low-centre so they never overlap the top-left index.
@@ -61,7 +61,7 @@ struct SlotView: View {
     var glyph: String? = nil
     var glyphSuit: Suit? = nil
 
-    private var height: CGFloat { width * 92 / 66 }
+    private var height: CGFloat { width * Theme.cardAspect }
 
     var body: some View {
         RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)

@@ -9,13 +9,13 @@ struct ContentView: View {
     @State private var showRules = false
     @State private var dealText = ""
 
-    private let outerPad: CGFloat = 8
-    private let gap: CGFloat = 6
+    private let outerPad: CGFloat = 6
+    private let gap: CGFloat = 4
 
     var body: some View {
         GeometryReader { geo in
             let cardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
-            let overlap = (cardW * 92 / 66 * 0.36).rounded()
+            let overlap = (cardW * Theme.cardAspect * 0.30).rounded()
 
             ZStack {
                 SummerBackground()
@@ -156,7 +156,7 @@ struct ContentView: View {
     // MARK: tableau
 
     private func tableauArea(cardW: CGFloat, overlap: CGFloat) -> some View {
-        let cardH = cardW * 92 / 66
+        let cardH = cardW * Theme.cardAspect
         return HStack(alignment: .top, spacing: gap) {
             ForEach(0..<Game.colCount, id: \.self) { col in
                 column(col, cardW: cardW, cardH: cardH, overlap: overlap)
