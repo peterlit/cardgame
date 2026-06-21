@@ -3,11 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CA5E1A2B3C4D5E6F00000001 /* Causeway */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Causeway; sourceTree = "<group>"; };
+		CA5E1A2B3C4D5E6F00000001 /* Causeway */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Causeway; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,7 +32,6 @@
 		CA5E1A2B3C4D5E6F00000004 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CA5E1A2B3C4D5E6F00000005 /* Causeway.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -59,7 +58,6 @@
 			packageProductDependencies = (
 			);
 			productName = Causeway;
-			productReference = CA5E1A2B3C4D5E6F00000005 /* Causeway.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -87,7 +85,6 @@
 			);
 			mainGroup = CA5E1A2B3C4D5E6F00000003;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = CA5E1A2B3C4D5E6F00000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -187,6 +184,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = YFW8N7PHU9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -214,6 +212,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = YFW8N7PHU9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -236,20 +235,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		CA5E1A2B3C4D5E6F0000000B /* Build configuration list for PBXProject "Causeway" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				CA5E1A2B3C4D5E6F0000000C /* Debug */,
-				CA5E1A2B3C4D5E6F0000000D /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		CA5E1A2B3C4D5E6F00000007 /* Build configuration list for PBXNativeTarget "Causeway" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CA5E1A2B3C4D5E6F0000000E /* Debug */,
 				CA5E1A2B3C4D5E6F0000000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CA5E1A2B3C4D5E6F0000000B /* Build configuration list for PBXProject "Causeway" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA5E1A2B3C4D5E6F0000000C /* Debug */,
+				CA5E1A2B3C4D5E6F0000000D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
