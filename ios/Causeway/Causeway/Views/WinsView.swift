@@ -1,51 +1,73 @@
 import SwiftUI
 
-/// Wins screen: compressed ranges of solved deals, tap a range to drill into the
-/// individual deals with stats, tap a deal to replay it.
+/// Wins screen: enter a deal number to play it, plus compressed ranges of solved
+/// deals — tap a range to drill into the individual deals with stats and replay.
 struct WinsView: View {
     @ObservedObject var game: Game
     @Environment(\.dismiss) private var dismiss
+
+    @State private var dealText = ""
 
     private var store: WinStore { game.winStore }
     private let cols = [GridItem(.adaptive(minimum: 78), spacing: 8)]
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.count == 0 {
-                    ContentUnavailableView("No wins yet", systemImage: "trophy",
-                                           description: Text("Go solve a deal!"))
-                } else {
-                    ScrollView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    dealEntry
+
+                    if store.count == 0 {
+                        Text("No wins yet — go solve one!")
+                            .foregroundStyle(.secondary).padding(.top, 24)
+                    } else {
                         let ranges = store.ranges()
                         Text("\(store.count) deals solved · \(ranges.count) ranges")
                             .font(.subheadline).foregroundStyle(.secondary)
-                            .padding(.top, 4)
                         LazyVGrid(columns: cols, spacing: 8) {
                             ForEach(ranges, id: \.lowerBound) { r in
-                                NavigationLink {
-                                    rangeDetail(r)
-                                } label: {
-                                    Text(DealFormat.rangeLabel(r))
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .monospacedDigit()
-                                        .padding(.vertical, 8).frame(maxWidth: .infinity)
-                                        .background(RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.gray.opacity(0.15)))
-                                        .overlay(RoundedRectangle(cornerRadius: 8)
-                                            .strokeBorder(currentInRange(r) ? Theme.gold : .clear, lineWidth: 2))
-                                }
-                                .buttonStyle(.plain)
+                                NavigationLink { rangeDetail(r) } label: { rangeChip(r) }
+                                    .buttonStyle(.plain)
                             }
                         }
-                        .padding()
                     }
                 }
+                .padding()
             }
             .navigationTitle("Deals won")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+    }
+
+    // Enter any deal number and play it.
+    private var dealEntry: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Play a deal").font(.headline)
+            HStack(spacing: 8) {
+                TextField("Number 1–\(Game.maxSeed)", text: $dealText)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Play", action: playEntered)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(Int(dealText.trimmingCharacters(in: .whitespaces)) == nil)
+            }
+        }
+    }
+
+    private func playEntered() {
+        guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)), n >= 1 else { return }
+        game.deal(seed: n)   // Game.deal clamps to 1...maxSeed
+        dismiss()
+    }
+
+    private func rangeChip(_ r: ClosedRange<Int>) -> some View {
+        Text(DealFormat.rangeLabel(r))
+            .font(.system(size: 14, weight: .semibold)).monospacedDigit()
+            .padding(.vertical, 8).frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.15)))
+            .overlay(RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(currentInRange(r) ? Theme.gold : .clear, lineWidth: 2))
     }
 
     private func currentInRange(_ r: ClosedRange<Int>) -> Bool { r.contains(game.seed) }
