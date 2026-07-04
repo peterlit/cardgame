@@ -58,7 +58,7 @@ final class Game: ObservableObject {
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
             autoplayOn = UserDefaults.standard.bool(forKey: "causeway.autoplay")
         }
-        deal(seed: Int.random(in: 1...Game.maxSeed))
+        if !restore() { deal(seed: randomSeed()) }   // resume an in-progress game if one was saved
     }
 
     // MARK: - Dealing
@@ -91,9 +91,57 @@ final class Game: ObservableObject {
         started = false
         stopTimer()
         autoplaying = false
+        persist()
     }
 
     func newRandomGame() { deal(seed: randomSeed()) }
+
+    // MARK: - In-progress persistence (survives backgrounding / eviction)
+
+    private let gameKey = "causeway.game"
+
+    private struct SavedGame: Codable {
+        var seed: Int
+        var tableau: [[Card]]
+        var cells: [Card?]
+        var up: [Int]
+        var down: [Int]
+        var moveCount: Int
+        var elapsed: Int
+        var started: Bool
+    }
+
+    /// Snapshot the live (unfinished) game to UserDefaults. Cheap: board only, no undo
+    /// history. Called after every move and on backgrounding.
+    func persist() {
+        guard !won else { return }
+        let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
+                          moveCount: moveCount, elapsed: elapsed, started: started)
+        if let data = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(data, forKey: gameKey)
+        }
+    }
+    private func clearSaved() { UserDefaults.standard.removeObject(forKey: gameKey) }
+
+    /// Restore a saved in-progress game; false if none / invalid.
+    private func restore() -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: gameKey),
+              let s = try? JSONDecoder().decode(SavedGame.self, from: data),
+              s.tableau.count == Game.colCount, s.cells.count == Game.cellCount,
+              s.up.count == 4, s.down.count == 4 else { return false }
+        // Sanity: every card must be accounted for exactly once.
+        let inTableau = s.tableau.reduce(0) { $0 + $1.count }
+        let inCells = s.cells.compactMap { $0 }.count
+        let onFoundations = (0..<4).reduce(0) { $0 + s.up[$1] + max(0, 14 - s.down[$1]) }
+        guard inTableau + inCells + onFoundations == 52 else { return false }
+
+        seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
+        moveCount = s.moveCount; elapsed = s.elapsed; started = s.started
+        selection = nil; history = []; won = false; autoplaying = false
+        stopTimer()
+        if started { startTimer() }
+        return true
+    }
 
     // MARK: - Rules
 
@@ -179,6 +227,7 @@ final class Game: ObservableObject {
         if !started { started = true; startTimer() }
         selection = nil
         if checkWin() { onWin(); return }
+        persist()
         runAutoplay()
     }
 
@@ -192,6 +241,7 @@ final class Game: ObservableObject {
         // A win stops the clock; undoing back into play must resume it (else elapsed
         // freezes and a later re-win would persist a bogus best time).
         if started && timer == nil { startTimer() }
+        persist()
     }
 
     private func selectedCards() -> [Card] {
@@ -355,14 +405,14 @@ final class Game: ObservableObject {
             if let c = cells[i], isSafeAutoplay(c) {
                 snapshot(); selection = nil; cells[i] = nil
                 if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                moveCount += 1; return true
+                moveCount += 1; persist(); return true
             }
         }
         for col in 0..<Game.colCount {
             guard let c = tableau[col].last, isSafeAutoplay(c) else { continue }
             snapshot(); selection = nil; tableau[col].removeLast()
             if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-            moveCount += 1; return true
+            moveCount += 1; persist(); return true
         }
         return false
     }
@@ -412,7 +462,7 @@ final class Game: ObservableObject {
             }
         }
         if any && !started { started = true; startTimer() }
-        if checkWin() { onWin() }
+        if checkWin() { onWin() } else if any { persist() }
     }
 
     // MARK: - Win + timer
@@ -420,6 +470,7 @@ final class Game: ObservableObject {
     private func onWin() {
         stopTimer()
         autoplaying = false
+        clearSaved()   // finished game — next launch should start fresh
         winStore.record(seed: seed, moves: moveCount, secs: elapsed)
         won = true
     }

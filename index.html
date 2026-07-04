@@ -375,11 +375,43 @@ function deal(theSeed){
   refreshHud();
   hideWin();
   render(false);
+  saveGame();
 }
 function refreshHud(){
   document.getElementById("seedLbl").textContent = seed;
   document.getElementById("seedWon").textContent = wins[seed] ? " ✓" : "";
   document.getElementById("won").textContent = winCount();
+}
+
+/* ---------- in-progress game persistence (survives reload / tab close) ---------- */
+function lsRemove(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function saveGame(){
+  if(!state || isWon()) return;
+  const elapsedSecs = startTime ? Math.floor((Date.now()-startTime)/1000) : 0;
+  lsSet("causeway.game", JSON.stringify({
+    seed, tableau: state.tableau, cells: state.cells, up: state.up, down: state.down,
+    moveCount, elapsedSecs, started: !!startTime
+  }));
+}
+function clearSavedGame(){ lsRemove("causeway.game"); }
+function restoreGame(){
+  const raw = lsGet("causeway.game"); if(!raw) return false;
+  let g; try{ g=JSON.parse(raw); }catch(e){ return false; }
+  if(!g || !Array.isArray(g.tableau) || g.tableau.length!==NCOLS ||
+     !Array.isArray(g.cells) || g.cells.length!==NCELLS) return false;
+  const inTab = g.tableau.reduce((n,c)=>n+c.length,0);
+  const inCells = g.cells.filter(Boolean).length;
+  const onFound = g.up.reduce((n,u)=>n+u,0) + g.down.reduce((n,d)=>n+Math.max(0,14-d),0);
+  if(inTab+inCells+onFound !== 52) return false;   // sanity: every card accounted for
+  seed = g.seed>>>0;
+  state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
+  history=[]; selection=null; moveCount=g.moveCount||0;
+  stopAutoplay(); hideWin();
+  const es = g.elapsedSecs||0;
+  if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
+  setMoves(moveCount); setTime(es);
+  refreshHud(); render(false);
+  return true;
 }
 
 /* ---------- rules ---------- */
@@ -465,7 +497,7 @@ function autoplayOneStep(){
     if(c && isSafeAutoplay(c)){
       snapshot(); state.cells[i]=null;
       if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
-      moveCount++; setMoves(moveCount); render(); return true;
+      moveCount++; setMoves(moveCount); render(); saveGame(); return true;
     }
   }
   for(let col=0;col<NCOLS;col++){
@@ -474,7 +506,7 @@ function autoplayOneStep(){
     if(isSafeAutoplay(c)){
       snapshot(); t.pop();
       if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
-      moveCount++; setMoves(moveCount); render(); return true;
+      moveCount++; setMoves(moveCount); render(); saveGame(); return true;
     }
   }
   return false;
@@ -513,6 +545,7 @@ function undo(){
   state.tableau=h.tableau; state.cells=h.cells; state.up=h.up; state.down=h.down;
   moveCount=h.moveCount; setMoves(moveCount);
   selection=null; render(false);
+  saveGame();
 }
 function commitMove(){
   moveCount++; setMoves(moveCount);
@@ -520,6 +553,7 @@ function commitMove(){
   selection=null;
   render();
   if(isWon()){ onWin(); return; }
+  saveGame();
   runAutoplay();
 }
 
@@ -640,7 +674,7 @@ function autoFinish(){
       if(up||dn){ snapshot(); t.pop(); if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
     }
   }
-  if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); }
+  if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); else saveGame(); }
 }
 
 /* ---------- selection handling ---------- */
@@ -809,6 +843,7 @@ function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 /* ---------- win ---------- */
 function onWin(){
   stopTimer();
+  clearSavedGame();   // finished game — a reload should start fresh
   const secs = startTime?Math.floor((Date.now()-startTime)/1000):0;
   const prev = wins[seed];
   wins[seed] = prev
@@ -946,8 +981,12 @@ document.addEventListener("keydown",e=>{
   if(e.key==="n"||e.key==="N"){ deal(randomSeed()); }
 });
 
-/* first deal */
-deal(randomSeed());
+// Capture the latest board + elapsed before the tab is hidden or closed.
+window.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveGame(); });
+window.addEventListener("pagehide", saveGame);
+
+/* resume an in-progress game if one was saved, else deal fresh */
+if(!restoreGame()) deal(randomSeed());
 </script>
 </body>
 </html>

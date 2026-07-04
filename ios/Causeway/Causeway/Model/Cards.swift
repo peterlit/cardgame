@@ -12,7 +12,7 @@ enum Suit: Int, CaseIterable, Codable {
     }
 }
 
-struct Card: Identifiable, Equatable, Hashable {
+struct Card: Identifiable, Equatable, Hashable, Codable {
     let suit: Suit
     let rank: Int        // 1...13 (Ace = 1, King = 13)
 

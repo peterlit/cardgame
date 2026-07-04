@@ -28,11 +28,13 @@ are done or added.
   the same column could still trap); completes C1.
 - **O1** — removed the dead `INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad` key
   (inert under iPhone-only target).
+- **M2** — in-progress game now persists on both platforms. iOS saves the board to
+  UserDefaults (`causeway.game`) after every move and on `scenePhase` background, restores
+  on launch, clears on win; web mirrors it via `localStorage` (save on move + `pagehide`/
+  `visibilitychange`, restore on load, clear on win). Undo history is intentionally *not*
+  persisted (board only; cheap). Sanity-checks all 52 cards before restoring.
 
 ## Open — high value
-- **M2 — Persist the in-progress game.** No save of tableau/cells/foundations/seed/moves/
-  history; iOS eviction loses the game and even the deal number. Cheap: persist seed +
-  snapshots (+ `scenePhase` autosave). *(both platforms)*
 - **M3 — Tableau overflow / no scrolling (iOS).** Fixed 0.40 overlap in a non-scrolling
   VStack overflows on small screens / deep columns; cards become untappable. Add a
   ScrollView or compress overlap adaptively.

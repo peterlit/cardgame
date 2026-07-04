@@ -45,3 +45,5 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
 31. Act on the skeptical full-app review; create & maintain `prompts.md` and `BACKLOG.md`.
 32. Address the post-fix validation review (REVIEW-2): closed R1 (isSeqHead guard), O1
     (dead iPad key); logged O2 (WinStore schema versioning) to the backlog.
+33. M2 — persist the in-progress game so backgrounding/reload doesn't lose it (both
+    platforms; restore on launch, clear on win).

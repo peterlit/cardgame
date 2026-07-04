@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var game = Game()
     @Namespace private var ns
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showWins = false
     @State private var showDeal = false
@@ -33,6 +34,9 @@ struct ContentView: View {
                 if game.won { winOverlay }
             }
             .foregroundStyle(Theme.ink)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
         }
         .sheet(isPresented: $showWins) { WinsView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
