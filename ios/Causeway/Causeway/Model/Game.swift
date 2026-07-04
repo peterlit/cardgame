@@ -107,6 +107,9 @@ final class Game: ObservableObject {
 
     /// Cards idx..end form an alternating-colour run monotonic by 1 (ascending or descending).
     func isSeqHead(col: Int, idx: Int) -> Bool {
+        // A view can call this with a Spot captured at render time that auto-play has since
+        // invalidated (tap disambiguation races the 0.14 s autoplay tick) — guard the index.
+        guard col < tableau.count, idx < tableau[col].count else { return false }
         let t = tableau[col]
         if idx == t.count - 1 { return true }
         let a = t[idx], b = t[idx + 1]

@@ -23,6 +23,12 @@ are done or added.
 - **L8 (part)** — Wins "Play" disabled for out-of-range input.
 - **I8** — removed dead `SlotView.glyph`.
 
+### review-2 validation follow-ups (2026-07-04)
+- **R1** — `isSeqHead()` now bounds-guards `col`/`idx` (a tap racing an auto-play removal in
+  the same column could still trap); completes C1.
+- **O1** — removed the dead `INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad` key
+  (inert under iPhone-only target).
+
 ## Open — high value
 - **M2 — Persist the in-progress game.** No save of tableau/cells/foundations/seed/moves/
   history; iOS eviction loses the game and even the deal number. Cheap: persist seed +
@@ -54,6 +60,10 @@ are done or added.
   align, and reconcile with `ios/README.md`.
 - **L6 — No `deinit` timer invalidate; iPad multi-window hazard** (moot now that target is
   iPhone-only, but keep if iPad support returns).
+- **O2 — WinStore hardening is recovery, not prevention.** The `.unreadable` backup preserves
+  bytes but nothing reads it back, and `WinRecord` has no schema-version field — a future
+  non-optional field still routes every user's history to the backup key. Add a version field
+  and a load-time backup-restore attempt **before** any `WinRecord` schema change ships.
 - **I3 — Pile direction inferred from top two cards** including dealt coincidences — document
   precisely or make explicit.
 - **I6 — Whole board re-renders at 1 Hz** (elapsed tick invalidates ContentView incl.

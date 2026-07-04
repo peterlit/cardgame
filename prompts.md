@@ -43,3 +43,5 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
 30. How do I publish to the App Store? → drafted `store/` listing + privacy policy;
     warn users it's an early alpha (tested only on iPhone 13 Pro, portrait only).
 31. Act on the skeptical full-app review; create & maintain `prompts.md` and `BACKLOG.md`.
+32. Address the post-fix validation review (REVIEW-2): closed R1 (isSeqHead guard), O1
+    (dead iPad key); logged O2 (WinStore schema versioning) to the backlog.
