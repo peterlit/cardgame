@@ -1,0 +1,73 @@
+# Backlog
+
+Tracks outstanding work, seeded from the skeptical full-app review
+(`REVIEW-1-20260704`). IDs (C1/H1/M1/…) reference that report. Kept up to date as items
+are done or added.
+
+## Done (review-1 fix pass, 2026-07-04)
+- **C1** — stale `selection` crash: bounds-checked `selectedCards()`; clear selection in
+  auto-play/auto-finish (iOS).
+- **H1** — "safe" auto-play made genuinely sound for two-way tableau (require opposite-colour
+  rank-1 **and** rank+1 home); both platforms.
+- **H2** — auto-finish now plays each suit's closing card (XOR → OR); both platforms.
+- **H3 / L3** — undo-from-win restarts the timer; auto-finish starts the clock only if it
+  moved something (iOS).
+- **H4 / M1** — `WinStore.load()` no longer traps on duplicate Int keys and no longer
+  silently wipes unreadable history (backs it up); both concerns fixed (iOS).
+- **M4** — `Game` now forwards `winStore.objectWillChange` so Won/Wins UI can't go stale.
+- **M5** — web double-tap no longer performs the single-tap move + a second move (guard).
+- **M9** — app icon flattened to opaque RGB (no alpha); `ITSAppUsesNonExemptEncryption = NO`
+  set; target set to **iPhone-only** (`TARGETED_DEVICE_FAMILY = 1`).
+- **M10 / L1 / L9 / L10 / I2** — doc fixes: bundle ID, storage claim, layout section,
+  build-status, "unlimited undo", web-storage caveat, double-tap "best spot".
+- **L8 (part)** — Wins "Play" disabled for out-of-range input.
+- **I8** — removed dead `SlotView.glyph`.
+
+## Open — high value
+- **M2 — Persist the in-progress game.** No save of tableau/cells/foundations/seed/moves/
+  history; iOS eviction loses the game and even the deal number. Cheap: persist seed +
+  snapshots (+ `scenePhase` autosave). *(both platforms)*
+- **M3 — Tableau overflow / no scrolling (iOS).** Fixed 0.40 overlap in a non-scrolling
+  VStack overflows on small screens / deep columns; cards become untappable. Add a
+  ScrollView or compress overlap adaptively.
+- **M7 — Accessibility (iOS).** No VoiceOver labels/actions; Dynamic Type ignored
+  (all fixed `.system(size:)`, tap gestures not buttons).
+
+## Open — medium
+- **M6 — Single-tap latency (iOS).** `.onTapGesture(count: 2)` before `.onTapGesture`
+  delays every tap; consider a spatial/temporal disambiguation that keeps selection instant.
+- **M8 — Verify buildability from the committed project.** App builds/runs for the owner,
+  but `project.pbxproj` was hand-authored (no `productReference`); confirm a clean clone
+  opens & archives in Xcode 16.
+- **L2 — Web hotkeys fire while typing / under the win overlay** ("n" discards the game;
+  Cmd+Z reverts under the overlay). Guard on focus/overlay state.
+- **L5 — `record()` chimera bests.** `min(moves)`/`min(secs)` taken independently can store
+  a best that never happened in one playthrough; `date` rewritten on no improvement. Store
+  the best *playthrough*, not per-field minima. *(both platforms)*
+- **L7 — Foundation-flight animations render under other piles (iOS)** — `zIndex` scoped per
+  column ZStack; matched-geometry flights pass beneath siblings.
+- **L8 (rest)** — deal alert / win-overlay button row can overflow at narrow widths; use
+  `FlowLayout`; give invalid input feedback instead of a silent no-op.
+
+## Open — low / polish
+- **L4 — Win-time semantics differ** (iOS foreground `Timer` ticks vs web wall clock);
+  align, and reconcile with `ios/README.md`.
+- **L6 — No `deinit` timer invalidate; iPad multi-window hazard** (moot now that target is
+  iPhone-only, but keep if iPad support returns).
+- **I3 — Pile direction inferred from top two cards** including dealt coincidences — document
+  precisely or make explicit.
+- **I6 — Whole board re-renders at 1 Hz** (elapsed tick invalidates ContentView incl.
+  SummerBackground); isolate the clock into its own view/model.
+- **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
+  document.
+- **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
+  "winnable deals" mode and a "no more moves" indicator; soften "pure skill" if not.
+
+## Release checklist (App Store)
+- [ ] Enroll in the Apple Developer Program; create the App Store Connect record.
+- [ ] Confirm the app **name** is available; set final display name.
+- [ ] Host **Support URL** and **Privacy Policy URL** (`store/privacy-policy.md`).
+- [ ] Capture **portrait iPhone screenshots**.
+- [ ] Set **Version 1.0 / Build 1**; archive; upload; submit.
+- [ ] **Remove the committed `DEVELOPMENT_TEAM` (personal Team ID)** before making the repo
+      public (`ios/Causeway/Causeway.xcodeproj/project.pbxproj`).

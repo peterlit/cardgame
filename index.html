@@ -449,15 +449,14 @@ function isWon(){ return [0,1,2,3].every(suitDone); }
 const BLACK_SUITS=[0,3], RED_SUITS=[1,2];
 // is rank r of this suit already on a foundation (up or down)?
 function rankOnFound(suit,r){ if(r<=0) return true; return state.up[suit]>=r || state.down[suit]<=r; }
-// A card is "safe" to auto-send if no tableau card could still need it as a parking spot.
-// Standard FreeCell rule: aces/twos always safe; otherwise both opposite-color suits
-// must already have rank-1 on a foundation. (Direction can't be wrong: a card has only
-// one legal foundation until its suit's final card, where either choice completes it.)
+// A card is "safe" to auto-send only if no tableau card could still need it as a base.
+// Causeway's tableau builds BOTH directions, so an opposite-color rank-1 (descending) or
+// rank+1 (ascending) card could need this one as a base. Safe only once neither neighbour
+// (for both opposite-color suits) is still in play. Stricter than plain FreeCell but sound.
 function isSafeAutoplay(card){
   if(!(canFoundationUp(card)||canFoundationDown(card))) return false;
-  if(card.rank<=2) return true;
   const opp = card.color==="red" ? BLACK_SUITS : RED_SUITS;
-  return opp.every(x=>rankOnFound(x, card.rank-1));
+  return opp.every(x=>rankOnFound(x, card.rank-1) && rankOnFound(x, card.rank+1));
 }
 // Move one safe card (free cells first, then tableau tops). Returns true if one moved.
 function autoplayOneStep(){
@@ -573,10 +572,15 @@ function removeRun(src){
   if(src.kind==="cell") state.cells[src.idx]=null;
   else state.tableau[src.col].length = src.idx;   // drop idx..end
 }
+// A double-tap dispatches click,click,dblclick. If the first click completed a
+// tap-move (a live selection dropped onto this card), suppress the trailing
+// smartMove so one gesture can't perform two moves.
+let tapMovedAt = 0;
 /* Double-tap = smart move. Works on any card heading a valid run (the card and
    the sub-stack below it). Priority: foundation → onto another card → empty
    column → free cell. Foundation/free cell apply to single cards only. */
 function smartMove(src){
+  if(performance.now() - tapMovedAt < 350) return false;   // part of a tap-then-double gesture
   let run;
   if(src.kind==="cell"){ const c=state.cells[src.idx]; if(!c) return false; run=[c]; }
   else {
@@ -626,13 +630,14 @@ function autoFinish(){
     for(let i=0;i<NCELLS;i++){
       const c=state.cells[i]; if(!c) continue;
       const up=canFoundationUp(c), dn=canFoundationDown(c);
-      if(up!==dn){ snapshot(); state.cells[i]=null; if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
+      // OR, not XOR: a suit's closing card is legal on both ends and either completes it.
+      if(up||dn){ snapshot(); state.cells[i]=null; if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
     }
     for(let col=0;col<NCOLS;col++){
       const t=state.tableau[col]; if(!t.length) continue;
       const c=t[t.length-1];
       const up=canFoundationUp(c), dn=canFoundationDown(c);
-      if(up!==dn){ snapshot(); t.pop(); if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
+      if(up||dn){ snapshot(); t.pop(); if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
     }
   }
   if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); }
@@ -649,8 +654,8 @@ function handleCardTap(loc){
       selection=null; render(); return;
     }
     // tapping another tableau card = try to drop onto that column
-    if(loc.kind==="tableau"){ if(tryDestTableau(loc.col)) return; }
-    if(loc.kind==="cell"){ if(tryDestCell(loc.idx)) return; }
+    if(loc.kind==="tableau"){ if(tryDestTableau(loc.col)){ tapMovedAt=performance.now(); return; } }
+    if(loc.kind==="cell"){ if(tryDestCell(loc.idx)){ tapMovedAt=performance.now(); return; } }
     // otherwise reselect the tapped card (if selectable)
   }
   // make a new selection

@@ -50,7 +50,7 @@ struct WinsView: View {
                     .textFieldStyle(.roundedBorder)
                 Button("Play", action: playEntered)
                     .buttonStyle(.borderedProminent)
-                    .disabled(Int(dealText.trimmingCharacters(in: .whitespaces)) == nil)
+                    .disabled((Int(dealText.trimmingCharacters(in: .whitespaces)) ?? 0) < 1)
             }
         }
     }

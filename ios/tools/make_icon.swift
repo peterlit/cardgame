@@ -2,6 +2,8 @@
 // Usage: swift make_icon.swift <output.png>
 import AppKit
 import Foundation
+import ImageIO
+import CoreGraphics
 
 let size: CGFloat = 1024
 guard CommandLine.arguments.count > 1 else { fatalError("usage: make_icon.swift <out.png>") }
@@ -90,6 +92,17 @@ drawCard(cx: 640, cy: 506, rot: 11) {
 
 NSGraphicsContext.restoreGraphicsState()
 
-guard let data = rep.representation(using: .png, properties: [:]) else { fatalError("png") }
-try! data.write(to: outURL)
-print("wrote \(outURL.path) (\(data.count) bytes)")
+// Flatten to an OPAQUE PNG (no alpha channel) — App Store Connect rejects marketing
+// icons that carry an alpha channel. The drawn background already covers every pixel.
+guard let drawn = rep.cgImage else { fatalError("cgImage") }
+let cs = CGColorSpaceCreateDeviceRGB()
+guard let ctx2 = CGContext(data: nil, width: Int(size), height: Int(size),
+        bitsPerComponent: 8, bytesPerRow: 0, space: cs,
+        bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { fatalError("ctx") }
+ctx2.draw(drawn, in: CGRect(x: 0, y: 0, width: size, height: size))
+guard let opaque = ctx2.makeImage(),
+      let dest = CGImageDestinationCreateWithURL(outURL as CFURL, "public.png" as CFString, 1, nil)
+else { fatalError("dest") }
+CGImageDestinationAddImage(dest, opaque, nil)
+guard CGImageDestinationFinalize(dest) else { fatalError("finalize") }
+print("wrote \(outURL.path) (opaque)")

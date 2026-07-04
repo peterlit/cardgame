@@ -15,7 +15,8 @@ numbered deals.
 ## Play it
 
 - **Web:** open [`index.html`](index.html) in any browser (or serve the folder, e.g.
-  `python3 -m http.server`). Works offline; win history is saved in the browser.
+  `python3 -m http.server`). Works offline; win history is saved in the browser's local
+  storage (where the browser permits it — e.g. not in some private-browsing modes).
 - **iOS:** a native SwiftUI app lives in [`ios/`](ios/). Open
   `ios/Causeway/Causeway.xcodeproj` in Xcode 16+ and Run. See
   [`ios/README.md`](ios/README.md) for build details.
@@ -28,7 +29,8 @@ numbered deals.
   tidy run as a group if you have enough free cells / empty columns.
 - **Free cells:** 3 single-card parking spots.
 - **Controls:** tap a card then tap its destination; double-tap to auto-move a card
-  (or a valid run) to the best spot.
+  (or a valid run) to the first valid spot (foundation, then a matching column, then an
+  empty column, then a free cell).
 
 ## Layout
 

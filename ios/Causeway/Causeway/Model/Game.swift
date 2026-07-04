@@ -45,10 +45,16 @@ final class Game: ObservableObject {
     private var started = false
     private var timer: Timer?
     private var autoplaying = false
+    private var cancellables = Set<AnyCancellable>()
 
     var canUndo: Bool { !history.isEmpty }
 
     init() {
+        // WinStore is a nested ObservableObject; its changes don't propagate through the
+        // parent automatically, so forward them (keeps "Won"/checkmark/Wins in sync).
+        winStore.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
             autoplayOn = UserDefaults.standard.bool(forKey: "causeway.autoplay")
         }
@@ -180,13 +186,22 @@ final class Game: ObservableObject {
         moveCount = h.moveCount
         selection = nil
         won = false
+        // A win stops the clock; undoing back into play must resume it (else elapsed
+        // freezes and a later re-win would persist a bogus best time).
+        if started && timer == nil { startTimer() }
     }
 
     private func selectedCards() -> [Card] {
         guard let sel = selection else { return [] }
         switch sel {
-        case .cell(let i): return cells[i].map { [$0] } ?? []
-        case .tableau(let col, let idx): return Array(tableau[col][idx...])
+        case .cell(let i):
+            guard i < cells.count else { return [] }
+            return cells[i].map { [$0] } ?? []
+        case .tableau(let col, let idx):
+            // Defense in depth: a stale selection (e.g. after autoplay/auto-finish
+            // removed cards) must not index out of bounds.
+            guard col < tableau.count, idx < tableau[col].count else { return [] }
+            return Array(tableau[col][idx...])
         }
     }
 
@@ -322,24 +337,27 @@ final class Game: ObservableObject {
     }
     private func isSafeAutoplay(_ c: Card) -> Bool {
         guard canFoundationUp(c) || canFoundationDown(c) else { return false }
-        if c.rank <= 2 { return true }
         let opp = c.isRed ? [Suit.spade.rawValue, Suit.club.rawValue]
                           : [Suit.heart.rawValue, Suit.diamond.rawValue]
-        return opp.allSatisfy { rankOnFoundation($0, c.rank - 1) }
+        // Causeway's tableau builds BOTH directions, so an opposite-colour rank-1
+        // (descending) or rank+1 (ascending) card could still need `c` as a base.
+        // Only safe home once neither neighbour is still in play (ranks <1 / >13 are
+        // treated as already-resolved). This is stricter than plain FreeCell but sound.
+        return opp.allSatisfy { rankOnFoundation($0, c.rank - 1) && rankOnFoundation($0, c.rank + 1) }
     }
 
     @discardableResult
     private func autoplayOneStep() -> Bool {
         for i in 0..<Game.cellCount {
             if let c = cells[i], isSafeAutoplay(c) {
-                snapshot(); cells[i] = nil
+                snapshot(); selection = nil; cells[i] = nil
                 if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
                 moveCount += 1; return true
             }
         }
         for col in 0..<Game.colCount {
             guard let c = tableau[col].last, isSafeAutoplay(c) else { continue }
-            snapshot(); tableau[col].removeLast()
+            snapshot(); selection = nil; tableau[col].removeLast()
             if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
             moveCount += 1; return true
         }
@@ -368,26 +386,29 @@ final class Game: ObservableObject {
 
     /// Force every available card home (manual button).
     func autoFinish() {
-        var moved = true
+        selection = nil
+        var moved = true, any = false
         withAnimation(.easeOut(duration: 0.2)) {
             while moved {
                 moved = false
                 for i in 0..<Game.cellCount {
-                    if let c = cells[i], canFoundationUp(c) != canFoundationDown(c) {
+                    // OR, not XOR: a suit's closing card is legal on BOTH ends and
+                    // either completes it identically — XOR wrongly skipped it.
+                    if let c = cells[i], canFoundationUp(c) || canFoundationDown(c) {
                         snapshot(); cells[i] = nil
                         if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                        moveCount += 1; moved = true
+                        moveCount += 1; moved = true; any = true
                     }
                 }
                 for col in 0..<Game.colCount {
-                    guard let c = tableau[col].last, canFoundationUp(c) != canFoundationDown(c) else { continue }
+                    guard let c = tableau[col].last, canFoundationUp(c) || canFoundationDown(c) else { continue }
                     snapshot(); tableau[col].removeLast()
                     if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                    moveCount += 1; moved = true
+                    moveCount += 1; moved = true; any = true
                 }
             }
         }
-        if !started { started = true; startTimer() }
+        if any && !started { started = true; startTimer() }
         if checkWin() { onWin() }
     }
 

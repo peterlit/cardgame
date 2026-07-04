@@ -1,0 +1,45 @@
+# Prompts log
+
+A running, chronological log of the user requests that have shaped Causeway. Newest at
+the bottom. Kept up to date as new instructions come in (paraphrased, one line each).
+
+## Concept & web prototype
+1. Design a new card game I might like (I love MobilityWare FreeCell, like Castle;
+   dislike TriPeaks/Solitaire/Crown), implement it in the browser, iterate.
+2. Add MobilityWare-style auto-play.
+3. Add pictures to cards (they're hard to distinguish); use images for J/Q/K.
+4. Add the ability to build a tableau pile from the other end (two-way building).
+5. Double-tap: if no foundation, move onto another column, else empty column, else free
+   cell; default suggestion = next deal number.
+6. Don't start auto-play until the first move.
+7. Add deal-number entry + track/visualise ranges of deals won (like the reference), with
+   a drill-down to individual deals + stats.
+8. Fix: single-click sends card under the next one (z-index bug).
+9. Restyle to look like MobilityWare FreeCell (cream cards, muted palette).
+10. Deal button gave no input box; add per-suit tint.
+11. Fix: pip layout too close to value / 10s overlap; use figures for J/Q/K.
+12. Win popup: option to leave the board and not start a new game.
+13. Commit working-tree changes at the end of every task (standing instruction).
+
+## iOS app
+14. Turn the web prototype into an iOS app → chose a **native SwiftUI rewrite**.
+15. Fix toolbar overflow (Deal #/Wins hidden); add How-to-play.
+16. Review + fix security implications of running on my iPhone.
+17. Design an app icon; make it deploy-ready.
+18. Debug device-install signing errors (ad-hoc / stale scheme / launch resolution).
+19. "Low-res" display fix → added a launch-screen storyboard.
+20. Bigger card values; match rank height to suit; enlarge the centre pip.
+21. "10" should be tall & slender (condense, don't shrink).
+22. Fix Q descender clipped on stacked cards.
+23. Make the diamond the same width as the other suit icons.
+24. Original sun-&-summer background artwork.
+25. Fix: cloud obscures foundation slot watermarks.
+26. Add deal-number entry on the Wins screen.
+
+## Cross-platform + release
+27. Port all the iOS features/style/visuals back into the web prototype.
+28. Double-tap works on any card heading a valid run (both platforms).
+29. Add a root README.
+30. How do I publish to the App Store? → drafted `store/` listing + privacy policy;
+    warn users it's an early alpha (tested only on iPhone 13 Pro, portrait only).
+31. Act on the skeptical full-app review; create & maintain `prompts.md` and `BACKLOG.md`.

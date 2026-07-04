@@ -18,9 +18,10 @@ version (the `Mulberry32` RNG is ported verbatim).
 3. Press **Run** (⌘R).
 
 To run on your own iPhone: select the project → target **Causeway** → **Signing &
-Capabilities** → set your Apple ID team and a unique **Bundle Identifier**
-(currently `com.example.Causeway`). Free personal teams allow 7-day on-device signing;
-a paid Apple Developer account is only needed for TestFlight / the App Store.
+Capabilities** → set your Apple ID team and a unique **Bundle Identifier** (currently
+`com.whimsicaldistractions.Causeway` — change it to your own). Free personal teams allow
+7-day on-device signing; a paid Apple Developer account is only needed for TestFlight /
+the App Store. The target is **iPhone-only, portrait**.
 
 ## If the project won't open
 
@@ -40,7 +41,9 @@ chokes on it, create the project fresh instead:
 ```
 Causeway/Causeway/
   CausewayApp.swift        @main entry
-  Theme.swift              colours + background gradient
+  Theme.swift              colours + palette
+  LaunchScreen.storyboard  launch screen (native-resolution)
+  PrivacyInfo.xcprivacy    privacy manifest
   Model/
     Cards.swift            Suit, Card, Mulberry32 RNG (ported from web)
     Game.swift             engine + ObservableObject state (rules, autoplay, smart-move, undo)
@@ -48,8 +51,11 @@ Causeway/Causeway/
   Views/
     ContentView.swift      board, HUD, toolbar, win overlay, deal entry
     CardView.swift         card face + empty slot
-    WinsView.swift         range chips + drill-down detail
-  Assets.xcassets/         AppIcon (placeholder) + AccentColor
+    SummerBackground.swift original sun-&-summer background (vector)
+    WinsView.swift         deal-number entry, range chips + drill-down detail
+    Extras.swift           FlowLayout + How-to-play rules sheet
+  Assets.xcassets/         AppIcon (opaque 1024) + AccentColor
+tools/make_icon.swift      app-icon generator
 ```
 
 ## Privacy & security
@@ -61,16 +67,16 @@ Causeway is fully offline and self-contained:
 - **No permissions** — no camera, location, contacts, notifications, pasteboard, or
   device identifiers are requested.
 - **No third-party dependencies** — Apple frameworks only (no supply-chain surface).
-- **Storage** — only the win history (deal numbers, moves, times) in `UserDefaults`,
-  inside the app sandbox and encrypted at rest by iOS.
+- **Storage** — the win history (deal numbers, moves, times) and the auto-play preference
+  in `UserDefaults`, inside the app sandbox and encrypted at rest by iOS.
 - A **Privacy Manifest** (`Causeway/PrivacyInfo.xcprivacy`) declares no tracking, no
   data collection, and the required-reason for `UserDefaults` (CA92.1).
 
 ## Status / known follow-ups
 
-- Built and verified only by syntax parse here (no Xcode on this machine). On first
-  build, report any compiler errors and they'll be fixed.
-- App icon: a 1024px icon (two fanned cards, A♥/K♠ on misty teal) lives in
+- Builds and runs on device (iPhone 13 Pro, iOS 26). Broader device/orientation testing
+  is still pending — see the repo-root `BACKLOG.md`.
+- App icon: an opaque 1024px icon (two fanned cards, A♥/K♠ on teal) lives in
   `Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`. Regenerate it with
   `swift tools/make_icon.swift Causeway/Causeway/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
 - Court cards (J/Q/K) use SF Symbols (crown / person); could be replaced with custom

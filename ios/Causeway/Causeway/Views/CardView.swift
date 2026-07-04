@@ -87,7 +87,6 @@ struct CardView: View {
 /// Empty drop slot (free cell or foundation), with an optional faint glyph.
 struct SlotView: View {
     let width: CGFloat
-    var glyph: String? = nil
     var glyphSuit: Suit? = nil
 
     private var height: CGFloat { width * Theme.cardAspect }
@@ -101,16 +100,12 @@ struct SlotView: View {
             .frame(width: width, height: height)
     }
 
-    // Watermarks read on the light summer background (and over clouds):
-    // suit-coloured pips for foundations, soft ink for any text glyph.
+    // Foundation watermark: suit-coloured pip, readable on the light summer background.
     @ViewBuilder private var glyphView: some View {
         if let suit = glyphSuit {
             Image(systemName: suit.sfSymbol)
                 .font(.system(size: width * 0.4))
                 .foregroundStyle(Theme.suitColor(suit).opacity(0.4))
-        } else if let g = glyph {
-            Text(g).font(.system(size: width * 0.42, weight: .bold, design: .serif))
-                .foregroundStyle(Theme.ink.opacity(0.3))
         }
     }
 }

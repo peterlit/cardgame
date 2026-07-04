@@ -54,12 +54,17 @@ final class WinStore: ObservableObject {
     // MARK: persistence (UserDefaults — survives relaunch; safe if unavailable)
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let decoded = try? JSONDecoder().decode([String: WinRecord].self, from: data)
-        else { return }
-        wins = Dictionary(uniqueKeysWithValues: decoded.compactMap { k, v in
-            Int(k).map { ($0, v) }
-        })
+        guard let data = UserDefaults.standard.data(forKey: key) else { return }
+        guard let decoded = try? JSONDecoder().decode([String: WinRecord].self, from: data) else {
+            // Don't silently discard unreadable history: stash the raw blob so the next
+            // save() can't overwrite it, leaving a chance to recover it later.
+            UserDefaults.standard.set(data, forKey: key + ".unreadable")
+            return
+        }
+        // uniquingKeysWith (not uniqueKeysWithValues) so distinct JSON keys that map to
+        // the same Int (e.g. "1" and "01") merge instead of trapping — a launch crash-loop.
+        wins = Dictionary(decoded.compactMap { k, v in Int(k).map { ($0, v) } },
+                          uniquingKeysWith: { a, b in a.secs <= b.secs ? a : b })
     }
 
     private func save() {

@@ -52,7 +52,7 @@ FEATURES
 - Pure skill — every card is visible, no luck involved
 - Build each suit from both ends (dual foundations)
 - 3 free cells and two-way tableau building
-- Smart double-tap, unlimited undo, and safe auto-play
+- Smart double-tap, undo, and safe auto-play
 - Numbered deals (1-1,000,000) — replay or share any exact deal
 - Tracks the deals you've solved
 - Fully offline: no accounts, no ads, no data collected
@@ -89,8 +89,8 @@ https://<your-username>.github.io/causeway/privacy
 
 ## Export compliance
 - Uses no encryption beyond Apple's standard OS — answer **"No"** to the encryption
-  question. To skip the prompt on every upload, set
-  `ITSAppUsesNonExemptEncryption = NO` in the build settings.
+  question. `ITSAppUsesNonExemptEncryption = NO` is already set in the build settings, so
+  uploads won't prompt.
 
 ## Screenshots (required)
 Capture in **portrait** from the iPhone 13 Pro (or the 6.9" simulator) — required set is
@@ -107,7 +107,8 @@ no network, no data collection. Everything is playable from a fresh launch.
 ```
 
 ## Recommended before submitting (alpha)
-- Consider setting **device family to iPhone only** (`TARGETED_DEVICE_FAMILY = "1"`); it's
-  currently universal ("1,2") but untested on iPad, which can trigger review issues and
-  requires iPad screenshots.
-- Set a real **Version** (1.0) and **Build** (1).
+- **Device family is now iPhone-only** (`TARGETED_DEVICE_FAMILY = 1`) to match the tested
+  scope — no iPad screenshots needed.
+- Set a real **Version** (1.0) and **Build** (1) in the target before archiving.
+- The committed `DEVELOPMENT_TEAM` is a personal Team ID; remove it before making the repo
+  public (see BACKLOG.md).
