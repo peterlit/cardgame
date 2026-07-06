@@ -49,7 +49,26 @@ are done or added.
 - **F5** — privacy policy now names the in-progress board snapshot (on-device only, wiped on
   delete).
 
+### review-loop round 2 (2026-07-05)
+- **F6** — added a dependency-free Node test harness (`tests/`, `npm test` /
+  `node --test "tests/**/*.test.mjs"`) locking the shared engine: deal/RNG determinism
+  (golden orders per seed), `isSafeAutoplay` two-way-tableau soundness cases, and the
+  restore validator (accepts partial games; rejects duplicates / out-of-range suit+rank /
+  crossed foundations / completed boards / mis-shaped saves). `tests/engine.mjs` is a
+  hand-copy of `index.html`'s pure logic (the file:// app can't import a module); a
+  **drift guard** test reads `index.html` and fails if the canonical bodies diverge.
+  XCTest deferred — see below. Notes in `tests/README.md`.
+- **F3** — web restore `mark()` now range-checks `suit` in 0..3 (was rank-only); a tampered
+  `suit:9` save is now rejected, matching iOS (whose Codable enum already throws).
+- **F5** — privacy policy "Last updated" bumped to 2026-07-05.
+
 ## Open — high value
+- **F6 (iOS XCTest target).** The Node harness covers the *shared* engine logic by
+  construction (iOS runs the same deal/shuffle/safe-autoplay algorithm), but there is no
+  native XCTest target yet: adding one to the hand-authored `project.pbxproj` without Xcode
+  is error-prone and could break the build. Add an XCTest target in Xcode that asserts the
+  Swift engine reproduces the same golden deal orders (`tests/engine.test.mjs` GOLDEN) and
+  the same `isSafeAutoplay` cases, so both platforms are pinned to one contract. Ties to M8.
 - **M3 — Tableau overflow / no scrolling (iOS).** Fixed 0.40 overlap in a non-scrolling
   VStack overflows on small screens / deep columns; cards become untappable. Add a
   ScrollView or compress overlap adaptively.

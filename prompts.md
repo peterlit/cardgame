@@ -50,3 +50,7 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
 34. Review-loop round 1 — fixed the win-overlay "Close" persist desync (F1, iOS), web
     `isSeqHead` bounds guard (F2), canonical-deck restore validation (F3, both), resume
     autoplay after restore (F4, both), and privacy-policy in-progress-save disclosure (F5).
+35. Review-loop round 2 — added a dependency-free Node engine test harness (F6:
+    deal/RNG determinism, `isSafeAutoplay` soundness, restore validator, + a drift guard;
+    XCTest deferred to backlog), suit range-check in the web restore validator (F3), and
+    bumped the privacy-policy date (F5).

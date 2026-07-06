@@ -1,6 +1,6 @@
 # Privacy Policy — Causeway
 
-_Last updated: 2026-06-21_
+_Last updated: 2026-07-05_
 
 Causeway is a single-player solitaire game. Your privacy is simple to describe: the app
 **does not collect, store, transmit, or share any personal data.**

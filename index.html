@@ -406,6 +406,7 @@ function restoreGame(){
   // (all 52 home) is refused too: it isn't a resumable game.
   const seen = new Set();
   const mark = (suit,rank)=>{
+    if(!(suit>=0 && suit<=3)) return false;
     if(!(rank>=1 && rank<=13)) return false;
     const id = suit*13 + rank;
     if(seen.has(id)) return false;
