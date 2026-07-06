@@ -1,77 +1,58 @@
-# Review-loop final report — Causeway
+# Review-loop final report — Causeway (OOM fix)
 
-**Result: CONVERGED** (round 2 of a 5-round budget).
-**Stop reason:** 0 open blockers, 0 open majors, and no blockers/majors newly introduced
-this round. Two open **minors** remain (F6, F7) — carried to the backlog, not fixed.
+**Result: CONVERGED** (round 1 of a 5-round budget).
+**Stop reason:** 0 open blockers, 0 open majors, 0 open minors; nothing newly introduced left open.
 
-Rounds ran: cold seed → round 1 (implement+validate) → round 2 (implement+validate).
-Commits produced by the loop: `5c70d95` (round 1), `50a139b` (round 2).
-Start SHA: `770b422`.
+Scope: the on-device OOM fix (commit `06cb6f5`) plus its doc follow-up (`1ac06f9`).
+Start SHA: `06cb6f5`. (Prior converged loop archived at `.review-loop/REPORT-prev.md`.)
 
 ## Trend
 
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Net | Decision |
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
-| 1 | 0 | 1 | 2 | 0 | 6 | 0 | -6 | continue |
-| 2 | 0 | 0 | 2 | 2 | 1 | 0 | +1 | converged |
+| 1 | 0 | 0 | 0 | 0 | 2 | 0 | -2 | converged |
 
-## Findings by status
+## What the review established
 
-**Fixed & validated**
-- **F1 [blocker]** — iOS win-overlay "Close" desynced `won` from the board so `persist()`
-  could save a finished/empty board that restored as a broken un-won table. Fixed:
-  `dismissWin()` routes Close through the model; `persist()` guards `!won && !boardComplete`;
-  `restore()` refuses a completed board. All persist call sites verified to funnel through
-  the guard. (`5c70d95`)
-- **F2 [major]** — web `isSeqHead` lacked the iOS bounds guard (crash on a stale index during
-  the autoplay timer gap). Fixed: matching `col`/`idx` guard added; parity confirmed. (`5c70d95`)
-- **F4 [minor]** — restore didn't resume autoplay. Fixed: both platforms call `runAutoplay()`
-  after restore; guards prevent reentrancy. (`5c70d95`)
-- **F5 [minor]** — privacy policy "Last updated" date stale. Fixed: bumped to 2026-07-05. (`50a139b`)
-- **F3 [minor]** — web restore validator didn't range-check `suit`. Fixed for the reported
-  case (`suit:9` now rejected; iOS parity confirmed). Related integrality gap split to F7. (`50a139b`)
+**The OOM fix's core mechanism is correct — independently verified, not just claimed.**
+The reviewer built an isolated Combine test confirming that a plain (non-`@Published`) nested
+`ObservableObject` (`let clock`) does **not** forward its mutations to the parent's
+`objectWillChange`. So `game.clock.elapsed` ticking at 1 Hz genuinely no longer invalidates
+`ContentView`; only the small `ClockStat` (`@ObservedObject var clock`) re-renders. The
+`winOverlay` reading `game.clock.elapsed` in `body` does **not** re-subscribe ContentView (plain
+read, gated by the already-stopped clock behind `if game.won`). `SummerBackground.equatable()`
+is sound (the view has zero external inputs) and correctly shields its `.blur()` layers from
+re-rasterization on both the idle-clock path and per-move board updates. Timer lifecycle
+(start/stop/reset/restore/undo-from-win/win/auto-finish) is single-timer-safe; `[weak self]`
+present; `elapsed` persist/restore and won-`secs` recording intact. Full iOS `swiftc -typecheck`
+passes.
 
-**Open — minor (to backlog)**
-- **F6 [minor, was major]** — a real, passing Node test harness now exists (18 tests; golden
-  deal orders independently reproduced), which is genuine progress over "no tests." **But its
-  headline "drift guard" is ineffective**: it hardcodes canonical strings and checks them only
-  against `index.html`, never deriving them from the imported `tests/engine.mjs` functions. The
-  reviewer injected an *unsound* `isSafeAutoplay` change into `engine.mjs` and **all 18 tests
-  still passed** — the harness can silently diverge from the shipped engine. Also no
-  `isSafeAutoplay` test makes the two opposite-colour-suit checks disagree, so a sound-vs-unsound
-  rule is unobservable. iOS XCTest deferral is accepted/documented. Remediation: derive the
-  drift strings via `fn.toString()` (or diff `engine.mjs` against `index.html` programmatically),
-  and add an asymmetric `isSafeAutoplay` case.
-- **F7 [minor]** — restore validator checks range but not integrality: a forged save card with
-  `suit:1.5`/`rank:5.5` yields a non-colliding fractional id and is accepted (`isValidSave===true`
-  reproduced). Single-player, on-device self-corruption only — low impact. Fix: `Number.isInteger`
-  checks on suit and rank (both platforms).
+## Findings (all fixed)
+- **F1 [minor]** — `prompts.md` duplicate numbering introduced by the OOM commit → renumbered
+  monotonic, content preserved (verified by a numbers-stripped diff). (`1ac06f9`)
+- **F2 [minor, process]** — the fix's "Closes I6" was asserted from reasoning + type-check, not an
+  on-device trace → BACKLOG I6 retitled "FIX LANDED, on-device trace pending", verified-vs-unverified
+  separated, and a concrete `I6-verify` task added. Fix code left intact. (`1ac06f9`)
 
-**Disputed (agree-to-disagree):** none. (F6/F7 are open with clear remediation paths, not impasses.)
+**Disputed (agree-to-disagree):** none.
 
-## HUMAN SKIM LIST — read these, the loop can't fully self-check
+## HUMAN SKIM LIST — read these, the loop can't self-check
 
-The loop used two same-family agents; the highest risk is them agreeing on a wrong fix. Look here:
-
-1. **`tests/engine.mjs` (`50a139b`) — highest-priority human read.** It's a *hand-copied duplicate*
-   of the web engine that every test imports, and its own drift guard was **proven not to catch it
-   diverging from `index.html`** (F6). Tests here can be green while the shipped engine is broken.
-   Verify `engine.mjs`'s `isSafeAutoplay`/`deal`/`isValidSave` match `index.html` line-for-line, and
-   decide whether to replace the copy with real extraction.
-2. **`ios/Causeway/Causeway/Model/Game.swift` `restore()`/`persist()` (`5c70d95`) — largest core-logic
-   change.** The canonical-card restore validator + `boardComplete` persist guard + resume-autoplay
-   decide whether a saved game loads or is *silently discarded*. A false-negative throws away a real
-   in-progress game with no user signal. Confirm the validator accepts every legitimately-reachable
-   partial board (esp. foundation encoding parity with how the app writes `up`/`down`).
-3. **`index.html` restore/`isSeqHead`/suit-guard (`5c70d95`, `50a139b`).** Parity-critical engine
-   logic; both remaining open minors (F6 harness fidelity, F7 integrality) live here.
-4. **`ios/Causeway/Causeway/Views/ContentView.swift` Close→`dismissWin()` (`5c70d95`).** The F1
-   blocker fix hinges on Close routing through the model plus the persist guard — confirm no other
-   view path can flip `won` and re-persist a finished board.
-
-Not machine-verified this loop (environment lacks Xcode): a clean-clone Xcode build/archive (BACKLOG
-M8). All Swift was `swiftc -parse`-checked only; the iOS engine has no XCTest coverage yet (BACKLOG).
+1. **The whole OOM fix — `ios/.../Model/GameClock.swift`, `Model/Game.swift` clock rewiring,
+   `Views/ContentView.swift` `ClockStat`, `Views/SummerBackground.swift` `.equatable()`
+   (commit `06cb6f5`).** This is the substantive change. The reviewer verified the *mechanism* is
+   correct, but **the fix is NOT yet confirmed on the device** — no Instruments/Allocations trace
+   shows RSS actually plateaus over a long idle session.
+2. **⚠️ Run the `I6-verify` task before trusting the OOM is gone.** Deploy commit `06cb6f5+`,
+   leave the app **idle for 15+ minutes on the iPhone 13 Pro** under Instruments → Allocations (or
+   watch the debug memory gauge), and confirm memory is flat, not climbing. If it still climbs, the
+   next suspect is `matchedGeometryEffect` retention on move/autoplay-driven renders — re-open I6.
+   This is the one thing a code review (and this loop) fundamentally cannot verify; it needs the device.
+3. **` contentView.body` clock read** — sanity-check on device that the "Time" display still ticks
+   live and the win screen shows the correct final time (the clock was moved out of `Game`'s
+   published state).
 
 ## Verdict
-Converged: the blocker and both majors from the cold review are fixed and validated with no
-regressions introduced. Two minor, well-characterized gaps remain and are logged for follow-up.
+Converged: no blockers/majors/minors open. The OOM fix is architecturally sound and mechanically
+verified; its real-world efficacy is pending a single on-device memory-profiling pass (tracked as
+`I6-verify` in BACKLOG.md). No regressions found.

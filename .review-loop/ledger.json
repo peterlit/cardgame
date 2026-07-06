@@ -1,30 +1,25 @@
 {
-  "round": 2,
-  "round_start_sha": "5c70d959e1103b6979b21a8b720effb6dd10b6d2",
+  "round": 1,
+  "round_start_sha": "06cb6f551e96471f112efe2ae6ddd48f3d80c40d",
   "max_rounds": 5,
   "findings": [
-    { "id": "F1", "severity": "blocker", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "ios Game.swift/ContentView.swift (win Close persist desync)",
-      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
-    { "id": "F2", "severity": "major", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "index.html isSeqHead bounds",
-      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
-    { "id": "F4", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "restore resume-autoplay both platforms",
-      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
-    { "id": "F5", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "store/privacy-policy.md:3",
-      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"open"}, {"round":2,"status":"fixed","note":"Last-updated bumped to 2026-07-05; confirmed"} ] },
-    { "id": "F3", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "index.html:408-414 restoreGame mark()",
-      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"open"}, {"round":2,"status":"fixed","note":"suit 0..3 guard added, rejects suit:9; iOS parity confirmed (Codable enum decode throws on bad raw value). Reported case closed; related integrality hole tracked as F7."} ] },
-    { "id": "F6", "severity": "minor", "current_status": "open", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "tests/engine.mjs, tests/engine.test.mjs",
-      "detail": "Node harness (18 tests) added; downgraded major->minor (real passing suite, golden deals independently reproduced, not 'no tests'). Residual: the 'drift guard' hardcodes canonical strings checked only vs index.html, never derived from the imported engine.mjs functions, so engine.mjs diverging from the app goes undetected (reviewer injected an unsound isSafeAutoplay change into engine.mjs and all 18 tests still passed). Also no isSafeAutoplay test sets the two opposite-color-suit checks in disagreement, so every-vs-some is unobservable. iOS XCTest deferral accepted/documented.",
-      "status_history": [ {"round":1,"status":"open","note":"no automated tests"}, {"round":2,"status":"open","note":"downgraded to minor; harness real but drift guard ineffective and isSafeAutoplay coverage gap. Remediation: derive drift strings via fn.toString(); add an asymmetric isSafeAutoplay case."} ] },
-    { "id": "F7", "severity": "minor", "current_status": "open", "first_seen_round": 2, "introduced_by_fix": false,
-      "location": "index.html:408-414 mark(); tests/engine.mjs mark()",
-      "detail": "restore validator range-checks suit/rank but not integrality: a forged card with suit:1.5 (or rank:5.5) yields a non-colliding fractional id and is ACCEPTED (reproduced isValidSave===true). Low severity: single-player on-device self-corruption only. Fix: Number.isInteger checks on both suit and rank (both platforms; iOS Int field likely already rejects fractional JSON, not fully re-verified).",
-      "status_history": [ {"round":2,"status":"open","note":"found validating F3"} ] }
+    {
+      "id": "F1", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": true,
+      "location": "prompts.md",
+      "detail": "OOM-fix commit introduced duplicate numbering (33,34,35,34,35).",
+      "status_history": [
+        { "round": 1, "status": "open", "note": "seeded" },
+        { "round": 1, "status": "fixed", "note": "renumbered monotonic 33-37; content-only diff shows sole change is OOM entry reordered to end (chronological); no text altered" }
+      ]
+    },
+    {
+      "id": "F2", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "BACKLOG.md I6 + commit 06cb6f5 message",
+      "detail": "OOM fix asserted 'Closes I6' from reasoning + type-check but no on-device memory trace.",
+      "status_history": [
+        { "round": 1, "status": "open", "note": "seeded" },
+        { "round": 1, "status": "fixed", "note": "I6 retitled 'FIX LANDED, on-device trace pending'; verified vs unverified separated; concrete I6-verify task added; fix code untouched (diff is docs-only). Honest-docs remedy as intended." }
+      ]
+    }
   ]
 }
