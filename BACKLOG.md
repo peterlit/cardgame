@@ -25,7 +25,8 @@ are done or added.
 
 ### review-2 validation follow-ups (2026-07-04)
 - **R1** — `isSeqHead()` now bounds-guards `col`/`idx` (a tap racing an auto-play removal in
-  the same column could still trap); completes C1.
+  the same column could still trap); completes C1. **Both platforms** (the web guard was added
+  in review-loop round 1 — F2).
 - **O1** — removed the dead `INFOPLIST_KEY_UISupportedInterfaceOrientations~ipad` key
   (inert under iPhone-only target).
 - **M2** — in-progress game now persists on both platforms. iOS saves the board to
@@ -33,6 +34,20 @@ are done or added.
   on launch, clears on win; web mirrors it via `localStorage` (save on move + `pagehide`/
   `visibilitychange`, restore on load, clear on win). Undo history is intentionally *not*
   persisted (board only; cheap). Sanity-checks all 52 cards before restoring.
+
+### review-loop round 1 (2026-07-05)
+- **F1** — win overlay "Close" no longer desyncs `won` from a solved board on iOS. Close
+  routes through `Game.dismissWin()`, and `persist()` now refuses a completed board
+  (`boardComplete`), so backgrounding after Close can't resurrect an empty, un-won table.
+  (Web was already safe: `saveGame()` guards `isWon()` and Close only hides the overlay.)
+- **F2** — web `isSeqHead()` now bounds-guards `col`/`idx` (parity with iOS R1).
+- **F3** — restore sanity check strengthened on **both platforms**: verifies the 52 canonical
+  cards each appear exactly once (board + foundation-implied), foundations in range and
+  non-crossing (up<down), and refuses a fully-completed board. Was count-only.
+- **F4** — `restore()`/`restoreGame()` now call `runAutoplay()` after a successful restore so
+  a board saved mid-autoplay-chain finishes its safe sends (no-op unless autoplay on & started).
+- **F5** — privacy policy now names the in-progress board snapshot (on-device only, wiped on
+  delete).
 
 ## Open — high value
 - **M3 — Tableau overflow / no scrolling (iOS).** Fixed 0.40 overlap in a non-scrolling

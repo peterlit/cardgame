@@ -199,7 +199,7 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     pill("Play deal #\(game.nextSeed)", primary: true) { withAnimation { game.deal(seed: game.nextSeed) } }
                     pill("Random") { withAnimation { game.newRandomGame() } }
-                    pill("Close") { game.won = false }
+                    pill("Close") { game.dismissWin() }
                 }
             }
             .padding(24)

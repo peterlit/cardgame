@@ -11,9 +11,11 @@ analytics, advertising, or tracking of any kind, and it does not access your con
 location, photos, camera, microphone, or device identifiers.
 
 ## Data stored on your device
-The app saves a small amount of game data **locally on your device only** — your settings
-and the list of deal numbers you've solved. This information never leaves your device and
-is removed if you delete the app.
+The app saves a small amount of game data **locally on your device only** — your settings,
+the list of deal numbers you've solved, and a snapshot of your current in-progress game (the
+board layout, free cells, foundations, move count, and elapsed time) so you can resume after
+closing the app. This information never leaves your device and is removed if you delete the
+app.
 
 ## Children
 The app is suitable for all ages and collects no data, so it poses no privacy risk to

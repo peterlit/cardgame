@@ -114,7 +114,10 @@ final class Game: ObservableObject {
     /// Snapshot the live (unfinished) game to UserDefaults. Cheap: board only, no undo
     /// history. Called after every move and on backgrounding.
     func persist() {
-        guard !won else { return }
+        // Refuse to save a finished board. `won` is a view-mutable flag (the win overlay's
+        // "Close" clears it), so guard on the actual position too: a completed table must
+        // never be written, else restore() would resurrect an empty, un-won game.
+        guard !won, !boardComplete else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
                           moveCount: moveCount, elapsed: elapsed, started: started)
         if let data = try? JSONEncoder().encode(s) {
@@ -129,17 +132,37 @@ final class Game: ObservableObject {
               let s = try? JSONDecoder().decode(SavedGame.self, from: data),
               s.tableau.count == Game.colCount, s.cells.count == Game.cellCount,
               s.up.count == 4, s.down.count == 4 else { return false }
-        // Sanity: every card must be accounted for exactly once.
-        let inTableau = s.tableau.reduce(0) { $0 + $1.count }
-        let inCells = s.cells.compactMap { $0 }.count
-        let onFoundations = (0..<4).reduce(0) { $0 + s.up[$1] + max(0, 14 - s.down[$1]) }
-        guard inTableau + inCells + onFoundations == 52 else { return false }
+        // Sanity: reject a corrupt/impossible save. Foundations must be in range and
+        // non-crossing (up < down per suit), and the 52 canonical cards — those still in the
+        // tableau/cells plus those implied as home by the foundation ranks — must each appear
+        // exactly once. A completed board (all 52 home) is refused too: it isn't a resumable
+        // game, and letting it through would restore an empty, un-won table.
+        for st in 0..<4 {
+            guard s.up[st] >= 0, s.up[st] <= 13, s.down[st] >= 1, s.down[st] <= 14,
+                  s.up[st] < s.down[st] else { return false }
+        }
+        var seen = Set<Int>()   // card id = suit*13 + rank
+        func mark(suit: Int, rank: Int) -> Bool {
+            guard rank >= 1, rank <= 13 else { return false }
+            return seen.insert(suit * 13 + rank).inserted
+        }
+        for col in s.tableau { for c in col { guard mark(suit: c.suit.rawValue, rank: c.rank) else { return false } } }
+        for c in s.cells.compactMap({ $0 }) { guard mark(suit: c.suit.rawValue, rank: c.rank) else { return false } }
+        for st in 0..<4 {
+            if s.up[st] >= 1 { for r in 1...s.up[st] where !mark(suit: st, rank: r) { return false } }
+            if s.down[st] <= 13 { for r in s.down[st]...13 where !mark(suit: st, rank: r) { return false } }
+        }
+        guard seen.count == 52, !Game.boardComplete(tableau: s.tableau, cells: s.cells) else { return false }
 
         seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
         moveCount = s.moveCount; elapsed = s.elapsed; started = s.started
         selection = nil; history = []; won = false; autoplaying = false
         stopTimer()
         if started { startTimer() }
+        // A kill mid-autoplay-chain can save a board with more safe cards still to send.
+        // runAutoplay() is a no-op unless started && autoplayOn, and only sends provably
+        // safe cards, so this is safe to call unconditionally here.
+        runAutoplay()
         return true
     }
 
@@ -214,6 +237,18 @@ final class Game: ObservableObject {
     }
 
     private func checkWin() -> Bool { (0..<4).allSatisfy { down[$0] == up[$0] + 1 } }
+
+    /// All 52 cards are home (nothing left in tableau or cells). A completed board must
+    /// never be persisted/restored, whatever the `won` flag currently says.
+    private static func boardComplete(tableau: [[Card]], cells: [Card?]) -> Bool {
+        tableau.allSatisfy { $0.isEmpty } && cells.allSatisfy { $0 == nil }
+    }
+    private var boardComplete: Bool { Game.boardComplete(tableau: tableau, cells: cells) }
+
+    /// Dismiss the win overlay through the model. The finished game was already cleared from
+    /// storage by onWin(); we just drop the banner and leave the solved board on screen.
+    /// Persisting stays blocked by `boardComplete` so backgrounding can't resurrect it.
+    func dismissWin() { won = false }
 
     // MARK: - Move plumbing
 

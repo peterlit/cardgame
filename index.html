@@ -398,11 +398,32 @@ function restoreGame(){
   const raw = lsGet("causeway.game"); if(!raw) return false;
   let g; try{ g=JSON.parse(raw); }catch(e){ return false; }
   if(!g || !Array.isArray(g.tableau) || g.tableau.length!==NCOLS ||
-     !Array.isArray(g.cells) || g.cells.length!==NCELLS) return false;
-  const inTab = g.tableau.reduce((n,c)=>n+c.length,0);
-  const inCells = g.cells.filter(Boolean).length;
-  const onFound = g.up.reduce((n,u)=>n+u,0) + g.down.reduce((n,d)=>n+Math.max(0,14-d),0);
-  if(inTab+inCells+onFound !== 52) return false;   // sanity: every card accounted for
+     !Array.isArray(g.cells) || g.cells.length!==NCELLS ||
+     !Array.isArray(g.up) || g.up.length!==4 || !Array.isArray(g.down) || g.down.length!==4) return false;
+  // Sanity: reject a corrupt/impossible save. Foundations in range and non-crossing
+  // (up<down per suit), and the 52 canonical cards — those still on the board plus those
+  // implied home by the foundation ranks — must each appear exactly once. A completed board
+  // (all 52 home) is refused too: it isn't a resumable game.
+  const seen = new Set();
+  const mark = (suit,rank)=>{
+    if(!(rank>=1 && rank<=13)) return false;
+    const id = suit*13 + rank;
+    if(seen.has(id)) return false;
+    seen.add(id); return true;
+  };
+  for(let s=0;s<4;s++){
+    const u=g.up[s], d=g.down[s];
+    if(!(u>=0 && u<=13 && d>=1 && d<=14 && u<d)) return false;
+  }
+  for(const col of g.tableau){ if(!Array.isArray(col)) return false;
+    for(const c of col){ if(!c || !mark(c.suit,c.rank)) return false; } }
+  for(const c of g.cells){ if(c && !mark(c.suit,c.rank)) return false; }
+  for(let s=0;s<4;s++){
+    for(let r=1;r<=g.up[s];r++) if(!mark(s,r)) return false;
+    for(let r=g.down[s];r<=13;r++) if(!mark(s,r)) return false;
+  }
+  const boardEmpty = g.tableau.every(c=>c.length===0) && g.cells.every(c=>c===null);
+  if(seen.size!==52 || boardEmpty) return false;
   seed = g.seed>>>0;
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
@@ -411,13 +432,20 @@ function restoreGame(){
   if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
   setMoves(moveCount); setTime(es);
   refreshHud(); render(false);
+  // A kill mid-autoplay-chain can leave more safe cards to send; runAutoplay() no-ops
+  // unless autoplay is on and the clock has started, and only sends provably safe cards.
+  runAutoplay();
   return true;
 }
 
 /* ---------- rules ---------- */
 // A movable run is alternating-color and monotonic by 1 — either descending OR ascending.
 function isSeqHead(col, idx){
+  // A tap can carry a {col,idx} captured before an auto-play removal in the same column
+  // during the setTimeout gap — guard the index so a stale target can't throw.
+  if(col<0 || col>=state.tableau.length) return false;
   const t = state.tableau[col];
+  if(idx<0 || idx>=t.length) return false;
   if(idx===t.length-1) return true;            // a single top card is always movable
   const a=t[idx], b=t[idx+1];
   if(a.color===b.color) return false;
