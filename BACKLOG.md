@@ -102,13 +102,20 @@ are done or added.
   and a load-time backup-restore attempt **before** any `WinRecord` schema change ships.
 - **I3 — Pile direction inferred from top two cards** including dealt coincidences — document
   precisely or make explicit.
-- **I6 — DONE (fixes an on-device OOM).** `elapsed` was `@Published` on `Game`, so the 1 Hz
-  timer re-rendered the entire `ContentView` — including `SummerBackground`'s `.blur()` layers
-  and 52 cards' `matchedGeometryEffect` — every second even while idle, growing memory until the
-  OS killed the app (~14 min). Isolated the clock into `GameClock` (only a small `ClockStat`
-  label observes it) and marked `SummerBackground` `Equatable` + `.equatable()` so its blur
-  scene isn't re-rasterized on unrelated state changes. Also gives `GameClock` a `deinit`
-  timer-invalidate (partially addresses L6).
+- **I6 — FIX LANDED, on-device trace pending (targets an on-device OOM).** `elapsed` was
+  `@Published` on `Game`, so the 1 Hz timer re-rendered the entire `ContentView` — including
+  `SummerBackground`'s `.blur()` layers and 52 cards' `matchedGeometryEffect` — every second
+  even while idle, the suspected cause of memory growing until the OS killed the app (~14 min).
+  Isolated the clock into `GameClock` (only a small `ClockStat` label observes it) and marked
+  `SummerBackground` `Equatable` + `.equatable()` so its blur scene isn't re-rasterized on
+  unrelated state changes. Also gives `GameClock` a `deinit` timer-invalidate (partially
+  addresses L6). **Verified: code-level SwiftUI/Combine reasoning + full iOS type-check
+  (`xcrun swiftc -typecheck`). NOT yet verified: an on-device Instruments/Allocations trace
+  showing RSS actually plateaus.** See the verification task below before marking I6 DONE.
+- **I6-verify — Confirm the OOM fix on device.** Profile RSS with Instruments (Allocations) over
+  a 15+ min idle session on a physical device to confirm memory plateaus and the OOM is gone.
+  Keep the clock-isolation (`GameClock`) + `SummerBackground.equatable` changes regardless; this
+  task only validates the effect. If RSS still climbs, the leak has another source — re-open I6.
 - **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
   document.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
