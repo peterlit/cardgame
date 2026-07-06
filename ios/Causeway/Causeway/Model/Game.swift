@@ -33,8 +33,10 @@ final class Game: ObservableObject {
     @Published var selection: Spot?
     @Published var seed = 0
     @Published var moveCount = 0
-    @Published var elapsed = 0
     @Published var won = false
+
+    /// Elapsed clock, isolated so its 1 Hz tick doesn't re-render the board (see GameClock).
+    let clock = GameClock()
     @Published var autoplayOn = true {
         didSet { UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay"); if autoplayOn { runAutoplay() } }
     }
@@ -43,7 +45,6 @@ final class Game: ObservableObject {
 
     private var history: [Snapshot] = []
     private var started = false
-    private var timer: Timer?
     private var autoplaying = false
     private var cancellables = Set<AnyCancellable>()
 
@@ -86,10 +87,9 @@ final class Game: ObservableObject {
         selection = nil
         history = []
         moveCount = 0
-        elapsed = 0
+        clock.reset()
         won = false
         started = false
-        stopTimer()
         autoplaying = false
         persist()
     }
@@ -119,7 +119,7 @@ final class Game: ObservableObject {
         // never be written, else restore() would resurrect an empty, un-won game.
         guard !won, !boardComplete else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
-                          moveCount: moveCount, elapsed: elapsed, started: started)
+                          moveCount: moveCount, elapsed: clock.elapsed, started: started)
         if let data = try? JSONEncoder().encode(s) {
             UserDefaults.standard.set(data, forKey: gameKey)
         }
@@ -155,7 +155,7 @@ final class Game: ObservableObject {
         guard seen.count == 52, !Game.boardComplete(tableau: s.tableau, cells: s.cells) else { return false }
 
         seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
-        moveCount = s.moveCount; elapsed = s.elapsed; started = s.started
+        moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
         stopTimer()
         if started { startTimer() }
@@ -275,7 +275,7 @@ final class Game: ObservableObject {
         won = false
         // A win stops the clock; undoing back into play must resume it (else elapsed
         // freezes and a later re-win would persist a bogus best time).
-        if started && timer == nil { startTimer() }
+        if started && !clock.isRunning { startTimer() }
         persist()
     }
 
@@ -506,17 +506,12 @@ final class Game: ObservableObject {
         stopTimer()
         autoplaying = false
         clearSaved()   // finished game — next launch should start fresh
-        winStore.record(seed: seed, moves: moveCount, secs: elapsed)
+        winStore.record(seed: seed, moves: moveCount, secs: clock.elapsed)
         won = true
     }
 
-    private func startTimer() {
-        stopTimer()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            self?.elapsed += 1
-        }
-    }
-    private func stopTimer() { timer?.invalidate(); timer = nil }
+    private func startTimer() { clock.start() }
+    private func stopTimer() { clock.stop() }
 
     // helpers for views
     func isSelected(_ spot: Spot) -> Bool {

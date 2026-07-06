@@ -3,7 +3,11 @@ import SwiftUI
 /// Original "sun & summer" background: warm sky, radiating sun, soft clouds,
 /// a calm sea and sandy beach with a little sailboat. Drawn as vectors so it
 /// stays crisp at any resolution. Kept calm in the upper half where cards sit.
-struct SummerBackground: View {
+struct SummerBackground: View, Equatable {
+    // Takes no inputs and never changes — `.equatable()` lets SwiftUI skip re-evaluating
+    // (and re-rasterizing the .blur layers of) this scene on every unrelated state change.
+    static func == (_: SummerBackground, _: SummerBackground) -> Bool { true }
+
     // Pinwheel sun rays (alternating warm wedges and gaps).
     private static let rayStops: [Gradient.Stop] = {
         var s: [Gradient.Stop] = []

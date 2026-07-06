@@ -102,8 +102,13 @@ are done or added.
   and a load-time backup-restore attempt **before** any `WinRecord` schema change ships.
 - **I3 — Pile direction inferred from top two cards** including dealt coincidences — document
   precisely or make explicit.
-- **I6 — Whole board re-renders at 1 Hz** (elapsed tick invalidates ContentView incl.
-  SummerBackground); isolate the clock into its own view/model.
+- **I6 — DONE (fixes an on-device OOM).** `elapsed` was `@Published` on `Game`, so the 1 Hz
+  timer re-rendered the entire `ContentView` — including `SummerBackground`'s `.blur()` layers
+  and 52 cards' `matchedGeometryEffect` — every second even while idle, growing memory until the
+  OS killed the app (~14 min). Isolated the clock into `GameClock` (only a small `ClockStat`
+  label observes it) and marked `SummerBackground` `Equatable` + `.equatable()` so its blur
+  scene isn't re-rasterized on unrelated state changes. Also gives `GameClock` a `deinit`
+  timer-invalidate (partially addresses L6).
 - **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
   document.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed

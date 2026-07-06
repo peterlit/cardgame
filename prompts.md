@@ -47,6 +47,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (dead iPad key); logged O2 (WinStore schema versioning) to the backlog.
 33. M2 — persist the in-progress game so backgrounding/reload doesn't lose it (both
     platforms; restore on launch, clear on win).
+34. Run the adversarial review loop (skeptical-reviewer <-> implementer) to convergence.
+35. Fix an on-device OOM: isolate the 1 Hz clock (GameClock) and make SummerBackground
+    equatable so the blurred scene isn't re-rasterized every second (I6). Then re-run the loop.
 34. Review-loop round 1 — fixed the win-overlay "Close" persist desync (F1, iOS), web
     `isSeqHead` bounds guard (F2), canonical-deck restore validation (F3, both), resume
     autoplay after restore (F4, both), and privacy-policy in-progress-save disclosure (F5).

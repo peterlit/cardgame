@@ -19,7 +19,7 @@ struct ContentView: View {
             let overlap = (cardW * Theme.cardAspect * 0.40).rounded()
 
             ZStack {
-                SummerBackground()
+                SummerBackground().equatable()   // never changes; skip re-rasterizing its blur layers
 
                 VStack(alignment: .leading, spacing: 12) {
                     header
@@ -60,8 +60,8 @@ struct ContentView: View {
             }
             Spacer()
             stat("Moves", "\(game.moveCount)")
-            stat("Time", DealFormat.time(game.elapsed))
-            stat("Won", "\(game.winStore.count)")
+            ClockStat(clock: game.clock)   // observes only the clock, so its 1 Hz tick
+            stat("Won", "\(game.winStore.count)")   // doesn't re-render the board
         }
     }
     private func stat(_ label: String, _ value: String) -> some View {
@@ -194,7 +194,7 @@ struct ContentView: View {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 14) {
                 Text("You solved it! 🎉").font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
-                Text("Deal #\(game.seed) · \(game.moveCount) moves · \(DealFormat.time(game.elapsed))")
+                Text("Deal #\(game.seed) · \(game.moveCount) moves · \(DealFormat.time(game.clock.elapsed))")
                     .font(.system(size: 14)).multilineTextAlignment(.center).foregroundStyle(.white)
                 HStack(spacing: 8) {
                     pill("Play deal #\(game.nextSeed)", primary: true) { withAnimation { game.deal(seed: game.nextSeed) } }
@@ -205,6 +205,18 @@ struct ContentView: View {
             .padding(24)
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0x2C3B3A)))
             .padding(28)
+        }
+    }
+}
+
+/// Time readout that observes only the isolated clock, so its per-second update
+/// invalidates just this label instead of the whole board.
+private struct ClockStat: View {
+    @ObservedObject var clock: GameClock
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("Time").font(.system(size: 12)).opacity(0.8)
+            Text(DealFormat.time(clock.elapsed)).font(.system(size: 18, weight: .bold, design: .serif))
         }
     }
 }
