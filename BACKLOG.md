@@ -109,6 +109,17 @@ are done or added.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
   "winnable deals" mode and a "no more moves" indicator; soften "pure skill" if not.
 
+### review-loop residuals (converged round 2; open minors)
+- **F6b — Node test harness can silently diverge from the app.** `tests/engine.mjs` is a
+  hand-copy of `index.html`'s engine, and the "drift guard" checks hardcoded strings against
+  `index.html` only — it never verifies `engine.mjs` still matches (an unsound `isSafeAutoplay`
+  change to `engine.mjs` passed all 18 tests). Derive the guard's strings via `fn.toString()`
+  (or diff `engine.mjs` vs `index.html` programmatically), and add an `isSafeAutoplay` test
+  where the two opposite-colour suits disagree so sound-vs-unsound is observable.
+- **F7 — Restore validator accepts non-integer suit/rank.** `mark()` range-checks but not
+  integrality; a forged `suit:1.5`/`rank:5.5` card yields a non-colliding fractional id and is
+  accepted. Add `Number.isInteger` checks (both platforms). Single-player self-corruption only.
+
 ## Release checklist (App Store)
 - [ ] Enroll in the Apple Developer Program; create the App Store Connect record.
 - [ ] Confirm the app **name** is available; set final display name.

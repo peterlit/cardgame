@@ -1,52 +1,30 @@
 {
-  "round": 1,
-  "round_start_sha": "770b422d1fd814bdfccc9941990a3b86901bc456",
+  "round": 2,
+  "round_start_sha": "5c70d959e1103b6979b21a8b720effb6dd10b6d2",
   "max_rounds": 5,
   "findings": [
-    {
-      "id": "F1",
-      "severity": "blocker",
-      "current_status": "open",
-      "title": "Win-overlay Close desyncs won from board state; persist() saves a finished board that restores as a broken empty table",
-      "location": "ios/Causeway/Causeway/Views/ContentView.swift:202; ios/Causeway/Causeway/Model/Game.swift:117,127-144",
-      "detail": "Close sets game.won=false directly from the view without resetting/redealing the board. persist()'s only guard is !won, so backgrounding after Close writes the fully-solved empty board to causeway.game; on relaunch restore() passes its 52-card count check (cards are on foundations) and restores won=false with nothing to tap and no win banner. Deterministically reachable. Web derives completion via isWon() so has no equivalent.",
-      "status_history": [{ "round": 1, "status": "open", "note": "found via code trace; persist() guard added in 770b422 interacts badly with pre-existing Close handler" }]
-    },
-    {
-      "id": "F2",
-      "severity": "major",
-      "current_status": "open",
-      "title": "isSeqHead unbounded-index crash (R1) fixed on iOS only - web still crashes on the same race",
-      "location": "index.html isSeqHead (~419-435), called from smartMove and handleCardTap",
-      "detail": "iOS isSeqHead was bounds-guarded per REVIEW-2 R1; the web function was never given the same guard. Node repro: stale idx past a column shortened by an intervening autoplay pop throws TypeError reading 'color'. Web autoplay uses setTimeout gaps in which a dblclick/click racing a re-render can deliver a stale {col,idx}. BACKLOG R1 claim of 'both platforms' is only true for iOS.",
-      "status_history": [{ "round": 1, "status": "open", "note": "reproduced with a standalone Node harness" }]
-    },
-    {
-      "id": "F3",
-      "severity": "minor",
-      "current_status": "open",
-      "title": "Restore sanity check validates card count only, not validity/uniqueness or foundation legality",
-      "location": "ios/Causeway/Causeway/Model/Game.swift:130-136; index.html:400-405",
-      "detail": "Check is inTableau+inCells+onFoundations==52 arithmetic only. 52 copies of an invalid/duplicate card pass; crossed up/down pairs can still sum to 52. Not exploitable via UI (only valid decks written) but BACKLOG 'sanity-checks all 52 cards' overstates the guarantee.",
-      "status_history": [{ "round": 1, "status": "open", "note": "verified with a standalone Swift Codable round-trip test" }]
-    },
-    {
-      "id": "F4",
-      "severity": "minor",
-      "current_status": "open",
-      "title": "Restoring a saved game never resumes autoplay, both platforms",
-      "location": "ios/Causeway/Causeway/Model/Game.swift:127-144 (restore); index.html:397-415 (restoreGame)",
-      "detail": "persist/saveGame runs after every autoplayOneStep, so a kill mid-autoplay-chain can persist a board with further safe-autoplayable cards. Neither restore path calls runAutoplay/step, so those cards sit inert until the next manual move. Cosmetic/UX gap.",
-      "status_history": [{ "round": 1, "status": "open", "note": "confirmed by tracing restore bodies on both platforms" }]
-    },
-    {
-      "id": "F5",
-      "severity": "minor",
-      "current_status": "open",
-      "title": "Privacy policy doesn't mention the new in-progress-game persistence",
-      "location": "store/privacy-policy.md:14-16",
-      "detail": "Lists only settings and solved deal numbers; this commit added the full in-progress board snapshot (causeway.game). Not a privacy risk (on-device only, wiped on delete) but the disclosure is stale.",
-      "status_history": [{ "round": 1, "status": "open", "note": "doc not updated in 770b422 despite new persisted-data category" }]
-    }
+    { "id": "F1", "severity": "blocker", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "ios Game.swift/ContentView.swift (win Close persist desync)",
+      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
+    { "id": "F2", "severity": "major", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "index.html isSeqHead bounds",
+      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
+    { "id": "F4", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "restore resume-autoplay both platforms",
+      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"fixed"} ] },
+    { "id": "F5", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "store/privacy-policy.md:3",
+      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"open"}, {"round":2,"status":"fixed","note":"Last-updated bumped to 2026-07-05; confirmed"} ] },
+    { "id": "F3", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "index.html:408-414 restoreGame mark()",
+      "status_history": [ {"round":1,"status":"open"}, {"round":1,"status":"open"}, {"round":2,"status":"fixed","note":"suit 0..3 guard added, rejects suit:9; iOS parity confirmed (Codable enum decode throws on bad raw value). Reported case closed; related integrality hole tracked as F7."} ] },
+    { "id": "F6", "severity": "minor", "current_status": "open", "first_seen_round": 1, "introduced_by_fix": false,
+      "location": "tests/engine.mjs, tests/engine.test.mjs",
+      "detail": "Node harness (18 tests) added; downgraded major->minor (real passing suite, golden deals independently reproduced, not 'no tests'). Residual: the 'drift guard' hardcodes canonical strings checked only vs index.html, never derived from the imported engine.mjs functions, so engine.mjs diverging from the app goes undetected (reviewer injected an unsound isSafeAutoplay change into engine.mjs and all 18 tests still passed). Also no isSafeAutoplay test sets the two opposite-color-suit checks in disagreement, so every-vs-some is unobservable. iOS XCTest deferral accepted/documented.",
+      "status_history": [ {"round":1,"status":"open","note":"no automated tests"}, {"round":2,"status":"open","note":"downgraded to minor; harness real but drift guard ineffective and isSafeAutoplay coverage gap. Remediation: derive drift strings via fn.toString(); add an asymmetric isSafeAutoplay case."} ] },
+    { "id": "F7", "severity": "minor", "current_status": "open", "first_seen_round": 2, "introduced_by_fix": false,
+      "location": "index.html:408-414 mark(); tests/engine.mjs mark()",
+      "detail": "restore validator range-checks suit/rank but not integrality: a forged card with suit:1.5 (or rank:5.5) yields a non-colliding fractional id and is ACCEPTED (reproduced isValidSave===true). Low severity: single-player on-device self-corruption only. Fix: Number.isInteger checks on both suit and rank (both platforms; iOS Int field likely already rejects fractional JSON, not fully re-verified).",
+      "status_history": [ {"round":2,"status":"open","note":"found validating F3"} ] }
   ]
 }
