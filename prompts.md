@@ -78,3 +78,6 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     live phys_footprint MEM/PEAK/FREE via task_vm_info) so a Release + untethered run can show
     whether footprint actually climbs — the clean signal Instruments/JetsamEvent would give,
     without either. Must set the flag false before shipping (release checklist).
+41. Card appearance: keep 8px radius, make the face flat white, border deepest black. Both
+    platforms — web `.card` white bg + `--card-edge` #000 + removed per-suit tints; iOS
+    `CardView` white fill + `Theme.cardEdge` #000. Empty slots left as-is.
