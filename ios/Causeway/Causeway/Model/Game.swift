@@ -1,14 +1,25 @@
 import Foundation
 import SwiftUI
 import Combine
+import UniformTypeIdentifiers
 
-/// A position a card can live in, used for selection and tap targets.
-enum Spot: Equatable {
+/// A position a card can live in — the source of a tap/drag. Codable+Transferable so it can
+/// be the payload of a drag-and-drop (manual placement).
+enum Spot: Equatable, Codable {
     case tableau(col: Int, idx: Int)
     case cell(Int)
 }
 
+extension Spot: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .data)
+    }
+}
+
 enum Dir { case up, down }
+
+/// A drag-and-drop destination.
+enum DropTarget { case column(Int), cell(Int), foundation(Suit, Dir) }
 
 private struct Snapshot {
     var tableau: [[Card]]
@@ -302,24 +313,22 @@ final class Game: ObservableObject {
 
     // MARK: - User intents (called by the views)
 
-    func tapCard(_ spot: Spot) {
-        if let sel = selection {
-            if sel == spot { selection = nil; return }          // tap selected -> deselect
-            if case .tableau(let col, _) = spot, tryMoveToTableau(col) { return }
-            if case .cell(let i) = spot, tryMoveToCell(i) { return }
-            // otherwise fall through to (re)select the tapped card
+    /// Manual placement via drag-and-drop: move the run headed by `source` onto `target`,
+    /// exactly where the player dropped it. Returns whether the drop was legal (and applied).
+    /// Reuses the tap-era move validators by staging `selection` for the duration of the move.
+    @discardableResult
+    func drop(_ source: Spot, to target: DropTarget) -> Bool {
+        if case .tableau(let c, let i) = source, !isSeqHead(col: c, idx: i) { return false }
+        selection = source
+        let moved: Bool
+        switch target {
+        case .column(let col): moved = tryMoveToTableau(col)
+        case .cell(let i): moved = tryMoveToCell(i)
+        case .foundation(let suit, let dir): moved = tryMoveToFoundation(suit: suit, dir: dir)
         }
-        switch spot {
-        case .cell(let i):
-            if cells[i] != nil { selection = spot }
-        case .tableau(let col, let idx):
-            if isSeqHead(col: col, idx: idx) { selection = spot }
-        }
+        selection = nil   // no persistent selection in the tap/drag model
+        return moved
     }
-
-    func tapTableauColumn(_ col: Int) { _ = tryMoveToTableau(col) }
-    func tapCell(_ i: Int) { _ = tryMoveToCell(i) }
-    func tapFoundation(suit: Suit, dir: Dir) { _ = tryMoveToFoundation(suit: suit, dir: dir) }
 
     @discardableResult
     private func tryMoveToTableau(_ col: Int) -> Bool {
@@ -514,13 +523,5 @@ final class Game: ObservableObject {
     private func stopTimer() { clock.stop() }
 
     // helpers for views
-    func isSelected(_ spot: Spot) -> Bool {
-        guard let sel = selection else { return false }
-        switch (sel, spot) {
-        case (.cell(let a), .cell(let b)): return a == b
-        case (.tableau(let sc, let si), .tableau(let c, let i)): return sc == c && i >= si
-        default: return false
-        }
-    }
     var nextSeed: Int { seed >= Game.maxSeed ? 1 : seed + 1 }
 }

@@ -45,7 +45,7 @@ struct RulesView: View {
                     rule("The catch", "The up and down halves of a suit can never cross. A 7 or 8 has no home until the ends climb to reach it — plan around it.")
                     rule("Tableau", "Build in alternating colours, one rank at a time, in either direction — a pile can run down (red on black) or up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run as a group if you have enough free cells and empty columns.")
                     rule("Free cells", "Three single-card parking spots.")
-                    rule("Controls", "Tap a card to pick it up, then tap where it should go. Double-tap a card to auto-move it: to a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Everything is face-up — it's pure skill.")
+                    rule("Controls", "Tap a card to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Tapping a card in a run moves the whole run. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
                 }
                 .padding()
             }

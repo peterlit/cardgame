@@ -123,14 +123,17 @@ struct ContentView: View {
     private func cellView(_ i: Int, cardW: CGFloat) -> some View {
         Group {
             if let c = game.cells[i] {
-                CardView(card: c, width: cardW, selected: game.isSelected(.cell(i)))
+                CardView(card: c, width: cardW)
                     .matchedGeometryEffect(id: c.id, in: ns)
-                    .onTapGesture(count: 2) { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.cell(i)) } }
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapCard(.cell(i)) } }
+                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.cell(i)) } }
+                    .draggable(Spot.cell(i))
             } else {
                 SlotView(width: cardW)
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapCell(i) } }
             }
+        }
+        .dropDestination(for: Spot.self) { items, _ in
+            guard let src = items.first else { return false }
+            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .cell(i)) }
         }
     }
 
@@ -149,11 +152,13 @@ struct ContentView: View {
                 let card = Card(suit: suit, rank: rank)
                 CardView(card: card, width: cardW)
                     .matchedGeometryEffect(id: card.id, in: ns)
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapFoundation(suit: suit, dir: dir) } }
             } else {
                 SlotView(width: cardW, glyphSuit: suit)
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapFoundation(suit: suit, dir: dir) } }
             }
+        }
+        .dropDestination(for: Spot.self) { items, _ in
+            guard let src = items.first else { return false }
+            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .foundation(suit, dir)) }
         }
     }
 
@@ -173,18 +178,32 @@ struct ContentView: View {
         return ZStack(alignment: .top) {
             if cards.isEmpty {
                 SlotView(width: cardW)
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapTableauColumn(col) } }
             }
             ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
-                CardView(card: card, width: cardW, selected: game.isSelected(.tableau(col: col, idx: idx)))
-                    .matchedGeometryEffect(id: card.id, in: ns)
-                    .offset(y: CGFloat(idx) * overlap)
-                    .zIndex(Double(idx))
-                    .onTapGesture(count: 2) { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.tableau(col: col, idx: idx)) } }
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.tapCard(.tableau(col: col, idx: idx)) } }
+                tableauCard(col: col, idx: idx, card: card, cardW: cardW, overlap: overlap)
             }
         }
         .frame(width: cardW, height: height, alignment: .top)
+        .dropDestination(for: Spot.self) { items, _ in
+            guard let src = items.first else { return false }
+            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .column(col)) }
+        }
+    }
+
+    /// A single tableau card: single tap = smart-move; drag = manual placement (only cards
+    /// heading a valid run are draggable, so buried cards don't lift).
+    @ViewBuilder
+    private func tableauCard(col: Int, idx: Int, card: Card, cardW: CGFloat, overlap: CGFloat) -> some View {
+        let base = CardView(card: card, width: cardW)
+            .matchedGeometryEffect(id: card.id, in: ns)
+            .offset(y: CGFloat(idx) * overlap)
+            .zIndex(Double(idx))
+            .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.tableau(col: col, idx: idx)) } }
+        if game.isSeqHead(col: col, idx: idx) {
+            base.draggable(Spot.tableau(col: col, idx: idx))
+        } else {
+            base
+        }
     }
 
     // MARK: win overlay

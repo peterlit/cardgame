@@ -62,6 +62,18 @@ are done or added.
   `suit:9` save is now rejected, matching iOS (whose Codable enum already throws).
 - **F5** — privacy policy "Last updated" bumped to 2026-07-05.
 
+### tap/drag interaction change (2026-08-11)
+- **Interaction** — single tap now smart-moves a card/run to its best spot (was double-tap);
+  drag places a card/run exactly. Removed the old tap-to-select model. **Web** done + tested
+  (pointer-event drag with a 6px tap/drag threshold; `elementFromPoint` drop hit-test). **iOS**
+  ported with native SwiftUI `.draggable`/`.dropDestination` (`Spot` is the Codable+Transferable
+  payload; drop routes through `Game.drop(_:to:)` reusing the tap-era move validators; only
+  valid run heads are draggable). Type-checks clean — **on-device tap/drag verification pending**
+  (can't run the simulator/device here; the tap-vs-drag coexistence and drop hit-testing are the
+  things a type-check can't confirm).
+- **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
+  double-tap is gone, so a single tap fires immediately with no disambiguation delay.
+
 ## Open — high value
 - **F6 (iOS XCTest target).** The Node harness covers the *shared* engine logic by
   construction (iOS runs the same deal/shuffle/safe-autoplay algorithm), but there is no
@@ -76,8 +88,6 @@ are done or added.
   (all fixed `.system(size:)`, tap gestures not buttons).
 
 ## Open — medium
-- **M6 — Single-tap latency (iOS).** `.onTapGesture(count: 2)` before `.onTapGesture`
-  delays every tap; consider a spatial/temporal disambiguation that keeps selection instant.
 - **M8 — Verify buildability from the committed project.** App builds/runs for the owner,
   but `project.pbxproj` was hand-authored (no `productReference`); confirm a clean clone
   opens & archives in Xcode 16.
@@ -116,6 +126,13 @@ are done or added.
   a 15+ min idle session on a physical device to confirm memory plateaus and the OOM is gone.
   Keep the clock-isolation (`GameClock`) + `SummerBackground.equatable` changes regardless; this
   task only validates the effect. If RSS still climbs, the leak has another source — re-open I6.
+- **DRAG-verify — Confirm the iOS tap/drag hybrid on device/simulator.** Type-check can't exercise
+  gestures. Confirm: (1) a single tap still smart-moves and fires with no delay; (2) `.draggable`
+  and `.onTapGesture` coexist (a quick tap isn't swallowed by the drag, a press-drag isn't read as
+  a tap); (3) dragging a run head lifts the whole run and drops legally onto a column/free
+  cell/foundation, snapping back on an illegal drop; (4) buried (non-run-head) cards don't lift.
+  If tap/drag coexistence misbehaves, fall back to a manual `DragGesture(minimumDistance:)` with a
+  tap threshold (as the web build does) + a PreferenceKey drop-zone frame map.
 - **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
   document.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
