@@ -78,6 +78,13 @@ are done or added.
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
 ## Open — high value
+- **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
+  The deferred-win logic has zero automated coverage, yet it has already produced a blocker
+  (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
+  loses the win) — both timing bugs invisible to the current Node suite. Add a headless test:
+  `recordWin` is idempotent under a double-call; a simulated undo-during-beat leaves the win
+  recorded exactly once; and `canOfferFinish`/`maybeAutoFinish`/`runAutoFinish` all reject a
+  board where `checkWin()`/`isWon()` is true. Ties to the missing iOS test target (F6).
 - **F6 (iOS XCTest target).** The Node harness covers the *shared* engine logic by
   construction (iOS runs the same deal/shuffle/safe-autoplay algorithm), but there is no
   native XCTest target yet: adding one to the hand-authored `project.pbxproj` without Xcode

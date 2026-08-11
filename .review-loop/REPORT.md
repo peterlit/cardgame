@@ -1,85 +1,76 @@
-# Review-loop final report — Causeway (auto-finish feature)
+# Review-loop final report — Causeway (deferred win overlay)
 
 **Result: CONVERGED** (round 1 of a 5-round budget).
-**Stop reason:** 0 open blockers, 0 open majors, 0 open minors; nothing newly introduced left open.
+**Stop reason:** 0 open blockers, 0 open majors, no new blockers/majors introduced. One minor
+(F3, a test-gap) remains open and is filed to BACKLOG.md.
 
-Scope: the auto-finish feature — the `.ask`/`.on`/`.off` tri-state setting, the "Ready to finish?"
-prompt, the deferred "Finish" button, and the sequential one-card-at-a-time finish animation.
-Commit range reviewed: `9817ecb..HEAD` (`8844567` auto-complete toggle, `ae1ebd7` Ask mode + prompt
-+ sequential finish). Loop start SHA: `ae1ebd7`. Fixes landed in `af23d33`.
-(Prior tap/drag loop archived at `.review-loop/REPORT-tapdrag.md`.)
+Scope: commit `f1ef1f1` — "hold the win overlay until the last auto-finish card lands" (deferring
+`onWin()` by ~0.32–0.38s so the win popup doesn't cover a still-animating foundation). Reviewed
+`e19754b..HEAD`. Loop start SHA: `f1ef1f1`. Fixes landed in `7f45ea5`.
+(Prior auto-finish loop archived at `.review-loop/REPORT-autofinish.md`.)
 
 ## Trend
 
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Net | Decision |
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
-| 1 | 0 | 0 | 0 | 0 | 0 | 0 | +0 | converged |
+| 1 | 0 | 0 | 1 | 0 | 0 | 0 | +0 | converged |
 
-(Seed review filed F1–F4, all minor; the same round's implementer pass fixed all four, so the
-round-1 row nets to zero open.)
+(Seed review filed a blocker F1 + a major F2; the same round's implementer pass fixed both, and the
+reviewer opened a new minor F3. Metrics converge — no open blockers/majors, F1/F2's fixes introduced
+no new blocker/major.)
 
-## What the review established
+## What the review caught (this is why the loop earned its keep)
 
-**The core safety fear did not materialize — verified by reading detection against execution.**
-The reviewer confirmed a false-positive that runs a finish and then strands a non-winning board
-cannot happen:
-- Every entry to the greedy send (`sendOneHome`) is gated by `runAutoFinish`, which self-gates on
-  `autoFinishWouldWin()` — no caller sends cards on an unproven board.
-- The simulation predicates are byte-identical to the real foundation rules on both platforms, and
-  the greedy send is confluent (up/down advance independently and meet exactly), so the batch
-  detector emptying the board guarantees the one-at-a-time chain also empties it. No lost/duplicated
-  cards.
-- `finishing` cannot get stuck true (set only in `runAutoFinish`, which immediately schedules a step;
-  every step either schedules the next or clears the flag).
-- Stale-timer safety: web clears the real `finishTimer`/`autoTimer`; iOS resets flags synchronously
-  before any pending `asyncAfter` runs, and each block guards its flag.
-- Web/iOS parity on mode semantics, prompt/defer, cadence, and the Finish-button gate; no dead code
-  or leftover `autoFinish`/`autoFinishOn` references; stacked iOS `.alert` modifiers are valid on the
-  iOS 17 target.
+The one-line "hold the overlay" change had **two real bugs**, both found and fixed this round:
 
-## Findings (all fixed)
-
-- **F1 [minor] — FIXED.** iOS `restore()` omitted the `finishing`/`promptAutoFinish`/
-  `autoFinishDeferred` resets that web `restoreGame()` performs. Harmless today (restore is
-  init-only) but a latent parity gap → the three resets were added.
-- **F2 [minor] — FIXED.** The iOS finish chain relied only on the `finishing` flag and never
-  cancelled a pending `asyncAfter`, so an Undo-mid-finish followed by a quick re-triggering move
-  could overlap two finish chains (self-healing, no card loss, but sloppy). Fixed with a monotonic
-  `finishGen` token captured per scheduled step and bumped on `runAutoFinish`/`undo`/`deal`; a stale
-  block from a superseded chain now bails. Reviewer traced normal-finish stability, Undo halting, and
-  the restart race being closed with at most one live block per chain.
-- **F3 [minor] — FIXED.** The whole safety story rests on "detection == execution," yet only the
-  detector (`autoFinishWouldWin`) was tested. Added a canonical `sendOneHomeStep` executor to the
-  Node harness (matching the web/iOS greedy order + up-before-down rule), a test looping it to
-  fixpoint over four fixtures asserting `boardEmptied === autoFinishWouldWin(state)`, and two
-  drift-guard substrings pinning the web `sendOneHome` body. 24/24 tests pass; drift guard real.
-- **F4 [minor] — FIXED.** The setting key was renamed (`causeway.autofinish` → `…mode`) and the
-  default flipped On→Ask with no migration; documented as intentional (app unshipped, so no legacy
-  key exists) via a one-line comment on both platforms.
+- **F1 [BLOCKER, iOS] — FIXED.** During the ~0.38s deferred-win window the board is complete but
+  `won`/`finishing` are both false, and `autoFinishWouldWin()` returns true on an already-complete
+  board — so `canOfferFinish` was true and the **"Finish" pill re-appeared over the solved board**.
+  Tapping it (or toggling `autoFinishMode`) called `runAutoFinish()`, which bumped `finishGen`,
+  which made the pending `onWin()` block bail — **the win was permanently discarded** (no overlay,
+  no recorded win, board not persisted). Root cause: iOS gated re-entry on the *flag* `!won` while
+  web gated on the *position* `!isWon()`. Fix: added `!checkWin()` to iOS `canOfferFinish`,
+  `runAutoFinish`, and `maybeAutoFinish`, matching web's position-based gate (canonical
+  `autoFinishWouldWin` + its drift guard left untouched). Reviewer audited every `finishGen` bump
+  site and confirmed the pending `onWin` now fires and a normal finish still completes.
+- **F2 [MAJOR, both] — FIXED.** During the delay the board was complete but the win was neither
+  recorded nor persisted (`persist()`/`saveGame()` refuse a complete board), so a **process kill /
+  tab close inside the ~0.32–0.38s window lost the win + best time** — a regression, since `onWin()`
+  used to fire synchronously. Fix: split out `recordWin()` (stop clock, clear saved game, write the
+  win/best-time) and call it **synchronously at the winning move**, guarded once
+  (`winRecorded`/`pendingWin`); the timer now defers **only** the overlay presentation. Reviewer
+  verified exactly-once recording across all win entry points, no `moveCount`/`clock` off-by-one,
+  correct flag reset on deal/restore, and that record-then-undo is coherent (the board genuinely
+  reached all-52-home; the resumable save is re-persisted after the undo).
 
 **Disputed (agree-to-disagree):** none.
 
+## Open findings
+
+- **F3 [minor] — OPEN → BACKLOG (`AF-test`).** The win-record / deferred-overlay / re-entry-gate
+  logic has zero automated coverage; both bugs above were timing bugs invisible to the current Node
+  suite, and there is no iOS test target. Suggested: a headless test asserting `recordWin`
+  idempotency, undo-during-beat records exactly once, and the three gates reject a complete board.
+
 ## HUMAN SKIM LIST — read these, the loop can't self-check
 
-1. **The sequential finish + async lifecycle — `Game.swift` `runAutoFinish`/`finishStep`/`finishGen`
-   and web `runAutoFinish`/`stepFinish`/`finishTimer` (commits `ae1ebd7`, `af23d33`).** This is the
-   substantive change and the one with real concurrency. The reviewer traced the `finishGen` race
-   closure by construction, but **timing/gesture behavior can't be unit-tested** — on a device,
-   confirm: Undo mid-finish halts cleanly; New game mid-finish leaves no ghost chain; rapidly
-   toggling the mode or spamming the Finish button never double-runs.
-2. **The `.ask` prompt lifecycle — `ContentView.swift` `.alert(isPresented: $game.promptAutoFinish)`
-   + `maybeAutoFinish` pausing safe-autoplay (commit `ae1ebd7`).** Verify on device that the prompt
-   appears at the right moment, "Not yet" doesn't re-nag, the "Finish" button then works, and the
-   board doesn't shuffle under the prompt. Note: a finishable *saved* game will prompt on app launch
-   (restore → maybeAutoFinish) — decide if that's desirable.
-3. **`sendOneHome` (iOS) has no direct test** — only the web `sendOneHomeStep` twin is tested, and
-   the iOS engine shares the algorithm by construction (no iOS test target — a known backlog item).
-   The drift guard pins web↔`engine.mjs` but never iOS; a future iOS-only edit to `sendOneHome` or
-   the foundation predicates could silently diverge.
+1. **The deferred-win + synchronous-record split — iOS `Game.swift` `finishStep`/`recordWin`/`onWin`/
+   `winRecorded`/`!checkWin()` gates and web `stepFinish`/`recordWin`/`pendingWin` (commits `f1ef1f1`,
+   `7f45ea5`).** This is subsecond async state with a durable side effect — the exact class of thing
+   the loop reasons about but cannot execute. **On device, verify:** (a) auto-finish to a win, then
+   confirm the win is in Wins with the right time; (b) **kill the app during the ~0.38s beat** and
+   confirm the win still shows in Wins on relaunch (F2's whole point); (c) undo *during* the beat and
+   confirm no overlay, no wedge, the board is playable, and the seed still counts as won.
+2. **`record-then-undo` semantics (F2b).** A win recorded, then undone in the beat, stays recorded.
+   That is the intended durability tradeoff (you can't have "survives a kill" and "undo un-records"
+   at once), but it's a behavior nuance a human should bless. Minor residual: `winRecorded` isn't
+   reset on undo, so a *faster* re-solve of the same seed in the same session won't lower the stored
+   best time — accepted, `WinStore` keeps `min` anyway.
+3. **The absent test coverage (F3).** Two serious bugs in a 7-line change slipped past CI because the
+   timing logic is untested. Until `AF-test` lands, this whole area is human-verify-only.
 
 ## Verdict
-Converged round 1: no blockers/majors/minors open. The feature is move-correct and at web/iOS parity
-by construction (gated detection == execution on both platforms); the one real concurrency gap (iOS
-finish double-run) is fixed and re-validated; execution is now test-covered; the two documentation/
-parity nits are closed. Residual risk is entirely in device-only async/gesture timing and the absence
-of an iOS engine test target — flagged above for a human pass, not code.
+Converged round 1: the "hold the overlay" change shipped with a blocker and a major; both are fixed
+and independently re-validated (position-based re-entry gating on iOS to match web; durable win
+recorded synchronously with overlay-only deferral). Residual risk is a genuine test gap (F3) and
+device-only async timing — flagged above for a human pass.
