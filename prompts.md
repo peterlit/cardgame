@@ -71,3 +71,10 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     and make it an invalid read of production memory. Code review finds no idle-time leak (clock
     isolated, autoplay self-terminating, undo bounded). Reopened I6; I6-verify now demands a
     Release + untethered (or Instruments Allocations) re-measure before chasing any fix.
+40. Third tethered OOM (~32 min, still Debug+Xcode instrumentation). Doesn't change the call —
+    same contaminated setup; survival is *increasing* across runs (14→21.6→32 min), and a code
+    audit finds no unbounded-growth mechanism (no audio, one Combine sink, undo bounded, clock
+    isolated). Built an in-app memory HUD (`DebugFlags.memoryHUD`, `MemoryMonitor`/`MemoryHUD`:
+    live phys_footprint MEM/PEAK/FREE via task_vm_info) so a Release + untethered run can show
+    whether footprint actually climbs — the clean signal Instruments/JetsamEvent would give,
+    without either. Must set the flag false before shipping (release checklist).

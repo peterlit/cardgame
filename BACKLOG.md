@@ -132,15 +132,20 @@ are done or added.
   Remaining app-level suspect *if* a clean build still climbs: `matchedGeometryEffect` retention
   across per-move re-renders during active play. Do I6-verify before spending any more on a fix.
 - **I6-verify — Re-measure the OOM WITHOUT debug instrumentation (this is the real test).** The
-  prior on-device numbers came from a Debug build under Xcode with view debugging + malloc stack
-  logging attached — invalid for judging production memory. Re-run one of: (a) **Release build,
-  launched untethered** (not attached to Xcode), played/idle 25–30 min — if it survives, the OOM
-  was a debug-tooling artifact and I6 can close; if it dies, capture `JetsamEvent-…Causeway` from
-  Settings → Privacy & Security → Analytics & Improvements → Analytics Data for the exact kill
-  size; or (b) **Instruments → Allocations** on a Release build (Product → Profile), watching
-  Persistent Bytes with a generation marked each minute — flat = fine, a growing generation names
-  the leak. Only if a clean Release build genuinely climbs is there a real leak to chase (start
-  with `matchedGeometryEffect`).
+  on-device OOM numbers all came from Debug builds under Xcode with View Debugging + Malloc Stack
+  Logging + checkers attached (three runs: ~14 → ~21.6 → ~32.2 min survival, increasing — more
+  consistent with tooling/environment variance than a fixed code leak), which is invalid for
+  judging production memory. A code audit finds **no unbounded-growth mechanism** (no audio/haptics,
+  one Combine `.sink`, no per-render allocation, clock isolated, autoplay self-terminating, undo
+  capped 500); only `matchedGeometryEffect` remains framework-level unverifiable.
+  **Easiest clean read (built 2026-08-11): the in-app memory HUD** (`DebugFlags.memoryHUD`,
+  `MemoryMonitor`/`MemoryHUD`) shows live `phys_footprint` (MEM), its high-water mark (PEAK — the
+  tell: if it never plateaus, real leak) and jetsam headroom (FREE). **Build Release, launch
+  untethered (not from Xcode), play/idle 25–30 min, watch MEM/PEAK:** flat/plateau → the OOM was a
+  debug-tooling artifact, close I6; steadily climbing → real leak, and the HUD gives the rate.
+  Alternatives: capture `JetsamEvent-…Causeway` (Settings → Privacy & Security → Analytics Data)
+  for the kill size, or Instruments → Allocations generations. Chase `matchedGeometryEffect` only
+  if a clean run genuinely climbs. Remove the HUD (flag → false) before shipping — see checklist.
 - **DRAG-verify — DONE (simulator-verified 2026-08-11).** The manual `DragGesture` build was
   driven on the iPhone 17 Pro simulator: tap→smart-move, single drag to a specific free cell
   (overriding the smart choice), illegal drop (heart→spade foundation) snapping back with no move
@@ -179,3 +184,6 @@ are done or added.
 - [ ] Set **Version 1.0 / Build 1**; archive; upload; submit.
 - [ ] **Remove the committed `DEVELOPMENT_TEAM` (personal Team ID)** before making the repo
       public (`ios/Causeway/Causeway.xcodeproj/project.pbxproj`).
+- [ ] **Set `DebugFlags.memoryHUD = false`** (`Model/MemoryMonitor.swift`) — the on-screen
+      memory HUD is a diagnostic for I6-verify and must not ship. (Not `#if DEBUG`-gated on
+      purpose, so it can be watched in a Release/untethered run.)

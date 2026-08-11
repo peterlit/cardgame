@@ -58,6 +58,10 @@ struct ContentView: View {
                 .padding(.top, 6)
 
                 if game.won { winOverlay }
+
+                if DebugFlags.memoryHUD {
+                    VStack { Spacer(); MemoryHUD().padding(.bottom, 6) }   // TESTING ONLY
+                }
             }
             .coordinateSpace(name: "board")
             .onPreferenceChange(DropZonesKey.self) { dropZones = $0 }
