@@ -59,5 +59,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     equatable so the blurred scene isn't re-rasterized every second (I6). Then re-run the loop.
 38. Analyze then change interaction: single tap = smart-move (was double-tap) + drag to place
     a card/stack exactly (hybrid). Removes the old tap-to-select model and double-tap latency
-    (M6). Web done + tested; iOS ported with native `.draggable`/`.dropDestination` (Spot is the
-    Transferable payload), type-checks clean — on-device drag/tap verification pending.
+    (M6). Web done + tested. iOS: single tap great on device, but the first `.draggable` port felt
+    wrong (press-and-hold to lift + the system "+"/ghost drag chrome) — replaced with a manual
+    `DragGesture(minimumDistance: 0)` (instant grab, in-place finger-follow, tap/drag split at an
+    8px slop) + a `PreferenceKey` map of drop-zone frames in a "board" coordinate space for
+    hit-testing. Type-checks + builds + renders on the simulator; on-device drag feel re-check
+    pending (DRAG-verify).

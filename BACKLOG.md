@@ -65,12 +65,15 @@ are done or added.
 ### tap/drag interaction change (2026-08-11)
 - **Interaction** — single tap now smart-moves a card/run to its best spot (was double-tap);
   drag places a card/run exactly. Removed the old tap-to-select model. **Web** done + tested
-  (pointer-event drag with a 6px tap/drag threshold; `elementFromPoint` drop hit-test). **iOS**
-  ported with native SwiftUI `.draggable`/`.dropDestination` (`Spot` is the Codable+Transferable
-  payload; drop routes through `Game.drop(_:to:)` reusing the tap-era move validators; only
-  valid run heads are draggable). Type-checks clean — **on-device tap/drag verification pending**
-  (can't run the simulator/device here; the tap-vs-drag coexistence and drop hit-testing are the
-  things a type-check can't confirm).
+  (pointer-event drag with a 6px tap/drag threshold; `elementFromPoint` drop hit-test). **iOS**:
+  single tap confirmed great on device. The first port used native `.draggable`/`.dropDestination`
+  but felt wrong on device — press-and-hold to lift + the system copy "+"/ghost drag chrome — so it
+  was replaced with a **manual `DragGesture(minimumDistance: 0)`**: instant grab, the run follows
+  the finger in place (`runOffset` + per-area z-ordering), tap-vs-drag split at an 8px slop, and a
+  `DropZonesKey` PreferenceKey collects every drop target's frame in a "board" coordinate space so
+  release hit-tests the zone under the finger. Drops still route through `Game.drop(_:to:)`
+  (tap-era validators; only valid run heads drag). Type-checks + builds for the simulator + renders
+  the board; **on-device drag feel/hit-test re-check pending (DRAG-verify)**.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
@@ -126,13 +129,14 @@ are done or added.
   a 15+ min idle session on a physical device to confirm memory plateaus and the OOM is gone.
   Keep the clock-isolation (`GameClock`) + `SummerBackground.equatable` changes regardless; this
   task only validates the effect. If RSS still climbs, the leak has another source — re-open I6.
-- **DRAG-verify — Confirm the iOS tap/drag hybrid on device/simulator.** Type-check can't exercise
-  gestures. Confirm: (1) a single tap still smart-moves and fires with no delay; (2) `.draggable`
-  and `.onTapGesture` coexist (a quick tap isn't swallowed by the drag, a press-drag isn't read as
-  a tap); (3) dragging a run head lifts the whole run and drops legally onto a column/free
-  cell/foundation, snapping back on an illegal drop; (4) buried (non-run-head) cards don't lift.
-  If tap/drag coexistence misbehaves, fall back to a manual `DragGesture(minimumDistance:)` with a
-  tap threshold (as the web build does) + a PreferenceKey drop-zone frame map.
+- **DRAG-verify — Confirm the iOS manual tap/drag on device.** Single tap already confirmed good.
+  Re-check the manual `DragGesture` build: (1) a card lifts *instantly* (no press-and-hold) and
+  follows the finger with no system drag chrome; (2) an 8px slop cleanly separates tap from drag;
+  (3) dragging a run head carries the whole run and drops legally onto the column/free
+  cell/foundation under the finger, snapping back on an illegal drop; (4) buried (non-run-head)
+  cards don't lift but still tap; (5) a card dragged across areas (free cell ⇄ tableau) floats
+  above, not under, the other area. If frame hit-testing is off, verify the `.coordinateSpace(name:
+  "board")` ancestor covers all drop zones and that `dropZones` isn't stale.
 - **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
   document.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed

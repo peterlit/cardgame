@@ -1,25 +1,17 @@
 import Foundation
 import SwiftUI
 import Combine
-import UniformTypeIdentifiers
 
-/// A position a card can live in — the source of a tap/drag. Codable+Transferable so it can
-/// be the payload of a drag-and-drop (manual placement).
-enum Spot: Equatable, Codable {
+/// A position a card can live in — the source of a tap or drag.
+enum Spot: Equatable {
     case tableau(col: Int, idx: Int)
     case cell(Int)
-}
-
-extension Spot: Transferable {
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: .data)
-    }
 }
 
 enum Dir { case up, down }
 
 /// A drag-and-drop destination.
-enum DropTarget { case column(Int), cell(Int), foundation(Suit, Dir) }
+enum DropTarget: Equatable { case column(Int), cell(Int), foundation(Suit, Dir) }
 
 private struct Snapshot {
     var tableau: [[Card]]

@@ -1,5 +1,23 @@
 import SwiftUI
 
+/// A card/run being dragged: its source and how far the finger has moved (board coords).
+private struct DragInfo: Equatable {
+    var source: Spot
+    var translation: CGSize
+}
+
+/// A drop target's live frame in the board coordinate space, collected via preferences.
+private struct DropZoneFrame: Equatable {
+    var target: DropTarget
+    var rect: CGRect
+}
+private struct DropZonesKey: PreferenceKey {
+    static var defaultValue: [DropZoneFrame] = []
+    static func reduce(value: inout [DropZoneFrame], nextValue: () -> [DropZoneFrame]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
 struct ContentView: View {
     @StateObject private var game = Game()
     @Namespace private var ns
@@ -9,6 +27,12 @@ struct ContentView: View {
     @State private var showDeal = false
     @State private var showRules = false
     @State private var dealText = ""
+
+    // Manual drag-and-drop (see cardGesture): source+offset while dragging, and the live
+    // frames of every drop target in the "board" coordinate space for hit-testing on drop.
+    @State private var drag: DragInfo?
+    @State private var dropZones: [DropZoneFrame] = []
+    private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     private let outerPad: CGFloat = 6
     private let gap: CGFloat = 4
@@ -25,7 +49,9 @@ struct ContentView: View {
                     header
                     toolbar
                     upperArea(cardW: cardW)
+                        .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
                     tableauArea(cardW: cardW, overlap: overlap)
+                        .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, outerPad)
@@ -33,6 +59,8 @@ struct ContentView: View {
 
                 if game.won { winOverlay }
             }
+            .coordinateSpace(name: "board")
+            .onPreferenceChange(DropZonesKey.self) { dropZones = $0 }
             .foregroundStyle(Theme.ink)
         }
         .onChange(of: scenePhase) { _, phase in
@@ -103,6 +131,7 @@ struct ContentView: View {
                 HStack(spacing: gap) {
                     ForEach(0..<Game.cellCount, id: \.self) { i in
                         cellView(i, cardW: cardW)
+                            .zIndex(drag?.source == .cell(i) ? 5 : 0)   // dragged cell floats over its neighbours
                     }
                 }
             }
@@ -120,21 +149,68 @@ struct ContentView: View {
         Text(t).font(.system(size: 10, weight: .semibold)).tracking(1).opacity(0.6)
     }
 
+    // MARK: tap / drag
+
+    private var dragInUpper: Bool { if case .cell = drag?.source { return true } else { return false } }
+    private var dragColumn: Int? { if case .tableau(let c, _) = drag?.source { return c } else { return nil } }
+
+    /// The finger offset to apply to `spot` — non-zero only for the card(s) in the run
+    /// currently being dragged (the run head plus everything stacked below it).
+    private func runOffset(_ spot: Spot) -> CGSize {
+        guard let d = drag else { return .zero }
+        switch (d.source, spot) {
+        case (.cell(let a), .cell(let b)):
+            return a == b ? d.translation : .zero
+        case (.tableau(let sc, let si), .tableau(let c, let i)):
+            return (sc == c && i >= si) ? d.translation : .zero
+        default:
+            return .zero
+        }
+    }
+
+    /// One unified gesture per card: a small finger travel is a tap (smart-move); a larger one
+    /// is a drag that drops onto whichever registered drop zone is under the finger on release.
+    /// `minimumDistance: 0` means the card follows the finger instantly — no press-and-hold.
+    private func cardGesture(for spot: Spot, canDrag: Bool) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("board"))
+            .onChanged { v in
+                guard canDrag else { return }
+                if drag == nil { drag = DragInfo(source: spot, translation: v.translation) }
+                else if drag?.source == spot { drag?.translation = v.translation }
+            }
+            .onEnded { v in
+                let travelled = hypot(v.translation.width, v.translation.height)
+                withAnimation(.easeOut(duration: 0.18)) {
+                    if travelled < tapSlop {
+                        game.smartMove(spot)                                   // tap
+                    } else if canDrag, let z = dropZones.first(where: { $0.rect.contains(v.location) }) {
+                        game.drop(spot, to: z.target)                          // drop onto target under finger
+                    }
+                    drag = nil                                                 // else: snaps back
+                }
+            }
+    }
+
+    /// A transparent probe that reports this view's frame in board coordinates as a drop zone.
+    private func dropZone(_ target: DropTarget) -> some View {
+        GeometryReader { g in
+            Color.clear.preference(key: DropZonesKey.self,
+                                   value: [DropZoneFrame(target: target, rect: g.frame(in: .named("board")))])
+        }
+    }
+
     private func cellView(_ i: Int, cardW: CGFloat) -> some View {
         Group {
             if let c = game.cells[i] {
                 CardView(card: c, width: cardW)
                     .matchedGeometryEffect(id: c.id, in: ns)
-                    .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.cell(i)) } }
-                    .draggable(Spot.cell(i))
+                    .offset(runOffset(.cell(i)))
+                    .gesture(cardGesture(for: .cell(i), canDrag: true))
             } else {
                 SlotView(width: cardW)
             }
         }
-        .dropDestination(for: Spot.self) { items, _ in
-            guard let src = items.first else { return false }
-            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .cell(i)) }
-        }
+        .background(dropZone(.cell(i)))
     }
 
     private func foundationRow(dir: Dir, cardW: CGFloat) -> some View {
@@ -156,10 +232,7 @@ struct ContentView: View {
                 SlotView(width: cardW, glyphSuit: suit)
             }
         }
-        .dropDestination(for: Spot.self) { items, _ in
-            guard let src = items.first else { return false }
-            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .foundation(suit, dir)) }
-        }
+        .background(dropZone(.foundation(suit, dir)))   // drop target only; foundation cards aren't dragged
     }
 
     // MARK: tableau
@@ -169,6 +242,7 @@ struct ContentView: View {
         return HStack(alignment: .top, spacing: gap) {
             ForEach(0..<Game.colCount, id: \.self) { col in
                 column(col, cardW: cardW, cardH: cardH, overlap: overlap)
+                    .zIndex(dragColumn == col ? 5 : 0)   // the column holding the dragged run floats over its neighbours
             }
         }
     }
@@ -184,26 +258,19 @@ struct ContentView: View {
             }
         }
         .frame(width: cardW, height: height, alignment: .top)
-        .dropDestination(for: Spot.self) { items, _ in
-            guard let src = items.first else { return false }
-            return withAnimation(.easeOut(duration: 0.16)) { game.drop(src, to: .column(col)) }
-        }
+        .background(dropZone(.column(col)))
     }
 
-    /// A single tableau card: single tap = smart-move; drag = manual placement (only cards
-    /// heading a valid run are draggable, so buried cards don't lift).
-    @ViewBuilder
+    /// A single tableau card: single tap = smart-move; drag = manual placement. Only cards
+    /// heading a valid run can drag (so buried cards don't lift); every card is still tappable.
     private func tableauCard(col: Int, idx: Int, card: Card, cardW: CGFloat, overlap: CGFloat) -> some View {
-        let base = CardView(card: card, width: cardW)
+        CardView(card: card, width: cardW)
             .matchedGeometryEffect(id: card.id, in: ns)
-            .offset(y: CGFloat(idx) * overlap)
+            .offset(y: CGFloat(idx) * overlap)              // fan the pile
+            .offset(runOffset(.tableau(col: col, idx: idx))) // + follow the finger while dragging
             .zIndex(Double(idx))
-            .onTapGesture { withAnimation(.easeOut(duration: 0.16)) { game.smartMove(.tableau(col: col, idx: idx)) } }
-        if game.isSeqHead(col: col, idx: idx) {
-            base.draggable(Spot.tableau(col: col, idx: idx))
-        } else {
-            base
-        }
+            .gesture(cardGesture(for: .tableau(col: col, idx: idx),
+                                 canDrag: game.isSeqHead(col: col, idx: idx)))
     }
 
     // MARK: win overlay
