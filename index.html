@@ -734,7 +734,12 @@ function runAutoFinish(){
       moveCount++; setMoves(moveCount);
       if(!startTime){ startTime=Date.now(); startTimer(); }
       render();   // FLIP animates this one card's flight home
-      if(isWon()){ finishing=false; refreshFinishBtn(); onWin(); return; }
+      if(isWon()){
+        finishing=false; refreshFinishBtn();
+        // let the last card land (140ms flight) + a beat before the win overlay covers the board
+        finishTimer=setTimeout(()=>{ finishTimer=null; if(isWon()) onWin(); },320);
+        return;
+      }
       saveGame();
       finishTimer=setTimeout(stepFinish,180);
     } else { finishing=false; refreshFinishBtn(); }

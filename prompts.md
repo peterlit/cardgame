@@ -94,3 +94,7 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     cadence. Both platforms; persisted (`causeway.autofinishmode`). Verified all 3 modes end-to-end
     on web (prompt, defer+no-renag, Finish button, sequential finish, On auto, Off manual); iOS
     type-checks + builds, toolbar shows "Auto-finish: Ask". Review loop requested next.
+44. Fix: the finish's win overlay popped up over a still-animating (incomplete-looking) foundation.
+    Now hold `onWin()` until the last card lands + a short beat (web setTimeout 320ms after the
+    140ms flight; iOS 0.38s after the 0.2s flight), guarded so undo/new-game during the delay cancels
+    it. Verified on web that onWin fires strictly after the final card's render.

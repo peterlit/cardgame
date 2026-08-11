@@ -557,7 +557,16 @@ final class Game: ObservableObject {
             guard sent else { self.finishing = false; return }
             self.moveCount += 1
             if !self.started { self.started = true; self.startTimer() }
-            if self.checkWin() { self.finishing = false; self.onWin(); return }
+            if self.checkWin() {
+                self.finishing = false
+                // Let the last card actually LAND (and the completed board show for a beat) before
+                // the win overlay covers it — otherwise it pops up over a still-animating foundation.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) { [weak self] in
+                    guard let self, self.finishGen == gen, self.checkWin(), !self.won else { return }
+                    self.onWin()
+                }
+                return
+            }
             self.persist()
             self.finishStep(gen: gen)
         }
