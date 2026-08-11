@@ -1,24 +1,90 @@
 {
   "round": 1,
-  "round_start_sha": "06cb6f551e96471f112efe2ae6ddd48f3d80c40d",
+  "round_start_sha": "e18331764b07512f17356727b951fb7ad71a8d10",
   "max_rounds": 5,
   "findings": [
     {
-      "id": "F1", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": true,
-      "location": "prompts.md",
-      "detail": "OOM-fix commit introduced duplicate numbering (33,34,35,34,35).",
+      "id": "F1",
+      "severity": "major",
+      "title": "iOS: no guard against a second concurrent gesture; second-finger tap fires unintended smartMove and clears in-flight drag",
+      "location": "ios/Causeway/Causeway/Views/ContentView.swift:181-191",
+      "failure_scenario": "Finger A mid-drag on head X; finger B taps head Y. Y's onEnded runs smartMove(Y) and drag=nil; A snaps back, then A re-creates drag(X) and can still drop X -> two moves from one drag.",
+      "rationale": "onEnded tap branch calls smartMove unconditionally + drag=nil with no drag?.source==spot check; @State drag is single-valued. CONFIRMED no guard; manifestation SUSPECTED (needs device). Recoverable via undo.",
+      "suggested_fix": "onEnded: return early unless drag==nil||drag?.source==spot; onChanged: only create DragInfo when drag==nil.",
+      "current_status": "fixed",
       "status_history": [
-        { "round": 1, "status": "open", "note": "seeded" },
-        { "round": 1, "status": "fixed", "note": "renumbered monotonic 33-37; content-only diff shows sole change is OOM entry reordered to end (chronological); no text altered" }
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "guard drag==nil||source==spot verified on all 4 paths; onChanged unchanged; no new swallow."
+        }
       ]
     },
     {
-      "id": "F2", "severity": "minor", "current_status": "fixed", "first_seen_round": 1, "introduced_by_fix": false,
-      "location": "BACKLOG.md I6 + commit 06cb6f5 message",
-      "detail": "OOM fix asserted 'Closes I6' from reasoning + type-check but no on-device memory trace.",
+      "id": "F2",
+      "severity": "minor",
+      "title": "iOS: drag state can stick non-nil if dragged view is torn down mid-drag by in-flight autoplay",
+      "location": "ios/Causeway/Causeway/Views/ContentView.swift:176-192",
+      "failure_scenario": "Drag a tableau top card while a prior autoplay chain ticks; a step sends it home, destroying the view. If SwiftUI cancels without onEnded, drag stays set -> column stuck at elevated zIndex.",
+      "rationale": "drag only cleared in onEnded; no board-mutation observer resets it. No corruption, purely stuck visual layering. SUSPECTED.",
+      "suggested_fix": "Reset drag=nil via .onChange(of: game.moveCount) or when drag.source no longer indexes a live card.",
+      "current_status": "fixed",
       "status_history": [
-        { "round": 1, "status": "open", "note": "seeded" },
-        { "round": 1, "status": "fixed", "note": "I6 retitled 'FIX LANDED, on-device trace pending'; verified vs unverified separated; concrete I6-verify task added; fix code untouched (diff is docs-only). Honest-docs remedy as intended." }
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "dragSourceHoldsCard bounds-safe; autoplay mutates before moveCount++; drop sets drag=nil synchronously first; no wrong-cancel."
+        }
+      ]
+    },
+    {
+      "id": "F3",
+      "severity": "minor",
+      "title": "Dead code from selection removal: CardView.selected and web .card.sel unreachable",
+      "location": "ios/Causeway/Causeway/Views/CardView.swift:7,52-53; index.html:119",
+      "failure_scenario": "No runtime failure; misleading residue implying a selection highlight that no longer exists.",
+      "rationale": "All CardView call sites dropped selected:; default false never true; .card.sel never applied after isSelected removal. CONFIRMED via grep.",
+      "suggested_fix": "Delete CardView.selected and its uses; delete the .card.sel CSS rule.",
+      "current_status": "fixed",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "param+overlay+CSS removed; grep clean; call sites use card:width: only; selectedCards untouched."
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "severity": "minor",
+      "title": "iOS: successful drop may visually jump (.offset snaps to zero simultaneously with matchedGeometryEffect)",
+      "location": "ios/Causeway/Causeway/Views/ContentView.swift:189,268-270",
+      "failure_scenario": "On legal drop the model relocates via matchedGeometryEffect while drag=nil zeroes runOffset in the same withAnimation; card may jump finger->old slot->glide to dest.",
+      "rationale": ".offset is render-time, not reflected in matched-geometry source frame; two animations don't compose. Web avoids via FLIP. Cosmetic; SUSPECTED.",
+      "suggested_fix": "Position drag via matchedGeometry-friendly means, or delay clearing drag until matched transition completes.",
+      "current_status": "wontfix_accepted",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "wontfix_accepted",
+          "validation": "only a BACKLOG entry added; no rendering change; cosmetic deferral accepted."
+        }
       ]
     }
   ]
