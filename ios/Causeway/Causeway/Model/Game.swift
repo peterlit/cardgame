@@ -43,6 +43,11 @@ final class Game: ObservableObject {
     @Published var autoplayOn = true {
         didSet { UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay"); if autoplayOn { runAutoplay() } }
     }
+    /// When on (default), the game finishes itself automatically the moment a full
+    /// send-everything-home cascade would win — no tap needed. Off = play the last cards yourself.
+    @Published var autoFinishOn = true {
+        didSet { UserDefaults.standard.set(autoFinishOn, forKey: "causeway.autofinish"); if autoFinishOn { maybeAutoFinish() } }
+    }
 
     let winStore = WinStore()
 
@@ -61,6 +66,9 @@ final class Game: ObservableObject {
             .store(in: &cancellables)
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
             autoplayOn = UserDefaults.standard.bool(forKey: "causeway.autoplay")
+        }
+        if UserDefaults.standard.object(forKey: "causeway.autofinish") != nil {
+            autoFinishOn = UserDefaults.standard.bool(forKey: "causeway.autofinish")
         }
         if !restore() { deal(seed: randomSeed()) }   // resume an in-progress game if one was saved
     }
@@ -166,6 +174,7 @@ final class Game: ObservableObject {
         // runAutoplay() is a no-op unless started && autoplayOn, and only sends provably
         // safe cards, so this is safe to call unconditionally here.
         runAutoplay()
+        maybeAutoFinish()   // a resumed board might already be finishable
         return true
     }
 
@@ -267,6 +276,7 @@ final class Game: ObservableObject {
         if checkWin() { onWin(); return }
         persist()
         runAutoplay()
+        maybeAutoFinish()   // auto-complete now if this move made the board finishable
     }
 
     func undo() {
@@ -467,6 +477,7 @@ final class Game: ObservableObject {
                     self.step()
                 } else {
                     self.autoplaying = false
+                    self.maybeAutoFinish()   // safe-autoplay settled; auto-complete if now finishable
                 }
             }
         }
@@ -499,6 +510,40 @@ final class Game: ObservableObject {
         }
         if any && !started { started = true; startTimer() }
         if checkWin() { onWin() } else if any { persist() }
+    }
+
+    /// Would forcing every available card home (the aggressive `autoFinish`) empty the board and
+    /// win? A pure simulation on copies of the state — the trigger for automatic finishing. Uses
+    /// the same greedy rule as `autoFinish` so detection and execution can never disagree.
+    private func autoFinishWouldWin() -> Bool {
+        var u = up, d = down, cs = cells, tb = tableau
+        func canUp(_ c: Card) -> Bool { c.rank == u[c.suit.rawValue] + 1 && c.rank < d[c.suit.rawValue] }
+        func canDown(_ c: Card) -> Bool { c.rank == d[c.suit.rawValue] - 1 && c.rank > u[c.suit.rawValue] }
+        var moved = true
+        while moved {
+            moved = false
+            for i in 0..<Game.cellCount {
+                if let c = cs[i], canUp(c) || canDown(c) {
+                    cs[i] = nil
+                    if canUp(c) { u[c.suit.rawValue] = c.rank } else { d[c.suit.rawValue] = c.rank }
+                    moved = true
+                }
+            }
+            for col in 0..<Game.colCount {
+                if let c = tb[col].last, canUp(c) || canDown(c) {
+                    tb[col].removeLast()
+                    if canUp(c) { u[c.suit.rawValue] = c.rank } else { d[c.suit.rawValue] = c.rank }
+                    moved = true
+                }
+            }
+        }
+        return (0..<4).allSatisfy { d[$0] == u[$0] + 1 }
+    }
+
+    /// Auto-complete when enabled: if a full auto-finish would win from here, run it now.
+    func maybeAutoFinish() {
+        guard autoFinishOn, started, !won, autoFinishWouldWin() else { return }
+        autoFinish()
     }
 
     // MARK: - Win + timer

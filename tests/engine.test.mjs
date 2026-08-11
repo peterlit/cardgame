@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
-  mulberry32, deal, isValidSave, isSafeAutoplay, saveFromDeal,
+  mulberry32, deal, isValidSave, isSafeAutoplay, saveFromDeal, autoFinishWouldWin,
   NCOLS, NCELLS,
 } from "./engine.mjs";
 
@@ -165,6 +165,30 @@ test("rejects wrong-shaped saves", () => {
 });
 
 /* ---------------- DRIFT GUARD ---------------- */
+/* ---------------- auto-finish trigger (autoFinishWouldWin) ---------------- */
+test("autoFinishWouldWin: true when the four remaining Kings can all cascade up", () => {
+  const state = { up:[12,12,12,12], down:[14,14,14,14], cells:[null,null,null],
+    tableau:[[{suit:0,rank:13}],[{suit:1,rank:13}],[{suit:2,rank:13}],[{suit:3,rank:13}],[],[],[],[]] };
+  assert.equal(autoFinishWouldWin(state), true);
+});
+
+test("autoFinishWouldWin: true when a full ordered suit must peel off across many steps", () => {
+  const spades = []; for(let r=13;r>=1;r--) spades.push({suit:0,rank:r});   // A on top
+  const state = { up:[0,13,13,13], down:[14,14,14,14], cells:[null,null,null],
+    tableau:[spades,[],[],[],[],[],[],[]] };
+  assert.equal(autoFinishWouldWin(state), true);
+});
+
+test("autoFinishWouldWin: false when a card can't reach any foundation", () => {
+  const state = { up:[0,0,0,0], down:[14,14,14,14], cells:[null,null,null],
+    tableau:[[{suit:0,rank:5}],[],[],[],[],[],[],[]] };   // lone 5 spades, foundations empty
+  assert.equal(autoFinishWouldWin(state), false);
+});
+
+test("autoFinishWouldWin: false for a freshly dealt board", () => {
+  assert.equal(autoFinishWouldWin(deal(42)), false);   // deal() returns a full state
+});
+
 // engine.mjs is a hand-copy of index.html's inline <script> logic. Assert the
 // canonical function bodies still appear verbatim in index.html so the copy can't
 // silently rot. Whitespace-normalized substring match.
@@ -187,6 +211,9 @@ test("engine.mjs logic still matches index.html (no drift)", () => {
     'if(!(canFoundationUp(card)||canFoundationDown(card))) return false; const opp = card.color==="red" ? BLACK_SUITS : RED_SUITS; return opp.every(x=>rankOnFound(x, card.rank-1) && rankOnFound(x, card.rank+1));',
     // mark() with the F3 suit guard
     "const mark = (suit,rank)=>{ if(!(suit>=0 && suit<=3)) return false; if(!(rank>=1 && rank<=13)) return false;",
+    // autoFinishWouldWin: the greedy cascade predicates + the win check
+    "const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit]; const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];",
+    "for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false; return true;",
   ];
   for (const c of canon) {
     assert.ok(html.includes(norm(c)), `index.html no longer contains: ${c.slice(0, 60)}...`);

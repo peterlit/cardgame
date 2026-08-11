@@ -116,7 +116,7 @@ struct ContentView: View {
             pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
             pill("Undo") { withAnimation { game.undo() } }.disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
             pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-            pill("Auto-finish") { game.autoFinish() }
+            pill(game.autoFinishOn ? "Auto-finish: On" : "Auto-finish: Off") { game.autoFinishOn.toggle() }
             pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
                 dealText = "\(game.seed)"; showDeal = true
             }

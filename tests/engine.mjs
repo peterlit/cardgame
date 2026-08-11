@@ -74,6 +74,34 @@ export function isSafeAutoplay(state, card){
   return opp.every(x=>rankOnFound(state,x, card.rank-1) && rankOnFound(state,x, card.rank+1));
 }
 
+// CANON:autoFinishWouldWin
+// Would forcing every available card home empty the board and win? Pure simulation on
+// copies — the trigger for automatic finishing. Same greedy rule as autoFinish.
+export function autoFinishWouldWin(state){
+  const up=state.up.slice(), down=state.down.slice();
+  const cells=state.cells.slice();
+  const tab=state.tableau.map(c=>c.slice());
+  const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit];
+  const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];
+  let moved=true;
+  while(moved){
+    moved=false;
+    for(let i=0;i<NCELLS;i++){
+      const c=cells[i]; if(!c) continue;
+      if(canUp(c)){ up[c.suit]=c.rank; cells[i]=null; moved=true; }
+      else if(canDown(c)){ down[c.suit]=c.rank; cells[i]=null; moved=true; }
+    }
+    for(let col=0;col<NCOLS;col++){
+      const t=tab[col]; if(!t.length) continue;
+      const c=t[t.length-1];
+      if(canUp(c)){ up[c.suit]=c.rank; t.pop(); moved=true; }
+      else if(canDown(c)){ down[c.suit]=c.rank; t.pop(); moved=true; }
+    }
+  }
+  for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false;
+  return true;
+}
+
 /* ---------- restore-save validator ---------- */
 // Mirrors index.html restoreGame()'s validation gate. Returns true iff `g` is a
 // resumable save (52 canonical cards, foundations in range and non-crossing,

@@ -81,3 +81,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
 41. Card appearance: keep 8px radius, make the face flat white, border deepest black. Both
     platforms — web `.card` white bg + `--card-edge` #000 + removed per-suit tints; iOS
     `CardView` white fill + `Theme.cardEdge` #000. Empty slots left as-is.
+42. Make Auto-finish a toggle (on by default) that fires automatically instead of on tap.
+    Trigger = "when the game is won" (a full send-everything-home cascade would win); action =
+    the existing aggressive `autoFinish()`. New `autoFinishWouldWin()` dry-run gates a
+    `maybeAutoFinish()` called after each move / autoplay-settle / restore. Both platforms +
+    persisted setting; 4 new engine tests (22/22) with drift guard; verified end-to-end on web
+    (ON auto-completes, OFF doesn't, fresh deal never false-triggers).

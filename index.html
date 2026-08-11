@@ -240,7 +240,7 @@
     <button class="btn primary" id="newBtn">New game</button>
     <button class="btn" id="undoBtn">Undo</button>
     <button class="btn" id="autoplayBtn" title="Automatically send safe cards to the foundations after each move">Auto-play: On</button>
-    <button class="btn" id="autoBtn" title="Force every available card to the foundations now">Auto-finish</button>
+    <button class="btn" id="autoBtn" title="Automatically finish the game as soon as every remaining card can go home">Auto-finish: On</button>
     <button class="btn" id="seedBtn" title="Type a deal number to play that exact deal">Deal #<span id="seedLbl">—</span><span id="seedWon"></span></button>
     <button class="btn" id="winsBtn" title="Deals you've solved">Wins</button>
   </div>
@@ -337,6 +337,7 @@ function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; 
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 
 let autoplayOn = lsGet("causeway.autoplay") !== "off";   // default ON, like MobilityWare
+let autoFinishOn = lsGet("causeway.autofinish") !== "off";   // default ON: auto-complete once the game is decided
 
 /* ---------- win tracking ---------- */
 let wins = loadWins();   // { [seed]: {moves, secs, date} }
@@ -433,6 +434,7 @@ function restoreGame(){
   // A kill mid-autoplay-chain can leave more safe cards to send; runAutoplay() no-ops
   // unless autoplay is on and the clock has started, and only sends provably safe cards.
   runAutoplay();
+  maybeAutoFinish();   // a resumed board might already be finishable
   return true;
 }
 
@@ -548,6 +550,8 @@ function runAutoplay(){
       if(!startTime){ startTime=Date.now(); startTimer(); }
       if(isWon()){ onWin(); return; }
       autoTimer=setTimeout(step,165);   // sequential reveal, paced just past the flight time
+    } else {
+      maybeAutoFinish();   // safe-autoplay settled; auto-complete if now finishable
     }
   };
   autoTimer=setTimeout(step,140);
@@ -581,6 +585,7 @@ function commitMove(){
   if(isWon()){ onWin(); return; }
   saveGame();
   runAutoplay();
+  maybeAutoFinish();   // auto-complete now if this move made the board finishable
 }
 
 /* selection: {kind:'tableau',col,idx} | {kind:'cell',idx} */
@@ -696,6 +701,39 @@ function autoFinish(){
     }
   }
   if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); else saveGame(); }
+}
+
+// Would forcing every available card home (autoFinish) empty the board and win? A pure
+// simulation on copies of the state — the trigger for automatic finishing. Uses the same
+// greedy rule as autoFinish, so detection and execution can never disagree.
+function autoFinishWouldWin(){
+  const up=state.up.slice(), down=state.down.slice();
+  const cells=state.cells.slice();
+  const tab=state.tableau.map(c=>c.slice());
+  const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit];
+  const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];
+  let moved=true;
+  while(moved){
+    moved=false;
+    for(let i=0;i<NCELLS;i++){
+      const c=cells[i]; if(!c) continue;
+      if(canUp(c)){ up[c.suit]=c.rank; cells[i]=null; moved=true; }
+      else if(canDown(c)){ down[c.suit]=c.rank; cells[i]=null; moved=true; }
+    }
+    for(let col=0;col<NCOLS;col++){
+      const t=tab[col]; if(!t.length) continue;
+      const c=t[t.length-1];
+      if(canUp(c)){ up[c.suit]=c.rank; t.pop(); moved=true; }
+      else if(canDown(c)){ down[c.suit]=c.rank; t.pop(); moved=true; }
+    }
+  }
+  for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false;
+  return true;
+}
+// Auto-complete when enabled: if a full auto-finish would win from here, run it now.
+function maybeAutoFinish(){
+  if(!autoFinishOn || !startTime || isWon()) return;
+  if(autoFinishWouldWin()) autoFinish();
 }
 
 /* ---------- rendering ---------- */
@@ -993,7 +1031,16 @@ document.getElementById("newBtn").onclick=()=>deal(randomSeed());
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=undo;
-document.getElementById("autoBtn").onclick=autoFinish;
+function refreshAutoFinishBtn(){
+  document.getElementById("autoBtn").textContent = "Auto-finish: " + (autoFinishOn?"On":"Off");
+}
+document.getElementById("autoBtn").onclick=()=>{
+  autoFinishOn=!autoFinishOn;
+  lsSet("causeway.autofinish", autoFinishOn?"on":"off");
+  refreshAutoFinishBtn();
+  if(autoFinishOn) maybeAutoFinish();   // flipping it on finishes now if the board is already decided
+};
+refreshAutoFinishBtn();
 document.getElementById("winsBtn").onclick=openWins;
 document.getElementById("winsClose").onclick=closeWins;
 document.getElementById("winsDealGo").onclick=winsPlay;
