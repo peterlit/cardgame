@@ -66,6 +66,9 @@ final class Game: ObservableObject {
     /// value live at schedule time; any teardown/restart (undo, deal, a new runAutoFinish) bumps
     /// it so a still-queued block from a superseded chain bails instead of double-running.
     private var finishGen = 0
+    /// Guards the durable win record so it fires exactly once even though recordWin() is called at
+    /// the winning move and onWin() may call it again after the deferred beat. Reset per new game.
+    private var winRecorded = false
 
     let winStore = WinStore()
 
@@ -121,6 +124,7 @@ final class Game: ObservableObject {
         moveCount = 0
         clock.reset()
         won = false
+        winRecorded = false      // fresh game — allow the next win to record
         started = false
         autoplaying = false
         finishing = false
@@ -193,6 +197,7 @@ final class Game: ObservableObject {
         seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
         moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
+        winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)
         // Reset finish state too (parity with web restoreGame): restore() is init-only so these
         // are already default, but keep it explicit and robust against future re-entrant restores.
         finishing = false; promptAutoFinish = false; autoFinishDeferred = false
@@ -541,7 +546,10 @@ final class Game: ObservableObject {
     /// previous lands, the same sequential reveal the safe-autoplay chain uses. Only meaningful
     /// when the board is finishable (callers gate on that); a no-op otherwise.
     func runAutoFinish() {
-        guard !finishing, !won, autoFinishWouldWin() else { return }
+        // `!checkWin()`: an already-complete board (e.g. during the deferred-overlay beat, when
+        // `won` is still false) has nothing to finish — re-entering here would bump finishGen and
+        // orphan the pending win. autoFinishWouldWin() alone returns true on a solved board.
+        guard !finishing, !won, !checkWin(), autoFinishWouldWin() else { return }
         promptAutoFinish = false
         stopAutoplayPending()   // the finish chain supersedes safe-autoplay
         selection = nil
@@ -559,6 +567,7 @@ final class Game: ObservableObject {
             if !self.started { self.started = true; self.startTimer() }
             if self.checkWin() {
                 self.finishing = false
+                self.recordWin()   // durable side effects NOW so a kill during the beat can't lose the win
                 // Let the last card actually LAND (and the completed board show for a beat) before
                 // the win overlay covers it — otherwise it pops up over a still-animating foundation.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) { [weak self] in
@@ -602,7 +611,7 @@ final class Game: ObservableObject {
 
     /// Offer or perform auto-finish when the board becomes finishable, per the current mode.
     func maybeAutoFinish() {
-        guard started, !won, !finishing, !promptAutoFinish, autoFinishWouldWin() else { return }
+        guard started, !won, !finishing, !promptAutoFinish, !checkWin(), autoFinishWouldWin() else { return }
         switch autoFinishMode {
         case .on:  runAutoFinish()
         case .ask: if !autoFinishDeferred { stopAutoplayPending(); promptAutoFinish = true }
@@ -621,16 +630,25 @@ final class Game: ObservableObject {
 
     /// Whether to show the manual "Finish" button: the board is finishable and idle.
     var canOfferFinish: Bool {
-        started && !won && !finishing && !promptAutoFinish && autoFinishWouldWin()
+        // `!checkWin()` mirrors web's position-based `!isWon()` gate: never offer Finish over an
+        // already-solved board (incl. the deferred-overlay window, where `won` is still false).
+        started && !won && !finishing && !promptAutoFinish && !checkWin() && autoFinishWouldWin()
     }
 
     // MARK: - Win + timer
 
-    private func onWin() {
+    /// Durable win side effects — recorded exactly once, synchronously at the winning move so a
+    /// process kill during the deferred-overlay beat can't lose the win/best-time.
+    private func recordWin() {
+        guard !winRecorded else { return }
+        winRecorded = true
         stopTimer()
         autoplaying = false
         clearSaved()   // finished game — next launch should start fresh
         winStore.record(seed: seed, moves: moveCount, secs: clock.elapsed)
+    }
+    private func onWin() {
+        recordWin()   // no-op if the winning step already recorded it
         won = true
     }
 

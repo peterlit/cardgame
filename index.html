@@ -386,6 +386,7 @@ function deal(theSeed){
   history=[]; moveCount=0; selection=null;
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
+  winRecorded=false; pendingWin=null;   // fresh game — allow the next win to record
   refreshHud();
   hideWin();
   render(false);
@@ -443,6 +444,7 @@ function restoreGame(){
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
+  winRecorded=false; pendingWin=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
   const es = g.elapsedSecs||0;
   if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
   setMoves(moveCount); setTime(es);
@@ -736,7 +738,8 @@ function runAutoFinish(){
       render();   // FLIP animates this one card's flight home
       if(isWon()){
         finishing=false; refreshFinishBtn();
-        // let the last card land (140ms flight) + a beat before the win overlay covers the board
+        recordWin();   // durable side effects NOW — a tab close during the beat can't lose the win
+        // defer ONLY the overlay so it doesn't cover a still-animating foundation
         finishTimer=setTimeout(()=>{ finishTimer=null; if(isWon()) onWin(); },320);
         return;
       }
@@ -974,7 +977,13 @@ function startTimer(){ stopTimer(); timerId=setInterval(()=>{ setTime(Math.floor
 function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 
 /* ---------- win ---------- */
-function onWin(){
+let winRecorded=false, pendingWin=null;
+// Durable win side effects — recorded exactly once, synchronously at the winning move so a tab
+// close during the deferred-overlay beat can't lose the win/best-time. Stashes the display data
+// (secs + prior best) for the deferred overlay, since wins[seed] gets overwritten here.
+function recordWin(){
+  if(winRecorded) return;
+  winRecorded=true;
   stopTimer();
   clearSavedGame();   // finished game — a reload should start fresh
   const secs = startTime?Math.floor((Date.now()-startTime)/1000):0;
@@ -984,10 +993,16 @@ function onWin(){
     : { moves:moveCount, secs, date:Date.now() };
   saveWins();
   refreshHud();
+  pendingWin = { seed, moves:moveCount, secs, prev };
+}
+function onWin(){
+  recordWin();   // durable side effects, exactly once (no-op if already recorded)
+  const w = pendingWin || { seed, moves:moveCount, prev:wins[seed],
+                            secs: startTime?Math.floor((Date.now()-startTime)/1000):0 };
   document.getElementById("winMsg").textContent =
-    `Deal #${seed} · ${moveCount} moves · ${fmtTime(secs)}.` +
-    (prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
-  const next = seed>=1000000 ? 1 : seed+1;          // suggest the next deal number
+    `Deal #${w.seed} · ${w.moves} moves · ${fmtTime(w.secs)}.` +
+    (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
+  const next = w.seed>=1000000 ? 1 : w.seed+1;      // suggest the next deal number
   const nextBtn = document.getElementById("winNext");
   nextBtn.textContent = `Play deal #${next}`;
   nextBtn.onclick = ()=>deal(next);
