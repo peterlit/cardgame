@@ -115,20 +115,32 @@ are done or added.
   and a load-time backup-restore attempt **before** any `WinRecord` schema change ships.
 - **I3 — Pile direction inferred from top two cards** including dealt coincidences — document
   precisely or make explicit.
-- **I6 — FIX LANDED, on-device trace pending (targets an on-device OOM).** `elapsed` was
-  `@Published` on `Game`, so the 1 Hz timer re-rendered the entire `ContentView` — including
-  `SummerBackground`'s `.blur()` layers and 52 cards' `matchedGeometryEffect` — every second
-  even while idle, the suspected cause of memory growing until the OS killed the app (~14 min).
-  Isolated the clock into `GameClock` (only a small `ClockStat` label observes it) and marked
-  `SummerBackground` `Equatable` + `.equatable()` so its blur scene isn't re-rasterized on
-  unrelated state changes. Also gives `GameClock` a `deinit` timer-invalidate (partially
-  addresses L6). **Verified: code-level SwiftUI/Combine reasoning + full iOS type-check
-  (`xcrun swiftc -typecheck`). NOT yet verified: an on-device Instruments/Allocations trace
-  showing RSS actually plateaus.** See the verification task below before marking I6 DONE.
-- **I6-verify — Confirm the OOM fix on device.** Profile RSS with Instruments (Allocations) over
-  a 15+ min idle session on a physical device to confirm memory plateaus and the OOM is gone.
-  Keep the clock-isolation (`GameClock`) + `SummerBackground.equatable` changes regardless; this
-  task only validates the effect. If RSS still climbs, the leak has another source — re-open I6.
+- **I6 — REOPENED: fix helped but did not fully clear the OOM; measurement was contaminated.**
+  `elapsed` was `@Published` on `Game`, so the 1 Hz timer re-rendered the entire `ContentView` —
+  including `SummerBackground`'s `.blur()` layers and 52 cards' `matchedGeometryEffect` — every
+  second even while idle, a suspected cause of memory growth. Isolated the clock into `GameClock`
+  (only a small `ClockStat` label observes it) and marked `SummerBackground` `Equatable` +
+  `.equatable()`. This **helped**: a fresh on-device OOM report (2026-08-11, iPhone 13 Pro / iOS
+  26.6) shows the app now survives **~21.6 min** vs **~14.2 min** pre-fix — but it *still* got
+  jetsam-killed. **However that crash is not a trustworthy read of production memory:** it was a
+  Debug build under LLDB with View Debugging (`viewDebugging_insertDylibOnLaunch=1`), Malloc Stack
+  Logging, and the Main-Thread / Thread-Performance checkers all enabled — instrumentation that
+  inflates and continuously grows RSS over minutes largely independent of app code. Code review
+  finds **no idle-time unbounded growth** in the app: `GameClock` is single-timer + `[weak self]` +
+  `deinit`-invalidate; `runAutoplay` self-terminates and guards `!autoplaying`; undo `history` is
+  bounded to 500 and only grows on moves. Keep the `GameClock`/`equatable` changes regardless.
+  Remaining app-level suspect *if* a clean build still climbs: `matchedGeometryEffect` retention
+  across per-move re-renders during active play. Do I6-verify before spending any more on a fix.
+- **I6-verify — Re-measure the OOM WITHOUT debug instrumentation (this is the real test).** The
+  prior on-device numbers came from a Debug build under Xcode with view debugging + malloc stack
+  logging attached — invalid for judging production memory. Re-run one of: (a) **Release build,
+  launched untethered** (not attached to Xcode), played/idle 25–30 min — if it survives, the OOM
+  was a debug-tooling artifact and I6 can close; if it dies, capture `JetsamEvent-…Causeway` from
+  Settings → Privacy & Security → Analytics & Improvements → Analytics Data for the exact kill
+  size; or (b) **Instruments → Allocations** on a Release build (Product → Profile), watching
+  Persistent Bytes with a generation marked each minute — flat = fine, a growing generation names
+  the leak. Only if a clean Release build genuinely climbs is there a real leak to chase (start
+  with `matchedGeometryEffect`).
 - **DRAG-verify — DONE (simulator-verified 2026-08-11).** The manual `DragGesture` build was
   driven on the iPhone 17 Pro simulator: tap→smart-move, single drag to a specific free cell
   (overriding the smart choice), illegal drop (heart→spade foundation) snapping back with no move

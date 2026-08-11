@@ -65,3 +65,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     8px slop) + a `PreferenceKey` map of drop-zone frames in a "board" coordinate space for
     hit-testing. Verified on the iPhone 17 Pro simulator: tap→smart-move, single drag to a chosen
     free cell, illegal-drop snap-back, and a 2-card run drag across columns all work.
+39. Review a fresh on-device OOM report (iPhone 13 Pro, ~21.6 min). Finding: the app now survives
+    longer post-fix (was ~14 min) but was still jetsam-killed — however the crash came from a Debug
+    build under Xcode with View Debugging + Malloc Stack Logging + checkers, which inflate/grow RSS
+    and make it an invalid read of production memory. Code review finds no idle-time leak (clock
+    isolated, autoplay self-terminating, undo bounded). Reopened I6; I6-verify now demands a
+    Release + untethered (or Instruments Allocations) re-measure before chasing any fix.
