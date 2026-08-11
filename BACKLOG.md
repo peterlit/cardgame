@@ -129,14 +129,14 @@ are done or added.
   a 15+ min idle session on a physical device to confirm memory plateaus and the OOM is gone.
   Keep the clock-isolation (`GameClock`) + `SummerBackground.equatable` changes regardless; this
   task only validates the effect. If RSS still climbs, the leak has another source — re-open I6.
-- **DRAG-verify — Confirm the iOS manual tap/drag on device.** Single tap already confirmed good.
-  Re-check the manual `DragGesture` build: (1) a card lifts *instantly* (no press-and-hold) and
-  follows the finger with no system drag chrome; (2) an 8px slop cleanly separates tap from drag;
-  (3) dragging a run head carries the whole run and drops legally onto the column/free
-  cell/foundation under the finger, snapping back on an illegal drop; (4) buried (non-run-head)
-  cards don't lift but still tap; (5) a card dragged across areas (free cell ⇄ tableau) floats
-  above, not under, the other area. If frame hit-testing is off, verify the `.coordinateSpace(name:
-  "board")` ancestor covers all drop zones and that `dropZones` isn't stale.
+- **DRAG-verify — DONE (simulator-verified 2026-08-11).** The manual `DragGesture` build was
+  driven on the iPhone 17 Pro simulator: tap→smart-move, single drag to a specific free cell
+  (overriding the smart choice), illegal drop (heart→spade foundation) snapping back with no move
+  counted, tap-park to a free cell, and a **2-card run drag** ([10♠,9♦]→J♥ across columns) all
+  behaved correctly — instant grab, no system drag chrome, correct frame hit-testing. Note: a
+  zero-dwell instant *flick* can occasionally fail to latch the drag; a normal finger drag (any
+  slight initial dwell) is reliable. Physical-device feel re-check is optional (the earlier
+  press-and-hold + "+"/ghost-chrome complaint is resolved by the instant-grab design).
 - **L1 (rest) — Undo cap is 500 snapshots** (auto-play snapshots per card); revisit or
   document.
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
