@@ -83,8 +83,9 @@
     border: 1px solid var(--card-edge);
     box-shadow: 0 1px 2px rgba(40,30,10,.28);
     position: absolute; left:0;
-    cursor: pointer; overflow:hidden;
+    cursor: grab; overflow:hidden; touch-action: none;
   }
+  .card:active { cursor: grabbing; }
   .cells .card, .found-grid .card { position:absolute; top:0; left:0; }
   /* value banner: rank top-left, suit top-right, both large + equal height */
   .card .r, .card .s {
@@ -268,7 +269,7 @@
       <li><b>The catch:</b> the up and down halves of a suit can never cross. A 7 or 8 has no home until the ends climb to reach it — plan around it.</li>
       <li><span class="name">Tableau:</span> build in <b>alternating colors</b>, one rank at a time, in <b>either direction</b> — a pile can run down (red on black) <i>or</i> up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run as a group if you have enough free cells + empty columns.</li>
       <li><span class="name">Free cells:</span> 3 single-card parking spots.</li>
-      <li><span class="name">Controls:</span> tap a card to pick it up, tap where it should go. Double-tap auto-moves a card: to a foundation if it fits, otherwise onto another card, then an empty column, then a free cell. Everything is face-up — it's pure skill.</li>
+      <li><span class="name">Controls:</span> <b>tap</b> a card (or a valid stack) to send it to the best spot — a foundation if it fits, otherwise onto another card, then an empty column, then a free cell. <b>Drag</b> a card to place it somewhere specific. Everything is face-up — it's pure skill.</li>
     </ul>
   </details>
 </div>
@@ -635,15 +636,10 @@ function removeRun(src){
   if(src.kind==="cell") state.cells[src.idx]=null;
   else state.tableau[src.col].length = src.idx;   // drop idx..end
 }
-// A double-tap dispatches click,click,dblclick. If the first click completed a
-// tap-move (a live selection dropped onto this card), suppress the trailing
-// smartMove so one gesture can't perform two moves.
-let tapMovedAt = 0;
-/* Double-tap = smart move. Works on any card heading a valid run (the card and
-   the sub-stack below it). Priority: foundation → onto another card → empty
-   column → free cell. Foundation/free cell apply to single cards only. */
+/* Tap = smart move. Works on any card heading a valid run (the card and the
+   sub-stack below it). Priority: foundation → onto another card → empty column →
+   free cell. Foundation/free cell apply to single cards only. */
 function smartMove(src){
-  if(performance.now() - tapMovedAt < 350) return false;   // part of a tap-then-double gesture
   let run;
   if(src.kind==="cell"){ const c=state.cells[src.idx]; if(!c) return false; run=[c]; }
   else {
@@ -706,30 +702,6 @@ function autoFinish(){
   if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); else saveGame(); }
 }
 
-/* ---------- selection handling ---------- */
-function handleCardTap(loc){
-  // loc = {kind:'tableau',col,idx} or {kind:'cell',idx}
-  if(selection){
-    // tapping the already-selected card deselects
-    if(selection.kind===loc.kind &&
-       ((loc.kind==="cell"&&selection.idx===loc.idx) ||
-        (loc.kind==="tableau"&&selection.col===loc.col&&selection.idx===loc.idx))){
-      selection=null; render(); return;
-    }
-    // tapping another tableau card = try to drop onto that column
-    if(loc.kind==="tableau"){ if(tryDestTableau(loc.col)){ tapMovedAt=performance.now(); return; } }
-    if(loc.kind==="cell"){ if(tryDestCell(loc.idx)){ tapMovedAt=performance.now(); return; } }
-    // otherwise reselect the tapped card (if selectable)
-  }
-  // make a new selection
-  if(loc.kind==="cell"){
-    if(state.cells[loc.idx]) { selection=loc; render(); }
-    return;
-  }
-  if(!isSeqHead(loc.col,loc.idx)) return;  // not a movable run
-  selection=loc; render();
-}
-
 /* ---------- rendering ---------- */
 // Traditional pip layouts: [x%, y%] of the card face. y>50 → pip is drawn upside-down.
 // Columns sit at 33/67% and the outer rows at 19/81% so pips clear the corner indices.
@@ -764,12 +736,6 @@ function cardEl(card, extraClass){
   el.innerHTML=html;
   return el;
 }
-function isSelected(loc){
-  if(!selection) return false;
-  if(loc.kind!==selection.kind) return false;
-  if(loc.kind==="cell") return selection.idx===loc.idx;
-  return selection.col===loc.col && loc.idx>=selection.idx;
-}
 
 // FLIP animation: remember where every card is, rebuild, then glide each to its new spot.
 function captureRects(){
@@ -801,16 +767,13 @@ function render(animate=true){
   /* free cells */
   const cells=document.getElementById("cells"); cells.innerHTML="";
   for(let i=0;i<NCELLS;i++){
-    const slot=document.createElement("div"); slot.className="slot";
+    const slot=document.createElement("div"); slot.className="slot"; slot.dataset.cell=i;
     const c=state.cells[i];
     if(c){
       const loc={kind:"cell",idx:i};
-      const el=cardEl(c, isSelected(loc)?"sel":"");
-      el.onclick=()=>handleCardTap(loc);
-      el.ondblclick=()=>smartMove(loc);
+      const el=cardEl(c);
+      el.addEventListener("pointerdown", e=>startDrag(e, loc));   // tap = smart-move, drag = place
       slot.appendChild(el);
-    } else {
-      slot.onclick=()=>{ if(selection) tryDestCell(i); };
     }
     cells.appendChild(slot);
   }
@@ -818,12 +781,11 @@ function render(animate=true){
   /* foundations: 4 suits x (up row, down row) */
   const founds=document.getElementById("founds"); founds.innerHTML="";
   const mk=(suit,dir)=>{
-    const slot=document.createElement("div"); slot.className="slot";
+    const slot=document.createElement("div"); slot.className="slot"; slot.dataset.found=suit+"-"+dir;
     const rank = dir==="up" ? state.up[suit] : (state.down[suit]<14?state.down[suit]:0);
     if(rank){ slot.appendChild(cardEl({suit,rank,color:RED.has(suit)?"red":"black",id:suit*13+rank})); }
     else { const g=document.createElement("div"); g.className="ghost";
            g.textContent=SUITS[suit]; g.style.color=RED.has(suit)?"var(--red)":"var(--black)"; slot.appendChild(g); }
-    slot.onclick=()=>{ if(selection) tryDestFoundation(suit,dir); };
     return slot;
   };
   // grid fills row by row: row0 = all four up piles, row1 = all four down piles
@@ -835,24 +797,18 @@ function render(animate=true){
   const ov=getComputedStyle(document.documentElement).getPropertyValue("--overlap");
   const overlap=parseInt(ov);
   for(let col=0;col<NCOLS;col++){
-    const colEl=document.createElement("div"); colEl.className="col";
+    const colEl=document.createElement("div"); colEl.className="col"; colEl.dataset.col=col;
     const t=state.tableau[col];
     if(t.length===0){
       const slot=document.createElement("div"); slot.className="slot";
-      slot.onclick=()=>{ if(selection) tryDestTableau(col); };
-      colEl.appendChild(slot);
+      colEl.appendChild(slot);   // whole column is a drop target via data-col
     } else {
       t.forEach((card,idx)=>{
         const loc={kind:"tableau",col,idx};
-        const movable=isSeqHead(col,idx);
-        let cls="";
-        if(isSelected(loc)) cls="sel";
-        else if(movable) cls="movable";
-        const el=cardEl(card,cls);
+        const el=cardEl(card, isSeqHead(col,idx)?"movable":"");
         el.style.top=(idx*overlap)+"px";
         el.style.zIndex=idx+1;
-        el.onclick=()=>handleCardTap(loc);
-        el.ondblclick=()=>smartMove(loc);   // works on any card heading a valid run
+        el.addEventListener("pointerdown", e=>startDrag(e, loc));   // tap = smart-move, drag = place
         colEl.appendChild(el);
       });
       colEl.style.height=((t.length-1)*overlap + parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ch")))+"px";
@@ -861,6 +817,66 @@ function render(animate=true){
   }
   document.getElementById("undoBtn").disabled = history.length===0;
   if(prev) flip(prev);
+}
+
+/* ---------- tap = smart-move, drag = manual placement ---------- */
+let drag=null;
+function startDrag(e, loc){
+  if(e.pointerType==="mouse" && e.button!==0) return;
+  if(loc.kind==="tableau" && !isSeqHead(loc.col, loc.idx)) return;   // only valid run heads
+  if(loc.kind==="cell" && !state.cells[loc.idx]) return;
+  e.preventDefault();
+  drag={ loc, x0:e.clientX, y0:e.clientY, started:false, els:[] };
+  window.addEventListener("pointermove", dragMove);
+  window.addEventListener("pointerup", dragUp);
+  window.addEventListener("pointercancel", dragCancel);
+}
+function dragBegin(){
+  drag.started=true;
+  let els;
+  if(drag.loc.kind==="cell"){
+    const s=document.querySelector(`.slot[data-cell="${drag.loc.idx}"]`);
+    els=[s && s.querySelector(".card")];
+  } else {
+    const c=document.querySelector(`.col[data-col="${drag.loc.col}"]`);
+    els = c ? [...c.querySelectorAll(".card")].slice(drag.loc.idx) : [];   // the run
+  }
+  drag.els=els.filter(Boolean);
+  // pointer-events:none so elementFromPoint sees the drop target beneath the floating run
+  drag.els.forEach(el=>{ el.style.pointerEvents="none"; el.style.zIndex=1000; el.style.transition="none"; });
+}
+function dragMove(e){
+  if(!drag) return;
+  const dx=e.clientX-drag.x0, dy=e.clientY-drag.y0;
+  if(!drag.started){ if(Math.hypot(dx,dy)<6) return; dragBegin(); }   // threshold: tap vs drag
+  for(const el of drag.els) el.style.transform=`translate(${dx}px,${dy}px)`;
+}
+function endDragListeners(){
+  window.removeEventListener("pointermove", dragMove);
+  window.removeEventListener("pointerup", dragUp);
+  window.removeEventListener("pointercancel", dragCancel);
+}
+function dragUp(e){
+  endDragListeners();
+  const d=drag; drag=null;
+  if(!d) return;
+  if(!d.started){ smartMove(d.loc); return; }          // no movement => a tap => auto-move
+  const under=document.elementFromPoint(e.clientX, e.clientY);
+  const dest=under ? under.closest("[data-col],[data-cell],[data-found]") : null;
+  let moved=false;
+  if(dest){
+    selection=d.loc;                                    // reuse the manual-placement logic
+    if(dest.dataset.col!==undefined) moved=tryDestTableau(+dest.dataset.col);
+    else if(dest.dataset.cell!==undefined) moved=tryDestCell(+dest.dataset.cell);
+    else if(dest.dataset.found!==undefined){ const p=dest.dataset.found.split("-"); moved=tryDestFoundation(+p[0], p[1]); }
+    selection=null;
+  }
+  if(!moved) render(false);                             // illegal/no drop => snap the run back
+}
+function dragCancel(){
+  endDragListeners();
+  const started=drag && drag.started; drag=null;
+  if(started) render(false);
 }
 
 /* ---------- stats / timer ---------- */

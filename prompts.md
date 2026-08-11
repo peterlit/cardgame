@@ -57,3 +57,6 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     bumped the privacy-policy date (F5).
 37. Fix an on-device OOM: isolate the 1 Hz clock (GameClock) and make SummerBackground
     equatable so the blurred scene isn't re-rasterized every second (I6). Then re-run the loop.
+38. Analyze then change interaction: single tap = smart-move (was double-tap) + drag to place
+    a card/stack exactly (hybrid). Removes the old tap-to-select model and double-tap latency
+    (M6). Web done + tested; iOS to follow.
