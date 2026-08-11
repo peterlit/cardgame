@@ -17,7 +17,7 @@ enum Theme {
 
     static let cardCream = Color(hex: 0xF3ECD9)
     static let cardCreamTop = Color(hex: 0xF8F2E2)
-    static let cardEdge = Color(hex: 0xCDBF9D)
+    static let cardEdge = Color(hex: 0x000000)   // deepest-black card border on the white face
     static let red = Color(hex: 0xB04738)
     static let black = Color(hex: 0x2A3B44)
     static let ink = Color(hex: 0x33403C)

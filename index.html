@@ -11,7 +11,7 @@
     --overlap: 48px;       /* visible slice of a stacked card */
     --gap: 6px;
     --card-bg: #f3ecd9;       /* warm parchment cream */
-    --card-edge: #cdbf9d;
+    --card-edge: #000;        /* deepest-black card border on the white face */
     --red: #b04738;           /* muted brick red */
     --black: #2a3b44;         /* dark navy-teal "black" */
     --ink: #33403c;           /* text on the soft background */
@@ -78,8 +78,8 @@
   .col .slot { position:absolute; top:0; left:0; }
 
   .card {
-    width: var(--cw); height: var(--ch); border-radius: 7px;
-    background: linear-gradient(180deg, #f8f2e2, var(--card-bg));
+    width: var(--cw); height: var(--ch); border-radius: 8px;
+    background: #fff;
     border: 1px solid var(--card-edge);
     box-shadow: 0 1px 2px rgba(40,30,10,.28);
     position: absolute; left:0;
@@ -112,10 +112,7 @@
   .card.red { color: var(--red); }
   .card.black { color: var(--black); }
   /* whisper-subtle per-suit tint on the cream base */
-  .card.s0 { background: linear-gradient(180deg,#f6f1e6,#eceadb); } /* spades  — cool */
-  .card.s1 { background: linear-gradient(180deg,#f9f1e4,#f3e6d6); } /* hearts  — warm */
-  .card.s2 { background: linear-gradient(180deg,#f9f2e2,#f4e8cf); } /* diamonds — amber */
-  .card.s3 { background: linear-gradient(180deg,#f5f2e4,#e9ecd9); } /* clubs   — green */
+  /* card face is flat white for every suit (per-suit tints removed) */
   .card.hintsrc { box-shadow: 0 0 0 3px #6fc3ff; }
   .card.movable::after {
     content:""; position:absolute; inset:0; border-radius:7px;
