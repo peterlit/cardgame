@@ -1,89 +1,69 @@
 {
   "round": 1,
-  "round_start_sha": "e18331764b07512f17356727b951fb7ad71a8d10",
+  "round_start_sha": "ae1ebd7d3c1b247aac6898508ea1c40ea4295d5c",
   "max_rounds": 5,
   "findings": [
     {
       "id": "F1",
-      "severity": "major",
-      "title": "iOS: no guard against a second concurrent gesture; second-finger tap fires unintended smartMove and clears in-flight drag",
-      "location": "ios/Causeway/Causeway/Views/ContentView.swift:181-191",
-      "failure_scenario": "Finger A mid-drag on head X; finger B taps head Y. Y's onEnded runs smartMove(Y) and drag=nil; A snaps back, then A re-creates drag(X) and can still drop X -> two moves from one drag.",
-      "rationale": "onEnded tap branch calls smartMove unconditionally + drag=nil with no drag?.source==spot check; @State drag is single-valued. CONFIRMED no guard; manifestation SUSPECTED (needs device). Recoverable via undo.",
-      "suggested_fix": "onEnded: return early unless drag==nil||drag?.source==spot; onChanged: only create DragInfo when drag==nil.",
-      "current_status": "fixed",
+      "severity": "minor",
+      "title": "iOS restore() omits finishing/promptAutoFinish/autoFinishDeferred resets that web restoreGame() performs",
+      "location": "ios/Causeway/Causeway/Model/Game.swift:186-194",
+      "failure_scenario": "restore() reused outside init with stale finishing/deferred -> restored game skips prompt or starts frozen; currently unreachable (restore() init-only).",
+      "rationale": "Web restoreGame() resets stopFinish/autoFinishDeferred/hideFinishPrompt; iOS restore() resets only selection/history/won/autoplaying \u2014 latent parity gap.",
+      "suggested_fix": "Add finishing=false; promptAutoFinish=false; autoFinishDeferred=false in restore().",
+      "current_status": "open",
       "status_history": [
         {
           "round": 1,
           "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "guard drag==nil||source==spot verified on all 4 paths; onChanged unchanged; no new swallow."
         }
       ]
     },
     {
       "id": "F2",
       "severity": "minor",
-      "title": "iOS: drag state can stick non-nil if dragged view is torn down mid-drag by in-flight autoplay",
-      "location": "ios/Causeway/Causeway/Views/ContentView.swift:176-192",
-      "failure_scenario": "Drag a tableau top card while a prior autoplay chain ticks; a step sends it home, destroying the view. If SwiftUI cancels without onEnded, drag stays set -> column stuck at elevated zIndex.",
-      "rationale": "drag only cleared in onEnded; no board-mutation observer resets it. No corruption, purely stuck visual layering. SUSPECTED.",
-      "suggested_fix": "Reset drag=nil via .onChange(of: game.moveCount) or when drag.source no longer indexes a live card.",
-      "current_status": "fixed",
+      "title": "iOS finish chain has no timer handle/generation token; overlapping chains possible",
+      "location": "ios/Causeway/Causeway/Model/Game.swift:501-511",
+      "failure_scenario": "mid-finish (.on): Undo sets finishing=false with a block still queued, then a move within ~160ms re-enters runAutoFinish -> two finishStep chains at 2x cadence + double persist; self-heals, no card loss.",
+      "rationale": "iOS relies solely on the finishing flag and never cancels the pending asyncAfter; web clears a single finishTimer in stopFinish and is immune.",
+      "suggested_fix": "Use a finish generation counter captured in the closure, or guard runAutoFinish against a pending block.",
+      "current_status": "open",
       "status_history": [
         {
           "round": 1,
           "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "dragSourceHoldsCard bounds-safe; autoplay mutates before moveCount++; drop sets drag=nil synchronously first; no wrong-cancel."
         }
       ]
     },
     {
       "id": "F3",
       "severity": "minor",
-      "title": "Dead code from selection removal: CardView.selected and web .card.sel unreachable",
-      "location": "ios/Causeway/Causeway/Views/CardView.swift:7,52-53; index.html:119",
-      "failure_scenario": "No runtime failure; misleading residue implying a selection highlight that no longer exists.",
-      "rationale": "All CardView call sites dropped selected:; default false never true; .card.sel never applied after isSelected removal. CONFIRMED via grep.",
-      "suggested_fix": "Delete CardView.selected and its uses; delete the .card.sel CSS rule.",
-      "current_status": "fixed",
+      "title": "Sequential execution (sendOneHome) untested; detection==execution never asserted; iOS engine untested",
+      "location": "tests/engine.test.mjs:169-215; tests/engine.mjs",
+      "failure_scenario": "a future edit makes sendOneHome disagree with autoFinishWouldWin (scan order / predicate tweak) -> a finish strands the board and no test catches it.",
+      "rationale": "engine.mjs exports only autoFinishWouldWin, not sendOneHome; tests only check the predicate on static boards; drift guard pins web/engine.mjs but never iOS.",
+      "suggested_fix": "Add an execution test that loops a sendOneHome-equivalent to fixpoint and asserts empties whenever autoFinishWouldWin is true.",
+      "current_status": "open",
       "status_history": [
         {
           "round": 1,
           "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "param+overlay+CSS removed; grep clean; call sites use card:width: only; selectedCards untouched."
         }
       ]
     },
     {
       "id": "F4",
       "severity": "minor",
-      "title": "iOS: successful drop may visually jump (.offset snaps to zero simultaneously with matchedGeometryEffect)",
-      "location": "ios/Causeway/Causeway/Views/ContentView.swift:189,268-270",
-      "failure_scenario": "On legal drop the model relocates via matchedGeometryEffect while drag=nil zeroes runOffset in the same withAnimation; card may jump finger->old slot->glide to dest.",
-      "rationale": ".offset is render-time, not reflected in matched-geometry source frame; two animations don't compose. Web avoids via FLIP. Cosmetic; SUSPECTED.",
-      "suggested_fix": "Position drag via matchedGeometry-friendly means, or delay clearing drag until matched transition completes.",
-      "current_status": "wontfix_accepted",
+      "title": "Orphaned old persistence key; default silently flips On->Ask, no migration",
+      "location": "ios/Causeway/Causeway/Model/Game.swift:84-88; index.html:352",
+      "failure_scenario": "a build from commit 8844567 stored causeway.autofinish=on; upgrading to HEAD ignores it and defaults to Ask.",
+      "rationale": "Key renamed with default changed On->Ask, no read of legacy key; harmless within one unreleased PR.",
+      "suggested_fix": "Optional: read legacy bool once and map true->on/false->off, or leave and note it.",
+      "current_status": "open",
       "status_history": [
         {
           "round": 1,
           "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "wontfix_accepted",
-          "validation": "only a BACKLOG entry added; no rendering change; cosmetic deferral accepted."
         }
       ]
     }

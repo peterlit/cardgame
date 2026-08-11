@@ -62,6 +62,10 @@ final class Game: ObservableObject {
     @Published var promptAutoFinish = false
     /// Set once the player defers this game's prompt, so we don't nag again (reset on deal).
     private var autoFinishDeferred = false
+    /// Monotonic token identifying the current finish chain. Each `asyncAfter` block captures the
+    /// value live at schedule time; any teardown/restart (undo, deal, a new runAutoFinish) bumps
+    /// it so a still-queued block from a superseded chain bails instead of double-running.
+    private var finishGen = 0
 
     let winStore = WinStore()
 
@@ -81,6 +85,8 @@ final class Game: ObservableObject {
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
             autoplayOn = UserDefaults.standard.bool(forKey: "causeway.autoplay")
         }
+        // No migration from the pre-release `causeway.autofinish` bool: the app hasn't shipped,
+        // so no such key exists in the wild, and the default intentionally moved On -> Ask.
         if let raw = UserDefaults.standard.string(forKey: "causeway.autofinishmode"),
            let mode = AutoFinishMode(rawValue: raw) {
             autoFinishMode = mode
@@ -118,6 +124,7 @@ final class Game: ObservableObject {
         started = false
         autoplaying = false
         finishing = false
+        finishGen &+= 1          // invalidate any finish block queued from the previous game
         promptAutoFinish = false
         autoFinishDeferred = false
         persist()
@@ -186,6 +193,9 @@ final class Game: ObservableObject {
         seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
         moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
+        // Reset finish state too (parity with web restoreGame): restore() is init-only so these
+        // are already default, but keep it explicit and robust against future re-entrant restores.
+        finishing = false; promptAutoFinish = false; autoFinishDeferred = false
         stopTimer()
         if started { startTimer() }
         // A kill mid-autoplay-chain can save a board with more safe cards still to send.
@@ -300,6 +310,7 @@ final class Game: ObservableObject {
     func undo() {
         stopAutoplayPending()
         finishing = false        // halt any running finish cascade
+        finishGen &+= 1          // invalidate any asyncAfter block still queued for the old chain
         promptAutoFinish = false
         guard let h = history.popLast() else { return }
         tableau = h.tableau; cells = h.cells; up = h.up; down = h.down
@@ -535,11 +546,12 @@ final class Game: ObservableObject {
         stopAutoplayPending()   // the finish chain supersedes safe-autoplay
         selection = nil
         finishing = true
-        finishStep()
+        finishGen &+= 1
+        finishStep(gen: finishGen)
     }
-    private func finishStep() {
+    private func finishStep(gen: Int) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
-            guard let self, self.finishing else { return }
+            guard let self, self.finishing, self.finishGen == gen else { return }
             var sent = false
             withAnimation(.easeOut(duration: 0.2)) { sent = self.sendOneHome() }
             guard sent else { self.finishing = false; return }
@@ -547,7 +559,7 @@ final class Game: ObservableObject {
             if !self.started { self.started = true; self.startTimer() }
             if self.checkWin() { self.finishing = false; self.onWin(); return }
             self.persist()
-            self.finishStep()
+            self.finishStep(gen: gen)
         }
     }
 

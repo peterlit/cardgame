@@ -102,6 +102,26 @@ export function autoFinishWouldWin(state){
   return true;
 }
 
+// CANON:sendOneHome
+// One greedy send home — the single step the finish chain repeats to fixpoint. Mirrors
+// index.html sendOneHome() (same cell-before-column order, up-before-down rule) but mutates
+// the passed `state` and omits the app's snapshot()/render side effects. iOS shares this exact
+// algorithm by construction (Game.swift sendOneHome); there is no iOS test target (known backlog).
+export function sendOneHomeStep(state){
+  for(let i=0;i<NCELLS;i++){
+    const c=state.cells[i]; if(!c) continue;
+    if(canFoundationUp(state,c)){ state.cells[i]=null; state.up[c.suit]=c.rank; return true; }
+    if(canFoundationDown(state,c)){ state.cells[i]=null; state.down[c.suit]=c.rank; return true; }
+  }
+  for(let col=0;col<NCOLS;col++){
+    const t=state.tableau[col]; if(!t.length) continue;
+    const c=t[t.length-1];
+    if(canFoundationUp(state,c)){ t.pop(); state.up[c.suit]=c.rank; return true; }
+    if(canFoundationDown(state,c)){ t.pop(); state.down[c.suit]=c.rank; return true; }
+  }
+  return false;
+}
+
 /* ---------- restore-save validator ---------- */
 // Mirrors index.html restoreGame()'s validation gate. Returns true iff `g` is a
 // resumable save (52 canonical cards, foundations in range and non-crossing,

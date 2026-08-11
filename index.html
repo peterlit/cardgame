@@ -349,6 +349,8 @@ function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; 
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 
 let autoplayOn = lsGet("causeway.autoplay") !== "off";   // default ON, like MobilityWare
+// No migration from the pre-release `causeway.autofinish` bool: unshipped, so no such key exists
+// in the wild, and the default intentionally moved On -> Ask.
 let autoFinishMode = (()=>{ const m=lsGet("causeway.autofinishmode"); return (m==="on"||m==="off"||m==="ask")?m:"ask"; })();  // ask (default) | on | off
 let finishing=false, autoFinishDeferred=false, finishPromptOpen=false;
 

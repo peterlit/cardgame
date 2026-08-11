@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   mulberry32, deal, isValidSave, isSafeAutoplay, saveFromDeal, autoFinishWouldWin,
-  NCOLS, NCELLS,
+  sendOneHomeStep, NCOLS, NCELLS,
 } from "./engine.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -189,6 +189,49 @@ test("autoFinishWouldWin: false for a freshly dealt board", () => {
   assert.equal(autoFinishWouldWin(deal(42)), false);   // deal() returns a full state
 });
 
+/* ------- execution == detection (greedy finish empties iff autoFinishWouldWin) ------- */
+// The whole safety story is that the finish *executor* (sendOneHome, looped) empties the board
+// exactly when the *detector* (autoFinishWouldWin) says it would. Run the executor to fixpoint on
+// a clone and assert board-emptied === autoFinishWouldWin over win and no-win fixtures.
+const clone = s => ({
+  up: s.up.slice(), down: s.down.slice(),
+  cells: s.cells.slice(),
+  tableau: s.tableau.map(c => c.slice()),
+});
+const boardEmpty = s => s.tableau.every(c => c.length === 0) && s.cells.every(c => c === null);
+function runFinish(state){                 // loop the single greedy step to fixpoint
+  let steps = 0;
+  while (sendOneHomeStep(state)) { if (++steps > 1000) throw new Error("finish did not terminate"); }
+  return boardEmpty(state);
+}
+
+const kings = () => ({ up:[12,12,12,12], down:[14,14,14,14], cells:[null,null,null],
+  tableau:[[{suit:0,rank:13}],[{suit:1,rank:13}],[{suit:2,rank:13}],[{suit:3,rank:13}],[],[],[],[]] });
+const orderedPeel = () => { const spades=[]; for(let r=13;r>=1;r--) spades.push({suit:0,rank:r});
+  return { up:[0,13,13,13], down:[14,14,14,14], cells:[null,null,null],
+    tableau:[spades,[],[],[],[],[],[],[]] }; };
+const stuck = () => ({ up:[0,0,0,0], down:[14,14,14,14], cells:[null,null,null],
+  tableau:[[{suit:0,rank:5}],[],[],[],[],[],[],[]] });
+
+test("greedy finish empties the board EXACTLY when autoFinishWouldWin is true", () => {
+  const fixtures = {
+    "kings cascade":    kings(),
+    "long ordered peel": orderedPeel(),
+    "stuck (lone 5)":   stuck(),
+    "fresh deal":       deal(42),
+  };
+  for (const [name, state] of Object.entries(fixtures)) {
+    const detected = autoFinishWouldWin(state);
+    const emptied  = runFinish(clone(state));
+    assert.equal(emptied, detected, `${name}: executor(${emptied}) must match detector(${detected})`);
+  }
+});
+
+test("greedy finish sends every card home for a winning fixture (executor sanity)", () => {
+  assert.equal(runFinish(kings()), true);
+  assert.equal(runFinish(orderedPeel()), true);
+});
+
 // engine.mjs is a hand-copy of index.html's inline <script> logic. Assert the
 // canonical function bodies still appear verbatim in index.html so the copy can't
 // silently rot. Whitespace-normalized substring match.
@@ -214,6 +257,10 @@ test("engine.mjs logic still matches index.html (no drift)", () => {
     // autoFinishWouldWin: the greedy cascade predicates + the win check
     "const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit]; const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];",
     "for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false; return true;",
+    // sendOneHome: the greedy single-send (cells then columns, up-before-down) mirrored by
+    // engine.mjs sendOneHomeStep and looped by the finish chain.
+    "const c=state.cells[i]; if(!c) continue; if(canFoundationUp(c)){ snapshot(); state.cells[i]=null; state.up[c.suit]=c.rank; return true; } if(canFoundationDown(c)){ snapshot(); state.cells[i]=null; state.down[c.suit]=c.rank; return true; }",
+    "if(canFoundationUp(c)){ snapshot(); t.pop(); state.up[c.suit]=c.rank; return true; } if(canFoundationDown(c)){ snapshot(); t.pop(); state.down[c.suit]=c.rank; return true; }",
   ];
   for (const c of canon) {
     assert.ok(html.includes(norm(c)), `index.html no longer contains: ${c.slice(0, 60)}...`);
