@@ -13,6 +13,14 @@ enum Dir { case up, down }
 /// A drag-and-drop destination.
 enum DropTarget: Equatable { case column(Int), cell(Int), foundation(Suit, Dir) }
 
+/// How the game reacts when the board becomes finishable (every remaining card can cascade home).
+/// `.ask` (default) prompts; `.on` finishes automatically; `.off` waits for the Finish button.
+enum AutoFinishMode: String, CaseIterable {
+    case ask, on, off
+    var label: String { self == .ask ? "Ask" : self == .on ? "On" : "Off" }
+    var next: AutoFinishMode { self == .ask ? .on : self == .on ? .off : .ask }
+}
+
 private struct Snapshot {
     var tableau: [[Card]]
     var cells: [Card?]
@@ -43,11 +51,17 @@ final class Game: ObservableObject {
     @Published var autoplayOn = true {
         didSet { UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay"); if autoplayOn { runAutoplay() } }
     }
-    /// When on (default), the game finishes itself automatically the moment a full
-    /// send-everything-home cascade would win — no tap needed. Off = play the last cards yourself.
-    @Published var autoFinishOn = true {
-        didSet { UserDefaults.standard.set(autoFinishOn, forKey: "causeway.autofinish"); if autoFinishOn { maybeAutoFinish() } }
+    /// How reaching a finishable board is handled: `.ask` (default) prompts, `.on` finishes
+    /// automatically, `.off` waits for the Finish button.
+    @Published var autoFinishMode: AutoFinishMode = .ask {
+        didSet { UserDefaults.standard.set(autoFinishMode.rawValue, forKey: "causeway.autofinishmode"); maybeAutoFinish() }
     }
+    /// True while the sequential finish animation runs (cards flying home one at a time).
+    @Published private(set) var finishing = false
+    /// Drives the "ready to finish?" prompt (`.ask` mode).
+    @Published var promptAutoFinish = false
+    /// Set once the player defers this game's prompt, so we don't nag again (reset on deal).
+    private var autoFinishDeferred = false
 
     let winStore = WinStore()
 
@@ -67,8 +81,9 @@ final class Game: ObservableObject {
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
             autoplayOn = UserDefaults.standard.bool(forKey: "causeway.autoplay")
         }
-        if UserDefaults.standard.object(forKey: "causeway.autofinish") != nil {
-            autoFinishOn = UserDefaults.standard.bool(forKey: "causeway.autofinish")
+        if let raw = UserDefaults.standard.string(forKey: "causeway.autofinishmode"),
+           let mode = AutoFinishMode(rawValue: raw) {
+            autoFinishMode = mode
         }
         if !restore() { deal(seed: randomSeed()) }   // resume an in-progress game if one was saved
     }
@@ -102,6 +117,9 @@ final class Game: ObservableObject {
         won = false
         started = false
         autoplaying = false
+        finishing = false
+        promptAutoFinish = false
+        autoFinishDeferred = false
         persist()
     }
 
@@ -275,12 +293,14 @@ final class Game: ObservableObject {
         selection = nil
         if checkWin() { onWin(); return }
         persist()
-        runAutoplay()
-        maybeAutoFinish()   // auto-complete now if this move made the board finishable
+        maybeAutoFinish()   // offer/auto-complete if this move made the board finishable
+        if !finishing && !promptAutoFinish { runAutoplay() }
     }
 
     func undo() {
         stopAutoplayPending()
+        finishing = false        // halt any running finish cascade
+        promptAutoFinish = false
         guard let h = history.popLast() else { return }
         tableau = h.tableau; cells = h.cells; up = h.up; down = h.down
         moveCount = h.moveCount
@@ -484,32 +504,51 @@ final class Game: ObservableObject {
     }
     private func stopAutoplayPending() { autoplaying = false }
 
-    /// Force every available card home (manual button).
-    func autoFinish() {
-        selection = nil
-        var moved = true, any = false
-        withAnimation(.easeOut(duration: 0.2)) {
-            while moved {
-                moved = false
-                for i in 0..<Game.cellCount {
-                    // OR, not XOR: a suit's closing card is legal on BOTH ends and
-                    // either completes it identically — XOR wrongly skipped it.
-                    if let c = cells[i], canFoundationUp(c) || canFoundationDown(c) {
-                        snapshot(); cells[i] = nil
-                        if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                        moveCount += 1; moved = true; any = true
-                    }
-                }
-                for col in 0..<Game.colCount {
-                    guard let c = tableau[col].last, canFoundationUp(c) || canFoundationDown(c) else { continue }
-                    snapshot(); tableau[col].removeLast()
-                    if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                    moveCount += 1; moved = true; any = true
-                }
+    /// Send exactly one available card home — cells first, then tableau tops left→right, taking
+    /// whichever end (up/down) is legal. Returns whether a card moved. Drives the sequential finish.
+    @discardableResult
+    private func sendOneHome() -> Bool {
+        for i in 0..<Game.cellCount {
+            if let c = cells[i], canFoundationUp(c) || canFoundationDown(c) {
+                snapshot(); cells[i] = nil
+                if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
+                return true
             }
         }
-        if any && !started { started = true; startTimer() }
-        if checkWin() { onWin() } else if any { persist() }
+        for col in 0..<Game.colCount {
+            // OR, not XOR: a suit's closing card is legal on BOTH ends and either completes it.
+            if let c = tableau[col].last, canFoundationUp(c) || canFoundationDown(c) {
+                snapshot(); tableau[col].removeLast()
+                if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Run auto-finish: fly every remaining card home one at a time — each card starts as the
+    /// previous lands, the same sequential reveal the safe-autoplay chain uses. Only meaningful
+    /// when the board is finishable (callers gate on that); a no-op otherwise.
+    func runAutoFinish() {
+        guard !finishing, !won, autoFinishWouldWin() else { return }
+        promptAutoFinish = false
+        stopAutoplayPending()   // the finish chain supersedes safe-autoplay
+        selection = nil
+        finishing = true
+        finishStep()
+    }
+    private func finishStep() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { [weak self] in
+            guard let self, self.finishing else { return }
+            var sent = false
+            withAnimation(.easeOut(duration: 0.2)) { sent = self.sendOneHome() }
+            guard sent else { self.finishing = false; return }
+            self.moveCount += 1
+            if !self.started { self.started = true; self.startTimer() }
+            if self.checkWin() { self.finishing = false; self.onWin(); return }
+            self.persist()
+            self.finishStep()
+        }
     }
 
     /// Would forcing every available card home (the aggressive `autoFinish`) empty the board and
@@ -540,10 +579,28 @@ final class Game: ObservableObject {
         return (0..<4).allSatisfy { d[$0] == u[$0] + 1 }
     }
 
-    /// Auto-complete when enabled: if a full auto-finish would win from here, run it now.
+    /// Offer or perform auto-finish when the board becomes finishable, per the current mode.
     func maybeAutoFinish() {
-        guard autoFinishOn, started, !won, autoFinishWouldWin() else { return }
-        autoFinish()
+        guard started, !won, !finishing, !promptAutoFinish, autoFinishWouldWin() else { return }
+        switch autoFinishMode {
+        case .on:  runAutoFinish()
+        case .ask: if !autoFinishDeferred { stopAutoplayPending(); promptAutoFinish = true }
+        case .off: break   // the Finish button (canOfferFinish) lets the player start it
+        }
+    }
+
+    /// Player chose "Not yet": stop prompting this game, but keep the Finish button available.
+    func deferAutoFinish() {
+        autoFinishDeferred = true
+        promptAutoFinish = false
+        runAutoplay()   // resume the safe-autoplay we paused for the prompt
+    }
+
+    func cycleAutoFinishMode() { autoFinishMode = autoFinishMode.next }
+
+    /// Whether to show the manual "Finish" button: the board is finishable and idle.
+    var canOfferFinish: Bool {
+        started && !won && !finishing && !promptAutoFinish && autoFinishWouldWin()
     }
 
     // MARK: - Win + timer

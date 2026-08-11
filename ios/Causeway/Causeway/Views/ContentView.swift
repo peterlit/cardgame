@@ -88,6 +88,10 @@ struct ContentView: View {
             Button("Random") { withAnimation { game.newRandomGame() } }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Enter a deal number to play that exact deal.") }
+        .alert("Ready to finish", isPresented: $game.promptAutoFinish) {
+            Button("Finish") { withAnimation { game.runAutoFinish() } }
+            Button("Not yet", role: .cancel) { game.deferAutoFinish() }
+        } message: { Text("Every remaining card can go home. Send them all now?") }
     }
 
     // MARK: header + toolbar
@@ -116,7 +120,10 @@ struct ContentView: View {
             pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
             pill("Undo") { withAnimation { game.undo() } }.disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
             pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-            pill(game.autoFinishOn ? "Auto-finish: On" : "Auto-finish: Off") { game.autoFinishOn.toggle() }
+            pill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+            if game.canOfferFinish {
+                pill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+            }
             pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
                 dealText = "\(game.seed)"; showDeal = true
             }

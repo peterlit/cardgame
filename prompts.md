@@ -87,3 +87,10 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     `maybeAutoFinish()` called after each move / autoplay-settle / restore. Both platforms +
     persisted setting; 4 new engine tests (22/22) with drift guard; verified end-to-end on web
     (ON auto-completes, OFF doesn't, fresh deal never false-triggers).
+43. Auto-finish: add a third mode "Ask" (now the default) — On/Off/Ask cycle. In Ask, reaching a
+    finishable board shows a "Ready to finish?" pop-up (Finish / Not yet); deferring stops nagging
+    but leaves a "Finish" button to run it later. Replaced the abrupt batch finish with a sequential
+    one-card-at-a-time flight (each starts as the previous lands), reusing the safe-autoplay reveal
+    cadence. Both platforms; persisted (`causeway.autofinishmode`). Verified all 3 modes end-to-end
+    on web (prompt, defer+no-renag, Finish button, sequential finish, On auto, Off manual); iOS
+    type-checks + builds, toolbar shows "Auto-finish: Ask". Review loop requested next.

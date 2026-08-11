@@ -240,7 +240,8 @@
     <button class="btn primary" id="newBtn">New game</button>
     <button class="btn" id="undoBtn">Undo</button>
     <button class="btn" id="autoplayBtn" title="Automatically send safe cards to the foundations after each move">Auto-play: On</button>
-    <button class="btn" id="autoBtn" title="Automatically finish the game as soon as every remaining card can go home">Auto-finish: On</button>
+    <button class="btn" id="autoBtn" title="How to handle a finishable board: Ask (prompt), On (auto), or Off">Auto-finish: Ask</button>
+    <button class="btn primary" id="finishBtn" title="Send every remaining card home now" style="display:none">Finish</button>
     <button class="btn" id="seedBtn" title="Type a deal number to play that exact deal">Deal #<span id="seedLbl">—</span><span id="seedWon"></span></button>
     <button class="btn" id="winsBtn" title="Deals you've solved">Wins</button>
   </div>
@@ -278,6 +279,17 @@
       <button class="btn primary" id="winNext">Play next deal</button>
       <button class="btn" id="winRandom">Random</button>
       <button class="btn" id="winClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="finishOverlay">
+  <div class="panel">
+    <h2>Ready to finish 🎉</h2>
+    <p>Every remaining card can go home. Send them all now?</p>
+    <div class="wins-actions">
+      <button class="btn primary" id="finishGo">Finish</button>
+      <button class="btn" id="finishLater">Not yet</button>
     </div>
   </div>
 </div>
@@ -337,7 +349,8 @@ function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; 
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 
 let autoplayOn = lsGet("causeway.autoplay") !== "off";   // default ON, like MobilityWare
-let autoFinishOn = lsGet("causeway.autofinish") !== "off";   // default ON: auto-complete once the game is decided
+let autoFinishMode = (()=>{ const m=lsGet("causeway.autofinishmode"); return (m==="on"||m==="off"||m==="ask")?m:"ask"; })();  // ask (default) | on | off
+let finishing=false, autoFinishDeferred=false, finishPromptOpen=false;
 
 /* ---------- win tracking ---------- */
 let wins = loadWins();   // { [seed]: {moves, secs, date} }
@@ -369,7 +382,8 @@ function deal(theSeed){
     down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
   };
   history=[]; moveCount=0; selection=null;
-  startTime=null; stopTimer(); stopAutoplay(); setMoves(0); setTime(0);
+  startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
+  autoFinishDeferred=false; hideFinishPrompt();
   refreshHud();
   hideWin();
   render(false);
@@ -426,7 +440,7 @@ function restoreGame(){
   seed = g.seed>>>0;
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
-  stopAutoplay(); hideWin();
+  stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
   const es = g.elapsedSecs||0;
   if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
   setMoves(moveCount); setTime(es);
@@ -570,6 +584,7 @@ function snapshot(){
 }
 function undo(){
   stopAutoplay();
+  stopFinish(); hideFinishPrompt();   // halt any running finish / dismiss its prompt
   if(!history.length) return;
   const h=history.pop();
   state.tableau=h.tableau; state.cells=h.cells; state.up=h.up; state.down=h.down;
@@ -584,8 +599,8 @@ function commitMove(){
   render();
   if(isWon()){ onWin(); return; }
   saveGame();
-  runAutoplay();
-  maybeAutoFinish();   // auto-complete now if this move made the board finishable
+  maybeAutoFinish();   // offer/auto-complete if this move made the board finishable
+  if(!finishing && !finishPromptOpen) runAutoplay();
 }
 
 /* selection: {kind:'tableau',col,idx} | {kind:'cell',idx} */
@@ -683,24 +698,46 @@ function smartMove(src){
   return false;
 }
 
-function autoFinish(){
-  let moved=true, any=false;
-  while(moved){
-    moved=false;
-    for(let i=0;i<NCELLS;i++){
-      const c=state.cells[i]; if(!c) continue;
-      const up=canFoundationUp(c), dn=canFoundationDown(c);
-      // OR, not XOR: a suit's closing card is legal on both ends and either completes it.
-      if(up||dn){ snapshot(); state.cells[i]=null; if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
-    }
-    for(let col=0;col<NCOLS;col++){
-      const t=state.tableau[col]; if(!t.length) continue;
-      const c=t[t.length-1];
-      const up=canFoundationUp(c), dn=canFoundationDown(c);
-      if(up||dn){ snapshot(); t.pop(); if(up)state.up[c.suit]=c.rank;else state.down[c.suit]=c.rank; moveCount++; moved=true; any=true; }
-    }
+// Send exactly one available card home — cells first, then tableau tops left->right, taking
+// whichever end is legal. Returns whether a card moved. Drives the sequential finish.
+function sendOneHome(){
+  for(let i=0;i<NCELLS;i++){
+    const c=state.cells[i]; if(!c) continue;
+    if(canFoundationUp(c)){ snapshot(); state.cells[i]=null; state.up[c.suit]=c.rank; return true; }
+    if(canFoundationDown(c)){ snapshot(); state.cells[i]=null; state.down[c.suit]=c.rank; return true; }
   }
-  if(any){ setMoves(moveCount); if(!startTime){startTime=Date.now();startTimer();} selection=null; render(); if(isWon()) onWin(); else saveGame(); }
+  for(let col=0;col<NCOLS;col++){
+    const t=state.tableau[col]; if(!t.length) continue;
+    const c=t[t.length-1];
+    // OR, not XOR: a suit's closing card is legal on both ends and either completes it.
+    if(canFoundationUp(c)){ snapshot(); t.pop(); state.up[c.suit]=c.rank; return true; }
+    if(canFoundationDown(c)){ snapshot(); t.pop(); state.down[c.suit]=c.rank; return true; }
+  }
+  return false;
+}
+let finishTimer=null;
+function stopFinish(){ finishing=false; if(finishTimer){ clearTimeout(finishTimer); finishTimer=null; } }
+// Fly every remaining card home one at a time — each starts as the previous lands (the same
+// sequential reveal as safe-autoplay). Only meaningful when finishable; a no-op otherwise.
+function runAutoFinish(){
+  if(finishing || isWon() || !autoFinishWouldWin()) return;
+  hideFinishPrompt();
+  stopAutoplay();          // the finish chain supersedes safe-autoplay
+  selection=null;
+  finishing=true; refreshFinishBtn();
+  const stepFinish=()=>{
+    finishTimer=null;
+    if(!finishing) return;
+    if(sendOneHome()){
+      moveCount++; setMoves(moveCount);
+      if(!startTime){ startTime=Date.now(); startTimer(); }
+      render();   // FLIP animates this one card's flight home
+      if(isWon()){ finishing=false; refreshFinishBtn(); onWin(); return; }
+      saveGame();
+      finishTimer=setTimeout(stepFinish,180);
+    } else { finishing=false; refreshFinishBtn(); }
+  };
+  finishTimer=setTimeout(stepFinish,140);
 }
 
 // Would forcing every available card home (autoFinish) empty the board and win? A pure
@@ -730,11 +767,20 @@ function autoFinishWouldWin(){
   for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false;
   return true;
 }
-// Auto-complete when enabled: if a full auto-finish would win from here, run it now.
+// Offer or perform auto-finish when the board becomes finishable, per the current mode.
 function maybeAutoFinish(){
-  if(!autoFinishOn || !startTime || isWon()) return;
-  if(autoFinishWouldWin()) autoFinish();
+  if(!startTime || isWon() || finishing || finishPromptOpen || !autoFinishWouldWin()) return;
+  if(autoFinishMode==="on") runAutoFinish();
+  else if(autoFinishMode==="ask"){ if(!autoFinishDeferred){ stopAutoplay(); showFinishPrompt(); } }
+  // "off": the Finish button (refreshFinishBtn) lets the player start it
 }
+// Player chose "Not yet": stop prompting this game, but keep the Finish button available.
+function deferAutoFinish(){ autoFinishDeferred=true; hideFinishPrompt(); runAutoplay(); }
+// The finish prompt (ask mode) + the manual Finish button.
+function showFinishPrompt(){ finishPromptOpen=true; document.getElementById("finishOverlay").classList.add("show"); refreshFinishBtn(); }
+function hideFinishPrompt(){ finishPromptOpen=false; document.getElementById("finishOverlay").classList.remove("show"); refreshFinishBtn(); }
+function canOfferFinish(){ return !!startTime && !isWon() && !finishing && !finishPromptOpen && autoFinishWouldWin(); }
+function refreshFinishBtn(){ const b=document.getElementById("finishBtn"); if(b) b.style.display = canOfferFinish() ? "" : "none"; }
 
 /* ---------- rendering ---------- */
 // Traditional pip layouts: [x%, y%] of the card face. y>50 → pip is drawn upside-down.
@@ -850,6 +896,7 @@ function render(animate=true){
     tab.appendChild(colEl);
   }
   document.getElementById("undoBtn").disabled = history.length===0;
+  refreshFinishBtn();   // show/hide the "Finish" button as finishability changes
   if(prev) flip(prev);
 }
 
@@ -1032,15 +1079,19 @@ document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=undo;
 function refreshAutoFinishBtn(){
-  document.getElementById("autoBtn").textContent = "Auto-finish: " + (autoFinishOn?"On":"Off");
+  const label = autoFinishMode==="ask"?"Ask":autoFinishMode==="on"?"On":"Off";
+  document.getElementById("autoBtn").textContent = "Auto-finish: " + label;
 }
-document.getElementById("autoBtn").onclick=()=>{
-  autoFinishOn=!autoFinishOn;
-  lsSet("causeway.autofinish", autoFinishOn?"on":"off");
+document.getElementById("autoBtn").onclick=()=>{   // cycle Ask -> On -> Off
+  autoFinishMode = autoFinishMode==="ask"?"on":autoFinishMode==="on"?"off":"ask";
+  lsSet("causeway.autofinishmode", autoFinishMode);
   refreshAutoFinishBtn();
-  if(autoFinishOn) maybeAutoFinish();   // flipping it on finishes now if the board is already decided
+  maybeAutoFinish();   // e.g. switching to On finishes now if the board is already decided
 };
 refreshAutoFinishBtn();
+document.getElementById("finishBtn").onclick=()=>runAutoFinish();
+document.getElementById("finishGo").onclick=()=>runAutoFinish();
+document.getElementById("finishLater").onclick=()=>deferAutoFinish();
 document.getElementById("winsBtn").onclick=openWins;
 document.getElementById("winsClose").onclick=closeWins;
 document.getElementById("winsDealGo").onclick=winsPlay;
