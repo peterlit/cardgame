@@ -152,6 +152,12 @@ are done or added.
 - **F7 — Restore validator accepts non-integer suit/rank.** `mark()` range-checks but not
   integrality; a forged `suit:1.5`/`rank:5.5` card yields a non-colliding fractional id and is
   accepted. Add `Number.isInteger` checks (both platforms). Single-player self-corruption only.
+- **F4 — iOS: suspected drop hitch (deferred, unverified).** On a successful drop
+  `.offset(runOffset…)` snaps to zero in the same `withAnimation` as the `matchedGeometryEffect`
+  relocation; the card *may* jump finger→old slot→glide instead of flying straight from the
+  finger. Cosmetic and unconfirmed on device; a fix means reworking the verified-working drag
+  rendering, so deferred until reproduced on hardware (`ios/.../Views/ContentView.swift`
+  `cardGesture`/`runOffset`/`tableauCard`).
 
 ## Release checklist (App Store)
 - [ ] Enroll in the Apple Developer Program; create the App Store Connect record.

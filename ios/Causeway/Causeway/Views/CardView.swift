@@ -4,7 +4,6 @@ import SwiftUI
 struct CardView: View {
     let card: Card
     let width: CGFloat
-    var selected: Bool = false
 
     private var height: CGFloat { width * Theme.cardAspect }
     private var color: Color { Theme.suitColor(card.suit) }
@@ -47,10 +46,6 @@ struct CardView: View {
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.28), radius: 1, x: 0, y: 1)
-        .overlay(
-            RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
-                .strokeBorder(Theme.gold, lineWidth: selected ? 3 : 0))
-        .offset(y: selected ? -width * 0.05 : 0)
     }
 
     /// J / Q / K figure symbol (crown for K, open crown for Q, person for J).

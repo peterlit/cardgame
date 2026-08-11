@@ -66,6 +66,14 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
         }
+        .onChange(of: game.moveCount) { _, _ in
+            // Self-heal a drag whose card was torn down mid-gesture by an async autoplay step
+            // (its view — and gesture — vanish, so onEnded never fires, leaving `drag` stuck at
+            // an elevated zIndex). Only clear when the source no longer holds its card, so an
+            // unrelated autoplay never cancels a legitimate in-flight drag (whose source still
+            // holds the card until the drop mutates the board).
+            if let d = drag, !dragSourceHoldsCard(d.source) { drag = nil }
+        }
         .sheet(isPresented: $showWins) { WinsView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
         .alert("Play a deal", isPresented: $showDeal) {
@@ -154,6 +162,15 @@ struct ContentView: View {
     private var dragInUpper: Bool { if case .cell = drag?.source { return true } else { return false } }
     private var dragColumn: Int? { if case .tableau(let c, _) = drag?.source { return c } else { return nil } }
 
+    /// Whether the drag's source slot still holds its card. False once an autoplay step has
+    /// removed the dragged card out from under the finger — used to self-heal a stuck drag.
+    private func dragSourceHoldsCard(_ s: Spot) -> Bool {
+        switch s {
+        case .cell(let i):            return game.cells[i] != nil
+        case .tableau(let c, let i):  return i < game.tableau[c].count
+        }
+    }
+
     /// The finger offset to apply to `spot` — non-zero only for the card(s) in the run
     /// currently being dragged (the run head plus everything stacked below it).
     private func runOffset(_ spot: Spot) -> CGSize {
@@ -179,6 +196,10 @@ struct ContentView: View {
                 else if drag?.source == spot { drag?.translation = v.translation }
             }
             .onEnded { v in
+                // Ignore a second finger's release while another card owns the drag: acting on
+                // it would fire a stray smartMove and clear `drag`, snapping the in-flight drag
+                // back. Only the owning card (or a fresh tap, drag == nil) may resolve here.
+                guard drag == nil || drag?.source == spot else { return }
                 let travelled = hypot(v.translation.width, v.translation.height)
                 withAnimation(.easeOut(duration: 0.18)) {
                     if travelled < tapSlop {
