@@ -1,12 +1,13 @@
-# Review-loop final report — Causeway (tap/drag refactor)
+# Review-loop final report — Causeway (auto-finish feature)
 
 **Result: CONVERGED** (round 1 of a 5-round budget).
 **Stop reason:** 0 open blockers, 0 open majors, 0 open minors; nothing newly introduced left open.
 
-Scope: the tap/drag interaction refactoring — single tap = smart-move, drag = place exactly —
-across commits `db2dd49..HEAD` (web `2b7703a`, iOS native-draggable `f334972`, iOS manual-gesture
-`62be89c`, docs `e183317`). Loop start SHA: `e183317`. Fixes landed in `bfb64c8`.
-(Prior OOM loop archived at `.review-loop/REPORT-oom.md`.)
+Scope: the auto-finish feature — the `.ask`/`.on`/`.off` tri-state setting, the "Ready to finish?"
+prompt, the deferred "Finish" button, and the sequential one-card-at-a-time finish animation.
+Commit range reviewed: `9817ecb..HEAD` (`8844567` auto-complete toggle, `ae1ebd7` Ask mode + prompt
++ sequential finish). Loop start SHA: `ae1ebd7`. Fixes landed in `af23d33`.
+(Prior tap/drag loop archived at `.review-loop/REPORT-tapdrag.md`.)
 
 ## Trend
 
@@ -14,75 +15,71 @@ across commits `db2dd49..HEAD` (web `2b7703a`, iOS native-draggable `f334972`, i
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | +0 | converged |
 
-(Seed review filed F1–F4; the same round's implementer pass fixed F1/F2/F3 and deferred F4, so the
-round-1 metrics row nets to zero open.)
+(Seed review filed F1–F4, all minor; the same round's implementer pass fixed all four, so the
+round-1 row nets to zero open.)
 
 ## What the review established
 
-**The headline fear did not materialize — verified, not assumed.** The reviewer traced both
-platforms and confirmed no tap/drag path can produce an illegal move, move the wrong run, drop an
-internally-invalid run, or lose/duplicate a card:
-- iOS `Game.drop` stages `selection = source`, dispatches to a `tryMove*` validator, then clears
-  `selection` on **every** path (success via `commit()`, failure explicitly) — no stale-selection
-  reuse, fully synchronous, no re-entrancy. `isSeqHead` + `canStackTableau` + `maxMovable` re-guard
-  at drop time; cell/foundation targets enforce single-card.
-- Web `dragUp` re-stages `selection` and re-validates through `tryDest*` against current state, so
-  even an autoplay chain firing mid-drag yields at worst a legal shorter move or a snap-back.
-- Smart-move priority, run-drag legality, same-column rejection, and buried-card (tappable but
-  non-draggable) behavior are **at parity** between web and iOS. The removed web M5 double-move
-  guard is correctly obsolete under the one-`smartMove`-per-tap pointer model. Web listener
-  add/remove is symmetric; `elementFromPoint` null / dragged-element cases handled.
+**The core safety fear did not materialize — verified by reading detection against execution.**
+The reviewer confirmed a false-positive that runs a finish and then strands a non-winning board
+cannot happen:
+- Every entry to the greedy send (`sendOneHome`) is gated by `runAutoFinish`, which self-gates on
+  `autoFinishWouldWin()` — no caller sends cards on an unproven board.
+- The simulation predicates are byte-identical to the real foundation rules on both platforms, and
+  the greedy send is confluent (up/down advance independently and meet exactly), so the batch
+  detector emptying the board guarantees the one-at-a-time chain also empties it. No lost/duplicated
+  cards.
+- `finishing` cannot get stuck true (set only in `runAutoFinish`, which immediately schedules a step;
+  every step either schedules the next or clears the flag).
+- Stale-timer safety: web clears the real `finishTimer`/`autoTimer`; iOS resets flags synchronously
+  before any pending `asyncAfter` runs, and each block guards its flag.
+- Web/iOS parity on mode semantics, prompt/defer, cadence, and the Finish-button gate; no dead code
+  or leftover `autoFinish`/`autoFinishOn` references; stacked iOS `.alert` modifiers are valid on the
+  iOS 17 target.
 
-## Findings (all resolved)
+## Findings (all fixed)
 
-- **F1 [major] — FIXED** (`ContentView.swift` `cardGesture.onEnded`). iOS had no concurrency guard:
-  a second finger tapping card Y while finger A dragged head X fired a stray `smartMove(Y)` and
-  cleared A's in-flight `drag` (could net two moves from one intended drag). Fix: `guard drag == nil
-  || drag?.source == spot else { return }` at the top of `onEnded`. Reviewer verified all four paths
-  (tap-on-draggable, tap-on-buried, real drag end, second-finger release) still behave and the guard
-  swallows nothing legitimate. Moves were individually validated, so this was recoverable, not a
-  blocker.
-- **F2 [minor] — FIXED** (`.onChange(of: game.moveCount)` + `dragSourceHoldsCard`). A drag whose card
-  is torn down mid-gesture by an async autoplay step never receives `onEnded`, leaving `drag` stuck
-  at an elevated `zIndex`. Fix clears `drag` **only** when its source no longer holds a card, so an
-  unrelated autoplay step during a legitimate drag can't cancel it. Reviewer confirmed autoplay
-  mutates the board before `moveCount++` and that normal drops null `drag` synchronously before the
-  `onChange` runs — no wrong-cancel, no double-processing.
-- **F3 [minor] — FIXED** (`CardView.swift`, `index.html`). Dead selection-highlight residue
-  (`CardView.selected` + its stroke/lift; the web `.card.sel` CSS) left over from removing the
-  select model. Removed on both platforms; grep confirms no remaining `selected:`/`.sel`/`isSelected`
-  reference, and the unrelated `Game.selectedCards()` is untouched.
+- **F1 [minor] — FIXED.** iOS `restore()` omitted the `finishing`/`promptAutoFinish`/
+  `autoFinishDeferred` resets that web `restoreGame()` performs. Harmless today (restore is
+  init-only) but a latent parity gap → the three resets were added.
+- **F2 [minor] — FIXED.** The iOS finish chain relied only on the `finishing` flag and never
+  cancelled a pending `asyncAfter`, so an Undo-mid-finish followed by a quick re-triggering move
+  could overlap two finish chains (self-healing, no card loss, but sloppy). Fixed with a monotonic
+  `finishGen` token captured per scheduled step and bumped on `runAutoFinish`/`undo`/`deal`; a stale
+  block from a superseded chain now bails. Reviewer traced normal-finish stability, Undo halting, and
+  the restart race being closed with at most one live block per chain.
+- **F3 [minor] — FIXED.** The whole safety story rests on "detection == execution," yet only the
+  detector (`autoFinishWouldWin`) was tested. Added a canonical `sendOneHomeStep` executor to the
+  Node harness (matching the web/iOS greedy order + up-before-down rule), a test looping it to
+  fixpoint over four fixtures asserting `boardEmptied === autoFinishWouldWin(state)`, and two
+  drift-guard substrings pinning the web `sendOneHome` body. 24/24 tests pass; drift guard real.
+- **F4 [minor] — FIXED.** The setting key was renamed (`causeway.autofinish` → `…mode`) and the
+  default flipped On→Ask with no migration; documented as intentional (app unshipped, so no legacy
+  key exists) via a one-line comment on both platforms.
 
 **Disputed (agree-to-disagree):** none.
 
-## Deferred (accepted)
-- **F4 [minor] — WONTFIX-ACCEPTED → BACKLOG.** Suspected cosmetic drop "hitch" on iOS: `.offset`
-  (drag follow) zeroes in the same `withAnimation` as the `matchedGeometryEffect` relocation, so a
-  legal drop *may* jump finger→old-slot→glide rather than fly from the finger. Unconfirmed on device;
-  a real fix reworks the verified-working drag rendering. Declining and deferring was judged correct
-  rather than destabilize a shipped-feeling interaction. Logged in `BACKLOG.md`.
-
 ## HUMAN SKIM LIST — read these, the loop can't self-check
 
-1. **The whole refactor diff `db2dd49..HEAD`** — the substantive change. Two same-family agents
-   agreeing it's correct is exactly what this loop can't fully de-risk. The move-correctness argument
-   rests on *drop-time re-validation*; if you ever change `tryMoveToTableau/Cell/Foundation` or
-   `drop()`'s `selection` staging, that guarantee must be re-checked.
-2. **`ContentView.swift` `cardGesture` (F1 guard) + `.onChange(of: moveCount)` (F2 self-heal), commit
-   `bfb64c8`.** Both fixes hinge on SwiftUI gesture/`onChange` *ordering and delivery* under
-   `minimumDistance: 0` — the one thing a code review can't run. **Verify on device:** (a) two fingers
-   on two cards at once doesn't double-move or strand a drag; (b) a card autoplayed out from under a
-   moving finger resets its column `zIndex` cleanly and doesn't leave a floating ghost.
-3. **iOS drop hit-testing via `DropZonesKey` frames in the `"board"` coordinate space
-   (`ContentView.swift`).** Was live-verified on the iPhone 17 Pro simulator this session (tap,
-   single drag, illegal snap-back, 2-card run drag). Re-confirm on a physical device that
-   `dropZones` isn't stale right after New Game / a deal change (drop onto a just-relaid column).
-4. **F4 drop-animation hitch** — the one known-unverified cosmetic item; eyeball a legal drop on
-   device and decide if it's perceptible before pulling it off the backlog.
+1. **The sequential finish + async lifecycle — `Game.swift` `runAutoFinish`/`finishStep`/`finishGen`
+   and web `runAutoFinish`/`stepFinish`/`finishTimer` (commits `ae1ebd7`, `af23d33`).** This is the
+   substantive change and the one with real concurrency. The reviewer traced the `finishGen` race
+   closure by construction, but **timing/gesture behavior can't be unit-tested** — on a device,
+   confirm: Undo mid-finish halts cleanly; New game mid-finish leaves no ghost chain; rapidly
+   toggling the mode or spamming the Finish button never double-runs.
+2. **The `.ask` prompt lifecycle — `ContentView.swift` `.alert(isPresented: $game.promptAutoFinish)`
+   + `maybeAutoFinish` pausing safe-autoplay (commit `ae1ebd7`).** Verify on device that the prompt
+   appears at the right moment, "Not yet" doesn't re-nag, the "Finish" button then works, and the
+   board doesn't shuffle under the prompt. Note: a finishable *saved* game will prompt on app launch
+   (restore → maybeAutoFinish) — decide if that's desirable.
+3. **`sendOneHome` (iOS) has no direct test** — only the web `sendOneHomeStep` twin is tested, and
+   the iOS engine shares the algorithm by construction (no iOS test target — a known backlog item).
+   The drift guard pins web↔`engine.mjs` but never iOS; a future iOS-only edit to `sendOneHome` or
+   the foundation predicates could silently diverge.
 
 ## Verdict
-Converged round 1: no blockers/majors/minors open. The refactor is move-correct and at web/iOS
-parity by construction (drop-time re-validation on both platforms); the three real defects (one
-concurrency major, two minor) are fixed and re-validated; one cosmetic, device-only item is
-deferred. Residual risk is entirely in SwiftUI gesture timing / device feel — flagged above for a
-human device pass, not code.
+Converged round 1: no blockers/majors/minors open. The feature is move-correct and at web/iOS parity
+by construction (gated detection == execution on both platforms); the one real concurrency gap (iOS
+finish double-run) is fixed and re-validated; execution is now test-covered; the two documentation/
+parity nits are closed. Residual risk is entirely in device-only async/gesture timing and the absence
+of an iOS engine test target — flagged above for a human pass, not code.
