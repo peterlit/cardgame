@@ -141,6 +141,24 @@ test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts'
   assert.deepEqual(day, { bronze: true, silver: true, gold: true, moves: 95, elapsed: 150 });
 });
 
+test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, best moves/time)', () => {
+  const challenge = dailyChallenge(0, POOL);   // silver 'moves' (N=96), gold 'no-cells'
+  // A: wins silver (few moves, no-cells fails via a cell use), slower.
+  const telemetryA = base({ won: true, moves: 90, elapsed: 240, cellUses: 1 });
+  // B: wins gold (no cells), more moves, faster.
+  const telemetryB = base({ won: true, moves: 96, elapsed: 150, cellUses: 0 });
+  const rA = evaluateChallenge(challenge, telemetryA);
+  const rB = evaluateChallenge(challenge, telemetryB);
+  assert.equal(rA.silver, true);  assert.equal(rA.gold, false);
+  assert.equal(rB.silver, true);  assert.equal(rB.gold, true);
+  const day = mergeTiers(mergeTiers(undefined, rA), rB);
+  // OR of tiers, and best (min) of each metric across the two attempts.
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, moves: 90, elapsed: 150 });
+  // A subsequent lost attempt must not clobber the recorded best moves/time.
+  const held = mergeTiers(day, evaluateChallenge(challenge, base({ won: false, moves: 5, elapsed: 5 })));
+  assert.deepEqual(held, { bronze: true, silver: true, gold: true, moves: 90, elapsed: 150 });
+});
+
 test('mergeTiers never loses a tier already earned on a later worse attempt', () => {
   const prev = { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 };
   const worse = { bronze: true, silver: false, gold: false, moves: 200, elapsed: 300 };

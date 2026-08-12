@@ -89,18 +89,27 @@ export function evaluate(objective, telemetry) { return OBJECTIVES[objective.id]
 // Silver, and vice versa. The day's standing is the OR-accumulation of attempts (see mergeTiers):
 // with free retries, earning Silver on one attempt and Gold on another still awards both for the
 // day. Callers must therefore fold each attempt into the day's record via mergeTiers, not overwrite.
+//
+// The result is directly mergeable: on a WIN it also echoes this attempt's { moves, elapsed } so
+// mergeTiers can keep best-of. A LOST attempt omits moves/elapsed entirely — a loss has no "best
+// time" to record, and omitting lets mergeTiers's `?? Infinity` preserve the prior best rather than
+// clobbering it with a losing run's metrics.
 export function evaluateChallenge(challenge, telemetry) {
   const bronze = !!telemetry.won;
-  return {
+  const result = {
     bronze,
     silver: bronze && evaluate(challenge.silver, telemetry),
     gold: bronze && evaluate(challenge.gold, telemetry),
   };
+  if (bronze) { result.moves = telemetry.moves; result.elapsed = telemetry.elapsed; }
+  return result;
 }
 
 // Accumulate a day's tiers across attempts: each tier is best-of (OR), and we keep the best moves
-// and time seen (lowest). `prev` may be undefined (first attempt of the day). This encodes the
-// design rule that Bronze/Silver/Gold are earned independently and never lost by a later attempt.
+// and time seen (lowest). `prev` may be undefined (first attempt of the day). `attempt` is an
+// evaluateChallenge() result (or a prior mergeTiers result); attempts that omit moves/elapsed (e.g.
+// a lost game) are treated as Infinity so they never displace a prior best. This encodes the design
+// rule that Bronze/Silver/Gold are earned independently and never lost by a later attempt.
 export function mergeTiers(prev, attempt) {
   const p = prev || { bronze: false, silver: false, gold: false, moves: Infinity, elapsed: Infinity };
   return {
