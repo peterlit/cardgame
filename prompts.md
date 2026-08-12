@@ -98,3 +98,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Now hold `onWin()` until the last card lands + a short beat (web setTimeout 320ms after the
     140ms flight; iOS 0.38s after the 0.2s flight), guarded so undo/new-game during the delay cancels
     it. Verified on web that onWin fires strictly after the final card's render.
+45. Design (no code) a MobilityWare-style Daily Challenges feature. Iterated to a fully-decided
+    design and wrote it up: `docs/daily-challenges.md`. Model A "Deal of the Day" tiered
+    (Bronze=win required + one Silver + one Gold), deterministic-from-date, solver-certified pool of
+    seeds >10,000 (1–10,000 reserved for personal range-play; Phase 0 constrained solver retires I2),
+    frozen replayable history, automation policy #3 (violating auto-move fails the objective),
+    dedicated Challenges & Streaks screen with Play/Silver/Gold streaks. Logged as BACKLOG DAILY.

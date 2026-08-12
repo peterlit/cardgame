@@ -78,6 +78,14 @@ are done or added.
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
 ## Open — high value
+- **DAILY — Daily Challenges feature (design approved).** MobilityWare-style dated challenges:
+  a "Deal of the Day" with 🥉 Bronze (win, required) + one 🥈 Silver + one 🥇 Gold optional
+  objective, deterministic from the date, past days replayable, three catch-up streaks
+  (Play/Silver/Gold), dedicated Challenges & Streaks screen. Full design in
+  [docs/daily-challenges.md](docs/daily-challenges.md). **Phase 0 (gating): an offline constrained
+  solver + a baked certified pool** (winnable / par / supports / constraintPar) over seeds > 10,000
+  — this also retires **I2** (no solvability guarantee). Both platforms; shared generator/checkers +
+  baked pool, parity-tested. Not started.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
