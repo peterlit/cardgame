@@ -104,3 +104,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     seeds >10,000 (1–10,000 reserved for personal range-play; Phase 0 constrained solver retires I2),
     frozen replayable history, automation policy #3 (violating auto-move fails the objective),
     dedicated Challenges & Streaks screen with Play/Silver/Gold streaks. Logged as BACKLOG DAILY.
+46. Document the solver spec and implement Phase 0. Built the offline Causeway solver `tools/solver/`
+    (rules ported from index.html; weighted-A* best-first with a burial heuristic + transposition +
+    gated auto-safe; certifies winnable/par + which constraint objectives each seed admits, sound by
+    construction for gating objectives). Spec in `docs/solver.md`; tests `tests/solver.test.mjs`
+    (9 pass); pool builder emits append-only `data/daily-pool.json` over seeds >10,000. Retires I2.
+    Dropped `empty-column` (vacuous — winning empties all columns). Par is near-optimal (documented).

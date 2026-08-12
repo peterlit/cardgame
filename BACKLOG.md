@@ -78,14 +78,20 @@ are done or added.
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
 ## Open — high value
-- **DAILY — Daily Challenges feature (design approved).** MobilityWare-style dated challenges:
-  a "Deal of the Day" with 🥉 Bronze (win, required) + one 🥈 Silver + one 🥇 Gold optional
-  objective, deterministic from the date, past days replayable, three catch-up streaks
+- **DAILY — Daily Challenges feature (design approved; Phase 0 landed).** MobilityWare-style dated
+  challenges: a "Deal of the Day" with 🥉 Bronze (win, required) + one 🥈 Silver + one 🥇 Gold
+  optional objective, deterministic from the date, past days replayable, three catch-up streaks
   (Play/Silver/Gold), dedicated Challenges & Streaks screen. Full design in
-  [docs/daily-challenges.md](docs/daily-challenges.md). **Phase 0 (gating): an offline constrained
-  solver + a baked certified pool** (winnable / par / supports / constraintPar) over seeds > 10,000
-  — this also retires **I2** (no solvability guarantee). Both platforms; shared generator/checkers +
-  baked pool, parity-tested. Not started.
+  [docs/daily-challenges.md](docs/daily-challenges.md).
+  - **Phase 0 — DONE:** the offline constrained solver + certified pool (`tools/solver/`, spec in
+    [docs/solver.md](docs/solver.md), tests in `tests/solver.test.mjs`, output `data/daily-pool.json`).
+    Certifies winnable/par/supports/constraintPar over seeds > 10,000; gating objectives are sound
+    by construction (no false-positive certs). This also **retires I2**. Grow the pool by re-running
+    `build-pool.mjs`. Follow-ups: a `rules.mjs`↔`index.html` drift guard (or replay-verify pass);
+    optimal par (currently near-optimal); redefine the dropped `empty-column` objective.
+  - **Phase 1+ — TODO:** the app-side feature (both platforms) — deterministic `date → challenge`
+    generator + objective checkers (shared engine, parity-tested), DailyStore + derived streaks,
+    the Challenges & Streaks screen — all consuming the baked pool as data.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
