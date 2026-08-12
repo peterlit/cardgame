@@ -142,13 +142,24 @@ export function dealState(seed) { const s = deal(seed); return { tableau: s.tabl
 
 // Certify one seed: winnable + reference par, and which certified objectives it supports.
 // null if not provably winnable within budget (skip it).
+//
+// `par` = reference par = the shortest winning line found in ANY of our searches (the
+// unconstrained search plus every constrained one). A constrained search restricts the move
+// generator but every line it finds is still a legal *unconstrained* win, so it is a valid witness
+// for par — and constrained sub-searches routinely beat the unconstrained f=g+2h line (which is
+// inadmissible). Taking the min keeps par a real, deterministic upper bound on the optimum and
+// makes any par-derived move cap tighter. `constraintPar[id]` keeps each objective's own length.
 export function certify(seed, opts = {}) {
   const base = solve(dealState(seed), objective('unconstrained'), opts);
   if (base.solved !== true) return null;
   const rec = { seed, winnable: true, par: base.par, supports: [], constraintPar: {} };
   for (const id of CERTIFIED) {
     const r = solve(dealState(seed), objective(id), opts);
-    if (r.solved === true) { rec.supports.push(id); rec.constraintPar[id] = r.par; }
+    if (r.solved === true) {
+      rec.supports.push(id);
+      rec.constraintPar[id] = r.par;
+      if (r.par < rec.par) rec.par = r.par;   // best legal winning line seen so far
+    }
   }
   return rec;
 }

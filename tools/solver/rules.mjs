@@ -68,9 +68,6 @@ export function isSafeAutoplay(up, down, c) {
 }
 
 // ---- state helpers ----
-export function cloneState(s) {
-  return { tableau: s.tableau.map(c => c.slice()), cells: s.cells.slice(), up: s.up.slice(), down: s.down.slice() };
-}
 // Canonical key: columns and cells are order-independent, so sort them (huge transposition dedup).
 export function stateKey(s) {
   const cols = s.tableau.map(c => c.map(x => x.id).join(',')).sort().join('|');

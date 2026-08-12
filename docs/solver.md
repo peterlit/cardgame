@@ -24,7 +24,10 @@ For each candidate seed (ID > 10,000), a certification record:
 ```
 
 - `winnable` + `par` power Bronze and the **Universal** objectives (a move cap is derived from
-  `par`; time caps generously from `par`).
+  `par`; time caps generously from `par`). `par` = **reference par = the shortest winning line
+  found in any of our searches** (unconstrained *and* every constrained one — each constrained line
+  is still a legal unconstrained win, and constrained sub-searches often beat the unconstrained
+  line). It is a real upper bound on the optimum, not proven-minimal.
 - `supports[]` are the **Certified** objectives this seed admits — a Silver/Gold objective is only
   ever offered by the daily generator on a seed that lists it. This is what guarantees every
   offered objective is beatable (§ solvability of ordering objectives).
@@ -74,9 +77,11 @@ hand-verified cases in `tests/solver.test.mjs`. *(Open item: a drift guard tying
   `unknown` (budget hit first — treated as *unsupported*, i.e. the seed/objective is simply skipped).
 
 **`par` is a reference, not proven-optimal.** Weighted A* (W=2) finds a short-but-not-guaranteed-
-minimal line. Move caps are therefore derived **generously** from `par` (exact `N = f(par)` tuned in
-Phase 1). True-optimal par (W=1 / IDA*) is a possible future refinement; a slightly generous cap is
-the safer error for a game anyway.
+minimal line. `certify` reports the **shortest line found across the unconstrained and all
+constrained searches** (each constrained win is also a legal unconstrained win), which is a tighter,
+still-deterministic upper bound than the unconstrained line alone. Move caps are derived
+**generously** from `par` (exact `N = f(par)` tuned in Phase 1). True-optimal par (W=1 / IDA*) is a
+possible future refinement; a slightly generous cap is the safer error for a game anyway.
 
 ---
 

@@ -1,12 +1,50 @@
 // Tests for the offline Causeway solver (tools/solver). Run: `node --test "tests/**/*.test.mjs"`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   isSeqHead, canStackTableau, maxMovable, legalMoves, applyMove, isWon,
 } from '../tools/solver/rules.mjs';
 import { solve, objective, dealState, certify, isDailyEligible, CERTIFIED } from '../tools/solver/solve.mjs';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO = join(__dirname, '..');
+
 const C = (suit, rank) => ({ suit, rank, color: (suit === 1 || suit === 2) ? 'red' : 'black', id: suit * 13 + rank });
+
+/* ---------- DRIFT GUARD: rules.mjs <-> index.html ---------- */
+// rules.mjs is a behavioural hand-port of index.html's "rules" section and is the feature's single
+// trust anchor. Assert the canonical tableau/foundation rule bodies still appear verbatim in
+// index.html (whitespace-normalized), mirroring the engine.mjs drift guard, so the port can't
+// silently rot against the shipped app.
+const norm = s => s.replace(/\s+/g, ' ').trim();
+
+test('rules.mjs logic still matches index.html (no drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const canon = [
+    // isSeqHead: direction pick + the run-validation loop
+    'if(a.rank===b.rank+1) dir="desc"; else if(a.rank===b.rank-1) dir="asc"; else return false;',
+    'if(dir==="desc" && x.rank!==y.rank+1) return false; if(dir==="asc" && x.rank!==y.rank-1) return false;',
+    // runDir
+    'return cards[0].rank===cards[1].rank+1 ? "desc" : "asc";',
+    // tailDir
+    'if(a.color!==b.color && a.rank===b.rank+1) return "desc"; if(a.color!==b.color && a.rank===b.rank-1) return "asc";',
+    // canStackTableau: the join direction + the "can't reverse an established pile" rule
+    'const conn = head.rank===top.rank-1 ? "desc" : "asc";',
+    'const rdir = runDir(cards); if(rdir!=="single" && rdir!==conn) return false;',
+    'const tdir = tailDir(col); if(tdir!=="single" && tdir!==conn) return false;',
+    // maxMovable
+    'const e = emptyCols() - (targetEmpty?1:0); return (freeCells()+1) * Math.pow(2, Math.max(0,e));',
+    // foundation legality
+    'return card.rank===state.up[s]+1 && card.rank < state.down[s];',
+    'return card.rank===state.down[s]-1 && card.rank > state.up[s];',
+  ];
+  for (const c of canon) {
+    assert.ok(html.includes(norm(c)), `index.html no longer contains: ${c.slice(0, 60)}...`);
+  }
+});
 
 /* ---------- rule model (ported from index.html) ---------- */
 test('isSeqHead: single top card, and alternating-colour runs both directions', () => {

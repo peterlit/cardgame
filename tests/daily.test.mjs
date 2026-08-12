@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, streaks, OBJECTIVES,
+  dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks, OBJECTIVES,
 } from './daily.mjs';
 
 // a tiny fake pool: two seeds with different support sets
@@ -43,6 +43,33 @@ test('appending to the pool never shifts a past day (frozen history)', () => {
   const before = dailyChallenge(0, POOL);
   const grown = { ...POOL, seeds: [...POOL.seeds, { seed: 10099, par: 70, supports: ['no-cells'] }] };
   assert.deepEqual(dailyChallenge(0, grown), before);
+});
+
+/* ---------- GOLDEN MASTER: frozen (dayIndex, fixed-pool) -> (silverId, goldId) ---------- */
+// Pins the objective-selection outcome for a FIXED inline pool. It depends on the ordering/contents
+// of SILVER_UNIVERSAL/SILVER_CERTIFIED/GOLD *and* the rng seed formula in daily.mjs. If anyone
+// reorders or mid-array-inserts into those FROZEN arrays, or changes the seed formula, a pinned
+// day's pick shifts and this test fails — catching a silent retroactive reshuffle of history.
+const FROZEN_POOL = {
+  version: 1, minSeed: 10000, seeds: [
+    { seed: 10001, par: 80,  supports: ['no-cells', 'aces-first', 'kings-first', 'cells-le-2'] },
+    { seed: 10002, par: 90,  supports: ['suits-top-down', 'down-openers-20'] },
+    { seed: 10003, par: 100, supports: ['no-cells', 'suit-sprint', 'jacks-down-first', 'cells-le-1', 'down-openers-20'] },
+  ],
+};
+const GOLDEN_PICKS = [
+  { day: 0, seed: 10001, silverId: 'moves',           goldId: 'no-cells' },
+  { day: 1, seed: 10002, silverId: 'no-undo',         goldId: 'suits-top-down' },
+  { day: 2, seed: 10003, silverId: 'down-openers-20', goldId: 'no-cells' },
+];
+
+test('golden master: frozen days map to frozen (seed, silverId, goldId) picks', () => {
+  for (const g of GOLDEN_PICKS) {
+    const c = dailyChallenge(g.day, FROZEN_POOL);
+    assert.equal(c.seed, g.seed, `day ${g.day} seed`);
+    assert.equal(c.silver.id, g.silverId, `day ${g.day} silver`);
+    assert.equal(c.gold.id, g.goldId, `day ${g.day} gold`);
+  }
 });
 
 test('the move-cap objective derives N from par', () => {
@@ -103,6 +130,22 @@ test('a lost game earns no tier', () => {
   const challenge = dailyChallenge(0, POOL);
   const r = evaluateChallenge(challenge, base({ won: false }));
   assert.deepEqual(r, { bronze: false, silver: false, gold: false });
+});
+
+/* ---------- per-attempt grading + OR-accumulation across attempts ---------- */
+test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts', () => {
+  // Silver earned on one attempt, Gold on a different one -> the day holds both.
+  const silverAttempt = { bronze: true, silver: true, gold: false, moves: 95, elapsed: 200 };
+  const goldAttempt   = { bronze: true, silver: false, gold: true, moves: 110, elapsed: 150 };
+  const day = mergeTiers(mergeTiers(undefined, silverAttempt), goldAttempt);
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, moves: 95, elapsed: 150 });
+});
+
+test('mergeTiers never loses a tier already earned on a later worse attempt', () => {
+  const prev = { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 };
+  const worse = { bronze: true, silver: false, gold: false, moves: 200, elapsed: 300 };
+  const merged = mergeTiers(prev, worse);
+  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 });
 });
 
 /* ---------- streaks ---------- */

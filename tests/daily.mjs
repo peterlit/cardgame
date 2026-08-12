@@ -22,6 +22,15 @@ export function dayIndexFor(y, m, d) { return daysFromCivil(y, m, d) - EPOCH_DAY
 // ---- objective catalogue (checkers evaluate a telemetry record) ----
 // telemetry = { won, moves, elapsed, cellUses, undos, usedAutoplay, usedAutoFinish,
 //               foundationOrder: [{ suit, rank, end:'up'|'down', moveIdx }] }  (in play order)
+//
+// TRUSTED-TELEMETRY CONTRACT. The checkers below treat the telemetry as ground truth; they do NOT
+// re-simulate the deal. The APP is responsible for emitting a complete, correctly-ordered
+// foundationOrder (every foundation send, in play order) and honest counters (cellUses, undos, ...).
+// This is a local, single-player, offline game with no server: the only "adversary" is a user
+// editing their own storage, which only cheats themselves — so full re-simulation would be
+// over-engineering. Checkers are kept deterministic and cheap, and are written to mirror EXACTLY
+// the solver's certification gates (tools/solver/solve.mjs) so that "certified => a passing line
+// exists" and "checker passes => a valid line" stay in agreement.
 const acesFirst = t => { let a = 0; for (const e of t.foundationOrder) { if (a >= 4) break; if (e.rank === 1) a++; else return false; } return t.won && a === 4; };
 const kingsFirst = t => { let k = 0; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') k++; else if (e.rank === 1 && e.end === 'up' && k < 4) return false; } return t.won; };
 const jacksDownFirst = t => { let j = 0; for (const e of t.foundationOrder) { if (e.rank === 11 && e.end === 'down') j++; else if (e.rank === 1 && e.end === 'up' && j < 4) return false; } return t.won; };
@@ -43,6 +52,10 @@ export const OBJECTIVES = {
   'suit-sprint':     { grade: 'gold',   certified: true, label: () => 'Finish one whole suit before any other suit is started',                                         check: suitSprint },
 };
 
+// FROZEN — APPEND-ONLY, NEVER REORDER. dailyChallenge() indexes these three arrays with a per-day
+// RNG, so any reorder or mid-array insertion retroactively reshuffles which objective every PAST
+// day picked (frozen history). New objectives may only be *appended*. The golden-master test in
+// tests/daily.test.mjs pins several days and fails if this invariant is broken.
 const SILVER_UNIVERSAL = ['moves', 'no-undo'];
 const SILVER_CERTIFIED = ['cells-le-1', 'cells-le-2', 'down-openers-20'];
 const GOLD = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint'];
@@ -59,6 +72,8 @@ function makeObjective(id, rec) {
 export function dailyChallenge(dayIndex, pool) {
   if (dayIndex < 0 || dayIndex >= pool.seeds.length) return null;
   const rec = pool.seeds[dayIndex];
+  // FROZEN rng seed formula — changing it retroactively reshuffles every past day's Silver/Gold
+  // pick. Golden-mastered in tests/daily.test.mjs. Never alter without a history migration.
   const rng = mulberry32((0x9e3779b9 ^ (dayIndex + 1)) >>> 0);
   const silverPool = SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id => rec.supports.includes(id)));
   const goldPool = GOLD.filter(id => rec.supports.includes(id));
@@ -69,13 +84,31 @@ export function dailyChallenge(dayIndex, pool) {
 
 export function evaluate(objective, telemetry) { return OBJECTIVES[objective.id].check(telemetry, objective.param); }
 
-// Bronze = won; Silver/Gold = won AND the objective satisfied.
+// Grade ONE attempt. Bronze = won; Silver/Gold = won AND that tier's objective satisfied on this
+// attempt. Silver and Gold are independent per-attempt results — a Gold attempt need NOT also be
+// Silver, and vice versa. The day's standing is the OR-accumulation of attempts (see mergeTiers):
+// with free retries, earning Silver on one attempt and Gold on another still awards both for the
+// day. Callers must therefore fold each attempt into the day's record via mergeTiers, not overwrite.
 export function evaluateChallenge(challenge, telemetry) {
   const bronze = !!telemetry.won;
   return {
     bronze,
     silver: bronze && evaluate(challenge.silver, telemetry),
     gold: bronze && evaluate(challenge.gold, telemetry),
+  };
+}
+
+// Accumulate a day's tiers across attempts: each tier is best-of (OR), and we keep the best moves
+// and time seen (lowest). `prev` may be undefined (first attempt of the day). This encodes the
+// design rule that Bronze/Silver/Gold are earned independently and never lost by a later attempt.
+export function mergeTiers(prev, attempt) {
+  const p = prev || { bronze: false, silver: false, gold: false, moves: Infinity, elapsed: Infinity };
+  return {
+    bronze: !!p.bronze || !!attempt.bronze,
+    silver: !!p.silver || !!attempt.silver,
+    gold: !!p.gold || !!attempt.gold,
+    moves: Math.min(p.moves ?? Infinity, attempt.moves ?? Infinity),
+    elapsed: Math.min(p.elapsed ?? Infinity, attempt.elapsed ?? Infinity),
   };
 }
 
