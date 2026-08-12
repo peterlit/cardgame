@@ -110,3 +110,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     construction for gating objectives). Spec in `docs/solver.md`; tests `tests/solver.test.mjs`
     (9 pass); pool builder emits append-only `data/daily-pool.json` over seeds >10,000. Retires I2.
     Dropped `empty-column` (vacuous — winning empties all columns). Par is near-optimal (documented).
+47. Start Phase 1 + grow pool + review loop. Grew the certified pool in the background (toward a
+    year). Built the shared Daily-Challenges core `tests/daily.mjs` (Node-tested, 13 tests): the
+    deterministic date→challenge generator (day index off a 2026-08-12 epoch → pool.seeds[dayIndex],
+    append-only frozen history; per-day RNG picks Silver/Gold from the seed's certified supports),
+    the objective checkers (evaluate from foundation-order + resource telemetry), and the three
+    catch-up streaks. App integration (screen/telemetry/DailyStore, both platforms) still TODO.

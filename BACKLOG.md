@@ -89,9 +89,15 @@ are done or added.
     by construction (no false-positive certs). This also **retires I2**. Grow the pool by re-running
     `build-pool.mjs`. Follow-ups: a `rules.mjs`↔`index.html` drift guard (or replay-verify pass);
     optimal par (currently near-optimal); redefine the dropped `empty-column` objective.
-  - **Phase 1+ — TODO:** the app-side feature (both platforms) — deterministic `date → challenge`
-    generator + objective checkers (shared engine, parity-tested), DailyStore + derived streaks,
-    the Challenges & Streaks screen — all consuming the baked pool as data.
+  - **Phase 1 shared core — DONE:** the deterministic `date → challenge` generator, objective
+    checkers, and streak computation, in `tests/daily.mjs` (canonical, Node-tested — 13 tests) for
+    both platforms to build on. Day index = days since the 2026-08-12 epoch → `pool.seeds[dayIndex]`
+    (append-only ⇒ frozen history); per-day RNG picks Silver/Gold from the seed's certified supports.
+  - **Phase 1 app integration — TODO:** wire the shared core into each platform — the Challenges &
+    Streaks screen, the per-attempt telemetry tracker (moves/cells/undos/foundation-order/auto
+    flags), the DailyStore (persist per-day tiers; derive the 3 streaks), and challenge play + live
+    objectives HUD + win-tier reporting. Web (inline the daily logic, drift-guarded; load the pool)
+    then iOS (mirror in Swift; bundle the pool). Not started.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
