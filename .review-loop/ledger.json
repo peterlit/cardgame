@@ -1,16 +1,16 @@
 {
   "round": 1,
-  "round_start_sha": "f1ef1f1c8fc42104892db6d71194f3388505b360",
+  "round_start_sha": "d8460bf1c7be59e23cc75876bede9627eb138f63",
   "max_rounds": 5,
   "findings": [
     {
       "id": "F1",
-      "severity": "blocker",
-      "title": "iOS Finish pill/maybeAutoFinish re-enters during the deferred-win window and permanently discards the win",
-      "location": "ios/Causeway/Causeway/Model/Game.swift:561-568,623-624,549; Views/ContentView.swift:124-125",
-      "failure_scenario": "Auto-finish lands the last card -> finishing=false, onWin deferred 0.38s. In that window won=false, finishing=false, board complete, so canOfferFinish==true and the Finish pill renders. Player taps Finish (or toggles autoFinishMode) -> runAutoFinish() bumps finishGen -> pending onWin block's guard finishGen==gen fails, onWin never fires. won stays false, winStore.record never called, board not persisted: solved board, no overlay, win lost.",
-      "rationale": "autoFinishWouldWin() returns true on a complete board (greedy loop moves nothing; final allSatisfy == checkWin). iOS canOfferFinish/maybeAutoFinish/runAutoFinish gate on flag !won not the position; web is immune via !isWon() (index.html:789,779).",
-      "suggested_fix": "Gate iOS canOfferFinish/maybeAutoFinish/runAutoFinish on the actual position (&& !checkWin()/!boardComplete), or make autoFinishWouldWin() false on a complete board \u2014 matching web's !isWon().",
+      "severity": "major",
+      "title": "Solver rule model (rules.mjs) has no drift guard against index.html",
+      "location": "tools/solver/rules.mjs:15-68; tests/engine.test.mjs drift guard",
+      "failure_scenario": "index.html's canStackTableau/tailDir/maxMovable/isSeqHead is edited; rules.mjs keeps old logic; certifications now use stale rules while all tests stay green.",
+      "rationale": "The tableau-move rules live only in index.html and rules.mjs; the existing drift guard covers engine.mjs only (which doesn't contain them). The feature's single trust anchor is unenforced. Currently identical (verified).",
+      "suggested_fix": "Extend a drift guard to assert isSeqHead/canStackTableau/tailDir/runDir/maxMovable bodies still appear verbatim in index.html.",
       "current_status": "fixed",
       "status_history": [
         {
@@ -20,18 +20,18 @@
         {
           "round": 1,
           "status": "fixed",
-          "validation": "All three gates (runAutoFinish/maybeAutoFinish/canOfferFinish) include !checkWin(); audited all finishGen bump sites; pending onWin fires normally; web already immune. FIXED."
+          "validation": "11 rule bodies pinned verbatim in current index.html; covers tailDir no-reverse + maxMovable; plausible edits trip it. FIXED."
         }
       ]
     },
     {
       "id": "F2",
       "severity": "major",
-      "title": "Process kill / tab close inside the deferred-win window loses the win record (regression from synchronous onWin)",
-      "location": "ios/Causeway/Causeway/Model/Game.swift:564,156; index.html:740,403",
-      "failure_scenario": "Last card lands; during the 0.38s/320ms delay the board is complete but win is not recorded and persist()/saveGame() refuse a complete board. If the app is killed (iOS) or tab closed (web) before the timer fires, onWin never runs: no winStore/wins[seed] entry, best time lost, next launch deals fresh. Pre-commit onWin fired synchronously so the win was durable.",
-      "rationale": "persist() guards !boardComplete (Game.swift:156), saveGame() guards !isWon() (index.html:403); the only record path is the deferred onWin timer, which a kill drops.",
-      "suggested_fix": "Record the win durably (winStore.record / wins[seed]) synchronously at the winning step; defer only the overlay presentation (won=true / DOM overlay).",
+      "title": "Frozen history depends on unguarded code constants, not just the pool",
+      "location": "tests/daily.mjs:52-73; tests/daily.test.mjs",
+      "failure_scenario": "A future edit adds/reorders GOLD or SILVER_CERTIFIED; goldPool/silverPool indices shift; rng()*len reshuffles every past day's gold/silver; all tests still pass.",
+      "rationale": "dailyChallenge depends on (dayIndex, pool, objective-array ordering, rng seed). Tests only append to a fake pool and never pin real (dayIndex->objectiveId) vectors.",
+      "suggested_fix": "Add a golden-master test pinning several (dayIndex, real-pool-slice)->{silverId,goldId}; freeze/version the objective arrays.",
       "current_status": "fixed",
       "status_history": [
         {
@@ -41,23 +41,113 @@
         {
           "round": 1,
           "status": "fixed",
-          "validation": "recordWin() split out, called synchronously at winning step, once-guarded (winRecorded/pendingWin); onWin's 2nd call no-ops; exactly-once verified; moveCount/clock correct; kill-during-beat keeps the win; flags reset on deal/restore. FIXED."
+          "validation": "golden values match code, non-tautological; silver picks at indices 0/1/3 catch reorders/rng change; append-only tested. FIXED."
         }
       ]
     },
     {
       "id": "F3",
       "severity": "minor",
-      "title": "No automated coverage for the win-record / deferred-overlay timing logic",
-      "location": "tests/**/*.test.mjs; ios (no test target)",
-      "failure_scenario": "A future refactor re-defers recordWin or drops a !checkWin() gate; tests stay green while a kill-during-beat again loses the win or the Finish pill re-offers over a solved board.",
-      "rationale": "24 node tests cover engine rules/safe-autoplay/restore/autoFinishWouldWin only; nothing exercises recordWin/winRecorded once-guard, deferred onWin gating, or record-then-undo. Both fixes were timing bugs invisible to current CI.",
-      "suggested_fix": "Add a headless harness test: recordWin idempotent under double-call; simulated undo-during-beat leaves the win recorded once; the canOffer/maybe/run gates return false when the board is complete.",
-      "current_status": "open",
+      "title": "par is inadmissible and overstates the optimum; moves cap runs loose",
+      "location": "tools/solver/solve.mjs; tests/daily.mjs:39",
+      "failure_scenario": "seed 10007: reference par=88 but aces-first par=76 (a legal unconstrained line); moves cap=106 granted when 76 achievable.",
+      "rationale": "f=g+2h inadmissible; constrained sub-searches beat the reference par. Deterministic so frozen history safe, but calibration loose; 'reference par' a misnomer.",
+      "suggested_fix": "Store par = min(base_par, min constraintPar) in certify (still deterministic), so the moves cap tightens.",
+      "current_status": "fixed",
       "status_history": [
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "par=min over fixed CERTIFIED; constraintPar numeric-only (no NaN); valid witness; docs updated. FIXED."
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "severity": "minor",
+      "title": "Checkers trust pre-digested telemetry; no re-simulation vs the seed",
+      "location": "tests/daily.mjs:31-36,76",
+      "failure_scenario": "A telemetry bug or edited localStorage logs wrong end/order or truncates foundationOrder; a checker grants the wrong tier; streaks corrupt. Confirmed kings-first with ace-down-before-kings passes (prefix/ace-up-only guard).",
+      "rationale": "evaluate consumes telemetry as ground truth, never validating legality for the seed. Local single-player (no server); the only 'adversary' is the user editing their own storage.",
+      "suggested_fix": "Add light structural invariants (well-formed foundationOrder) and/or document the trusted-telemetry contract; full re-simulation is likely over-engineering for a local personal game \u2014 use judgment.",
+      "current_status": "disputed",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "disputed",
+          "validation": "checkers verified to mirror solver gates exactly (only ace-up gated; ace-down/non-ace early allowed by both); tightening would break parity. Decline accepted. DISPUTED."
+        }
+      ]
+    },
+    {
+      "id": "F5",
+      "severity": "minor",
+      "title": "Dead/unused outputs: cloneState and constraintPar",
+      "location": "tools/solver/rules.mjs:71-73; tools/solver/solve.mjs",
+      "failure_scenario": "No functional failure; cost with no consumer.",
+      "rationale": "cloneState exported but unused; constraintPar stored but never read (moves cap uses base par).",
+      "suggested_fix": "Delete cloneState; and either consume constraintPar (F3) or drop it.",
+      "current_status": "fixed",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "cloneState deleted, unreferenced; constraintPar now read by F3. FIXED."
+        }
+      ]
+    },
+    {
+      "id": "F6",
+      "severity": "minor",
+      "title": "Silver+gold may be jointly infeasible on one attempt (suspected)",
+      "location": "tests/daily.mjs:79-86",
+      "failure_scenario": "silver='moves' cap paired with a gold whose cheapest line exceeds the cap => no single attempt earns both.",
+      "rationale": "evaluateChallenge grades both from one telemetry. Per the design, retries are free and the DailyStore keeps best-of per tier across attempts, so silver & gold need NOT co-occur on one attempt \u2014 likely a non-issue once aggregation is best-of. No concrete failing day found.",
+      "suggested_fix": "Document/enforce that per-day tiers are OR-accumulated across attempts (silver and gold independent); add a helper mergeTiers; optionally a pool sanity check.",
+      "current_status": "fixed",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed",
+          "validation": "mergeTiers correct in isolation (OR tiers, min metrics, undefined-prev guarded). FIXED (but composition gap -> F7)."
+        }
+      ]
+    },
+    {
+      "id": "F7",
+      "severity": "minor",
+      "title": "evaluateChallenge output lacks moves/elapsed that mergeTiers consumes",
+      "location": "tests/daily.mjs:92-112",
+      "introduced_by_fix": true,
+      "failure_scenario": "web/iOS wire evaluateChallenge(...) into mergeTiers; attempt.moves/elapsed undefined; ?? Infinity keeps the day's moves/elapsed Infinity forever -> best-moves/best-time never records.",
+      "rationale": "evaluateChallenge returns {bronze,silver,gold} only; mergeTiers reads attempt.moves/elapsed; no test exercises the composition.",
+      "suggested_fix": "evaluateChallenge echoes moves/elapsed from telemetry (or mergeTiers takes telemetry); add a composition test.",
+      "current_status": "fixed",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed",
+          "validation": "evaluateChallenge echoes {moves,elapsed} on win, omits on loss; composition test added; 51/51. FIXED."
         }
       ]
     }
