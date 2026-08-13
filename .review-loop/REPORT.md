@@ -1,80 +1,63 @@
-# Review-loop final report — Daily Challenges implementation (solver + shared core)
+# Review-loop final report — Daily Challenges web integration
 
-**Result: CONVERGED** (round 2 of a 5-round budget).
-**Stop reason:** 0 open blockers, 0 open majors, 0 open minors; one disputed item accepted.
+**Result: CONVERGED** (round 1 of a 5-round budget). 0 open blockers/majors/minors.
 
-Scope: the Daily-Challenges code delivered this session — the offline constrained solver + certified
-pool (`tools/solver/`) and the shared date→challenge / objective-checker / streak core
-(`tests/daily.mjs`). Design docs out of scope. Reviewed `d6789fe..HEAD`. Loop start SHA: `d8460bf`.
-Fixes landed in `4896a28` (round 1) and `a954543` (round 2). (Prior loops archived under
-`.review-loop/REPORT-*.md`.)
+Scope: wiring the shared daily core into the web app (`index.html`) — commit `f71a8aa`. Loop start
+SHA `f71a8aa`; fixes in `f87154e`. (Prior loops archived under `.review-loop/*-*.md`.)
 
 ## Trend
 
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Net | Decision |
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
-| 1 | 0 | 0 | 1 | 0 | 0 | 0 | +0 | converged |
-| 2 | 0 | 0 | 0 | 1 | 0 | 0 | +1 | converged |
+| 1 | 0 | 0 | 0 | 0 | 0 | 0 | +0 | converged |
 
-## What the review established
+(Seed review filed F1–F6 — 2 blockers, 2 major, 2 minor; all fixed and validated the same round.)
 
-**Core soundness verified, not assumed.** The reviewer traced the certification pipeline and
-confirmed the headline guarantee — *no false-positive certifications*: every solver move mirrors an
-app-legal move, `isWon` is a genuine all-foundations-complete check, ordering constraints are
-memoryless (read only `up`/`down`) so the sorted-column transposition table can't launder a
-history-violating line, and `autoSafe` is gated by the constraint at every send. Determinism holds
-(no `Date.now`/`Math.random`; deterministic heap tie-breaking; `par` reproducible run-to-run). The
-objective checkers were shown to **mirror the solver's gates exactly**, so "certified ⇒ a passing
-line exists" and "checker passes ⇒ a valid line" stay in agreement.
+## What the review caught — this is why the loop earned its keep
 
-## Findings
+The integration shipped with **two blockers**, both in the telemetry/robustness seams:
 
-- **F1 [major] — FIXED.** The solver's rule model (`rules.mjs`) — the feature's single trust anchor
-  — had no drift guard against `index.html`. Added one pinning 11 verbatim rule bodies (incl. the
-  `tailDir` no-reverse rule and the `maxMovable` formula); a plausible edit to the app's stacking or
-  supermove rules now trips it.
-- **F2 [major] — FIXED.** Frozen history depended on unguarded code constants (the objective-array
-  ordering + the rng seed formula), not just the append-only pool — a future reorder/insert would
-  retroactively reshuffle every past day's Silver/Gold. Added a golden-master test pinning
-  `(day, fixed-pool) → {seed, silverId, goldId}` and marked the arrays + rng formula FROZEN /
-  append-only.
-- **F3 [minor] — FIXED.** `par` (weighted-A*, inadmissible) overstated the optimum, so move caps ran
-  loose. `certify` now stores `par = min(base, …all constraintPar)` — the shortest winning line found
-  in any search (deterministic). Doc updated.
-- **F4 [minor] — DISPUTED (accepted).** The ordering checkers weren't "tightened" to reject
-  ace-down/early-non-ace sends. Verified this is *correct*: those events are intentionally permitted
-  by **both** the solver gates and the checkers (only ace-*up* is gated), so tightening would reject
-  solver-certified lines and break checker↔solver parity. The trusted-telemetry stance is reasonable
-  for a local, offline, no-server game; the contract is now documented.
-- **F5 [minor] — FIXED.** Deleted unused `cloneState`; `constraintPar` is now consumed by F3.
-- **F6 [minor] — FIXED.** Silver and Gold need not be earned on one attempt; added `mergeTiers`
-  (OR the tiers, keep best moves/time across retries) and documented `evaluateChallenge` as
-  per-attempt with per-day OR-accumulation.
-- **F7 [minor, introduced by the F6 fix] — FIXED (round 2).** `evaluateChallenge`'s result lacked the
-  `moves`/`elapsed` that `mergeTiers` reads, so best-time would silently never record once wired up.
-  `evaluateChallenge` now echoes those metrics on a win (omits on a loss so a fast-but-losing run
-  can't clobber a prior best); added an end-to-end composition test.
+- **F1 [BLOCKER] — undo didn't roll back challenge telemetry.** `snapshot()`/`undo()` restored the
+  board and `moveCount` but not `telem.foundationOrder`/`cellUses`, so exploring with undo — a
+  first-class, app-encouraged mechanic ("Replay to improve") — polluted the objective stream: a
+  deserved Gold/Silver could be *denied* (an undone early non-ace still sat in `foundationOrder`; an
+  undone cell park kept `cellUses` high), and a count objective could be *inflated*
+  (home-a-King-down / undo / redo appends duplicate entries → false `down-openers-20`). Fixed by
+  recording `foundationOrder.length` + `cellUses` in the snapshot and truncating/restoring on undo
+  (both append-only; `undos` intentionally stays failed).
+- **F2 [BLOCKER] — the Daily overlay crashed** (null deref) whenever `todayIndex()` fell outside
+  `[0, pool.length)` — before the 2026-08-12 epoch (a user west of UTC at launch), or after the
+  366-day horizon. Fixed by clamping `dailyView` and rendering a "no challenge available" card
+  instead of dereferencing a null challenge.
+- **F3 [major]** — autoplay persisted telemetry one card behind the board (`saveGame` inside
+  `autoplayOneStep` ran before the caller's `recordHomed`), so a reload mid-autoplay-chain saved a
+  foundation with no `foundationOrder` entry → wrong tier on eventual win. Fixed by moving
+  `recordHomed` into `autoplayOneStep` (before its save) and removing the now-duplicate call.
+- **F4 [major]** — cell→cell relocation over-counted `cellUses`, wrongly failing `no-cells`/
+  `cells-le-N`. Fixed (only count a genuine tableau→cell park).
+- **F5 [minor]** — widened the daily drift guard to pin the previously-unpinned checkers and the
+  `EPOCH_DAYS`/`dayIndexFor` constants.
+- **F6 [minor]** — the live-HUD `objViolated` for `down-openers-20` didn't flag failure after the
+  20-move deadline; now matches the authoritative checker.
 
-Tests: 51/51 across the suite (engine 24 + solver 10 + daily 17).
+Core telemetry correctness in forward play, `challengeDay` lifecycle, once-only scoring, old-save
+compatibility, and no global-name collisions were all verified clean. 52/52 tests (engine 24 +
+solver 10 + daily 18, incl. 3 drift guards).
 
 ## HUMAN SKIM LIST — read these, the loop can't self-check
 
-1. **The rule port `tools/solver/rules.mjs` vs the app `index.html` (drift guard now in
-   `tests/solver.test.mjs`).** The guard pins `index.html`'s text one-directionally; `rules.mjs` is
-   covered by its own behavioural tests. If you ever change Causeway's tableau/supermove rules, make
-   the change in BOTH and re-run — a wrong port silently mis-certifies every future seed.
-2. **`par` is near-optimal, not proven-optimal.** Move caps derive from it generously; fine for a
-   game, but "expert-tight" caps would need an admissible/optimal pass.
-3. **Trusted-telemetry contract (`tests/daily.mjs` header).** The checkers grade the app's reported
-   `foundationOrder`/counters without re-simulating. That's a deliberate choice for a local
-   single-player game — but it means **Phase-1 app integration must emit complete, correctly-ordered
-   telemetry**; a telemetry bug shows up as wrong tiers, not a crash. Worth a focused test when the
-   app side lands.
-4. **Objective arrays + rng formula are FROZEN.** New objectives may only be *appended*; the golden
-   test enforces it. A reorder is a history-rewrite.
+1. **The telemetry seam — `recordHomed`/`snapshot`/`undo`/`autoplayOneStep` (commits `f71a8aa`,
+   `f87154e`).** It reconstructs the foundation-order stream by diffing snapshots; the invariant is
+   "at most one card homed per move." If a future change ever homes 2+ cards in one move, the
+   `moveIdx` and truncation logic need revisiting. **Play-test on device:** win a daily with heavy
+   undo/redo and with safe-autoplay on, and confirm the awarded tiers match what you actually did.
+2. **The trusted-telemetry stance.** Scoring believes the app's reported stream (no re-simulation) —
+   fine for a local, single-player, no-server game, but it means a telemetry bug shows up as a wrong
+   tier, not a crash. The drift guard + these fixes are the safety net.
+3. **Out-of-range dates (F2).** Confirmed fixed, but the launch-day / timezone boundary is exactly
+   the kind of thing to eyeball once on a real device around the epoch date.
 
 ## Verdict
-Converged: the daily-challenges foundation (solver + shared core) is sound — certifications are
-false-positive-free and deterministic, the rule anchor and frozen-history invariant are now guarded
-by tests, and par/tier-accumulation are corrected. Remaining risk is the one-directional rule guard
-and the (deliberate) trusted-telemetry model, both flagged for a human/Phase-1 pass.
+Converged: the web integration shipped with two real blockers (undo telemetry pollution; an
+out-of-date-range overlay crash) plus two majors and two minors — all fixed and independently
+re-validated, no regressions, 52/52. iOS mirror still pending (BACKLOG DAILY).
