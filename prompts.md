@@ -205,4 +205,8 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     pinning the iOS port's parity-critical logic (deal RNG, calendar, daily generator, checkers,
     mergeTiers/streaks, once-only win gate, applyDemoToken) — closing the "iOS has zero drift guards"
     gap. 67 tests green. Owner action items (Support/Privacy URLs, contact email, real 17/18-device
-    testing) and the on-device landscape screenshot (sim wedged) are tracked in the doc. Review loop next.
+    testing) and the on-device landscape screenshot (sim wedged) are tracked in the doc. Review loop:
+    converged round 2 — caught a real landscape ScrollView-vs-drag gesture conflict (fixed by a
+    no-scroll fit-to-height layout that keeps portrait's exact drag mechanics) + tightened two weak
+    tests; one documented landscape known-minor (long-column clipping on small phones). Published an
+    owner-facing shipping-status page (Artifact). 67 tests green.
