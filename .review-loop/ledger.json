@@ -1,11 +1,1 @@
-{
-  "round": 1,
-  "round_start_sha": "b7a8477",
-  "max_rounds": 5,
-  "findings": [
-    {"id":"F1","severity":"minor","region":"ios/Causeway/Causeway/Model/Daily.swift:15-33","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Fixed: floorDiv/floorMod correct for all sign combos; provably inert for year>=2026 (daysFromCivil(2026,8,12)=EPOCH_DAYS, dayIndexFor=0). RNG/checkers/mergeTiers/streaks untouched."},
-    {"id":"F2","severity":"minor","region":"ios/Causeway/Causeway/Model/Daily.swift:210","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Fixed: guard after both pool filters, before both rng.int picks; normal-path RNG order/count unchanged. Nil handled by all callers; no force-unwrap."},
-    {"id":"F3","severity":"minor","region":"ios/Causeway/Causeway/Views/ContentView.swift:85-87","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Decline accepted: multiple .sheet modifiers on one view are supported iOS 16+ (target iOS 17); bindings mutually exclusive. Not a defect."},
-    {"id":"F4","severity":"minor","region":"ios/Causeway/Causeway/Views/DailyView.swift:156","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Fixed: negative-id data-driven blanks can't collide with positive day-cell ids; visual output unchanged; re-diffs cleanly on month rollover."}
-  ]
-}
+{ "round": 1, "round_start_sha": "1132c8c", "max_rounds": 5, "findings": [] }
