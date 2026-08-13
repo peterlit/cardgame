@@ -27,6 +27,8 @@ private struct Snapshot {
     var up: [Int]
     var down: [Int]
     var moveCount: Int
+    var foLen: Int      // pre-move length of telem.foundationOrder (append-only cursor)
+    var cellUses: Int   // pre-move free-cell-use counter
 }
 
 /// The Causeway engine + observable state for SwiftUI. Rules ported from the web prototype:
@@ -71,6 +73,20 @@ final class Game: ObservableObject {
     private var winRecorded = false
 
     let winStore = WinStore()
+    let dailyStore = DailyStore()
+
+    /// The certified daily-challenge seed pool (empty ⇒ Daily unavailable).
+    let pool = DailyData.pool
+
+    /// The day index currently being played as a challenge (nil = casual play). @Published so the
+    /// live objectives HUD shows/hides as a challenge starts/ends.
+    @Published var challengeDay: Int? = nil
+    /// Per-attempt telemetry (reset on deal/restore) — the ordered foundation stream + resource
+    /// counters the objective checkers read. Persisted with the in-progress game across relaunch.
+    private var telem = Telemetry()
+    /// The graded result of the just-won challenge attempt, for the win overlay (nil for casual
+    /// wins). Set in recordWin(); cleared on the next deal.
+    @Published var dailyResult: TierResult? = nil
 
     private var history: [Snapshot] = []
     private var started = false
@@ -83,6 +99,11 @@ final class Game: ObservableObject {
         // WinStore is a nested ObservableObject; its changes don't propagate through the
         // parent automatically, so forward them (keeps "Won"/checkmark/Wins in sync).
         winStore.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        // DailyStore is a nested ObservableObject too; forward its changes so the Challenges
+        // screen and any streak/badge readouts stay in sync.
+        dailyStore.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
         if UserDefaults.standard.object(forKey: "causeway.autoplay") != nil {
@@ -124,6 +145,9 @@ final class Game: ObservableObject {
         moveCount = 0
         clock.reset()
         won = false
+        telem = Telemetry()      // fresh attempt; a plain deal is casual play until playChallenge sets challengeDay
+        challengeDay = nil
+        dailyResult = nil
         winRecorded = false      // fresh game — allow the next win to record
         started = false
         autoplaying = false
@@ -149,6 +173,8 @@ final class Game: ObservableObject {
         var moveCount: Int
         var elapsed: Int
         var started: Bool
+        var challengeDay: Int?      // preserve a challenge attempt (+ its telemetry) across relaunch
+        var telem: Telemetry?
     }
 
     /// Snapshot the live (unfinished) game to UserDefaults. Cheap: board only, no undo
@@ -159,7 +185,8 @@ final class Game: ObservableObject {
         // never be written, else restore() would resurrect an empty, un-won game.
         guard !won, !boardComplete else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
-                          moveCount: moveCount, elapsed: clock.elapsed, started: started)
+                          moveCount: moveCount, elapsed: clock.elapsed, started: started,
+                          challengeDay: challengeDay, telem: telem)
         if let data = try? JSONEncoder().encode(s) {
             UserDefaults.standard.set(data, forKey: gameKey)
         }
@@ -197,6 +224,9 @@ final class Game: ObservableObject {
         seed = s.seed; tableau = s.tableau; cells = s.cells; up = s.up; down = s.down
         moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
+        challengeDay = s.challengeDay          // resume a challenge attempt if one was in progress
+        telem = s.telem ?? Telemetry()
+        dailyResult = nil
         winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)
         // Reset finish state too (parity with web restoreGame): restore() is init-only so these
         // are already default, but keep it explicit and robust against future re-entrant restores.
@@ -298,12 +328,34 @@ final class Game: ObservableObject {
     // MARK: - Move plumbing
 
     private func snapshot() {
-        history.append(Snapshot(tableau: tableau, cells: cells, up: up, down: down, moveCount: moveCount))
+        history.append(Snapshot(tableau: tableau, cells: cells, up: up, down: down, moveCount: moveCount,
+                                foLen: telem.foundationOrder.count, cellUses: telem.cellUses))
         if history.count > 500 { history.removeFirst() }
+    }
+
+    /// Record any cards newly sent home this move by diffing the foundations against the pre-move
+    /// snapshot (each move homes at most one card). Non-invasive — leaves the move plumbing
+    /// untouched. Call right after moveCount is bumped at each commit point. Builds the ordered
+    /// foundation stream the daily objective checkers read. Mirrors index.html's recordHomed().
+    private func recordHomed() {
+        guard let p = history.last else { return }
+        for s in 0..<4 {
+            if up[s] > p.up[s] {
+                for r in (p.up[s] + 1)...up[s] {
+                    telem.foundationOrder.append(FoundationEvent(suit: s, rank: r, end: "up", moveIdx: moveCount))
+                }
+            }
+            if down[s] < p.down[s] {
+                for r in stride(from: p.down[s] - 1, through: down[s], by: -1) {
+                    telem.foundationOrder.append(FoundationEvent(suit: s, rank: r, end: "down", moveIdx: moveCount))
+                }
+            }
+        }
     }
 
     private func commit() {
         moveCount += 1
+        recordHomed()   // capture any card this move sent home (for daily-challenge telemetry)
         if !started { started = true; startTimer() }
         selection = nil
         if checkWin() { onWin(); return }
@@ -317,9 +369,15 @@ final class Game: ObservableObject {
         finishing = false        // halt any running finish cascade
         finishGen &+= 1          // invalidate any asyncAfter block still queued for the old chain
         promptAutoFinish = false
+        telem.undos += 1        // an undo permanently fails the no-undo objective (never rolled back)
         guard let h = history.popLast() else { return }
         tableau = h.tableau; cells = h.cells; up = h.up; down = h.down
         moveCount = h.moveCount
+        // Roll back challenge telemetry too, so exploring with undo can't pollute the stream:
+        // truncate the append-only foundationOrder to its pre-move length and restore the cell-use
+        // counter. (undos itself intentionally stays incremented.)
+        if telem.foundationOrder.count > h.foLen { telem.foundationOrder.removeLast(telem.foundationOrder.count - h.foLen) }
+        telem.cellUses = h.cellUses
         selection = nil
         won = false
         // A win stops the clock; undoing back into play must resume it (else elapsed
@@ -394,6 +452,8 @@ final class Game: ObservableObject {
         snapshot()
         remove(from: sel)
         cells[i] = cards[0]
+        // A cell→cell shuffle isn't a new free-cell use; only a tableau→cell park counts.
+        if case .cell = sel {} else { telem.cellUses += 1 }
         commit()
         return true
     }
@@ -453,7 +513,7 @@ final class Game: ObservableObject {
         // 4) a free cell (single card, and not already in a cell)
         if n == 1, case .tableau = spot {
             for i in 0..<Game.cellCount where cells[i] == nil {
-                snapshot(); cells[i] = head; removeRun(spot); commit(); return
+                snapshot(); cells[i] = head; telem.cellUses += 1; removeRun(spot); commit(); return
             }
         }
     }
@@ -487,14 +547,14 @@ final class Game: ObservableObject {
             if let c = cells[i], isSafeAutoplay(c) {
                 snapshot(); selection = nil; cells[i] = nil
                 if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-                moveCount += 1; persist(); return true
+                moveCount += 1; recordHomed(); persist(); return true
             }
         }
         for col in 0..<Game.colCount {
             guard let c = tableau[col].last, isSafeAutoplay(c) else { continue }
             snapshot(); selection = nil; tableau[col].removeLast()
             if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
-            moveCount += 1; persist(); return true
+            moveCount += 1; recordHomed(); persist(); return true
         }
         return false
     }
@@ -564,6 +624,7 @@ final class Game: ObservableObject {
             withAnimation(.easeOut(duration: 0.2)) { sent = self.sendOneHome() }
             guard sent else { self.finishing = false; return }
             self.moveCount += 1
+            self.recordHomed()   // auto-finish sends count in the foundation-order stream too
             if !self.started { self.started = true; self.startTimer() }
             if self.checkWin() {
                 self.finishing = false
@@ -645,7 +706,45 @@ final class Game: ObservableObject {
         stopTimer()
         autoplaying = false
         clearSaved()   // finished game — next launch should start fresh
-        winStore.record(seed: seed, moves: moveCount, secs: clock.elapsed)
+        let secs = clock.elapsed
+        winStore.record(seed: seed, moves: moveCount, secs: secs)
+        dailyResult = recordChallengeResult(secs: secs)   // score the daily attempt (if any); clears challengeDay
+    }
+
+    // MARK: - Daily challenges
+
+    /// Begin playing `day` as a challenge: deal its seed (which resets telemetry and clears
+    /// challengeDay), then mark this attempt as that challenge. No-op if unavailable / in the future.
+    func playChallenge(_ day: Int) {
+        guard day >= 0, day < pool.count, day <= todayIndex() else { return }
+        deal(seed: pool[day].seed)   // resets telem + clears challengeDay + dailyResult
+        challengeDay = day
+        persist()
+    }
+
+    /// Fold a won challenge attempt into the day's record (OR-accumulated). Returns the graded
+    /// attempt for the win overlay, or nil for casual play. Clears challengeDay.
+    private func recordChallengeResult(secs: Int) -> TierResult? {
+        guard let day = challengeDay, let ch = dailyChallenge(day, pool) else { return nil }
+        let attempt = Attempt(won: true, moves: moveCount, elapsed: secs,
+                              cellUses: telem.cellUses, undos: telem.undos,
+                              foundationOrder: telem.foundationOrder)
+        let res = evaluateChallenge(ch, attempt)
+        dailyStore.record(day: day, result: res)
+        challengeDay = nil
+        return res
+    }
+
+    /// The live objectives HUD's view of the current challenge attempt (nil when not on a challenge).
+    /// The authoritative scoring happens at win via the checkers; this drives the in-play hints.
+    var liveChallenge: Challenge? {
+        guard let day = challengeDay else { return nil }
+        return dailyChallenge(day, pool)
+    }
+    /// A snapshot of the current attempt's telemetry for the HUD (`won` reflects the live board).
+    func liveAttempt() -> Attempt {
+        Attempt(won: checkWin(), moves: moveCount, elapsed: 0,
+                cellUses: telem.cellUses, undos: telem.undos, foundationOrder: telem.foundationOrder)
     }
     private func onWin() {
         recordWin()   // no-op if the winning step already recorded it

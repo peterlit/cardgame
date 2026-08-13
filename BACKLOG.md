@@ -107,9 +107,16 @@ are done or added.
     keeps it sticky, `streaks` derives a 4th run (all drift-guarded). Web shows a 4-up 🌟 streak card,
     a today-card header badge, a calendar ⭐ on flawless days, and a win-overlay callout. iOS: TODO
     (mirror as part of the Phase 1 iOS integration below).
-  - **Phase 1 iOS integration — TODO:** mirror the above (incl. Flawless) in SwiftUI — bundle the
-    pool, mirror the daily logic in Swift, the Challenges & Streaks screen, telemetry, DailyStore,
-    live HUD.
+  - **Phase 1 iOS integration — DONE:** the shared core is ported to Swift (`Model/Daily.swift` —
+    generator, objective checkers, streaks, Flawless, bundle pool loader) with `Model/DailyStore.swift`
+    (versioned UserDefaults). `Model/Game.swift` carries the per-attempt telemetry (diff-based
+    `recordHomed`, snapshot/undo rollback of foundationOrder+cellUses, cellUses on genuine parks,
+    challengeDay lifecycle preserved across relaunch, `recordChallengeResult` on win). `Views/DailyView.swift`
+    is the Challenges & Streaks screen (4 streaks incl. Flawless, tiered day card, month calendar with
+    ⭐ + legend) plus a live objectives HUD; ContentView adds the Daily pill, sheet, HUD, and the
+    win-overlay tiers/Flawless callout. Pool JSON auto-bundled via the synchronized group. Builds +
+    runs on the iPhone 17 Pro simulator; day 0 → Deal #10,001 with the same objectives as web.
+    No XCTest coverage yet (the daily logic is validated by the Node suite it mirrors; see below).
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat

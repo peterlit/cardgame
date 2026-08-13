@@ -26,6 +26,7 @@ struct ContentView: View {
     @State private var showWins = false
     @State private var showDeal = false
     @State private var showRules = false
+    @State private var showDaily = false
     @State private var dealText = ""
 
     // Manual drag-and-drop (see cardGesture): source+offset while dragging, and the live
@@ -48,6 +49,9 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     header
                     toolbar
+                    if game.challengeDay != nil {
+                        DailyHUD(game: game)   // live objectives while playing a challenge
+                    }
                     upperArea(cardW: cardW)
                         .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
                     tableauArea(cardW: cardW, overlap: overlap)
@@ -79,6 +83,7 @@ struct ContentView: View {
             if let d = drag, !dragSourceHoldsCard(d.source) { drag = nil }
         }
         .sheet(isPresented: $showWins) { WinsView(game: game) }
+        .sheet(isPresented: $showDaily) { DailyView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
         .alert("Play a deal", isPresented: $showDeal) {
             TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
@@ -126,6 +131,9 @@ struct ContentView: View {
             }
             pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
                 dealText = "\(game.seed)"; showDeal = true
+            }
+            if !game.pool.isEmpty {
+                pill("Daily") { showDaily = true }
             }
             pill("Wins") { showWins = true }
             pill("How to play") { showRules = true }
@@ -307,6 +315,17 @@ struct ContentView: View {
 
     // MARK: win overlay
 
+    /// The daily-challenge line for the win overlay, mirroring the web onWin(): a Flawless callout
+    /// when all three tiers fell in this single run, else the medals earned this attempt. nil for
+    /// casual (non-challenge) wins.
+    private var winDailyText: String? {
+        guard let d = game.dailyResult else { return nil }
+        if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." }
+        let earned = [(d.bronze, "🥉"), (d.silver, "🥈"), (d.gold, "🥇")]
+            .filter { $0.0 }.map { $0.1 }.joined(separator: " ")
+        return "Daily challenge: \(earned.isEmpty ? "—" : earned) earned."
+    }
+
     private var winOverlay: some View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
@@ -314,6 +333,10 @@ struct ContentView: View {
                 Text("You solved it! 🎉").font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
                 Text("Deal #\(game.seed) · \(game.moveCount) moves · \(DealFormat.time(game.clock.elapsed))")
                     .font(.system(size: 14)).multilineTextAlignment(.center).foregroundStyle(.white)
+                if let dl = winDailyText {
+                    Text(dl).font(.system(size: 14, weight: .semibold))
+                        .multilineTextAlignment(.center).foregroundStyle(Theme.gold)
+                }
                 HStack(spacing: 8) {
                     pill("Play deal #\(game.nextSeed)", primary: true) { withAnimation { game.deal(seed: game.nextSeed) } }
                     pill("Random") { withAnimation { game.newRandomGame() } }

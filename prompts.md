@@ -129,3 +129,16 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (`index.html`) mirrors all three (drift-guarded) + a 4-up streak card (🌟), a today-card header
     badge, a calendar ⭐ on flawless days, and a win-overlay callout. 55 tests green; verified in the
     browser (4 streak cards, badge, 2 calendar stars). Then run a review loop; then mirror to iOS.
+50. Web Flawless review loop — converged (round 2). Round 1 caught a major (calendar ⭐ was
+    position:absolute with no positioned ancestor → all stars piled in the overlay corner; fixed by
+    .dcell{position:relative}) and a minor (legend missing the 🌟 entry); round 2 cold pass clean.
+51. Mirror the whole Daily Challenges feature (incl. Flawless) into the iOS app. New Swift port of
+    the shared core (`Model/Daily.swift`: date→challenge generator, objective checkers, streaks,
+    Flawless, pool loader) + `Model/DailyStore.swift` (versioned UserDefaults). Telemetry wired into
+    `Model/Game.swift` (diff-based recordHomed, snapshot/undo rollback of foundationOrder+cellUses,
+    cellUses on genuine parks, challengeDay lifecycle + persist/restore, recordChallengeResult on
+    win). New `Views/DailyView.swift` — Challenges & Streaks screen (4 streaks, tiered day card,
+    month calendar with ⭐ + legend) + a live objectives HUD. ContentView gets a Daily pill, the
+    sheet, the HUD, and the win-overlay tiers/Flawless callout. Pool JSON bundled (auto-synced
+    group). Builds + runs on the iPhone 17 Pro simulator; the generator produces the same Deal
+    #10,001 + objectives as web. Review loop next.
