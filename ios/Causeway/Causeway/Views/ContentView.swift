@@ -123,7 +123,9 @@ struct ContentView: View {
     private var toolbar: some View {
         FlowLayout(spacing: 8) {
             pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
-            pill("Undo") { withAnimation { game.undo() } }.disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+            pill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
+                .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+            pill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
             pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
             pill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
             if game.canOfferFinish {
@@ -139,13 +141,16 @@ struct ContentView: View {
             pill("How to play") { showRules = true }
         }
     }
-    private func pill(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
+    private func pill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title).font(.system(size: 13, weight: .semibold))
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(Capsule().fill(primary ? Theme.gold : Color(hex: 0x2A3B44).opacity(0.46)))
-                .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
-                .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            HStack(spacing: 4) {
+                if let systemImage { Image(systemName: systemImage).font(.system(size: 12, weight: .bold)) }
+                Text(title).font(.system(size: 13, weight: .semibold))
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Capsule().fill(primary ? Theme.gold : Color(hex: 0x2A3B44).opacity(0.46)))
+            .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
         }
     }
 

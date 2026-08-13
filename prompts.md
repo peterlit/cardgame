@@ -142,3 +142,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     sheet, the HUD, and the win-overlay tiers/Flawless callout. Pool JSON bundled (auto-synced
     group). Builds + runs on the iPhone 17 Pro simulator; the generator produces the same Deal
     #10,001 + objectives as web. Review loop next.
+52. Add a Replay button (restart the current deal from scratch — preserving the daily-challenge
+    context if one is active, so a challenge replay stays scored as that day) and give the Undo
+    button a recognizable icon (a left-bent/curved arrow). Both platforms: web adds an inline
+    Material-style undo SVG on the Undo pill + a Replay toolbar button wired to a new `restartDeal()`
+    (re-deals `seed`, keeps `challengeDay`); iOS adds a `pill(systemImage:)` overload, an
+    `arrow.uturn.backward` icon on Undo, a Replay pill (`arrow.clockwise`), and `Game.restartDeal()`.
+    Verified: web casual restart resets moves/history/telemetry for the same seed; iOS Replay on a
+    daily reset the board to a fresh Deal #10,001 with the live HUD (challenge) preserved. Standing
+    rule from this task on: run a review loop after every non-trivial change unless told otherwise.

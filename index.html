@@ -54,6 +54,8 @@
   button.btn:active { transform: translateY(1px); }
   button.btn.primary { background: var(--gold); color:#3a2b00; border-color: #c79a3e; }
   button.btn:disabled { opacity:.4; cursor:default; }
+  /* Inline button icon (e.g. the Undo curved-arrow) — sits just left of the label. */
+  .bico { width:15px; height:15px; vertical-align:-3px; margin-right:4px; fill:currentColor; }
 
   .upper { display:flex; justify-content:space-between; gap:10px; margin-bottom: 18px; }
   .group-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; opacity:.6; margin:0 0 5px 2px;
@@ -287,7 +289,8 @@
 
   <div class="toolbar">
     <button class="btn primary" id="newBtn">New game</button>
-    <button class="btn" id="undoBtn">Undo</button>
+    <button class="btn" id="undoBtn"><svg class="bico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L3 8v7h7l-2.62-2.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>Undo</button>
+    <button class="btn" id="replayBtn" title="Restart this deal from the beginning">Replay</button>
     <button class="btn" id="autoplayBtn" title="Automatically send safe cards to the foundations after each move">Auto-play: On</button>
     <button class="btn" id="autoBtn" title="How to handle a finishable board: Ask (prompt), On (auto), or Off">Auto-finish: Ask</button>
     <button class="btn primary" id="finishBtn" title="Send every remaining card home now" style="display:none">Finish</button>
@@ -1384,6 +1387,14 @@ document.getElementById("newBtn").onclick=()=>deal(randomSeed());
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=undo;
+// Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
+// context if one is active (so a challenge replay stays scored as that same challenge/day).
+function restartDeal(){
+  const day = challengeDay;
+  deal(seed);                                   // re-deal same seed; resets telemetry + clears challengeDay
+  if(day!=null){ challengeDay=day; saveGame(); render(); }   // keep it a challenge if it was one (refresh HUD)
+}
+document.getElementById("replayBtn").onclick=restartDeal;
 function refreshAutoFinishBtn(){
   const label = autoFinishMode==="ask"?"Ask":autoFinishMode==="on"?"On":"Off";
   document.getElementById("autoBtn").textContent = "Auto-finish: " + label;

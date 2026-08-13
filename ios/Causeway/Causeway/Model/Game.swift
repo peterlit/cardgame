@@ -160,6 +160,14 @@ final class Game: ObservableObject {
 
     func newRandomGame() { deal(seed: randomSeed()) }
 
+    /// Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
+    /// context if one is active (so a challenge replay stays scored as that same challenge/day).
+    func restartDeal() {
+        let day = challengeDay
+        deal(seed: seed)                    // re-deal same seed; resets telemetry/board, clears challengeDay
+        if let day = day { challengeDay = day; persist() }   // keep it a challenge if it was one
+    }
+
     // MARK: - In-progress persistence (survives backgrounding / eviction)
 
     private let gameKey = "causeway.game"
