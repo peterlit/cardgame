@@ -1,9 +1,15 @@
 // Tests for the shared Daily-Challenges logic (tests/daily.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks, OBJECTIVES,
 } from './daily.mjs';
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
+const norm = s => s.replace(/\s+/g, ' ').trim();
 
 // a tiny fake pool: two seeds with different support sets
 const POOL = {
@@ -188,4 +194,21 @@ test('streaks: current run ending at today, plus longest ever, per tier', () => 
 test('streaks count a day completed yesterday (today not yet played)', () => {
   const rec = { 8: { bronze: true, silver: false, gold: false } };
   assert.equal(streaks(rec, 9).play.current, 1);   // yesterday done, today pending -> streak alive
+});
+
+/* ---------- DRIFT GUARD: the web app inlines this logic; assert it hasn't diverged ---------- */
+// The daily logic is inlined into index.html (file:// can't import modules). Pin distinctive bodies
+// so an edit to one copy without the other trips CI — mirrors the engine/rules drift guards.
+test('daily logic is inlined verbatim in index.html (no drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const canon = [
+    'const acesFirst=t=>{let a=0;for(const e of t.foundationOrder){if(a>=4)break;if(e.rank===1)a++;else return false;}return t.won&&a===4;};',
+    'const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")k++;else if(e.rank===1&&e.end==="up"&&k<4)return false;}return t.won;};',
+    'const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};',
+    'const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);',
+    'const silverId=silverPool[Math.floor(rng()*silverPool.length)];',
+    'moves:Math.min(p.moves??Infinity,attempt.moves??Infinity)',
+    'while(i!=null&&has(i,tier)){cur++;i--;}',
+  ];
+  for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
 });

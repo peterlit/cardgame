@@ -183,6 +183,53 @@
     .app { padding: 8px 6px 30px; }
     .stats { gap:12px; } .stats b { font-size:16px; }
   }
+  /* ---- daily challenges ---- */
+  .hud{ display:none; gap:8px; margin:-6px 0 12px; flex-wrap:wrap; }
+  .hud.show{ display:flex; }
+  .hobj{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
+    background:rgba(42,59,68,.5); color:#f1ece0; border:1px solid rgba(255,255,255,.28);
+    padding:4px 9px; border-radius:16px; backdrop-filter:blur(2px); }
+  .hobj .hmk{ font-weight:800; }
+  .hobj.ok{ background:rgba(47,138,78,.85); border-color:#2f8a4e; }
+  .hobj.no{ background:rgba(150,55,45,.7); text-decoration:line-through; opacity:.85; }
+  .panel.daily{ text-align:left; max-width:460px; }
+  .panel.daily h2{ text-align:center; }
+  .dstreaks{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:2px 0 14px; }
+  .dstreak{ background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); border-radius:12px;
+    padding:8px 4px; text-align:center; }
+  .dstreak .ic{ font-size:17px; } .dstreak .cur{ font-family:Georgia,serif; font-size:24px; font-weight:700; color:var(--gold); line-height:1.1; }
+  .dstreak .l{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:.75; font-weight:600; }
+  .dstreak .b{ font-size:10.5px; opacity:.6; }
+  .dcard{ background:#fff; color:#33403c; border:1px solid #000; border-radius:12px; padding:13px 14px; margin-bottom:14px; }
+  .dhd{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+  .dhd .dday{ font-family:Georgia,serif; font-size:17px; font-weight:700; }
+  .dhd .ddeal{ font-size:12px; color:#6f7468; font-variant-numeric:tabular-nums; }
+  .dtiers{ display:flex; flex-direction:column; gap:8px; margin-bottom:9px; }
+  .dtier{ display:flex; gap:9px; align-items:flex-start; }
+  .dtier .med{ font-size:18px; line-height:1.2; }
+  .dtier.miss .med{ filter:grayscale(1); opacity:.4; }
+  .dtier .tb{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .dtier .tn{ font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:#6f7468; }
+  .dtier .to{ font-size:13.5px; line-height:1.3; }
+  .dtier .ts{ align-self:center; font-size:15px; color:#c9c2ad; }
+  .dtier.done .ts{ color:#2f8a4e; }
+  .dauto{ font-size:11px; color:#6f7468; margin-bottom:11px; display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+  .dpill{ font-size:10.5px; padding:2px 7px; border-radius:14px; background:rgba(42,59,68,.1); color:#40484a; font-weight:600; }
+  .dcalhd{ display:flex; justify-content:space-between; align-items:center; margin:2px 2px 7px; }
+  .dcalhd .dm{ font-family:Georgia,serif; font-size:15px; font-weight:700; }
+  .dcalhd .dleg{ display:flex; gap:8px; font-size:10px; opacity:.8; } .dcalhd .dleg span{ display:inline-flex; align-items:center; gap:3px; }
+  .d3{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .ddow{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:3px; }
+  .ddow div{ text-align:center; font-size:10px; opacity:.55; font-weight:600; }
+  .dgrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .dcell{ aspect-ratio:1; border-radius:8px; background:rgba(255,255,255,.09); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:3px; font-size:12px; cursor:pointer; border:1px solid transparent; }
+  .dcell.empty{ background:none; cursor:default; }
+  .dcell.off{ opacity:.35; cursor:default; }
+  .dcell.sel{ border-color:var(--gold); background:rgba(255,255,255,.16); }
+  .dcell.today{ box-shadow:inset 0 0 0 1.5px var(--gold); }
+  .dcell .dn{ font-variant-numeric:tabular-nums; font-weight:600; }
+  .dcell .dd{ display:flex; gap:2.5px; height:7px; align-items:center; }
 </style>
 </head>
 <body>
@@ -244,7 +291,9 @@
     <button class="btn primary" id="finishBtn" title="Send every remaining card home now" style="display:none">Finish</button>
     <button class="btn" id="seedBtn" title="Type a deal number to play that exact deal">Deal #<span id="seedLbl">—</span><span id="seedWon"></span></button>
     <button class="btn" id="winsBtn" title="Deals you've solved">Wins</button>
+    <button class="btn" id="dailyBtn" title="Daily challenges" disabled>Daily</button>
   </div>
+  <div class="hud" id="dailyHud"></div>
 
   <div class="upper">
     <div>
@@ -323,6 +372,19 @@
   </div>
 </div>
 
+<div class="overlay" id="dailyOverlay">
+  <div class="panel wide daily">
+    <h2>Daily Challenges</h2>
+    <div class="dstreaks" id="dailyStreaks"></div>
+    <div class="dcard" id="dailyCard"></div>
+    <div class="dcalhd"><span class="dm" id="dailyMonth"></span>
+      <span class="dleg"><span><i class="d3" style="background:#c98b3a"></i>🥉</span><span><i class="d3" style="background:#9aa0a6"></i>🥈</span><span><i class="d3" style="background:#d9ad55"></i>🥇</span></span></div>
+    <div class="ddow"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
+    <div class="dgrid" id="dailyGrid"></div>
+    <div class="wins-actions"><button class="btn primary" id="dailyClose">Close</button></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
@@ -353,6 +415,22 @@ let autoplayOn = lsGet("causeway.autoplay") !== "off";   // default ON, like Mob
 // in the wild, and the default intentionally moved On -> Ask.
 let autoFinishMode = (()=>{ const m=lsGet("causeway.autofinishmode"); return (m==="on"||m==="off"||m==="ask")?m:"ask"; })();  // ask (default) | on | off
 let finishing=false, autoFinishDeferred=false, finishPromptOpen=false;
+// Daily-challenge per-attempt telemetry (reset on deal/restore). `challengeDay` = the day index
+// being played as a challenge (null = casual play). See the "daily challenges" section below.
+let telem = { cellUses:0, undos:0, foundationOrder:[] }, challengeDay = null;
+function resetTelem(){ telem = { cellUses:0, undos:0, foundationOrder:[] }; }
+// Record any cards newly sent home this move, by diffing the foundations against the pre-move
+// snapshot (each move homes at most one card). Non-invasive — leaves the drift-guarded send
+// functions untouched. Call right after moveCount++ at each commit point. Builds the ordered
+// foundation stream the daily objective checkers read.
+function recordHomed(){
+  if(!history.length) return;
+  const p = history[history.length-1];
+  for(let s=0;s<4;s++){
+    for(let r=p.up[s]+1; r<=state.up[s]; r++)   telem.foundationOrder.push({ suit:s, rank:r, end:"up",   moveIdx:moveCount });
+    for(let r=p.down[s]-1; r>=state.down[s]; r--) telem.foundationOrder.push({ suit:s, rank:r, end:"down", moveIdx:moveCount });
+  }
+}
 
 /* ---------- win tracking ---------- */
 let wins = loadWins();   // { [seed]: {moves, secs, date} }
@@ -384,6 +462,7 @@ function deal(theSeed){
     down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
   };
   history=[]; moveCount=0; selection=null;
+  resetTelem(); challengeDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
   winRecorded=false; pendingWin=null;   // fresh game — allow the next win to record
@@ -405,7 +484,8 @@ function saveGame(){
   const elapsedSecs = startTime ? Math.floor((Date.now()-startTime)/1000) : 0;
   lsSet("causeway.game", JSON.stringify({
     seed, tableau: state.tableau, cells: state.cells, up: state.up, down: state.down,
-    moveCount, elapsedSecs, started: !!startTime
+    moveCount, elapsedSecs, started: !!startTime,
+    challengeDay, telem   // preserve a challenge attempt (+ its telemetry) across reload
   }));
 }
 function clearSavedGame(){ lsRemove("causeway.game"); }
@@ -443,6 +523,8 @@ function restoreGame(){
   seed = g.seed>>>0;
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
+  challengeDay = (typeof g.challengeDay==="number") ? g.challengeDay : null;
+  telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[] };
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
   winRecorded=false; pendingWin=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
   const es = g.elapsedSecs||0;
@@ -565,6 +647,7 @@ function runAutoplay(){
     autoTimer=null;
     if(!autoplayOn) return;
     if(autoplayOneStep()){
+      recordHomed();   // auto-play sends count in the foundation-order stream too (policy #3)
       if(!startTime){ startTime=Date.now(); startTimer(); }
       if(isWon()){ onWin(); return; }
       autoTimer=setTimeout(step,165);   // sequential reveal, paced just past the flight time
@@ -590,6 +673,7 @@ function undo(){
   stopAutoplay();
   stopFinish(); hideFinishPrompt();   // halt any running finish / dismiss its prompt
   if(!history.length) return;
+  telem.undos++;
   const h=history.pop();
   state.tableau=h.tableau; state.cells=h.cells; state.up=h.up; state.down=h.down;
   moveCount=h.moveCount; setMoves(moveCount);
@@ -598,6 +682,7 @@ function undo(){
 }
 function commitMove(){
   moveCount++; setMoves(moveCount);
+  recordHomed();   // capture any card this move sent home (for daily-challenge telemetry)
   if(!startTime){ startTime=Date.now(); startTimer(); }
   selection=null;
   render();
@@ -635,7 +720,7 @@ function tryDestCell(idx){
   snapshot();
   if(selection.kind==="cell"){ state.cells[selection.idx]=null; }
   else { state.tableau[selection.col].pop(); }
-  state.cells[idx]=cards[0];
+  state.cells[idx]=cards[0]; telem.cellUses++;
   commitMove(); return true;
 }
 function tryDestFoundation(suit,dir){
@@ -695,7 +780,7 @@ function smartMove(src){
   if(n===1 && src.kind!=="cell"){
     for(let i=0;i<NCELLS;i++){
       if(state.cells[i]===null){
-        snapshot(); state.cells[i]=head; removeRun(src); commitMove(); return true;
+        snapshot(); state.cells[i]=head; telem.cellUses++; removeRun(src); commitMove(); return true;
       }
     }
   }
@@ -734,6 +819,7 @@ function runAutoFinish(){
     if(!finishing) return;
     if(sendOneHome()){
       moveCount++; setMoves(moveCount);
+      recordHomed();   // auto-finish sends count in the foundation-order stream too
       if(!startTime){ startTime=Date.now(); startTimer(); }
       render();   // FLIP animates this one card's flight home
       if(isWon()){
@@ -907,6 +993,7 @@ function render(animate=true){
   }
   document.getElementById("undoBtn").disabled = history.length===0;
   refreshFinishBtn();   // show/hide the "Finish" button as finishability changes
+  renderDailyHud();     // live objectives overlay during a challenge attempt
   if(prev) flip(prev);
 }
 
@@ -993,15 +1080,18 @@ function recordWin(){
     : { moves:moveCount, secs, date:Date.now() };
   saveWins();
   refreshHud();
-  pendingWin = { seed, moves:moveCount, secs, prev };
+  const daily = recordChallengeResult(secs);   // score the daily attempt (if any); clears challengeDay
+  pendingWin = { seed, moves:moveCount, secs, prev, daily: daily ? daily.res : null };
 }
 function onWin(){
   recordWin();   // durable side effects, exactly once (no-op if already recorded)
   const w = pendingWin || { seed, moves:moveCount, prev:wins[seed],
                             secs: startTime?Math.floor((Date.now()-startTime)/1000):0 };
+  const dailyLine = w.daily
+    ? ` Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`
+    : (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
   document.getElementById("winMsg").textContent =
-    `Deal #${w.seed} · ${w.moves} moves · ${fmtTime(w.secs)}.` +
-    (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
+    `Deal #${w.seed} · ${w.moves} moves · ${fmtTime(w.secs)}.` + dailyLine;
   const next = w.seed>=1000000 ? 1 : w.seed+1;      // suggest the next deal number
   const nextBtn = document.getElementById("winNext");
   nextBtn.textContent = `Play deal #${next}`;
@@ -1009,6 +1099,179 @@ function onWin(){
   document.getElementById("overlay").classList.add("show");
 }
 function hideWin(){ document.getElementById("overlay").classList.remove("show"); }
+
+/* =================== Daily Challenges =================== */
+/* Logic inlined from tests/daily.mjs (canonical, Node-tested); drift-guarded in tests/daily.test.mjs.
+   mulberry32 is reused from the deal RNG above. */
+function daysFromCivil(y,m,d){y-=m<=2?1:0;const era=Math.floor((y>=0?y:y-399)/400);const yoe=y-era*400;const doy=Math.floor((153*(m+(m>2?-3:9))+2)/5)+d-1;const doe=yoe*365+Math.floor(yoe/4)-Math.floor(yoe/100)+doy;return era*146097+doe-719468;}
+const EPOCH_DAYS=daysFromCivil(2026,8,12);
+const dayIndexFor=(y,m,d)=>daysFromCivil(y,m,d)-EPOCH_DAYS;
+function todayIndex(){const n=new Date();return dayIndexFor(n.getFullYear(),n.getMonth()+1,n.getDate());}
+const acesFirst=t=>{let a=0;for(const e of t.foundationOrder){if(a>=4)break;if(e.rank===1)a++;else return false;}return t.won&&a===4;};
+const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")k++;else if(e.rank===1&&e.end==="up"&&k<4)return false;}return t.won;};
+const jacksDownFirst=t=>{let j=0;for(const e of t.foundationOrder){if(e.rank===11&&e.end==="down")j++;else if(e.rank===1&&e.end==="up"&&j<4)return false;}return t.won;};
+const suitsTopDown=t=>{const kd=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")kd[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!kd[e.suit])return false;}return t.won;};
+const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};
+const downOpeners20=t=>{let k=0,opened=null;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down"){k++;if(k===4){opened=e.moveIdx;break;}}}return t.won&&opened!=null&&opened<=20;};
+const OBJECTIVES={
+  'moves':{grade:'silver',param:rec=>({N:Math.round(rec.par*1.2)}),label:p=>`Win in ${p.N} moves or fewer`,check:(t,p)=>t.won&&t.moves<=p.N},
+  'no-undo':{grade:'silver',label:()=>'Win without using undo',check:t=>t.won&&t.undos===0},
+  'cells-le-1':{grade:'silver',label:()=>'Win using a free cell at most once',check:t=>t.won&&t.cellUses<=1},
+  'cells-le-2':{grade:'silver',label:()=>'Win using free cells at most twice',check:t=>t.won&&t.cellUses<=2},
+  'down-openers-20':{grade:'silver',label:()=>'Open all four down-foundations within your first 20 moves',check:downOpeners20},
+  'no-cells':{grade:'gold',label:()=>'Win without ever using a free cell',check:t=>t.won&&t.cellUses===0},
+  'aces-first':{grade:'gold',label:()=>'Send all four Aces home before any other card',check:acesFirst},
+  'kings-first':{grade:'gold',label:()=>'Send all four Kings to the down-foundation before any Ace',check:kingsFirst},
+  'jacks-down-first':{grade:'gold',label:()=>'Get every Jack onto the down-foundation before any Ace',check:jacksDownFirst},
+  'suits-top-down':{grade:'gold',label:()=>'For every suit, send its King home before its Ace',check:suitsTopDown},
+  'suit-sprint':{grade:'gold',label:()=>'Finish one whole suit before any other suit is started',check:suitSprint},
+};
+const SILVER_UNIVERSAL=['moves','no-undo'], SILVER_CERTIFIED=['cells-le-1','cells-le-2','down-openers-20'];
+const GOLD=['no-cells','aces-first','kings-first','jacks-down-first','suits-top-down','suit-sprint'];
+function makeObjective(id,rec){const o=OBJECTIVES[id];const param=o.param?o.param(rec):{};return{id,grade:o.grade,param,label:o.label(param)};}
+function dailyChallenge(dayIndex,pool){
+  if(dayIndex<0||dayIndex>=pool.length)return null;
+  const rec=pool[dayIndex];
+  const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);
+  const silverPool=SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id=>rec.supports.includes(id)));
+  const goldPool=GOLD.filter(id=>rec.supports.includes(id));
+  const silverId=silverPool[Math.floor(rng()*silverPool.length)];
+  const goldId=goldPool[Math.floor(rng()*goldPool.length)];
+  return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(silverId,rec),gold:makeObjective(goldId,rec)};
+}
+function evaluate(objective,telemetry){return OBJECTIVES[objective.id].check(telemetry,objective.param);}
+function evaluateChallenge(challenge,telemetry){
+  const bronze=!!telemetry.won;
+  const result={bronze,silver:bronze&&evaluate(challenge.silver,telemetry),gold:bronze&&evaluate(challenge.gold,telemetry)};
+  if(bronze){result.moves=telemetry.moves;result.elapsed=telemetry.elapsed;}
+  return result;
+}
+function mergeTiers(prev,attempt){
+  const p=prev||{bronze:false,silver:false,gold:false,moves:Infinity,elapsed:Infinity};
+  return{bronze:!!p.bronze||!!attempt.bronze,silver:!!p.silver||!!attempt.silver,gold:!!p.gold||!!attempt.gold,
+    moves:Math.min(p.moves??Infinity,attempt.moves??Infinity),elapsed:Math.min(p.elapsed??Infinity,attempt.elapsed??Infinity)};
+}
+function streaks(records,todayIndex){
+  const has=(i,tier)=>records[i]&&records[i][tier]; const played=i=>!!records[i];
+  const tierRun=tier=>{
+    const days=Object.keys(records).map(Number).filter(i=>has(i,tier)).sort((a,b)=>a-b);
+    let best=0,run=0,prev=null;
+    for(const d of days){run=(prev!=null&&d===prev+1)?run+1:1;best=Math.max(best,run);prev=d;}
+    let i=played(todayIndex)?todayIndex:(played(todayIndex-1)?todayIndex-1:null); let cur=0;
+    while(i!=null&&has(i,tier)){cur++;i--;}
+    return{current:cur,best};
+  };
+  return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold')};
+}
+
+/* ---- pool + per-day store ---- */
+let dailyPool=null;
+let dailyStore=loadDaily();
+function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days) return g; }catch(e){} return {version:1, days:{}}; }
+function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
+// The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
+fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.seeds; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
+
+/* ---- play a challenge, and score it on win ---- */
+function playChallenge(day){
+  if(!dailyPool||!dailyPool[day]||day>todayIndex()) return;
+  deal(dailyPool[day].seed);   // resets telem + clears challengeDay
+  challengeDay=day; saveGame();
+  closeDaily(); render();
+}
+// Fold a won challenge attempt into the day's record. Called synchronously from recordWin().
+function recordChallengeResult(secs){
+  if(challengeDay==null || !dailyPool) return null;
+  const ch=dailyChallenge(challengeDay,dailyPool);
+  const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder});
+  dailyStore.days[challengeDay]=mergeTiers(dailyStore.days[challengeDay],res);
+  saveDaily();
+  const day=challengeDay; challengeDay=null;
+  return {day, res};
+}
+
+/* ---- rendering ---- */
+const MEDAL={bronze:'🥉',silver:'🥈',gold:'🥇'};
+const DOTCOL={bronze:'#c98b3a',silver:'#9aa0a6',gold:'#d9ad55'};
+function refreshDailyBtn(){ const b=document.getElementById("dailyBtn"); if(b){ b.disabled=!dailyPool; b.title=dailyPool?"Today's challenge + your streaks":"Daily challenges unavailable"; } }
+let dailyView=null;   // which day the Daily overlay is showing (defaults to today)
+function openDaily(){ if(!dailyPool) return; dailyView=todayIndex(); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
+function closeDaily(){ document.getElementById("dailyOverlay").classList.remove("show"); }
+function renderDaily(){
+  const ti=todayIndex();
+  const s=streaks(dailyStore.days, ti);
+  document.getElementById("dailyStreaks").innerHTML=
+    [['🔥','Play',s.play],['🥈','Silver',s.silver],['🥇','Gold',s.gold]].map(([ic,l,v])=>
+      `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="b">best ${v.best}</div></div>`).join('');
+  renderDailyCard(); renderDailyCal();
+}
+function renderDailyCard(){
+  const day=dailyView, ti=todayIndex();
+  const c=dailyChallenge(day,dailyPool); const rec=dailyStore.days[day]||{};
+  const future=day>ti, isToday=day===ti;
+  const st=tier=>rec[tier]?'done':(future?'future':'miss'); const icon=tier=>rec[tier]?'✓':'○';
+  const row=(name,tier,text)=>`<div class="dtier ${st(tier)}"><span class="med">${MEDAL[tier]}</span>
+    <span class="tb"><span class="tn">${name}</span><span class="to">${text}</span></span><span class="ts">${icon(tier)}</span></div>`;
+  const dstr=fmtDayLabel(day);
+  let btn;
+  if(future) btn=`<button class="btn" disabled style="opacity:.5;width:100%">Unlocks ${dstr}</button>`;
+  else if(rec.bronze) btn=`<button class="btn" style="width:100%" onclick="playChallenge(${day})">Replay to improve ↻</button>`;
+  else btn=`<button class="btn primary" style="width:100%" onclick="playChallenge(${day})">Play</button>`;
+  document.getElementById("dailyCard").innerHTML=
+    `<div class="dhd"><span class="dday">${isToday?'Today':dstr}</span><span class="ddeal">Deal #${c.seed}</span></div>
+     <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
+     <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
+     ${btn}`;
+}
+function fmtDayLabel(idx){const b=new Date(Date.UTC(2026,7,12));b.setUTCDate(b.getUTCDate()+idx);return b.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
+function renderDailyCal(){
+  const ti=todayIndex(); const now=new Date(); const y=now.getFullYear(), m=now.getMonth()+1;
+  document.getElementById("dailyMonth").textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const first=((daysFromCivil(y,m,1)%7)+4)%7; const dim=new Date(y,m,0).getDate();
+  let html='';
+  for(let i=0;i<first;i++) html+='<div class="dcell empty"></div>';
+  for(let d=1;d<=dim;d++){
+    const idx=dayIndexFor(y,m,d); const rec=dailyStore.days[idx];
+    const avail=idx>=0 && idx<dailyPool.length && idx<=ti;
+    const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
+    const dots=rec?['bronze','silver','gold'].filter(t=>rec[t]).map(t=>`<i class="d3" style="background:${DOTCOL[t]}"></i>`).join(''):'';
+    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}><span class="dn">${d}</span><span class="dd">${dots}</span></div>`;
+  }
+  document.getElementById("dailyGrid").innerHTML=html;
+}
+// Has this objective already been made IMPOSSIBLE (fail-fast)? UI-only live hint — the authoritative
+// scoring uses the drift-guarded checkers at win. Mirrors each checker's violation branch.
+function objViolated(obj, t){
+  const fo=t.foundationOrder;
+  switch(obj.id){
+    case 'moves': return t.moves>obj.param.N;
+    case 'no-undo': return t.undos>0;
+    case 'cells-le-1': return t.cellUses>1;
+    case 'cells-le-2': return t.cellUses>2;
+    case 'no-cells': return t.cellUses>0;
+    case 'aces-first': { let a=0; for(const e of fo){ if(a>=4) break; if(e.rank===1) a++; else return true; } return false; }
+    case 'kings-first': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down") k++; else if(e.rank===1&&e.end==="up"&&k<4) return true; } return false; }
+    case 'jacks-down-first': { let j=0; for(const e of fo){ if(e.rank===11&&e.end==="down") j++; else if(e.rank===1&&e.end==="up"&&j<4) return true; } return false; }
+    case 'suits-top-down': { const kd=[0,0,0,0]; for(const e of fo){ if(e.rank===13&&e.end==="down") kd[e.suit]=1; else if(e.rank===1&&e.end==="up"&&!kd[e.suit]) return true; } return false; }
+    case 'suit-sprint': { const home=[0,0,0,0],st=[false,false,false,false]; for(const e of fo){ const S=e.suit; if(!st[S]){ for(let T=0;T<4;T++) if(T!==S&&st[T]&&home[T]<13) return true; st[S]=true; } home[S]++; } return false; }
+    case 'down-openers-20': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down"){ k++; if(k===4) return false; } } return t.moves>20; }
+    default: return false;
+  }
+}
+// Compact live objectives HUD shown over the board during a challenge attempt.
+function renderDailyHud(){
+  const hud=document.getElementById("dailyHud"); if(!hud) return;
+  if(challengeDay==null || !dailyPool){ hud.classList.remove("show"); return; }
+  const c=dailyChallenge(challengeDay,dailyPool);
+  const won=isWon();
+  const t={won,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder};
+  const live=obj=> won ? (evaluate(obj,{...t,won:true})?'ok':'no') : (objViolated(obj,t)?'no':'live');
+  const mark=s=> s==='ok'?'✓':(s==='no'?'✗':'·');
+  const line=(medal,obj)=>{const s=live(obj); return `<span class="hobj ${s}">${medal}<span class="hmk">${mark(s)}</span> ${obj.label}</span>`;};
+  const bs=won?'ok':'live';
+  hud.innerHTML=`<span class="hobj ${bs}">🥉<span class="hmk">${mark(bs)}</span> Clear the deal</span>${line('🥈',c.silver)}${line('🥇',c.gold)}`;
+  hud.classList.add("show");
+}
 
 // Collapse the won seeds into contiguous [start,end] ranges (e.g. 1,2,3,5 -> "1–3","5").
 function wonRanges(){
@@ -1116,6 +1379,8 @@ document.getElementById("finishGo").onclick=()=>runAutoFinish();
 document.getElementById("finishLater").onclick=()=>deferAutoFinish();
 document.getElementById("winsBtn").onclick=openWins;
 document.getElementById("winsClose").onclick=closeWins;
+document.getElementById("dailyBtn").onclick=openDaily;
+document.getElementById("dailyClose").onclick=closeDaily;
 document.getElementById("winsDealGo").onclick=winsPlay;
 document.getElementById("winsDealInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); winsPlay(); } });
 function refreshAutoplayBtn(){

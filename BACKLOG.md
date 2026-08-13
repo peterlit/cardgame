@@ -93,11 +93,17 @@ are done or added.
     checkers, and streak computation, in `tests/daily.mjs` (canonical, Node-tested — 13 tests) for
     both platforms to build on. Day index = days since the 2026-08-12 epoch → `pool.seeds[dayIndex]`
     (append-only ⇒ frozen history); per-day RNG picks Silver/Gold from the seed's certified supports.
-  - **Phase 1 app integration — TODO:** wire the shared core into each platform — the Challenges &
-    Streaks screen, the per-attempt telemetry tracker (moves/cells/undos/foundation-order/auto
-    flags), the DailyStore (persist per-day tiers; derive the 3 streaks), and challenge play + live
-    objectives HUD + win-tier reporting. Web (inline the daily logic, drift-guarded; load the pool)
-    then iOS (mirror in Swift; bundle the pool). Not started.
+  - **Phase 1 web integration — DONE:** the shared core is inlined into `index.html`
+    (drift-guarded in `tests/daily.test.mjs`), the pool is fetched at load, and the Challenges &
+    Streaks overlay (streaks + today's card + month calendar) is wired to a "Daily" toolbar button.
+    Per-attempt telemetry (moves/cells/undos/foundation-order via a diff-based `recordHomed`, which
+    leaves the drift-guarded send functions untouched) + a live objectives HUD during play;
+    `recordChallengeResult` scores tiers on win into a versioned `causeway.daily` DailyStore
+    (OR-accumulated across retries), streaks derived, tiers shown in the win overlay; challenge
+    context persists across reload. Verified end-to-end in the browser. `build-pool.mjs` now writes
+    the pool one-seed-per-line (readable).
+  - **Phase 1 iOS integration — TODO:** mirror the above in SwiftUI — bundle the pool, mirror the
+    daily logic in Swift, the Challenges & Streaks screen, telemetry, DailyStore, live HUD.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat

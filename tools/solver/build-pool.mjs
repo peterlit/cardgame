@@ -13,6 +13,12 @@ import { certify, isDailyEligible } from './solve.mjs';
 const POOL_VERSION = 1;
 const MIN_SEED = 10000;   // exclusive floor; daily pool uses IDs strictly > 10,000
 
+// Human-readable but compact: header fields expanded, one seed record per indented line.
+function serializePool(pool) {
+  const rows = pool.seeds.map(s => '    ' + JSON.stringify(s)).join(',\n');
+  return `{\n  "version": ${pool.version},\n  "minSeed": ${pool.minSeed},\n  "seeds": [\n${rows}\n  ]\n}\n`;
+}
+
 function arg(name, def) {
   const i = process.argv.indexOf('--' + name);
   return i >= 0 && process.argv[i + 1] != null ? process.argv[i + 1] : def;
@@ -45,5 +51,5 @@ for (let seed = start; scanned < scan && added < target; seed++, scanned++) {
 function require_gold(x) { return ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint'].includes(x); }
 
 mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, JSON.stringify(pool, null, 0) + '\n');
+writeFileSync(out, serializePool(pool));
 console.log(`done: scanned ${scanned} (winnable ${winnable}), added ${added}, pool now ${pool.seeds.length} seeds -> ${out}`);

@@ -116,3 +116,10 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     append-only frozen history; per-day RNG picks Silver/Gold from the seed's certified supports),
     the objective checkers (evaluate from foundation-order + resource telemetry), and the three
     catch-up streaks. App integration (screen/telemetry/DailyStore, both platforms) still TODO.
+48. Pool → 366 seeds (a full year; ~98% winnable), reformatted one-seed-per-line. Prototyped the
+    Challenges & Streaks screen (Artifact) for review. Then wired the shared core into the WEB app:
+    inlined daily logic (drift-guarded), fetch the pool, Daily button + Challenges/Streaks overlay
+    (streaks + today card + month calendar), per-attempt telemetry (diff-based recordHomed leaves the
+    pinned send fns untouched; cellUses/undos), live objectives HUD, on-win tier scoring into a
+    versioned causeway.daily store (OR across retries) + derived streaks + win-overlay tiers, persisted
+    across reload. Verified end-to-end in the browser (52 tests, 3 drift guards). iOS mirror still TODO.
