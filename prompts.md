@@ -123,3 +123,9 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     pinned send fns untouched; cellUses/undos), live objectives HUD, on-win tier scoring into a
     versioned causeway.daily store (OR across retries) + derived streaks + win-overlay tiers, persisted
     across reload. Verified end-to-end in the browser (52 tests, 3 drift guards). iOS mirror still TODO.
+49. Add a "Flawless" recognition + a 4th Flawless streak: earning Bronze+Silver+Gold in a SINGLE
+    attempt (harder than banking them across free retries). Shared core (`tests/daily.mjs`):
+    evaluateChallenge sets `flawless`, mergeTiers keeps it sticky, streaks derives a 4th run; web
+    (`index.html`) mirrors all three (drift-guarded) + a 4-up streak card (🌟), a today-card header
+    badge, a calendar ⭐ on flawless days, and a win-overlay callout. 55 tests green; verified in the
+    browser (4 streak cards, badge, 2 calendar stars). Then run a review loop; then mirror to iOS.

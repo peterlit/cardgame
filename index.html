@@ -194,10 +194,12 @@
   .hobj.no{ background:rgba(150,55,45,.7); text-decoration:line-through; opacity:.85; }
   .panel.daily{ text-align:left; max-width:460px; }
   .panel.daily h2{ text-align:center; }
-  .dstreaks{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:2px 0 14px; }
+  .dstreaks{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:2px 0 14px; }
   .dstreak{ background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); border-radius:12px;
-    padding:8px 4px; text-align:center; }
-  .dstreak .ic{ font-size:17px; } .dstreak .cur{ font-family:Georgia,serif; font-size:24px; font-weight:700; color:var(--gold); line-height:1.1; }
+    padding:8px 3px; text-align:center; }
+  .dstreak .ic{ font-size:16px; } .dstreak .cur{ font-family:Georgia,serif; font-size:22px; font-weight:700; color:var(--gold); line-height:1.1; }
+  .dstar{ font-size:12px; color:var(--gold); font-weight:700; letter-spacing:.02em; }
+  .dstar-c{ position:absolute; top:1px; right:2px; font-size:10px; line-height:1; }
   .dstreak .l{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:.75; font-weight:600; }
   .dstreak .b{ font-size:10.5px; opacity:.6; }
   .dcard{ background:#fff; color:#33403c; border:1px solid #000; border-radius:12px; padding:13px 14px; margin-bottom:14px; }
@@ -1095,7 +1097,9 @@ function onWin(){
   const w = pendingWin || { seed, moves:moveCount, prev:wins[seed],
                             secs: startTime?Math.floor((Date.now()-startTime)/1000):0 };
   const dailyLine = w.daily
-    ? ` Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`
+    ? (w.daily.flawless
+        ? " 🌟 Flawless! 🥉🥈🥇 all in a single run."
+        : ` Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`)
     : (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
   document.getElementById("winMsg").textContent =
     `Deal #${w.seed} · ${w.moves} moves · ${fmtTime(w.secs)}.` + dailyLine;
@@ -1149,13 +1153,16 @@ function dailyChallenge(dayIndex,pool){
 function evaluate(objective,telemetry){return OBJECTIVES[objective.id].check(telemetry,objective.param);}
 function evaluateChallenge(challenge,telemetry){
   const bronze=!!telemetry.won;
-  const result={bronze,silver:bronze&&evaluate(challenge.silver,telemetry),gold:bronze&&evaluate(challenge.gold,telemetry)};
+  const silver=bronze&&evaluate(challenge.silver,telemetry);
+  const gold=bronze&&evaluate(challenge.gold,telemetry);
+  const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold)};
   if(bronze){result.moves=telemetry.moves;result.elapsed=telemetry.elapsed;}
   return result;
 }
 function mergeTiers(prev,attempt){
-  const p=prev||{bronze:false,silver:false,gold:false,moves:Infinity,elapsed:Infinity};
+  const p=prev||{bronze:false,silver:false,gold:false,flawless:false,moves:Infinity,elapsed:Infinity};
   return{bronze:!!p.bronze||!!attempt.bronze,silver:!!p.silver||!!attempt.silver,gold:!!p.gold||!!attempt.gold,
+    flawless:!!p.flawless||!!attempt.flawless,
     moves:Math.min(p.moves??Infinity,attempt.moves??Infinity),elapsed:Math.min(p.elapsed??Infinity,attempt.elapsed??Infinity)};
 }
 function streaks(records,todayIndex){
@@ -1168,7 +1175,7 @@ function streaks(records,todayIndex){
     while(i!=null&&has(i,tier)){cur++;i--;}
     return{current:cur,best};
   };
-  return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold')};
+  return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};
 }
 
 /* ---- pool + per-day store ---- */
@@ -1208,7 +1215,7 @@ function renderDaily(){
   const ti=todayIndex();
   const s=streaks(dailyStore.days, ti);
   document.getElementById("dailyStreaks").innerHTML=
-    [['🔥','Play',s.play],['🥈','Silver',s.silver],['🥇','Gold',s.gold]].map(([ic,l,v])=>
+    [['🔥','Play',s.play],['🥈','Silver',s.silver],['🥇','Gold',s.gold],['🌟','Flawless',s.flawless]].map(([ic,l,v])=>
       `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="b">best ${v.best}</div></div>`).join('');
   renderDailyCard(); renderDailyCal();
 }
@@ -1231,7 +1238,7 @@ function renderDailyCard(){
   else if(rec.bronze) btn=`<button class="btn" style="width:100%" onclick="playChallenge(${day})">Replay to improve ↻</button>`;
   else btn=`<button class="btn primary" style="width:100%" onclick="playChallenge(${day})">Play</button>`;
   document.getElementById("dailyCard").innerHTML=
-    `<div class="dhd"><span class="dday">${isToday?'Today':dstr}</span><span class="ddeal">Deal #${c.seed}</span></div>
+    `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
      ${btn}`;
@@ -1248,7 +1255,8 @@ function renderDailyCal(){
     const avail=idx>=0 && idx<dailyPool.length && idx<=ti;
     const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
     const dots=rec?['bronze','silver','gold'].filter(t=>rec[t]).map(t=>`<i class="d3" style="background:${DOTCOL[t]}"></i>`).join(''):'';
-    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}><span class="dn">${d}</span><span class="dd">${dots}</span></div>`;
+    const star=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':'';
+    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}>${star}<span class="dn">${d}</span><span class="dd">${dots}</span></div>`;
   }
   document.getElementById("dailyGrid").innerHTML=html;
 }

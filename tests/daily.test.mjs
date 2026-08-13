@@ -135,7 +135,7 @@ test('resource checkers: no-cells, cells-le-2, no-undo, down-openers-20', () => 
 test('a lost game earns no tier', () => {
   const challenge = dailyChallenge(0, POOL);
   const r = evaluateChallenge(challenge, base({ won: false }));
-  assert.deepEqual(r, { bronze: false, silver: false, gold: false });
+  assert.deepEqual(r, { bronze: false, silver: false, gold: false, flawless: false });
 });
 
 /* ---------- per-attempt grading + OR-accumulation across attempts ---------- */
@@ -144,7 +144,7 @@ test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts'
   const silverAttempt = { bronze: true, silver: true, gold: false, moves: 95, elapsed: 200 };
   const goldAttempt   = { bronze: true, silver: false, gold: true, moves: 110, elapsed: 150 };
   const day = mergeTiers(mergeTiers(undefined, silverAttempt), goldAttempt);
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, moves: 95, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: false, moves: 95, elapsed: 150 });
 });
 
 test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, best moves/time)', () => {
@@ -159,17 +159,48 @@ test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, bes
   assert.equal(rB.silver, true);  assert.equal(rB.gold, true);
   const day = mergeTiers(mergeTiers(undefined, rA), rB);
   // OR of tiers, and best (min) of each metric across the two attempts.
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, moves: 90, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: true, moves: 90, elapsed: 150 });
   // A subsequent lost attempt must not clobber the recorded best moves/time.
   const held = mergeTiers(day, evaluateChallenge(challenge, base({ won: false, moves: 5, elapsed: 5 })));
-  assert.deepEqual(held, { bronze: true, silver: true, gold: true, moves: 90, elapsed: 150 });
+  assert.deepEqual(held, { bronze: true, silver: true, gold: true, flawless: true, moves: 90, elapsed: 150 });
 });
 
 test('mergeTiers never loses a tier already earned on a later worse attempt', () => {
   const prev = { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 };
   const worse = { bronze: true, silver: false, gold: false, moves: 200, elapsed: 300 };
   const merged = mergeTiers(prev, worse);
-  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 });
+  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, flawless: false, moves: 80, elapsed: 100 });
+});
+
+/* ---------- flawless (all three tiers in one attempt) ---------- */
+test('evaluateChallenge marks flawless only when a single attempt earns all three', () => {
+  const ch = dailyChallenge(0, POOL);   // silver 'moves' N=96, gold 'no-cells'
+  const all = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 0 }));   // silver + gold in one run
+  assert.equal(all.flawless, true);
+  const partial = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 1 }));   // gold fails (used a cell)
+  assert.equal(partial.flawless, false);
+});
+
+test('flawless is NOT earned by banking silver and gold across two attempts', () => {
+  const ch = dailyChallenge(0, POOL);
+  const silverOnly = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 1 }));   // silver, not gold
+  const goldOnly   = evaluateChallenge(ch, base({ won: true, moves: 200, cellUses: 0 }));  // gold, not silver
+  const day = mergeTiers(mergeTiers(undefined, silverOnly), goldOnly);
+  assert.equal(day.silver, true); assert.equal(day.gold, true);   // both banked
+  assert.equal(day.flawless, false);                              // but never in one run
+});
+
+test('streaks: a flawless run extends the flawless streak', () => {
+  const rec = {
+    3: { bronze: true, silver: true, gold: true, flawless: true },
+    4: { bronze: true, silver: true, gold: true, flawless: false },   // three-starred across attempts
+    5: { bronze: true, silver: true, gold: true, flawless: true },
+    6: { bronze: true, silver: true, gold: true, flawless: true },    // today
+  };
+  const s = streaks(rec, 6);
+  assert.equal(s.flawless.current, 2);   // days 5-6 (gap: day 4 not flawless)
+  assert.equal(s.flawless.best, 2);
+  assert.equal(s.gold.current, 4);       // gold still counts all four
 });
 
 /* ---------- streaks ---------- */
@@ -214,9 +245,11 @@ test('daily logic is inlined verbatim in index.html (no drift)', () => {
     'const silverId=silverPool[Math.floor(rng()*silverPool.length)];',
     'const EPOCH_DAYS=daysFromCivil(2026,8,12);',
     'const dayIndexFor=(y,m,d)=>daysFromCivil(y,m,d)-EPOCH_DAYS;',
-    'const result={bronze,silver:bronze&&evaluate(challenge.silver,telemetry),gold:bronze&&evaluate(challenge.gold,telemetry)};',
+    'const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold)};',
     'moves:Math.min(p.moves??Infinity,attempt.moves??Infinity)',
+    'flawless:!!p.flawless||!!attempt.flawless',
     'while(i!=null&&has(i,tier)){cur++;i--;}',
+    "return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};",
   ];
   for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
 });

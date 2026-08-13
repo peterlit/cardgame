@@ -96,11 +96,10 @@ export function evaluate(objective, telemetry) { return OBJECTIVES[objective.id]
 // clobbering it with a losing run's metrics.
 export function evaluateChallenge(challenge, telemetry) {
   const bronze = !!telemetry.won;
-  const result = {
-    bronze,
-    silver: bronze && evaluate(challenge.silver, telemetry),
-    gold: bronze && evaluate(challenge.gold, telemetry),
-  };
+  const silver = bronze && evaluate(challenge.silver, telemetry);
+  const gold = bronze && evaluate(challenge.gold, telemetry);
+  // `flawless` = all three tiers in THIS single attempt (harder than banking them across retries).
+  const result = { bronze, silver, gold, flawless: !!(bronze && silver && gold) };
   if (bronze) { result.moves = telemetry.moves; result.elapsed = telemetry.elapsed; }
   return result;
 }
@@ -111,11 +110,12 @@ export function evaluateChallenge(challenge, telemetry) {
 // a lost game) are treated as Infinity so they never displace a prior best. This encodes the design
 // rule that Bronze/Silver/Gold are earned independently and never lost by a later attempt.
 export function mergeTiers(prev, attempt) {
-  const p = prev || { bronze: false, silver: false, gold: false, moves: Infinity, elapsed: Infinity };
+  const p = prev || { bronze: false, silver: false, gold: false, flawless: false, moves: Infinity, elapsed: Infinity };
   return {
     bronze: !!p.bronze || !!attempt.bronze,
     silver: !!p.silver || !!attempt.silver,
     gold: !!p.gold || !!attempt.gold,
+    flawless: !!p.flawless || !!attempt.flawless,   // sticky once any single attempt aces all three
     moves: Math.min(p.moves ?? Infinity, attempt.moves ?? Infinity),
     elapsed: Math.min(p.elapsed ?? Infinity, attempt.elapsed ?? Infinity),
   };
@@ -137,5 +137,5 @@ export function streaks(records, todayIndex) {
     while (i != null && has(i, tier)) { cur++; i--; }
     return { current: cur, best };
   };
-  return { play: tierRun('bronze'), silver: tierRun('silver'), gold: tierRun('gold') };
+  return { play: tierRun('bronze'), silver: tierRun('silver'), gold: tierRun('gold'), flawless: tierRun('flawless') };
 }

@@ -102,8 +102,14 @@ are done or added.
     (OR-accumulated across retries), streaks derived, tiers shown in the win overlay; challenge
     context persists across reload. Verified end-to-end in the browser. `build-pool.mjs` now writes
     the pool one-seed-per-line (readable).
-  - **Phase 1 iOS integration — TODO:** mirror the above in SwiftUI — bundle the pool, mirror the
-    daily logic in Swift, the Challenges & Streaks screen, telemetry, DailyStore, live HUD.
+  - **Flawless recognition — DONE (web):** a 4th tier for earning Bronze+Silver+Gold in a SINGLE
+    attempt (vs. banking them across free retries). `evaluateChallenge` sets `flawless`, `mergeTiers`
+    keeps it sticky, `streaks` derives a 4th run (all drift-guarded). Web shows a 4-up 🌟 streak card,
+    a today-card header badge, a calendar ⭐ on flawless days, and a win-overlay callout. iOS: TODO
+    (mirror as part of the Phase 1 iOS integration below).
+  - **Phase 1 iOS integration — TODO:** mirror the above (incl. Flawless) in SwiftUI — bundle the
+    pool, mirror the daily logic in Swift, the Challenges & Streaks screen, telemetry, DailyStore,
+    live HUD.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
