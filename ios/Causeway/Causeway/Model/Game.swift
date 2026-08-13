@@ -88,12 +88,20 @@ final class Game: ObservableObject {
     /// wins). Set in recordWin(); cleared on the next deal.
     @Published var dailyResult: TierResult? = nil
 
-    /// True while a "Show me how to win" line is animating. Input is locked and nothing is scored.
+    /// True while a "Show me how to win" line is loaded (playing OR paused). Input is locked and
+    /// nothing is scored.
     @Published private(set) var demoing = false
+    /// While `demoing`, whether auto-advance is paused (the player steps with "Next" instead).
+    @Published private(set) var demoPaused = false
     /// The end-of-demo banner message ("that's one way to win…"); nil when no demo banner shows.
     @Published private(set) var demoDoneMessage: String? = nil
-    /// Monotonic token so a queued demo step from a superseded/stopped run bails.
+    /// Monotonic token so a queued demo step from a superseded/stopped/paused run bails.
     private var demoGen = 0
+    /// The loaded winning line and cursor (for pause/step).
+    private var demoMoves: [String] = []
+    private var demoIdx = 0
+    /// "12 / 83" progress for the demo bar.
+    var demoProgress: String { "\(min(demoIdx, demoMoves.count)) / \(demoMoves.count)" }
 
     private var history: [Snapshot] = []
     private var started = false
@@ -782,36 +790,68 @@ final class Game: ObservableObject {
 
     /// Demonstrate a winning line for `seed`: reset to the fresh deal, then animate the baked moves.
     /// It's a demo — challengeDay stays nil and nothing is scored (we never route through commit()).
+    /// Playing auto-advances on a timer; the player can pause and step one move at a time.
     func showSolution(_ seed: Int) {
         guard let tokens = DailyData.solutions[seed] else { return }
         stopDemo()
         deal(seed: seed)             // fresh deal, casual (challengeDay nil), telemetry reset
         autoplaying = false          // the line already includes the safe sends — don't race autoplay
         demoing = true
+        demoPaused = false
         demoDoneMessage = nil
-        let moves = tokens.split(separator: " ").map(String.init)
+        demoMoves = tokens.split(separator: " ").map(String.init)
+        demoIdx = 0
         demoGen &+= 1
-        demoStep(moves, 0, gen: demoGen)
+        scheduleDemoStep(gen: demoGen, first: true)
     }
 
-    private func demoStep(_ moves: [String], _ i: Int, gen: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + (i == 0 ? 0.45 : 0.24)) { [weak self] in
-            guard let self, self.demoing, self.demoGen == gen else { return }
-            if i >= moves.count {
-                self.demoing = false
-                self.demoDoneMessage = "That's one way to win — tap Replay to try it yourself."
-                return
-            }
-            withAnimation(.easeOut(duration: 0.22)) { self.applyDemoToken(moves[i]) }
-            self.demoStep(moves, i + 1, gen: gen)
+    /// Schedule the next auto-advance. Bails if the demo was stopped/paused or superseded (gen).
+    private func scheduleDemoStep(gen: Int, first: Bool) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (first ? 0.45 : 0.24)) { [weak self] in
+            guard let self, self.demoing, !self.demoPaused, self.demoGen == gen else { return }
+            if self.demoAdvance() { self.scheduleDemoStep(gen: self.demoGen, first: false) }
         }
     }
 
-    /// Stop any running demo (and clear its banner), invalidating queued steps.
+    /// Apply the next move (animated); on the last one, flip to the completion banner. Returns
+    /// whether it advanced (false once the line is finished).
+    @discardableResult
+    private func demoAdvance() -> Bool {
+        guard demoIdx < demoMoves.count else { finishDemo(); return false }
+        withAnimation(.easeOut(duration: 0.22)) { self.applyDemoToken(self.demoMoves[self.demoIdx]) }
+        demoIdx += 1
+        if demoIdx >= demoMoves.count { finishDemo(); return false }
+        return true
+    }
+
+    private func finishDemo() {
+        demoing = false
+        demoPaused = false
+        demoDoneMessage = "That's one way to win — tap Replay to try it yourself."
+    }
+
+    /// Pause/resume the auto-advance.
+    func demoTogglePause() {
+        guard demoing else { return }
+        demoPaused.toggle()
+        if !demoPaused { demoGen &+= 1; scheduleDemoStep(gen: demoGen, first: false) }  // resume a fresh chain
+        // when pausing, the queued step bails on the !demoPaused guard
+    }
+
+    /// "Next": advance exactly one move (only meaningful while paused).
+    func demoStepOnce() {
+        guard demoing, demoPaused else { return }
+        demoAdvance()
+    }
+
+    /// Stop any running/finished demo (and clear its banner), invalidating queued steps.
     func stopDemo() {
         guard demoing || demoDoneMessage != nil else { return }
         demoing = false
+        demoPaused = false
         demoDoneMessage = nil
+        demoMoves = []
+        demoIdx = 0
         demoGen &+= 1
     }
 

@@ -199,6 +199,7 @@
     margin:-6px 0 12px; padding:8px 12px; border-radius:12px; font-size:12.5px; font-weight:600;
     background:rgba(42,59,68,.72); border:1px solid rgba(255,255,255,.28); color:#f4efe2; }
   .demobar.show{ display:flex; }
+  .demobtns{ display:flex; gap:6px; flex-shrink:0; }
   .demobar .btn{ padding:5px 12px; font-size:12px; }
   button.btn.dshow{ background:rgba(217,173,85,.24); border-color:rgba(217,173,85,.6); }
   button.btn.dshow:hover{ background:rgba(217,173,85,.36); }
@@ -307,7 +308,7 @@
     <button class="btn" id="dailyBtn" title="Daily challenges" disabled>Daily</button>
   </div>
   <div class="hud" id="dailyHud"></div>
-  <div class="demobar" id="demoBar"><span id="demoMsg">Showing a winning line…</span><button class="btn" id="demoStop">Stop</button></div>
+  <div class="demobar" id="demoBar"><span id="demoMsg">Showing a winning line…</span><span class="demobtns"><button class="btn" id="demoNext">Next</button><button class="btn" id="demoPause">Pause</button><button class="btn" id="demoStop">Stop</button></span></div>
 
   <div class="upper">
     <div>
@@ -1221,8 +1222,11 @@ function playChallenge(day){
   closeDaily(); render();
 }
 
-/* ---- "Show me how to win": animate a baked winning line (assisted; never scored) ---- */
-let demoing=false, demoTimer=null;
+/* ---- "Show me how to win": animate a baked winning line (assisted; never scored) ----
+   State machine: `demoing` is true while a line is loaded (playing OR paused); `demoPaused`
+   splits those. When playing, a timer auto-advances; when paused, the "Next" button advances one
+   move at a time via demoStepOnce(). Completion drops demoing but leaves the bar showing "Done". */
+let demoing=false, demoPaused=false, demoTimer=null, demoMoves=null, demoIdx=0;
 // Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove). end: 0=up,1=down.
 function applyDemoToken(tok){
   const f=tok.split(','), t=state.tableau, cells=state.cells, up=state.up, down=state.down;
@@ -1236,11 +1240,61 @@ function applyDemoToken(tok){
   }
   moveCount++; setMoves(moveCount);
 }
+// Reflect the current demo state onto the bar (message + which controls show).
+function updateDemoBar(){
+  const bar=document.getElementById("demoBar"); if(!bar) return;
+  const msg=document.getElementById("demoMsg");
+  const next=document.getElementById("demoNext"), pause=document.getElementById("demoPause"), stop=document.getElementById("demoStop");
+  const total=demoMoves?demoMoves.length:0;
+  const done = !demoing && bar.classList.contains("show");   // completed line: banner + Done only
+  if(done){
+    if(msg) msg.textContent="That's one way to win — tap Replay to try it yourself.";
+    if(next) next.style.display="none";
+    if(pause) pause.style.display="none";
+    if(stop) stop.textContent="Done";
+    return;
+  }
+  if(msg) msg.textContent=`Winning line — move ${Math.min(demoIdx,total)} / ${total}${demoPaused?" (paused)":"…"}`;
+  if(next) next.style.display=demoPaused?"":"none";
+  if(pause){ pause.style.display=""; pause.textContent=demoPaused?"Resume":"Pause"; }
+  if(stop) stop.textContent="Stop";
+}
+// Apply the next move; on the last one, flip to the completion banner. Returns whether it advanced.
+function demoAdvance(){
+  if(!demoMoves || demoIdx>=demoMoves.length){ finishDemo(); return false; }
+  applyDemoToken(demoMoves[demoIdx++]); render();
+  if(demoIdx>=demoMoves.length){ finishDemo(); return false; }
+  return true;
+}
+function finishDemo(){
+  demoing=false; demoPaused=false;
+  if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
+  updateDemoBar();
+}
+function demoTick(){
+  demoTimer=null;
+  if(!demoing || demoPaused) return;
+  if(demoAdvance()){ updateDemoBar(); demoTimer=setTimeout(demoTick, 240); }
+}
 function stopDemo(){
   const bar=document.getElementById("demoBar");
   if(!demoing && !demoTimer && !(bar && bar.classList.contains("show"))) return;
-  demoing=false; if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
+  demoing=false; demoPaused=false; demoMoves=null; demoIdx=0;
+  if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
   if(bar) bar.classList.remove("show");
+}
+// Pause/resume the auto-advance.
+function demoTogglePause(){
+  if(!demoing) return;
+  demoPaused=!demoPaused;
+  if(demoPaused){ if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; } }
+  else if(!demoTimer){ demoTimer=setTimeout(demoTick, 240); }
+  updateDemoBar();
+}
+// "Next": advance exactly one move (only meaningful while paused).
+function demoStepOnce(){
+  if(!demoing || !demoPaused) return;
+  if(demoAdvance()) updateDemoBar();   // if it finished, finishDemo already refreshed the bar
 }
 // Demonstrate a winning line for `seed`: reset to the fresh deal, then play the baked moves out.
 // It's a demo — challengeDay stays null and nothing is scored (we never route through commitMove).
@@ -1251,20 +1305,11 @@ function showSolution(seed){
   closeDaily();
   deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
   stopAutoplay();        // the line already includes the safe sends — don't race the app's autoplay
-  demoing=true;
+  demoing=true; demoPaused=false; demoMoves=tokens.split(' '); demoIdx=0;
   const bar=document.getElementById("demoBar"); if(bar) bar.classList.add("show");
-  const setBar=(msg,stopOnly)=>{ const el=document.getElementById("demoMsg"); if(el) el.textContent=msg;
-    const b=document.getElementById("demoStop"); if(b) b.textContent=stopOnly?"Done":"Stop"; };
-  setBar("Showing a winning line…", false);
-  const moves=tokens.split(' '); let i=0;
-  const step=()=>{
-    if(!demoing) return;
-    if(i>=moves.length){ demoing=false; demoTimer=null; setBar("That's one way to win — tap Replay to try it yourself.", true); return; }
-    applyDemoToken(moves[i++]); render();
-    demoTimer=setTimeout(step, 240);
-  };
+  updateDemoBar();
   render();
-  demoTimer=setTimeout(step, 450);
+  demoTimer=setTimeout(demoTick, 450);
 }
 // Fold a won challenge attempt into the day's record. Called synchronously from recordWin().
 function recordChallengeResult(secs){
@@ -1462,6 +1507,8 @@ document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=()=>{ stopDemo(); undo(); };
 document.getElementById("demoStop").onclick=stopDemo;
+document.getElementById("demoPause").onclick=demoTogglePause;
+document.getElementById("demoNext").onclick=demoStepOnce;
 // Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
 // context if one is active (so a challenge replay stays scored as that same challenge/day).
 function restartDeal(){

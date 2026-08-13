@@ -125,6 +125,8 @@ are done or added.
     `DailyData.solutions` loads the bundled JSON; `Game.showSolution/stopDemo/applyDemoToken` drive
     the playback (asyncAfter step loop, demoGen token), a `demoBar` in ContentView shows status +
     Stop/Done. Verified on the iPhone 17 Pro simulator (deal 10002 clears in 78 moves, Won stays 0).
+    Playback is pausable and single-steppable: a Pause/Resume toggle + a "Next" button (paused only)
+    that advances one move at a time, with live progress in the bar. Both platforms.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat

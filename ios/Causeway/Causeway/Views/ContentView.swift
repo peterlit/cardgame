@@ -323,26 +323,37 @@ struct ContentView: View {
     // MARK: "Show me how to win" status bar
 
     private var demoBar: some View {
-        HStack(spacing: 10) {
-            Text(game.demoDoneMessage ?? "Showing a winning line…")
+        HStack(spacing: 8) {
+            Text(game.demoing
+                 ? "Winning line — \(game.demoProgress)\(game.demoPaused ? " (paused)" : "…")"
+                 : (game.demoDoneMessage ?? ""))
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xF4EFE2))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 6)
-            Button { game.stopDemo() } label: {
-                Text(game.demoing ? "Stop" : "Done")
-                    .font(.system(size: 12, weight: .semibold))
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(Color(hex: 0x2A3B44).opacity(0.6)))
-                    .foregroundStyle(Color(hex: 0xF4EFE2))
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            if game.demoing {
+                if game.demoPaused {
+                    demoPill("Next") { game.demoStepOnce() }
+                }
+                demoPill(game.demoPaused ? "Resume" : "Pause") { game.demoTogglePause() }
             }
-            .buttonStyle(.plain)
+            demoPill(game.demoing ? "Stop" : "Done") { game.stopDemo() }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x2A3B44).opacity(0.72)))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+    }
+    private func demoPill(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Capsule().fill(Color(hex: 0x2A3B44).opacity(0.6)))
+                .foregroundStyle(Color(hex: 0xF4EFE2))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: win overlay

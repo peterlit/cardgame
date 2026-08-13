@@ -167,3 +167,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     gains the "💡 Show me how to win" button; ContentView gains a `demoBar` (status + Stop/Done).
     Verified on the iPhone 17 Pro simulator: deal 10002 animates to a cleared board in 78 moves, ends
     with the "tap Replay to try it yourself" banner, Won stays 0 (assisted, unscored). Review loop next.
+55. Add pause + single-step controls to "Show me how to win" (both platforms). The demo is now a
+    state machine (playing ↔ paused, then done): a Pause/Resume toggle stops/starts the auto-advance,
+    and a "Next" button (shown only while paused) advances exactly one move; the bar shows live
+    progress ("Winning line — 55 / 78 (paused)"). Web refactors `showSolution` into
+    `demoAdvance`/`demoTick`/`demoTogglePause`/`demoStepOnce` + `updateDemoBar` over module state
+    (demoMoves/demoIdx/demoPaused); iOS mirrors it (`scheduleDemoStep` guards on `!demoPaused`,
+    `demoAdvance`/`demoStepOnce`/`demoTogglePause`, `demoProgress`, demoBar shows Next/Pause/Resume/
+    Stop/Done). Verified: web pause holds + Next steps one move + Resume continues + step-to-end shows
+    Done (unscored); iOS same on the simulator (paused 53/78, Next→54→55, Resume→done, Won 0).
