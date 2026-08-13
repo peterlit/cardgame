@@ -180,8 +180,19 @@ followed), and on a win we walk parents back to the root and flatten to the comp
 the raw deal. `moveToken()` serializes each move to a compact, replayable token (`F/G` foundation,
 `T` tableau run, `C` park, `X` cell→column; `end` 0=up/1=down; comma-separated fields, space-joined).
 
-`tools/solver/build-solutions.mjs` bakes, for every pool seed, the shortest **unconstrained** line
-(the reference-par search — "clear the deal") into an append-only `data/daily-solutions.json`
-(`{ version, solutions: { "<seed>": "<tokens>" } }`). It **re-simulates every emitted line through
-`rules.mjs` and refuses any that doesn't win** — the verification pass anticipated in open question
-#2 above. The apps load this file and animate the line for a demonstration (assisted, never scored).
+`tools/solver/build-solutions.mjs` bakes, for every pool seed, **one line per tier** into
+`data/daily-solutions.json` (`{ version, solutions: { "<seed>": { bronze, silver?, gold? } } }`):
+
+- **bronze** — the shortest *unconstrained* win (clear the deal).
+- **gold** — a win solved under the day's Gold objective (`solve(objective(ch.gold.id))`), always a
+  certified/constraining objective. The day's objective is keyed by the seed's **pool index**
+  (`dailyChallenge(index, pool)`), frozen by the append-only pool.
+- **silver** — a win under the day's Silver objective, but only when it's a *certified* (constraining)
+  objective (free-cell limits / down-openers). A "universal" Silver (win in N moves / no undo) is
+  already satisfied by the bronze line, so it's omitted and the app falls back to bronze.
+
+Every line is **re-simulated through `rules.mjs`** and, for silver/gold, **re-checked against the
+actual objective checker** (`tests/daily.mjs evaluate`) — a line that doesn't win *and* earn its tier
+is dropped (the current 366-seed pool: 366 gold + 190 silver lines, 0 rejected). The apps offer a
+"Show me how to win" button per available tier and animate the line as a demonstration (assisted,
+pausable/single-steppable, never scored).

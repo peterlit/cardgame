@@ -79,19 +79,17 @@ struct DailyView: View {
                     tierRow("Gold", "gold", c.gold.label, rec, future: dayView > ti)
                 }
                 playButton(day: dayView, ti: ti, rec: rec)
-                // "Show me how to win": a demonstration (assisted) — never counts toward tiers.
+                // "Show me how to win": one line per tier — Bronze clears the deal; Silver/Gold obey
+                // that day's objective. Demonstrations (assisted) — never count toward tiers.
                 if dayView <= ti, game.hasSolution(c.seed) {
-                    Button {
-                        game.showSolution(c.seed)
-                        dismiss()
-                    } label: {
-                        Text("💡 Show me how to win")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(maxWidth: .infinity).padding(.vertical, 10)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.gold.opacity(0.20)))
-                            .foregroundStyle(Theme.ink)
+                    Text("Show me how to win:")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 6) {
+                        showPill(c.seed, "bronze", "🥉 Clear", "Clear the deal")
+                        if game.hasSilverLine(c.seed) { showPill(c.seed, "silver", "🥈 Silver", c.silver.label) }
+                        if game.hasGoldLine(c.seed) { showPill(c.seed, "gold", "🥇 Gold", c.gold.label) }
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(16)
@@ -141,6 +139,21 @@ struct DailyView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// A per-tier "show a winning line" button — hands off to the demo (assisted, unscored).
+    private func showPill(_ seed: Int, _ tier: String, _ title: String, _ label: String) -> some View {
+        Button {
+            game.showSolution(seed, tier: tier, label: label)
+            dismiss()
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(maxWidth: .infinity).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.gold.opacity(0.20)))
+                .foregroundStyle(Theme.ink)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: month calendar

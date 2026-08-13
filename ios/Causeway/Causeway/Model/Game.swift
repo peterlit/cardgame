@@ -100,6 +100,9 @@ final class Game: ObservableObject {
     /// The loaded winning line and cursor (for pause/step).
     private var demoMoves: [String] = []
     private var demoIdx = 0
+    /// Which tier's line is playing ("bronze"/"silver"/"gold") and its objective text (for the bar).
+    @Published private(set) var demoTier = "bronze"
+    @Published private(set) var demoLabel = ""
     /// "12 / 83" progress for the demo bar.
     var demoProgress: String { "\(min(demoIdx, demoMoves.count)) / \(demoMoves.count)" }
 
@@ -785,20 +788,37 @@ final class Game: ObservableObject {
 
     // MARK: - "Show me how to win" (assisted demo; never scored)
 
-    /// Whether a baked winning line exists for `seed`.
+    /// Whether a baked winning line exists for `seed` (bronze is the baseline; always present when
+    /// the seed has any solution).
     func hasSolution(_ seed: Int) -> Bool { DailyData.solutions[seed] != nil }
+    /// Whether a DISTINCT Silver / Gold line exists for `seed` (i.e. worth its own demo button).
+    func hasSilverLine(_ seed: Int) -> Bool { DailyData.solutions[seed]?.silver != nil }
+    func hasGoldLine(_ seed: Int) -> Bool { DailyData.solutions[seed]?.gold != nil }
 
-    /// Demonstrate a winning line for `seed`: reset to the fresh deal, then animate the baked moves.
+    /// The baked line for `seed` at `tier`. Silver falls back to bronze for a universal Silver.
+    private func solutionLine(_ seed: Int, tier: String) -> String? {
+        guard let s = DailyData.solutions[seed] else { return nil }
+        switch tier {
+        case "gold":   return s.gold
+        case "silver": return s.silver ?? s.bronze
+        default:       return s.bronze
+        }
+    }
+
+    /// Demonstrate a winning line for `seed` at `tier` ("bronze"/"silver"/"gold"; `label` is that
+    /// tier's objective text, for the bar). Reset to the fresh deal, then animate the baked moves.
     /// It's a demo — challengeDay stays nil and nothing is scored (we never route through commit()).
     /// Playing auto-advances on a timer; the player can pause and step one move at a time.
-    func showSolution(_ seed: Int) {
-        guard let tokens = DailyData.solutions[seed] else { return }
+    func showSolution(_ seed: Int, tier: String = "bronze", label: String = "") {
+        guard let tokens = solutionLine(seed, tier: tier) else { return }
         stopDemo()
         deal(seed: seed)             // fresh deal, casual (challengeDay nil), telemetry reset
         autoplaying = false          // the line already includes the safe sends — don't race autoplay
         demoing = true
         demoPaused = false
         demoDoneMessage = nil
+        demoTier = tier
+        demoLabel = label
         demoMoves = tokens.split(separator: " ").map(String.init)
         demoIdx = 0
         demoGen &+= 1
@@ -827,7 +847,8 @@ final class Game: ObservableObject {
     private func finishDemo() {
         demoing = false
         demoPaused = false
-        demoDoneMessage = "That's one way to win — tap Replay to try it yourself."
+        let name = demoTier == "gold" ? "Gold" : demoTier == "silver" ? "Silver" : "winning"
+        demoDoneMessage = "That's a \(name) line — tap Replay to try it yourself."
     }
 
     /// Pause/resume the auto-advance.

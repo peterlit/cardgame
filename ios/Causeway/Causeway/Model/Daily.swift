@@ -373,7 +373,15 @@ struct PoolSeed: Decodable, Equatable {
     let supports: [String]
 }
 private struct PoolFile: Decodable { let seeds: [PoolSeed] }
-private struct SolutionsFile: Decodable { let solutions: [String: String] }
+
+/// The baked winning lines for one seed, one per tier. `silver` is present only when the day's
+/// Silver is a certified (constraining) objective; a universal Silver falls back to `bronze`.
+struct TierSolutions: Decodable, Equatable {
+    let bronze: String
+    let silver: String?
+    let gold: String?
+}
+private struct SolutionsFile: Decodable { let solutions: [String: TierSolutions] }
 
 enum DailyData {
     /// The certified seed pool, or [] if the resource is missing/unreadable (Daily then disabled).
@@ -384,9 +392,9 @@ enum DailyData {
         return file.seeds
     }()
 
-    /// Baked winning lines for "Show me how to win" (seed -> compact token string). Empty if the
-    /// resource is missing — the feature just doesn't offer itself for those seeds.
-    static let solutions: [Int: String] = {
+    /// Baked "Show me how to win" lines per seed (bronze/silver/gold). Empty if the resource is
+    /// missing — the feature just doesn't offer itself for those seeds.
+    static let solutions: [Int: TierSolutions] = {
         guard let url = Bundle.main.url(forResource: "daily-solutions", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let file = try? JSONDecoder().decode(SolutionsFile.self, from: data) else { return [:] }

@@ -176,3 +176,13 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     `demoAdvance`/`demoStepOnce`/`demoTogglePause`, `demoProgress`, demoBar shows Next/Pause/Resume/
     Stop/Done). Verified: web pause holds + Next steps one move + Resume continues + step-to-end shows
     Done (unscored); iOS same on the simulator (paused 53/78, Next→54→55, Resume→done, Won 0).
+56. Add Silver/Gold options to "Show me how to win" (it previously only aimed at Bronze/clear).
+    The solver now bakes ONE line per tier: `build-solutions.mjs` solves each seed under its day's
+    Gold objective (`dailyChallenge(index).gold`) and, when the day's Silver is a *certified*
+    objective, under that Silver too (universal Silvers — win-in-N / no-undo — fall back to bronze).
+    Each silver/gold line is re-checked against the real objective checker (`tests/daily.mjs evaluate`),
+    not just isWon — 366 gold + 190 silver lines, 0 rejected. Data schema v2: `{bronze, silver?, gold?}`
+    per seed. Both apps show a per-tier "Show me how to win:" button row (🥉 Clear / 🥈 Silver / 🥇 Gold)
+    and the demo bar names the objective ("🥇 Gold: Get every Jack onto the down-foundation… — 49/88").
+    Verified: web + iOS tier buttons render; the Gold demo visibly holds the Aces back while sending
+    Jacks down; lines satisfy their objectives; still assisted/unscored.

@@ -324,9 +324,7 @@ struct ContentView: View {
 
     private var demoBar: some View {
         HStack(spacing: 8) {
-            Text(game.demoing
-                 ? "Winning line — \(game.demoProgress)\(game.demoPaused ? " (paused)" : "…")"
-                 : (game.demoDoneMessage ?? ""))
+            Text(demoHeadline)
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xF4EFE2))
                 .fixedSize(horizontal: false, vertical: true)
@@ -343,6 +341,17 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x2A3B44).opacity(0.72)))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+    }
+    /// The demo bar's status line — Bronze just clears the deal; Silver/Gold name their objective.
+    private var demoHeadline: String {
+        guard game.demoing else { return game.demoDoneMessage ?? "" }
+        let head: String
+        switch game.demoTier {
+        case "gold":   head = "🥇 Gold: \(game.demoLabel)"
+        case "silver": head = "🥈 Silver: \(game.demoLabel)"
+        default:       head = "Winning line"
+        }
+        return "\(head) — \(game.demoProgress)\(game.demoPaused ? " (paused)" : "…")"
     }
     private func demoPill(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {

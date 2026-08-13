@@ -127,6 +127,11 @@ are done or added.
     Stop/Done. Verified on the iPhone 17 Pro simulator (deal 10002 clears in 78 moves, Won stays 0).
     Playback is pausable and single-steppable: a Pause/Resume toggle + a "Next" button (paused only)
     that advances one move at a time, with live progress in the bar. Both platforms.
+    Now offers a line per TIER: `build-solutions.mjs` bakes bronze + a Gold line (solved under the
+    day's Gold objective) + a Silver line (only for certified Silvers; universal ones fall back to
+    bronze), each re-verified against the objective checker (data schema v2 `{bronze,silver?,gold?}`;
+    366 gold + 190 silver, 0 rejected). Both apps show a 🥉/🥈/🥇 button row and name the objective
+    in the demo bar.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat
