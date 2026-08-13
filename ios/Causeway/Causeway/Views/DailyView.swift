@@ -135,7 +135,7 @@ struct DailyView: View {
         let now = Calendar.current.dateComponents([.year, .month], from: Date())
         let y = now.year ?? 2026, m = now.month ?? 1
         let ti = todayIndex()
-        let first = ((daysFromCivil(y, m, 1) % 7) + 4) % 7   // 0 = Sunday (matches web)
+        let first = floorMod(floorMod(daysFromCivil(y, m, 1), 7) + 4, 7)   // 0 = Sunday (matches web; floor-mod matches JS %)
         let dim = daysInMonth(y, m)
         return VStack(spacing: 8) {
             HStack {
@@ -151,7 +151,9 @@ struct DailyView: View {
                     Text(d).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
-                ForEach(0..<first, id: \.self) { _ in Color.clear.frame(height: 40) }
+                // Data-driven ForEach (not the constant-range ForEach(0..<Int)) so a month rollover
+                // that changes `first` re-diffs cleanly; negative ids never collide with day cells.
+                ForEach(Array(0..<first).map { -($0 + 1) }, id: \.self) { _ in Color.clear.frame(height: 40) }
                 ForEach(1...dim, id: \.self) { d in
                     calCell(idx: dayIndexFor(y, m, d), day: d, ti: ti)
                 }

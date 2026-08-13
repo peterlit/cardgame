@@ -9,13 +9,26 @@ import Foundation
 
 // MARK: - Calendar (day index = integer days since the launch epoch)
 
+/// Floor division / modulo — Swift `/` and `%` truncate toward zero, but the JS reference
+/// (tests/daily.mjs) wraps these subexpressions in `Math.floor`. They only diverge for negative
+/// numerators (pre-year-1 dates), unreachable with today's year >= 2026 inputs, but we match
+/// `Math.floor` semantics for ALL inputs so the port stays correct against the reference.
+private func floorDiv(_ a: Int, _ b: Int) -> Int {
+    let q = a / b, r = a % b
+    return (r != 0 && (r < 0) != (b < 0)) ? q - 1 : q
+}
+func floorMod(_ a: Int, _ b: Int) -> Int {
+    let r = a % b
+    return (r != 0 && (r < 0) != (b < 0)) ? r + b : r
+}
+
 /// Proleptic-Gregorian days-from-civil (Howard Hinnant's algorithm) — identical to daily.mjs.
 func daysFromCivil(_ y0: Int, _ m: Int, _ d: Int) -> Int {
     let y = y0 - (m <= 2 ? 1 : 0)
-    let era = (y >= 0 ? y : y - 399) / 400
+    let era = floorDiv(y >= 0 ? y : y - 399, 400)
     let yoe = y - era * 400
-    let doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+    let doy = floorDiv(153 * (m + (m > 2 ? -3 : 9)) + 2, 5) + d - 1
+    let doe = yoe * 365 + floorDiv(yoe, 4) - floorDiv(yoe, 100) + doy
     return era * 146097 + doe - 719468
 }
 let EPOCH_DAYS = daysFromCivil(2026, 8, 12)   // launch epoch = day 0
@@ -192,6 +205,9 @@ func dailyChallenge(_ dayIndex: Int, _ pool: [PoolSeed]) -> Challenge? {
     var rng = Mulberry32(UInt32(truncatingIfNeeded: 0x9e37_79b9 ^ (dayIndex + 1)))
     let silverPool = SILVER_UNIVERSAL + SILVER_CERTIFIED.filter { rec.supports.contains($0) }
     let goldPool = GOLD.filter { rec.supports.contains($0) }
+    // Web yields `undefined` (misrenders) on an empty pool; Swift would hard-crash on the subscript.
+    // Treat "no objective available" as no challenge — the nil callers already handle for out-of-range.
+    guard !silverPool.isEmpty, !goldPool.isEmpty else { return nil }
     let silverId = silverPool[rng.int(silverPool.count)]   // rng() call #1 (order matters — matches web)
     let goldId = goldPool[rng.int(goldPool.count)]         // rng() call #2
     return Challenge(dayIndex: dayIndex, seed: rec.seed, par: rec.par,
