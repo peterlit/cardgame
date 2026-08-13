@@ -7,7 +7,7 @@ import Combine
 /// read the app's real memory behaviour without View Debugging / Malloc Stack Logging
 /// inflating and growing it. See BACKLOG "I6-verify".
 enum DebugFlags {
-    static let memoryHUD = true
+    static let memoryHUD = false   // RELEASE: must stay false — the HUD is not #if DEBUG-gated
 }
 
 /// Reads the process's own memory numbers via mach — no Instruments needed.

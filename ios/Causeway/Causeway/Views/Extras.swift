@@ -46,6 +46,7 @@ struct RulesView: View {
                     rule("Tableau", "Build in alternating colours, one rank at a time, in either direction — a pile can run down (red on black) or up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run as a group if you have enough free cells and empty columns.")
                     rule("Free cells", "Three single-card parking spots.")
                     rule("Controls", "Tap a card to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Tapping a card in a run moves the whole run. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
+                    about
                 }
                 .padding()
             }
@@ -60,5 +61,26 @@ struct RulesView: View {
             Text(title).font(.headline).foregroundStyle(Theme.gold)
             Text(body).font(.subheadline).foregroundStyle(.primary)
         }
+    }
+
+    /// About / copyright footer — app name, version, and ownership notice.
+    private var about: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider().padding(.vertical, 6)
+            Text("About").font(.headline).foregroundStyle(Theme.gold)
+            Text("Causeway · v\(Self.appVersion)")
+                .font(.subheadline).foregroundStyle(.primary)
+            Text("© 2026 Whimsical Distractions. All rights reserved.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("An original two-ended-foundation solitaire.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// "1.0 (1)" from the bundle's marketing version + build number.
+    static var appVersion: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "\(short) (\(build))"
     }
 }

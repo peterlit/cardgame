@@ -40,7 +40,12 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let cardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
+            // Landscape: the wide viewport would blow card size up to fill 8 columns, and the tall
+            // tableau overflows the short height — so cap the card width and let the board scroll,
+            // centered. Portrait keeps its exact, well-tested layout.
+            let landscape = geo.size.width > geo.size.height
+            let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
+            let cardW = landscape ? min(widthCardW, 64) : widthCardW
             let overlap = (cardW * Theme.cardAspect * 0.40).rounded()
 
             ZStack {
@@ -54,11 +59,16 @@ struct ContentView: View {
                     } else if game.challengeDay != nil {
                         DailyHUD(game: game)   // live objectives while playing a challenge
                     }
-                    upperArea(cardW: cardW)
-                        .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
-                    tableauArea(cardW: cardW, overlap: overlap)
-                        .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
-                    Spacer(minLength: 0)
+                    if landscape {
+                        // Board scrolls vertically and centers within the wide viewport.
+                        ScrollView(.vertical, showsIndicators: false) {
+                            boardStack(cardW: cardW, overlap: overlap)
+                                .frame(maxWidth: .infinity)   // centre the fixed-width board
+                        }
+                    } else {
+                        boardStack(cardW: cardW, overlap: overlap)
+                        Spacer(minLength: 0)
+                    }
                 }
                 .padding(.horizontal, outerPad)
                 .padding(.top, 6)
@@ -99,6 +109,19 @@ struct ContentView: View {
             Button("Finish") { withAnimation { game.runAutoFinish() } }
             Button("Not yet", role: .cancel) { game.deferAutoFinish() }
         } message: { Text("Every remaining card can go home. Send them all now?") }
+    }
+
+    /// The free-cells/foundations row plus the tableau — the draggable play area. Pinned to the
+    /// board's natural width (8 cards + gaps) so it can centre within a wider (landscape) viewport
+    /// without stretching the internal HStacks.
+    private func boardStack(cardW: CGFloat, overlap: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            upperArea(cardW: cardW)
+                .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
+            tableauArea(cardW: cardW, overlap: overlap)
+                .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
+        }
+        .frame(width: cardW * 8 + gap * 7)
     }
 
     // MARK: header + toolbar

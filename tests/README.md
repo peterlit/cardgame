@@ -27,6 +27,16 @@ Exits non-zero on any failure. No dependencies, no install step (Node >= 18).
 - **Restore-save validator** — accepts fresh and partial games; rejects duplicates,
   out-of-range suit (F3 regression) / rank, crossed foundations, completed boards,
   and wrong-shaped saves.
+- **Daily challenges** (`daily.test.mjs`) — the deterministic date→challenge generator,
+  the objective checkers, `mergeTiers`/`streaks`/Flawless, and a golden-master pin.
+- **Baked solutions** (`solutions.test.mjs`) — replays every "Show me how to win" line in
+  `data/daily-solutions.json` from the raw deal and asserts it wins, and that each
+  Silver/Gold line satisfies its objective. Guards the shipped data against a stale/corrupt
+  regenerate or a rules/checker change that silently invalidates a line.
+- **iOS parity drift guards** (`ios-parity.test.mjs`) — pin the distinctive Swift bodies of
+  the parity-critical logic (deal RNG, `daysFromCivil`, the daily generator + frozen pools,
+  checkers, `mergeTiers`/`streaks`, the once-only win-record gate, `applyDemoToken`). An edit
+  to the Swift port that diverges from the canonical logic trips CI. See below.
 
 ## How the engine copy stays honest (drift guard)
 
@@ -38,6 +48,9 @@ If you edit the logic in `index.html`, mirror it in `engine.mjs` or the tests fa
 
 ## Not covered here
 
-The iOS engine is exercised indirectly: it must produce the same golden deal orders
-by construction (same algorithm), but there is no XCTest target yet — adding one to a
-hand-authored `.pbxproj` without Xcode is risky. See BACKLOG.md ("XCTest target").
+There is still no **XCTest** target (adding one to a hand-authored `.pbxproj` without Xcode
+is risky — see BACKLOG.md "XCTest target"). Until then, `ios-parity.test.mjs` is the fallback:
+it pins the Swift port's canonical bodies so web↔iOS drift trips CI. Full **auto-finish
+deferred-overlay timing** (record-exactly-once, not-before-cascade) is app/UI timing and is only
+partially guarded here (the `winRecorded` once-only gate is pinned); the full timing test remains
+an app-level concern (BACKLOG "AF-test").

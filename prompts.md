@@ -194,3 +194,15 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     line-for-line mirror + compiles; live sim check deferred — the host CoreSimulator wedged
     (SBMainWorkspace launch denial affecting even a fresh clean sim while Safari launches; a parallel
     session is running its own sim, so I avoided a shared-service restart).
+58. Deep review of App Store shipping readiness + implement. Ran two audits (iOS/App-Store readiness
+    + test coverage). Created rollback tag `pre-ship-prep`; documented the plan/status in
+    `docs/shipping-readiness.md`. Implemented: (B1, blocker) `DebugFlags.memoryHUD=false` so the debug
+    MEM/PEAK overlay doesn't ship; (F2) an About/copyright screen (app name + version + © line) on the
+    iOS How-to-play and the web rules panel; (F1) iOS landscape — enabled landscape orientations and
+    made the board scroll + centre in landscape (card size capped) while portrait stays byte-identical;
+    (F4) regression tests — `tests/solutions.test.mjs` replays every baked "Show me how to win" line and
+    asserts win+objective (366 seeds), and `tests/ios-parity.test.mjs` adds 10 Swift drift guards
+    pinning the iOS port's parity-critical logic (deal RNG, calendar, daily generator, checkers,
+    mergeTiers/streaks, once-only win gate, applyDemoToken) — closing the "iOS has zero drift guards"
+    gap. 67 tests green. Owner action items (Support/Privacy URLs, contact email, real 17/18-device
+    testing) and the on-device landscape screenshot (sim wedged) are tracked in the doc. Review loop next.
