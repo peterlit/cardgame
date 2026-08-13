@@ -1,11 +1,1 @@
-{
-  "round": 3,
-  "round_start_sha": "cb08a919f1ae4239351d9ae3155250ef49675df1",
-  "max_rounds": 5,
-  "findings": [
-    {"id":"F1-ios-deal-not-chokepoint","severity":"blocker","region":"ios/Causeway/Causeway/Model/Game.swift deal(seed:)","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"},{"round":2,"status":"closed"}],"current_status":"closed","note":"deal(seed:) is the demo chokepoint."},
-    {"id":"F2-web-deal-not-chokepoint","severity":"major","region":"index.html deal()","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"},{"round":2,"status":"closed"}],"current_status":"closed","note":"deal() is the demo chokepoint."},
-    {"id":"F3-demo-board-persisted","severity":"minor","region":"index.html saveGame; ios/.../Game.swift persist","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"},{"round":2,"status":"closed"}],"current_status":"closed","note":"Persistence skipped mid-demo."},
-    {"id":"F4-web-stopdemo-completed-banner-stuck","severity":"major","region":"index.html stopDemo (1239-1244)","first_seen_round":2,"introduced_by_fix":false,"status_history":[{"round":2,"status":"open"},{"round":3,"status":"closed"}],"current_status":"closed","note":"Fixed: stopDemo guard now also fires when the demo bar is shown, so a completed banner is dismissed by the Done button and every deal() teardown. Live-verified (Done + fresh deal both dismiss; no-op safe). Mirrors iOS."}
-  ]
-}
+{ "round": 1, "round_start_sha": "234d989", "max_rounds": 5, "findings": [] }
