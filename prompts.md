@@ -160,3 +160,10 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     it's a demonstration — input is locked during playback, `challengeDay` stays null, and nothing is
     scored (verified: board clears in 83 moves, wins + daily store unchanged, no win overlay). iOS
     mirror + review loop next.
+54. Mirror "Show me how to win" into iOS. `DailyData.solutions` loads the bundled
+    `daily-solutions.json`; `Game.showSolution/stopDemo/applyDemoToken` animate the line (asyncAfter
+    step loop gated by a `demoGen` token; `demoing`/`demoDoneMessage` @Published), with input locked
+    (guards in smartMove/drop) and nothing scored; New game/Undo/Replay stop the demo. `DailyView`
+    gains the "💡 Show me how to win" button; ContentView gains a `demoBar` (status + Stop/Done).
+    Verified on the iPhone 17 Pro simulator: deal 10002 animates to a cleared board in 78 moves, ends
+    with the "tap Replay to try it yourself" banner, Won stays 0 (assisted, unscored). Review loop next.

@@ -88,6 +88,13 @@ final class Game: ObservableObject {
     /// wins). Set in recordWin(); cleared on the next deal.
     @Published var dailyResult: TierResult? = nil
 
+    /// True while a "Show me how to win" line is animating. Input is locked and nothing is scored.
+    @Published private(set) var demoing = false
+    /// The end-of-demo banner message ("that's one way to win…"); nil when no demo banner shows.
+    @Published private(set) var demoDoneMessage: String? = nil
+    /// Monotonic token so a queued demo step from a superseded/stopped run bails.
+    private var demoGen = 0
+
     private var history: [Snapshot] = []
     private var started = false
     private var autoplaying = false
@@ -158,11 +165,12 @@ final class Game: ObservableObject {
         persist()
     }
 
-    func newRandomGame() { deal(seed: randomSeed()) }
+    func newRandomGame() { stopDemo(); deal(seed: randomSeed()) }
 
     /// Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
     /// context if one is active (so a challenge replay stays scored as that same challenge/day).
     func restartDeal() {
+        stopDemo()
         let day = challengeDay
         deal(seed: seed)                    // re-deal same seed; resets telemetry/board, clears challengeDay
         if let day = day { challengeDay = day; persist() }   // keep it a challenge if it was one
@@ -373,6 +381,7 @@ final class Game: ObservableObject {
     }
 
     func undo() {
+        stopDemo()               // an undo during the demo banner returns to normal play
         stopAutoplayPending()
         finishing = false        // halt any running finish cascade
         finishGen &+= 1          // invalidate any asyncAfter block still queued for the old chain
@@ -422,6 +431,7 @@ final class Game: ObservableObject {
     /// Reuses the tap-era move validators by staging `selection` for the duration of the move.
     @discardableResult
     func drop(_ source: Spot, to target: DropTarget) -> Bool {
+        if demoing { return false }   // input is locked while a "how to win" line plays
         if case .tableau(let c, let i) = source, !isSeqHead(col: c, idx: i) { return false }
         selection = source
         let moved: Bool
@@ -485,6 +495,7 @@ final class Game: ObservableObject {
     /// sub-stack below it), moving the whole run. Priority: foundation → onto
     /// another card → empty column → free cell (foundation/free cell single-card only).
     func smartMove(_ spot: Spot) {
+        if demoing { return }   // input is locked while a "how to win" line plays
         let run: [Card]
         switch spot {
         case .cell(let i): guard let c = cells[i] else { return }; run = [c]
@@ -753,6 +764,74 @@ final class Game: ObservableObject {
     func liveAttempt() -> Attempt {
         Attempt(won: checkWin(), moves: moveCount, elapsed: 0,
                 cellUses: telem.cellUses, undos: telem.undos, foundationOrder: telem.foundationOrder)
+    }
+
+    // MARK: - "Show me how to win" (assisted demo; never scored)
+
+    /// Whether a baked winning line exists for `seed`.
+    func hasSolution(_ seed: Int) -> Bool { DailyData.solutions[seed] != nil }
+
+    /// Demonstrate a winning line for `seed`: reset to the fresh deal, then animate the baked moves.
+    /// It's a demo — challengeDay stays nil and nothing is scored (we never route through commit()).
+    func showSolution(_ seed: Int) {
+        guard let tokens = DailyData.solutions[seed] else { return }
+        stopDemo()
+        deal(seed: seed)             // fresh deal, casual (challengeDay nil), telemetry reset
+        autoplaying = false          // the line already includes the safe sends — don't race autoplay
+        demoing = true
+        demoDoneMessage = nil
+        let moves = tokens.split(separator: " ").map(String.init)
+        demoGen &+= 1
+        demoStep(moves, 0, gen: demoGen)
+    }
+
+    private func demoStep(_ moves: [String], _ i: Int, gen: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + (i == 0 ? 0.45 : 0.24)) { [weak self] in
+            guard let self, self.demoing, self.demoGen == gen else { return }
+            if i >= moves.count {
+                self.demoing = false
+                self.demoDoneMessage = "That's one way to win — tap Replay to try it yourself."
+                return
+            }
+            withAnimation(.easeOut(duration: 0.22)) { self.applyDemoToken(moves[i]) }
+            self.demoStep(moves, i + 1, gen: gen)
+        }
+    }
+
+    /// Stop any running demo (and clear its banner), invalidating queued steps.
+    func stopDemo() {
+        guard demoing || demoDoneMessage != nil else { return }
+        demoing = false
+        demoDoneMessage = nil
+        demoGen &+= 1
+    }
+
+    /// Apply one solution token directly to the board (mirrors tools/solver rules.mjs applyMove and
+    /// the web applyDemoToken). Fields are comma-separated; end 0=up, 1=down.
+    private func applyDemoToken(_ tok: String) {
+        let p = tok.split(separator: ",")
+        func n(_ j: Int) -> Int { Int(p[j]) ?? 0 }
+        switch p[0] {
+        case "F":
+            let c = tableau[n(1)].removeLast()
+            if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }
+        case "G":
+            let idx = n(1); guard let c = cells[idx] else { return }
+            cells[idx] = nil
+            if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }
+        case "T":
+            let src = n(1), idx = n(2), dst = n(3)
+            let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)
+            tableau[dst].append(contentsOf: run)
+        case "C":
+            let c = tableau[n(1)].removeLast()
+            if let e = cells.firstIndex(where: { $0 == nil }) { cells[e] = c }
+        case "X":
+            let idx = n(1); guard let c = cells[idx] else { return }
+            cells[idx] = nil; tableau[n(2)].append(c)
+        default: break
+        }
+        moveCount += 1
     }
     private func onWin() {
         recordWin()   // no-op if the winning step already recorded it

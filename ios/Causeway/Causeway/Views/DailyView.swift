@@ -79,6 +79,20 @@ struct DailyView: View {
                     tierRow("Gold", "gold", c.gold.label, rec, future: dayView > ti)
                 }
                 playButton(day: dayView, ti: ti, rec: rec)
+                // "Show me how to win": a demonstration (assisted) — never counts toward tiers.
+                if dayView <= ti, game.hasSolution(c.seed) {
+                    Button {
+                        game.showSolution(c.seed)
+                        dismiss()
+                    } label: {
+                        Text("💡 Show me how to win")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.gold.opacity(0.20)))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(16)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color.gray.opacity(0.10)))

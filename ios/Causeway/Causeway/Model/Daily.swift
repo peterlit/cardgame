@@ -373,6 +373,7 @@ struct PoolSeed: Decodable, Equatable {
     let supports: [String]
 }
 private struct PoolFile: Decodable { let seeds: [PoolSeed] }
+private struct SolutionsFile: Decodable { let solutions: [String: String] }
 
 enum DailyData {
     /// The certified seed pool, or [] if the resource is missing/unreadable (Daily then disabled).
@@ -381,5 +382,15 @@ enum DailyData {
               let data = try? Data(contentsOf: url),
               let file = try? JSONDecoder().decode(PoolFile.self, from: data) else { return [] }
         return file.seeds
+    }()
+
+    /// Baked winning lines for "Show me how to win" (seed -> compact token string). Empty if the
+    /// resource is missing — the feature just doesn't offer itself for those seeds.
+    static let solutions: [Int: String] = {
+        guard let url = Bundle.main.url(forResource: "daily-solutions", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let file = try? JSONDecoder().decode(SolutionsFile.self, from: data) else { return [:] }
+        return Dictionary(file.solutions.compactMap { k, v in Int(k).map { ($0, v) } },
+                          uniquingKeysWith: { a, _ in a })
     }()
 }
