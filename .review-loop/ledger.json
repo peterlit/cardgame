@@ -1,59 +1,14 @@
 {
-  "round": 1,
-  "round_start_sha": "f71a8aa41b9ff09dceeb9116768b95f7fbc7932f",
+  "round": 2,
+  "round_start_sha": "4bc63789ed00334053f519fab42bdcb1843a9ddc",
   "max_rounds": 5,
   "findings": [
     {
-      "id": "F1",
-      "severity": "blocker",
-      "title": "Undo doesn't roll back telem.foundationOrder / cellUses; ordering & cell objectives wrongly denied and count objectives inflatable",
-      "location": "index.html snapshot()/undo(); recordHomed()",
-      "failure_scenario": "Home 2\u2665 while exploring, undo it, then win a clean aces-first line; foundationOrder still starts [2\u2665up] so acesFirst returns false and Gold is denied. Or park a card then undo, win cell-free, but cellUses stuck at 1 denies no-cells. Or home a King down/undo/redo repeatedly to append 4 duplicate {rank13,down} and falsely satisfy down-openers-20.",
-      "rationale": "snapshot() captures only tableau/cells/up/down/moveCount; undo() restores those + moveCount but never touches telem.foundationOrder or telem.cellUses. Undo is a first-class, encouraged mechanic (Replay to improve).",
-      "suggested_fix": "In snapshot() record foundationOrder.length and cellUses; in undo() truncate foundationOrder to that length and restore cellUses (both append-only, so length restore suffices).",
-      "current_status": "fixed",
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "snapshot records pre-move foundationOrder.length+cellUses; undo truncates array + restores counter; undos correctly not rolled back; one-card-per-move invariant makes truncation exact."
-        }
-      ]
-    },
-    {
-      "id": "F2",
-      "severity": "blocker",
-      "title": "Daily overlay crashes (null deref) when todayIndex() is outside [0, pool.length)",
-      "location": "index.html openDaily/renderDailyCard",
-      "failure_scenario": "Before the 2026-08-12 epoch (e.g. a user west of UTC at launch) todayIndex()=-1; openDaily sets dailyView=-1, renderDailyCard calls dailyChallenge(-1)->null, derefs c.seed -> TypeError, overlay never opens (Daily button looks dead). Same after ~2027-08-13 when todayIndex()>=366.",
-      "rationale": "refreshDailyBtn enables the button whenever the pool loaded, independent of date; openDaily/renderDailyCard never range-check dailyView (renderDailyCal does).",
-      "suggested_fix": "Guard/clamp dailyView to the available range; render an explicit 'no challenge available' state instead of dereferencing null.",
-      "current_status": "fixed",
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "openDaily clamps dailyView to [0,len-1]; renderDailyCard null-guards before any deref; calendar onclick gated; playChallenge guarded. Pre-epoch & beyond-pool render without crash."
-        }
-      ]
-    },
-    {
-      "id": "F3",
+      "id": "F1-calendar-star-misposition",
       "severity": "major",
-      "title": "Autoplay persists telemetry one card behind the board; reload mid-chain desyncs foundationOrder",
-      "location": "index.html autoplayOneStep saveGame vs recordHomed in runAutoplay step",
-      "failure_scenario": "During a safe-autoplay chain each step saves BEFORE the step closure appends the homed card via recordHomed. Reload mid-chain: restoreGame loads a board with a foundation card that has no foundationOrder entry; on eventual win, aces-first/down-openers-20/suit-sprint evaluate a truncated stream -> wrong tier.",
-      "rationale": "autoplayOneStep calls saveGame() internally before recordHomed() runs in the step. commitMove and auto-finish both save after recordHomed, so only the autoplay path desyncs.",
-      "suggested_fix": "Record the homed card inside autoplayOneStep (before its saveGame) and REMOVE the recordHomed() in the runAutoplay step to avoid double-counting; or saveGame() again after recordHomed in the step.",
-      "current_status": "fixed",
+      "region": "index.html:202,227",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
       "status_history": [
         {
           "round": 1,
@@ -61,41 +16,18 @@
         },
         {
           "round": 1,
-          "status": "fixed",
-          "validation": "recordHomed now in exactly 4 sites (commitMove, autoplayOneStep x2, stepFinish), each once/homed card; removed from runAutoplay; runs before isWon and before autoplay saveGame."
+          "status": "closed"
         }
-      ]
+      ],
+      "current_status": "closed",
+      "note": "Fixed by adding position:relative to .dcell; .dstar-c is the sole absolutely-positioned descendant and now anchors to its own cell. Verified in browser (star box inside cell). No regression."
     },
     {
-      "id": "F4",
-      "severity": "major",
-      "title": "Cell-to-cell relocation over-counts telem.cellUses",
-      "location": "index.html tryDestCell",
-      "failure_scenario": "Move a card from one free cell to another empty cell (legal): cellUses++ fires though no new card left the tableau. park+relocate+park yields cellUses=3, denying cells-le-2 though only two cards ever occupied a cell.",
-      "rationale": "cellUses incremented unconditionally in tryDestCell even when selection.kind==='cell' (smartMove's cell branch is guarded; tryDestCell isn't).",
-      "suggested_fix": "if(selection.kind!=='cell') telem.cellUses++;",
-      "current_status": "fixed",
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "tryDestCell guards cellUses++ with selection.kind!=='cell'; cell->cell counts 0."
-        }
-      ]
-    },
-    {
-      "id": "F5",
+      "id": "F2-legend-missing-flawless",
       "severity": "minor",
-      "title": "Drift guard pins only 7 substrings; several checkers + EPOCH_DAYS unpinned",
-      "location": "tests/daily.test.mjs drift guard",
-      "failure_scenario": "downOpeners20, jacksDownFirst, suitsTopDown, evaluateChallenge, the silverPool/goldPool selection, OBJECTIVES params, and EPOCH_DAYS/dayIndexFor can drift between daily.mjs and the inlined index.html copy without tripping CI.",
-      "rationale": "Guard whitelists a small subset; unpinned downOpeners20 and the epoch constant are exactly what's most likely edited in one copy only.",
-      "suggested_fix": "Pin the remaining checker bodies, the pool-selection lines, evaluateChallenge, and EPOCH_DAYS/dayIndexFor.",
-      "current_status": "fixed",
+      "region": "index.html:383",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
       "status_history": [
         {
           "round": 1,
@@ -103,31 +35,11 @@
         },
         {
           "round": 1,
-          "status": "fixed",
-          "validation": "added canon pins (jacksDownFirst/suitsTopDown/downOpeners20/silverPool/goldPool/EPOCH_DAYS/dayIndexFor/evaluateChallenge), all present verbatim; 52/52."
+          "status": "closed"
         }
-      ]
-    },
-    {
-      "id": "F6",
-      "severity": "minor",
-      "title": "HUD objViolated for down-openers-20 shows Gold live after it has failed",
-      "location": "index.html objViolated down-openers-20 case",
-      "failure_scenario": "4th down opens at move 25; live HUD keeps '\u00b7' because objViolated returns not-violated once k===4 regardless of moveIdx, while the real checker (opened<=20) already failed. UI-only; scoring correct.",
-      "rationale": "objViolated only checks moves>20 while k<4; once k===4 returns false unconditionally.",
-      "suggested_fix": "When k reaches 4, treat as violated if the opening moveIdx exceeds 20.",
-      "current_status": "fixed",
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed",
-          "validation": "objViolated down-openers-20 returns e.moveIdx>20 at k===4, matching the checker (20 pass, 21 violate)."
-        }
-      ]
+      ],
+      "current_status": "closed",
+      "note": "Fixed by appending a \ud83c\udf1f Flawless span to .dleg. Markup well-formed; legend renders \ud83e\udd49\ud83e\udd48\ud83e\udd47\ud83c\udf1f Flawless."
     }
   ]
 }
