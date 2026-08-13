@@ -3,10 +3,104 @@
   "round_start_sha": "dffd216",
   "max_rounds": 5,
   "findings": [
-    {"id":"F1-landscape-gesture-conflict","severity":"major","region":"ContentView.swift landscape","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"ScrollView removed; landscape uses the same non-scrolling drag mechanics as portrait. Interaction risk retired."},
-    {"id":"F2-portrait-not-identical","severity":"minor","region":"ContentView.swift portrait branch","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Portrait branch is inline upper/tableau/Spacer, byte-identical to pre-commit."},
-    {"id":"F3-solutions-loose-bounds","severity":"minor","region":"tests/solutions.test.mjs","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"closed"}],"current_status":"closed","note":"Exact bounds: goldChecked==366, silverChecked==computed expectedSilver(190)."},
-    {"id":"F4-parity-checker-coverage","severity":"minor","region":"tests/ios-parity.test.mjs checker pins","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"},{"round":1,"status":"partial"}],"current_status":"open","note":"3 of 4 new pins (kingsFirst/jacksDownFirst/suitsTopDown 'if e.rank==...{ k+=1 }' style lines) ALSO appear verbatim in the objViolated HUD mirror, so an authoritative-only checker bug leaves the string alive in the mirror and the guard passes. Fix: pin the DISTINCTIVE violation branches unique to the authoritative checkers — 'else if e.rank == 1 && e.end == \"up\" && k < 4 { return false }' (kings), '... && j < 4 { return false }' (jacks), '... && !kd[e.suit] { return false }' (suits-top-down) — which differ from the mirror's 'return true'."},
-    {"id":"F5-landscape-longcol-overflow","severity":"minor","region":"ContentView.swift:50-76","first_seen_round":1,"introduced_by_fix":true,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"No-scroll landscape floors cardW at 32pt; a long column (~12+) on a short viewport overflows below the screen with no way to reach the bottom cards. Mitigate: compress the tableau fan in landscape (smaller overlap factor) so columns fit more cards; keep tappable card size. Residual (extreme-long-column landscape on small phones) accepted as a documented known-minor pending on-device tuning."}
+    {
+      "id": "F1-landscape-gesture-conflict",
+      "severity": "major",
+      "region": "ContentView.swift landscape",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "ScrollView removed; landscape uses the same non-scrolling drag mechanics as portrait. Interaction risk retired."
+    },
+    {
+      "id": "F2-portrait-not-identical",
+      "severity": "minor",
+      "region": "ContentView.swift portrait branch",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Portrait branch is inline upper/tableau/Spacer, byte-identical to pre-commit."
+    },
+    {
+      "id": "F3-solutions-loose-bounds",
+      "severity": "minor",
+      "region": "tests/solutions.test.mjs",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Exact bounds: goldChecked==366, silverChecked==computed expectedSilver(190)."
+    },
+    {
+      "id": "F4-parity-checker-coverage",
+      "severity": "minor",
+      "region": "tests/ios-parity.test.mjs checker pins",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
+        },
+        {
+          "round": 2,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Fixed: pinned the distinctive return-false violation branches unique to the authoritative checkers (verified 1 occurrence each; objViolated mirror uses return true). Guard now catches authoritative-checker drift."
+    },
+    {
+      "id": "F5-landscape-longcol-overflow",
+      "severity": "minor",
+      "region": "ContentView.swift:50-76",
+      "first_seen_round": 1,
+      "introduced_by_fix": true,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Mitigated: landscape compresses the tableau fan (overlap 0.30 vs 0.40) so more cards fit; cards stay >=32pt; no ScrollView. Residual (extreme ~12+ card columns in landscape on small phones may still clip) accepted as a DOCUMENTED known-minor pending on-device tuning / a future side-by-side landscape layout. Not a blocker; v1 support is portrait-primary."
+    }
   ]
 }
