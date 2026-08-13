@@ -1237,9 +1237,10 @@ function applyDemoToken(tok){
   moveCount++; setMoves(moveCount);
 }
 function stopDemo(){
-  if(!demoing && !demoTimer) return;
+  const bar=document.getElementById("demoBar");
+  if(!demoing && !demoTimer && !(bar && bar.classList.contains("show"))) return;
   demoing=false; if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
-  const bar=document.getElementById("demoBar"); if(bar) bar.classList.remove("show");
+  if(bar) bar.classList.remove("show");
 }
 // Demonstrate a winning line for `seed`: reset to the fresh deal, then play the baked moves out.
 // It's a demo — challengeDay stays null and nothing is scored (we never route through commitMove).
