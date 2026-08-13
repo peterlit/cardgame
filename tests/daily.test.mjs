@@ -204,9 +204,17 @@ test('daily logic is inlined verbatim in index.html (no drift)', () => {
   const canon = [
     'const acesFirst=t=>{let a=0;for(const e of t.foundationOrder){if(a>=4)break;if(e.rank===1)a++;else return false;}return t.won&&a===4;};',
     'const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")k++;else if(e.rank===1&&e.end==="up"&&k<4)return false;}return t.won;};',
+    'const jacksDownFirst=t=>{let j=0;for(const e of t.foundationOrder){if(e.rank===11&&e.end==="down")j++;else if(e.rank===1&&e.end==="up"&&j<4)return false;}return t.won;};',
+    'const suitsTopDown=t=>{const kd=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")kd[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!kd[e.suit])return false;}return t.won;};',
     'const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};',
+    'const downOpeners20=t=>{let k=0,opened=null;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down"){k++;if(k===4){opened=e.moveIdx;break;}}}return t.won&&opened!=null&&opened<=20;};',
     'const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);',
+    'const silverPool=SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id=>rec.supports.includes(id)));',
+    'const goldPool=GOLD.filter(id=>rec.supports.includes(id));',
     'const silverId=silverPool[Math.floor(rng()*silverPool.length)];',
+    'const EPOCH_DAYS=daysFromCivil(2026,8,12);',
+    'const dayIndexFor=(y,m,d)=>daysFromCivil(y,m,d)-EPOCH_DAYS;',
+    'const result={bronze,silver:bronze&&evaluate(challenge.silver,telemetry),gold:bronze&&evaluate(challenge.gold,telemetry)};',
     'moves:Math.min(p.moves??Infinity,attempt.moves??Infinity)',
     'while(i!=null&&has(i,tier)){cur++;i--;}',
   ];

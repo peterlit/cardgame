@@ -625,7 +625,7 @@ function autoplayOneStep(){
     if(c && isSafeAutoplay(c)){
       snapshot(); state.cells[i]=null;
       if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
-      moveCount++; setMoves(moveCount); render(); saveGame(); return true;
+      moveCount++; setMoves(moveCount); recordHomed(); render(); saveGame(); return true;
     }
   }
   for(let col=0;col<NCOLS;col++){
@@ -634,7 +634,7 @@ function autoplayOneStep(){
     if(isSafeAutoplay(c)){
       snapshot(); t.pop();
       if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
-      moveCount++; setMoves(moveCount); render(); saveGame(); return true;
+      moveCount++; setMoves(moveCount); recordHomed(); render(); saveGame(); return true;
     }
   }
   return false;
@@ -646,8 +646,7 @@ function runAutoplay(){
   const step=()=>{
     autoTimer=null;
     if(!autoplayOn) return;
-    if(autoplayOneStep()){
-      recordHomed();   // auto-play sends count in the foundation-order stream too (policy #3)
+    if(autoplayOneStep()){   // records the homed card itself (inside autoplayOneStep, before its saveGame)
       if(!startTime){ startTime=Date.now(); startTimer(); }
       if(isWon()){ onWin(); return; }
       autoTimer=setTimeout(step,165);   // sequential reveal, paced just past the flight time
@@ -665,7 +664,9 @@ function snapshot(){
     cells: state.cells.slice(),
     up: state.up.slice(),
     down: state.down.slice(),
-    moveCount
+    moveCount,
+    foundationOrder: telem.foundationOrder.length,   // pre-move telemetry cursor (append-only)
+    cellUses: telem.cellUses                          // pre-move cell-use counter
   });
   if(history.length>500) history.shift();
 }
@@ -677,6 +678,12 @@ function undo(){
   const h=history.pop();
   state.tableau=h.tableau; state.cells=h.cells; state.up=h.up; state.down=h.down;
   moveCount=h.moveCount; setMoves(moveCount);
+  // Roll back challenge telemetry too, so exploring with undo can't pollute the stream:
+  // truncate the append-only foundationOrder back to its pre-move length and restore the
+  // cell-use counter. (undos itself is NOT rolled back — an undo happened.) The ?? fallbacks
+  // tolerate snapshots taken before these fields were recorded.
+  telem.foundationOrder.length = h.foundationOrder ?? telem.foundationOrder.length;
+  telem.cellUses = h.cellUses ?? telem.cellUses;
   selection=null; render(false);
   saveGame();
 }
@@ -720,7 +727,7 @@ function tryDestCell(idx){
   snapshot();
   if(selection.kind==="cell"){ state.cells[selection.idx]=null; }
   else { state.tableau[selection.col].pop(); }
-  state.cells[idx]=cards[0]; telem.cellUses++;
+  state.cells[idx]=cards[0]; if(selection.kind!=="cell") telem.cellUses++;   // cell→cell shuffles aren't a new use
   commitMove(); return true;
 }
 function tryDestFoundation(suit,dir){
@@ -1195,7 +1202,7 @@ const MEDAL={bronze:'🥉',silver:'🥈',gold:'🥇'};
 const DOTCOL={bronze:'#c98b3a',silver:'#9aa0a6',gold:'#d9ad55'};
 function refreshDailyBtn(){ const b=document.getElementById("dailyBtn"); if(b){ b.disabled=!dailyPool; b.title=dailyPool?"Today's challenge + your streaks":"Daily challenges unavailable"; } }
 let dailyView=null;   // which day the Daily overlay is showing (defaults to today)
-function openDaily(){ if(!dailyPool) return; dailyView=todayIndex(); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
+function openDaily(){ if(!dailyPool) return; dailyView=Math.max(0,Math.min(todayIndex(),dailyPool.length-1)); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
 function closeDaily(){ document.getElementById("dailyOverlay").classList.remove("show"); }
 function renderDaily(){
   const ti=todayIndex();
@@ -1208,6 +1215,12 @@ function renderDaily(){
 function renderDailyCard(){
   const day=dailyView, ti=todayIndex();
   const c=dailyChallenge(day,dailyPool); const rec=dailyStore.days[day]||{};
+  if(!c){   // day outside the pool range (pre-epoch or beyond the baked pool) — don't deref a null challenge
+    document.getElementById("dailyCard").innerHTML=
+      `<div class="dhd"><span class="dday">${fmtDayLabel(day)}</span></div>
+       <div class="dtiers"><div class="dtier future"><span class="tb"><span class="tn">No challenge available yet</span></span></div></div>`;
+    return;
+  }
   const future=day>ti, isToday=day===ti;
   const st=tier=>rec[tier]?'done':(future?'future':'miss'); const icon=tier=>rec[tier]?'✓':'○';
   const row=(name,tier,text)=>`<div class="dtier ${st(tier)}"><span class="med">${MEDAL[tier]}</span>
@@ -1254,7 +1267,7 @@ function objViolated(obj, t){
     case 'jacks-down-first': { let j=0; for(const e of fo){ if(e.rank===11&&e.end==="down") j++; else if(e.rank===1&&e.end==="up"&&j<4) return true; } return false; }
     case 'suits-top-down': { const kd=[0,0,0,0]; for(const e of fo){ if(e.rank===13&&e.end==="down") kd[e.suit]=1; else if(e.rank===1&&e.end==="up"&&!kd[e.suit]) return true; } return false; }
     case 'suit-sprint': { const home=[0,0,0,0],st=[false,false,false,false]; for(const e of fo){ const S=e.suit; if(!st[S]){ for(let T=0;T<4;T++) if(T!==S&&st[T]&&home[T]<13) return true; st[S]=true; } home[S]++; } return false; }
-    case 'down-openers-20': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down"){ k++; if(k===4) return false; } } return t.moves>20; }
+    case 'down-openers-20': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down"){ k++; if(k===4) return e.moveIdx>20; } } return t.moves>20; }
     default: return false;
   }
 }
