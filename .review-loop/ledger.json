@@ -1,1 +1,10 @@
-{ "round": 1, "round_start_sha": "1132c8c", "max_rounds": 5, "findings": [] }
+{
+  "round": 1,
+  "round_start_sha": "3a0940e",
+  "max_rounds": 5,
+  "findings": [
+    {"id":"F1-ios-deal-not-chokepoint","severity":"blocker","region":"ios/Causeway/Causeway/Model/Game.swift deal(seed:)/playChallenge; Views/ContentView.swift Deal-alert","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"iOS deal(seed:) doesn't invalidate a running demo. playChallenge + the Deal-alert Play call deal() directly (toolbar is live during a demo); a queued demoStep then runs applyDemoToken on the new board -> removeLast on empty column traps / out-of-range, or corrupts + strands demoing=true (input locked, demoBar stuck). Fix: make deal(seed:) itself call stopDemo()."},
+    {"id":"F2-web-deal-not-chokepoint","severity":"major","region":"index.html deal(); keydown 'n'; seed modal goDeal/dealRandom; winsPlay","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"Web deal() never clears demoing/demoTimer; the 'n' key, seed modal, and wins-play call deal() without stopDemo(). A pending setTimeout step then fires with demoing true -> applyDemoToken hits pop()===undefined -> TypeError thrown before rescheduling and before demoing cleared -> loop dies with demoing stuck true -> startDrag locked forever. Fix: call stopDemo() inside deal()."},
+    {"id":"F3-demo-board-persisted","severity":"minor","region":"index.html saveGame; ios/Causeway/Causeway/Views/ContentView.swift scenePhase persist","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"applyDemoToken mutates the live board; backgrounding mid-demo runs the normal persist hooks (web saveGame guard isWon() is false mid-demo; iOS persist()). A half-auto-played casual board is saved and resumed on next launch. Fix: skip persistence while demoing (web saveGame add demoing to the guard; iOS persist() guard on !demoing)."}
+  ]
+}

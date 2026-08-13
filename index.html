@@ -461,6 +461,13 @@ function freshDeck(){
 }
 
 function deal(theSeed){
+  // deal() is the single demo-teardown chokepoint: any path that lays out a fresh board
+  // ('n' shortcut, seed modal goDeal/dealRandom, winsPlay, restartDeal, showSolution) must
+  // cancel a running "how to win" demo first, else the pending setTimeout(step) fires with
+  // demoing still true and applyDemoToken hits t[col].pop()===undefined → the loop dies with
+  // demoing stuck true and startDrag early-returns forever (input locked).
+  // showSolution sets demoing=true AFTER deal() returns, so this doesn't self-cancel it.
+  stopDemo();
   seed = theSeed>>>0;
   const rng = mulberry32(seed);
   const deck = freshDeck();
@@ -494,7 +501,9 @@ function refreshHud(){
 /* ---------- in-progress game persistence (survives reload / tab close) ---------- */
 function lsRemove(k){ try{ localStorage.removeItem(k); }catch(e){} }
 function saveGame(){
-  if(!state || isWon()) return;
+  // Never persist a mid-demo board: it's an auto-played casual line the user never played,
+  // and restoreGame() would resume it on next launch. isWon() is false mid-demo, so guard here.
+  if(!state || isWon() || demoing) return;
   const elapsedSecs = startTime ? Math.floor((Date.now()-startTime)/1000) : 0;
   lsSet("causeway.game", JSON.stringify({
     seed, tableau: state.tableau, cells: state.cells, up: state.up, down: state.down,

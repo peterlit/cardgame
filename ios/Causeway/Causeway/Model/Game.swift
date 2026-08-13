@@ -130,6 +130,13 @@ final class Game: ObservableObject {
     func randomSeed() -> Int { Int.random(in: 1...Game.maxSeed) }
 
     func deal(seed: Int) {
+        // deal() is the single demo-teardown chokepoint: any path that lays out a fresh
+        // board (playChallenge, the Deal-number alert, restartDeal, newRandomGame, showSolution)
+        // must cancel a running "how to win" demo first, else a queued demoStep would fire its
+        // asyncAfter against the new board (empty-column removeLast trap / out-of-range subscript)
+        // and lingering demoing/demoDoneMessage would keep the demo bar up and lock input.
+        // showSolution re-arms demoing = true AFTER deal() returns, so this doesn't self-cancel it.
+        stopDemo()
         self.seed = max(1, min(Game.maxSeed, seed))
         var rng = Mulberry32(UInt32(truncatingIfNeeded: self.seed))
         var deck: [Card] = []
@@ -199,7 +206,9 @@ final class Game: ObservableObject {
         // Refuse to save a finished board. `won` is a view-mutable flag (the win overlay's
         // "Close" clears it), so guard on the actual position too: a completed table must
         // never be written, else restore() would resurrect an empty, un-won game.
-        guard !won, !boardComplete else { return }
+        // Never persist a mid-demo board: it's an auto-played casual line the user never played,
+        // and restore() would resume it on next launch.
+        guard !won, !boardComplete, !demoing else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
                           moveCount: moveCount, elapsed: clock.elapsed, started: started,
                           challengeDay: challengeDay, telem: telem)
