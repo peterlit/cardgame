@@ -91,8 +91,12 @@ final class Game: ObservableObject {
     /// True while a "Show me how to win" line is loaded (playing OR paused). Input is locked and
     /// nothing is scored.
     @Published private(set) var demoing = false
-    /// While `demoing`, whether auto-advance is paused (the player steps with "Next" instead).
+    /// While `demoing`, whether auto-advance is paused (the player steps with "Next" instead). The
+    /// demo OPENS paused (ready, not started).
     @Published private(set) var demoPaused = false
+    /// Whether auto-play has ever been started for this demo — distinguishes the initial "Start" state
+    /// (never started) from a "Resume" state (paused after playing).
+    @Published private(set) var demoStarted = false
     /// The end-of-demo banner message ("that's one way to win…"); nil when no demo banner shows.
     @Published private(set) var demoDoneMessage: String? = nil
     /// Monotonic token so a queued demo step from a superseded/stopped/paused run bails.
@@ -815,21 +819,21 @@ final class Game: ObservableObject {
         deal(seed: seed)             // fresh deal, casual (challengeDay nil), telemetry reset
         autoplaying = false          // the line already includes the safe sends — don't race autoplay
         demoing = true
-        demoPaused = false
+        demoPaused = true            // open in a READY (not-started) state — the player presses Start
+        demoStarted = false
         demoDoneMessage = nil
         demoTier = tier
         demoLabel = label
         demoMoves = tokens.split(separator: " ").map(String.init)
         demoIdx = 0
-        demoGen &+= 1
-        scheduleDemoStep(gen: demoGen, first: true)
+        demoGen &+= 1                // no scheduled step yet — Start (or Next) drives it
     }
 
     /// Schedule the next auto-advance. Bails if the demo was stopped/paused or superseded (gen).
-    private func scheduleDemoStep(gen: Int, first: Bool) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + (first ? 0.45 : 0.24)) { [weak self] in
+    private func scheduleDemoStep(gen: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) { [weak self] in
             guard let self, self.demoing, !self.demoPaused, self.demoGen == gen else { return }
-            if self.demoAdvance() { self.scheduleDemoStep(gen: self.demoGen, first: false) }
+            if self.demoAdvance() { self.scheduleDemoStep(gen: self.demoGen) }
         }
     }
 
@@ -851,11 +855,11 @@ final class Game: ObservableObject {
         demoDoneMessage = "That's a \(name) line — tap Replay to try it yourself."
     }
 
-    /// Pause/resume the auto-advance.
+    /// Start / pause / resume the auto-advance.
     func demoTogglePause() {
         guard demoing else { return }
         demoPaused.toggle()
-        if !demoPaused { demoGen &+= 1; scheduleDemoStep(gen: demoGen, first: false) }  // resume a fresh chain
+        if !demoPaused { demoStarted = true; demoGen &+= 1; scheduleDemoStep(gen: demoGen) }  // Start/Resume a fresh chain
         // when pausing, the queued step bails on the !demoPaused guard
     }
 
@@ -870,6 +874,7 @@ final class Game: ObservableObject {
         guard demoing || demoDoneMessage != nil else { return }
         demoing = false
         demoPaused = false
+        demoStarted = false
         demoDoneMessage = nil
         demoMoves = []
         demoIdx = 0

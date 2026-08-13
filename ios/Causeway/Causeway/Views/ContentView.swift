@@ -333,7 +333,8 @@ struct ContentView: View {
                 if game.demoPaused {
                     demoPill("Next") { game.demoStepOnce() }
                 }
-                demoPill(game.demoPaused ? "Resume" : "Pause") { game.demoTogglePause() }
+                // "Start" before the first play, "Pause" while playing, "Resume" once paused.
+                demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
             }
             demoPill(game.demoing ? "Stop" : "Done") { game.stopDemo() }
         }
@@ -351,7 +352,8 @@ struct ContentView: View {
         case "silver": head = "🥈 Silver: \(game.demoLabel)"
         default:       head = "Winning line"
         }
-        return "\(head) — \(game.demoProgress)\(game.demoPaused ? " (paused)" : "…")"
+        let suffix = !game.demoPaused ? "…" : (game.demoStarted ? " (paused)" : "")   // initial = no suffix
+        return "\(head) — \(game.demoProgress)\(suffix)"
     }
     private func demoPill(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {

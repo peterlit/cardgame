@@ -186,3 +186,11 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     and the demo bar names the objective ("🥇 Gold: Get every Jack onto the down-foundation… — 49/88").
     Verified: web + iOS tier buttons render; the Gold demo visibly holds the Aces back while sending
     Jacks down; lines satisfy their objectives; still assisted/unscored.
+57. "Show me how to win" should NOT auto-start. The demo now opens in a READY state (paused, no
+    timer) showing Next / Start / Stop; Start begins auto-play and the button becomes Pause; pausing
+    makes it Resume; Next still steps one move at a time (even before Start). New `demoStarted` flag
+    distinguishes initial ("Start") from paused-after-play ("Resume"). Both platforms. Web verified
+    end-to-end (opens ready at move 0, no auto-advance, Next steps, Start→Pause→Resume). iOS is a
+    line-for-line mirror + compiles; live sim check deferred — the host CoreSimulator wedged
+    (SBMainWorkspace launch denial affecting even a fresh clean sim while Safari launches; a parallel
+    session is running its own sim, so I avoided a shared-service restart).

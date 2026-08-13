@@ -1228,7 +1228,7 @@ function playChallenge(day){
    State machine: `demoing` is true while a line is loaded (playing OR paused); `demoPaused`
    splits those. When playing, a timer auto-advances; when paused, the "Next" button advances one
    move at a time via demoStepOnce(). Completion drops demoing but leaves the bar showing "Done". */
-let demoing=false, demoPaused=false, demoTimer=null, demoMoves=null, demoIdx=0, demoTier='bronze', demoLabel='';
+let demoing=false, demoPaused=false, demoStarted=false, demoTimer=null, demoMoves=null, demoIdx=0, demoTier='bronze', demoLabel='';
 // Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove). end: 0=up,1=down.
 function applyDemoToken(tok){
   const f=tok.split(','), t=state.tableau, cells=state.cells, up=state.up, down=state.down;
@@ -1260,9 +1260,11 @@ function updateDemoBar(){
   }
   // Bronze just clears the deal; Silver/Gold also name the objective they obey.
   const head = demoTier==='bronze' ? 'Winning line' : `${TIER[demoTier]}: ${demoLabel}`;
-  if(msg) msg.textContent=`${head} — move ${Math.min(demoIdx,total)} / ${total}${demoPaused?" (paused)":"…"}`;
+  const suffix = !demoPaused ? "…" : (demoStarted ? " (paused)" : "");   // initial (never started) = no suffix
+  if(msg) msg.textContent=`${head} — move ${Math.min(demoIdx,total)} / ${total}${suffix}`;
   if(next) next.style.display=demoPaused?"":"none";
-  if(pause){ pause.style.display=""; pause.textContent=demoPaused?"Resume":"Pause"; }
+  // Toggle button: "Start" before the first play, "Pause" while playing, "Resume" once paused.
+  if(pause){ pause.style.display=""; pause.textContent = !demoPaused ? "Pause" : (demoStarted ? "Resume" : "Start"); }
   if(stop) stop.textContent="Stop";
 }
 // Apply the next move; on the last one, flip to the completion banner. Returns whether it advanced.
@@ -1285,16 +1287,16 @@ function demoTick(){
 function stopDemo(){
   const bar=document.getElementById("demoBar");
   if(!demoing && !demoTimer && !(bar && bar.classList.contains("show"))) return;
-  demoing=false; demoPaused=false; demoMoves=null; demoIdx=0;
+  demoing=false; demoPaused=false; demoStarted=false; demoMoves=null; demoIdx=0;
   if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
   if(bar) bar.classList.remove("show");
 }
-// Pause/resume the auto-advance.
+// Start / pause / resume the auto-advance.
 function demoTogglePause(){
   if(!demoing) return;
   demoPaused=!demoPaused;
   if(demoPaused){ if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; } }
-  else if(!demoTimer){ demoTimer=setTimeout(demoTick, 240); }
+  else { demoStarted=true; if(!demoTimer) demoTimer=setTimeout(demoTick, 240); }   // Start/Resume
   updateDemoBar();
 }
 // "Next": advance exactly one move (only meaningful while paused).
@@ -1321,12 +1323,13 @@ function showSolution(seed, tier, label){
   closeDaily();
   deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
   stopAutoplay();        // the line already includes the safe sends — don't race the app's autoplay
-  demoing=true; demoPaused=false; demoMoves=tokens.split(' '); demoIdx=0;
+  // Open in a READY (not-started) state — paused with no timer — so the player presses Start (or
+  // steps with Next) rather than the line auto-running.
+  demoing=true; demoPaused=true; demoStarted=false; demoMoves=tokens.split(' '); demoIdx=0;
   demoTier=tier; demoLabel=label||'';
   const bar=document.getElementById("demoBar"); if(bar) bar.classList.add("show");
   updateDemoBar();
   render();
-  demoTimer=setTimeout(demoTick, 450);
 }
 // Fold a won challenge attempt into the day's record. Called synchronously from recordWin().
 function recordChallengeResult(secs){
