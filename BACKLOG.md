@@ -117,6 +117,12 @@ are done or added.
     win-overlay tiers/Flawless callout. Pool JSON auto-bundled via the synchronized group. Builds +
     runs on the iPhone 17 Pro simulator; day 0 → Deal #10,001 with the same objectives as web.
     No XCTest coverage yet (the daily logic is validated by the Node suite it mirrors; see below).
+  - **"Show me how to win" — DONE (web); iOS pending in this task.** The solver reconstructs the
+    winning line (`solve({withPath})` + `moveToken`) and `tools/solver/build-solutions.mjs` bakes each
+    pool seed's shortest unconstrained line (re-simulated to a verified win) into append-only
+    `data/daily-solutions.json`. Web shows a "💡 Show me how to win" button on a playable Daily day
+    card that resets the deal and animates the line (assisted, input locked, never scored). iOS
+    mirror bundles the JSON + a playback engine.
 - **AF-test — Cover the auto-finish win-record / deferred-overlay timing (review-loop F3).**
   The deferred-win logic has zero automated coverage, yet it has already produced a blocker
   (Finish pill re-offering over a solved board → win discarded) and a major (kill-during-beat

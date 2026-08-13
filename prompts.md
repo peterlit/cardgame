@@ -151,3 +151,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Verified: web casual restart resets moves/history/telemetry for the same seed; iOS Replay on a
     daily reset the board to a fresh Deal #10,001 with the live HUD (challenge) preserved. Standing
     rule from this task on: run a review loop after every non-trivial change unless told otherwise.
+53. Add a "Show me how to win" feature for Daily Challenge deals. The offline solver now reconstructs
+    the winning line (weighted-A* with parent/segment tracking, incl. the auto-safe sends) and
+    `tools/solver/build-solutions.mjs` bakes each pool seed's shortest UNCONSTRAINED line as a compact
+    token string into an append-only `data/daily-solutions.json` (366 seeds, each re-simulated to a
+    verified win). Web: a "💡 Show me how to win" button on any playable Daily day card resets to the
+    fresh deal and animates the line move-by-move over a "Showing a winning line…" bar (Stop/Done);
+    it's a demonstration — input is locked during playback, `challengeDay` stays null, and nothing is
+    scored (verified: board clears in 83 moves, wins + daily store unchanged, no win overlay). iOS
+    mirror + review loop next.

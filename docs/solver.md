@@ -171,3 +171,17 @@ Documented per "proceed, but write down the questions." Implementation proceeded
    parallelizing across worker processes is straightforward (each seed is independent).
 
 None of these block Phase 1 (the app-side feature), which consumes the baked pool as data.
+
+## Solutions ("Show me how to win")
+
+`solve()` optionally reconstructs the winning line (`{ withPath: true }`): each search node remembers
+its parent and the move-segment that produced it (the chosen move plus the auto-safe sends that
+followed), and on a win we walk parents back to the root and flatten to the complete move list from
+the raw deal. `moveToken()` serializes each move to a compact, replayable token (`F/G` foundation,
+`T` tableau run, `C` park, `X` cell→column; `end` 0=up/1=down; comma-separated fields, space-joined).
+
+`tools/solver/build-solutions.mjs` bakes, for every pool seed, the shortest **unconstrained** line
+(the reference-par search — "clear the deal") into an append-only `data/daily-solutions.json`
+(`{ version, solutions: { "<seed>": "<tokens>" } }`). It **re-simulates every emitted line through
+`rules.mjs` and refuses any that doesn't win** — the verification pass anticipated in open question
+#2 above. The apps load this file and animate the line for a demonstration (assisted, never scored).

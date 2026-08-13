@@ -53,13 +53,14 @@ export function objective(id) {
 // ordering objective isn't broken by an auto-send. Matches the app's auto-play and cuts the search.
 function autoSafe(s, constraint) {
   let st = s, moves = 0, changed = true;
+  const applied = [];   // the exact auto-safe foundation sends, in order (for path reconstruction)
   while (changed) {
     changed = false;
     for (let i = 0; i < st.cells.length && !changed; i++) {
       const c = st.cells[i];
       if (c && isSafeAutoplay(st.up, st.down, c)) {
         const end = canUp(st.up, st.down, c) ? 'up' : 'down';
-        if (constraint.allowFoundation(st, c, end)) { st = applyMove(st, { k: 'F', from: { cell: i }, end }); moves++; changed = true; }
+        if (constraint.allowFoundation(st, c, end)) { const m = { k: 'F', from: { cell: i }, end }; st = applyMove(st, m); applied.push(m); moves++; changed = true; }
       }
     }
     for (let col = 0; col < st.tableau.length && !changed; col++) {
@@ -67,11 +68,11 @@ function autoSafe(s, constraint) {
       const c = t[t.length - 1];
       if (isSafeAutoplay(st.up, st.down, c)) {
         const end = canUp(st.up, st.down, c) ? 'up' : 'down';
-        if (constraint.allowFoundation(st, c, end)) { st = applyMove(st, { k: 'F', from: { col }, end }); moves++; changed = true; }
+        if (constraint.allowFoundation(st, c, end)) { const m = { k: 'F', from: { col }, end }; st = applyMove(st, m); applied.push(m); moves++; changed = true; }
       }
     }
   }
-  return { state: st, moves };
+  return { state: st, moves, applied };
 }
 
 // h = cards not yet home + burial depth of each foundation's next-needed card (guides unburying).
@@ -97,7 +98,23 @@ class MinHeap {
 
 // Best-first search. Returns { solved:true, par } | { solved:false } (space exhausted, none) |
 // { solved:'unknown' } (node budget hit before either — treated as unsupported).
-export function solve(state0, constraint, { budget = 300000 } = {}) {
+// Compact, replayable token for one move (see rules.mjs applyMove for the shapes). `end` is
+// encoded 0=up / 1=down. Fields are comma-separated; a solution is the tokens space-joined.
+export function moveToken(m) {
+  if (m.k === 'F') return m.from.col !== undefined
+    ? `F,${m.from.col},${m.end === 'up' ? 0 : 1}`
+    : `G,${m.from.cell},${m.end === 'up' ? 0 : 1}`;
+  if (m.k === 'T') return `T,${m.src},${m.idx},${m.dst}`;
+  if (m.k === 'C') return `C,${m.src}`;
+  if (m.k === 'X') return `X,${m.cell},${m.dst}`;
+  throw new Error('bad move ' + JSON.stringify(m));
+}
+
+// When `withPath` is set, each node remembers its parent and the move-segment that produced it
+// (the chosen move plus the auto-safe sends that followed); on a win we walk parents back to the
+// root and flatten to the complete move list from the raw deal. Off by default so the certify hot
+// loop pays nothing.
+export function solve(state0, constraint, { budget = 300000, withPath = false } = {}) {
   const heap = new MinHeap();
   const best = new Map();                 // key -> best g seen (lazy-deletion transposition)
   const usesCells = constraint.cellBudget < Infinity;
@@ -105,15 +122,21 @@ export function solve(state0, constraint, { budget = 300000 } = {}) {
   const key = (s, cellUses, opened) =>
     stateKey(s) + '#' + (usesCells ? 'c' + cellUses : '') + (usesOpen ? 'o' + (opened ? 1 : 0) : '');
 
-  const push = (s, g, cellUses, opened) => {
+  const push = (s, g, cellUses, opened, parent, seg) => {
     const k = key(s, cellUses, opened);
     if (best.has(k) && best.get(k) <= g) return;
     best.set(k, g);
-    heap.push({ f: g + 2 * heuristic(s), g, s, cellUses, opened, k });
+    heap.push({ f: g + 2 * heuristic(s), g, s, cellUses, opened, k, parent: withPath ? parent : null, seg: withPath ? seg : null });
+  };
+  const reconstruct = node => {
+    const segs = [];
+    for (let n = node; n; n = n.parent) segs.push(n.seg);
+    return segs.reverse().flat();
   };
 
   const a0 = autoSafe(state0, constraint);
-  push(a0.state, a0.moves, 0, usesOpen ? (kingsDown(a0.state) && a0.moves <= constraint.downOpenN) : false);
+  push(a0.state, a0.moves, 0, usesOpen ? (kingsDown(a0.state) && a0.moves <= constraint.downOpenN) : false,
+       null, withPath ? a0.applied.slice() : null);
 
   let nodes = 0;
   while (heap.size()) {
@@ -121,7 +144,10 @@ export function solve(state0, constraint, { budget = 300000 } = {}) {
     const node = heap.pop();
     if (best.get(node.k) < node.g) continue;            // superseded by a cheaper path
     const { s, g } = node;
-    if (isWon(s)) { if (!usesOpen || node.opened) return { solved: true, par: g }; continue; }
+    if (isWon(s)) {
+      if (!usesOpen || node.opened) return withPath ? { solved: true, par: g, moves: reconstruct(node) } : { solved: true, par: g };
+      continue;
+    }
     for (const m of legalMoves(s, node.cellUses, constraint)) {
       const a = autoSafe(applyMove(s, m), constraint);
       const ns = a.state;
@@ -132,7 +158,7 @@ export function solve(state0, constraint, { budget = 300000 } = {}) {
         if (!opened && kingsDown(ns) && ng <= constraint.downOpenN) opened = true;
         if (!opened && ng > constraint.downOpenN) continue;   // deadline blown, can't satisfy
       }
-      push(ns, ng, ncell, opened);
+      push(ns, ng, ncell, opened, node, withPath ? [m, ...a.applied] : null);
     }
   }
   return { solved: false };

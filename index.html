@@ -194,6 +194,14 @@
   .hobj .hmk{ font-weight:800; }
   .hobj.ok{ background:rgba(47,138,78,.85); border-color:#2f8a4e; }
   .hobj.no{ background:rgba(150,55,45,.7); text-decoration:line-through; opacity:.85; }
+  /* "Show me how to win" demo bar (over the board while a winning line plays) + its trigger. */
+  .demobar{ display:none; align-items:center; justify-content:space-between; gap:10px;
+    margin:-6px 0 12px; padding:8px 12px; border-radius:12px; font-size:12.5px; font-weight:600;
+    background:rgba(42,59,68,.72); border:1px solid rgba(255,255,255,.28); color:#f4efe2; }
+  .demobar.show{ display:flex; }
+  .demobar .btn{ padding:5px 12px; font-size:12px; }
+  button.btn.dshow{ background:rgba(217,173,85,.24); border-color:rgba(217,173,85,.6); }
+  button.btn.dshow:hover{ background:rgba(217,173,85,.36); }
   .panel.daily{ text-align:left; max-width:460px; }
   .panel.daily h2{ text-align:center; }
   .dstreaks{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:2px 0 14px; }
@@ -299,6 +307,7 @@
     <button class="btn" id="dailyBtn" title="Daily challenges" disabled>Daily</button>
   </div>
   <div class="hud" id="dailyHud"></div>
+  <div class="demobar" id="demoBar"><span id="demoMsg">Showing a winning line…</span><button class="btn" id="demoStop">Stop</button></div>
 
   <div class="upper">
     <div>
@@ -1012,6 +1021,7 @@ function render(animate=true){
 /* ---------- tap = smart-move, drag = manual placement ---------- */
 let drag=null;
 function startDrag(e, loc){
+  if(demoing) return;   // input is locked out while a "how to win" line is playing
   if(e.pointerType==="mouse" && e.button!==0) return;
   if(loc.kind==="tableau" && !isSeqHead(loc.col, loc.idx)) return;   // only valid run heads
   if(loc.kind==="cell" && !state.cells[loc.idx]) return;
@@ -1188,13 +1198,63 @@ function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.
 function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
 // The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
 fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.seeds; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
+// Baked winning lines for "Show me how to win" (seed -> compact token string). Optional: absent =
+// the feature just doesn't offer itself for that seed.
+let dailySolutions=null;
+fetch("data/daily-solutions.json").then(r=>r.json()).then(s=>{ dailySolutions=s.solutions||null; if(dailyView!=null)renderDaily(); }).catch(()=>{});
 
 /* ---- play a challenge, and score it on win ---- */
 function playChallenge(day){
   if(!dailyPool||!dailyPool[day]||day>todayIndex()) return;
+  stopDemo();
   deal(dailyPool[day].seed);   // resets telem + clears challengeDay
   challengeDay=day; saveGame();
   closeDaily(); render();
+}
+
+/* ---- "Show me how to win": animate a baked winning line (assisted; never scored) ---- */
+let demoing=false, demoTimer=null;
+// Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove). end: 0=up,1=down.
+function applyDemoToken(tok){
+  const f=tok.split(','), t=state.tableau, cells=state.cells, up=state.up, down=state.down;
+  let card;
+  switch(f[0]){
+    case 'F': card=t[+f[1]].pop(); if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;
+    case 'G': card=cells[+f[1]]; cells[+f[1]]=null; if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;
+    case 'T': { const run=t[+f[1]].splice(+f[2]); for(const c of run) t[+f[3]].push(c); break; }
+    case 'C': card=t[+f[1]].pop(); cells[cells.indexOf(null)]=card; break;
+    case 'X': card=cells[+f[1]]; cells[+f[1]]=null; t[+f[2]].push(card); break;
+  }
+  moveCount++; setMoves(moveCount);
+}
+function stopDemo(){
+  if(!demoing && !demoTimer) return;
+  demoing=false; if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
+  const bar=document.getElementById("demoBar"); if(bar) bar.classList.remove("show");
+}
+// Demonstrate a winning line for `seed`: reset to the fresh deal, then play the baked moves out.
+// It's a demo — challengeDay stays null and nothing is scored (we never route through commitMove).
+function showSolution(seed){
+  const tokens = dailySolutions && dailySolutions[seed];
+  if(!tokens) return;
+  stopDemo();
+  closeDaily();
+  deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
+  stopAutoplay();        // the line already includes the safe sends — don't race the app's autoplay
+  demoing=true;
+  const bar=document.getElementById("demoBar"); if(bar) bar.classList.add("show");
+  const setBar=(msg,stopOnly)=>{ const el=document.getElementById("demoMsg"); if(el) el.textContent=msg;
+    const b=document.getElementById("demoStop"); if(b) b.textContent=stopOnly?"Done":"Stop"; };
+  setBar("Showing a winning line…", false);
+  const moves=tokens.split(' '); let i=0;
+  const step=()=>{
+    if(!demoing) return;
+    if(i>=moves.length){ demoing=false; demoTimer=null; setBar("That's one way to win — tap Replay to try it yourself.", true); return; }
+    applyDemoToken(moves[i++]); render();
+    demoTimer=setTimeout(step, 240);
+  };
+  render();
+  demoTimer=setTimeout(step, 450);
 }
 // Fold a won challenge attempt into the day's record. Called synchronously from recordWin().
 function recordChallengeResult(secs){
@@ -1240,11 +1300,15 @@ function renderDailyCard(){
   if(future) btn=`<button class="btn" disabled style="opacity:.5;width:100%">Unlocks ${dstr}</button>`;
   else if(rec.bronze) btn=`<button class="btn" style="width:100%" onclick="playChallenge(${day})">Replay to improve ↻</button>`;
   else btn=`<button class="btn primary" style="width:100%" onclick="playChallenge(${day})">Play</button>`;
+  // "Show me how to win": offered on any playable day whose seed has a baked solution. It's a
+  // demonstration (assisted), so it never counts toward tiers/streaks.
+  const canShow = !future && dailySolutions && dailySolutions[c.seed];
+  const showBtn = canShow ? `<button class="btn dshow" style="width:100%;margin-top:6px" onclick="showSolution(${c.seed})">💡 Show me how to win</button>` : '';
   document.getElementById("dailyCard").innerHTML=
     `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
-     ${btn}`;
+     ${btn}${showBtn}`;
 }
 function fmtDayLabel(idx){const b=new Date(Date.UTC(2026,7,12));b.setUTCDate(b.getUTCDate()+idx);return b.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
 function renderDailyCal(){
@@ -1383,13 +1447,15 @@ function goDeal(){
 }
 
 /* ---------- wiring ---------- */
-document.getElementById("newBtn").onclick=()=>deal(randomSeed());
+document.getElementById("newBtn").onclick=()=>{ stopDemo(); deal(randomSeed()); };
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
-document.getElementById("undoBtn").onclick=undo;
+document.getElementById("undoBtn").onclick=()=>{ stopDemo(); undo(); };
+document.getElementById("demoStop").onclick=stopDemo;
 // Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
 // context if one is active (so a challenge replay stays scored as that same challenge/day).
 function restartDeal(){
+  stopDemo();
   const day = challengeDay;
   deal(seed);                                   // re-deal same seed; resets telemetry + clears challengeDay
   if(day!=null){ challengeDay=day; saveGame(); render(); }   // keep it a challenge if it was one (refresh HUD)
