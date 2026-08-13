@@ -59,9 +59,9 @@ pin('Model/Daily.swift', 'dailyChallenge RNG seed + pick order', [
 pin('Model/Daily.swift', 'objective checkers', [
   'for e in t.foundationOrder { if a >= 4 { break }; if e.rank == 1 { a += 1 } else { return false } }', // acesFirst
   'for e in t.foundationOrder where e.rank == 13 && e.end == "down" {',                                   // downOpeners20
-  'if e.rank == 13 && e.end == "down" { k += 1 }',                                                        // kingsFirst
-  'if e.rank == 11 && e.end == "down" { j += 1 }',                                                        // jacksDownFirst
-  'if e.rank == 13 && e.end == "down" { kd[e.suit] = true }',                                             // suitsTopDown
+  'else if e.rank == 1 && e.end == "up" && k < 4 { return false }',                                       // kingsFirst
+  'else if e.rank == 1 && e.end == "up" && j < 4 { return false }',                                       // jacksDownFirst
+  'else if e.rank == 1 && e.end == "up" && !kd[e.suit] { return false }',                                 // suitsTopDown
   'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',                          // suitSprint
 ]);
 pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless)', [

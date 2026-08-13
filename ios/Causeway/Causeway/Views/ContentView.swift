@@ -50,12 +50,13 @@ struct ContentView: View {
             let cardW: CGFloat = {
                 guard landscape else { return widthCardW }
                 let longest = max(7, game.tableau.map(\.count).max() ?? 7)
-                let units = 3.1 + 0.40 * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights
+                let units = 3.1 + 0.30 * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights (compressed fan in landscape)
                 let availH = max(160, geo.size.height - 132)     // minus header/toolbar chrome
                 let heightCardW = floor(availH / (Theme.cardAspect * units))
                 return max(32, min(widthCardW, heightCardW))     // fit, but keep cards tappable
             }()
-            let overlap = (cardW * Theme.cardAspect * 0.40).rounded()
+            let overlapFactor: CGFloat = landscape ? 0.30 : 0.40
+            let overlap = (cardW * Theme.cardAspect * overlapFactor).rounded()
 
             ZStack {
                 SummerBackground().equatable()   // never changes; skip re-rasterizing its blur layers
