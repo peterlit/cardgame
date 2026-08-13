@@ -64,7 +64,9 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
     const br = replay(seed, e.bronze);
     assert.ok(br.won, `seed ${seed} bronze line does not win`);
 
-    if (e.gold) {
+    // Every seed MUST bake a gold line — an absent one must not slip through green.
+    assert.ok(e.gold, `seed ${seed} missing gold line`);
+    {
       const t = replay(seed, e.gold);
       assert.ok(t.won, `seed ${seed} gold line does not win`);
       assert.ok(evaluate(ch.gold, t), `seed ${seed} gold line fails objective ${ch.gold.id}`);
@@ -77,7 +79,12 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
       silverChecked++;
     }
   });
-  // Sanity: the current pool bakes a gold line for every seed and silver for the certified-silver days.
-  assert.ok(goldChecked >= pool.seeds.length - 2, `expected ~all gold lines, got ${goldChecked}/${pool.seeds.length}`);
-  assert.ok(silverChecked > 0, 'expected some certified-silver lines');
+  // Exact expectations, so an absent line can't hide behind a loose lower bound:
+  // every seed bakes a gold line, and a silver line iff that day's silver is a distinct
+  // baked (certified) objective — i.e. its id is one of the certified-silver ids.
+  assert.equal(goldChecked, pool.seeds.length, `expected a gold line for every seed`);
+  const expectedSilver = pool.seeds.filter((_, i) =>
+    ['cells-le-1', 'cells-le-2', 'down-openers-20'].includes(dailyChallenge(i, pool).silver.id)
+  ).length;
+  assert.equal(silverChecked, expectedSilver, `expected ${expectedSilver} certified-silver lines`);
 });

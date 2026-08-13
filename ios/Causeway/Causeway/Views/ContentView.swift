@@ -41,11 +41,20 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
             // Landscape: the wide viewport would blow card size up to fill 8 columns, and the tall
-            // tableau overflows the short height — so cap the card width and let the board scroll,
-            // centered. Portrait keeps its exact, well-tested layout.
+            // tableau overflows the short height. Rather than scroll (whose pan gesture fights each
+            // card's minimumDistance:0 DragGesture), shrink the cards to fit the shorter height so
+            // the board NEVER scrolls — identical drag/tap/coordinate behavior as portrait, just
+            // smaller. Portrait keeps its exact, well-tested layout (width-driven card size).
             let landscape = geo.size.width > geo.size.height
             let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
-            let cardW = landscape ? min(widthCardW, 64) : widthCardW
+            let cardW: CGFloat = {
+                guard landscape else { return widthCardW }
+                let longest = max(7, game.tableau.map(\.count).max() ?? 7)
+                let units = 3.1 + 0.40 * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights
+                let availH = max(160, geo.size.height - 132)     // minus header/toolbar chrome
+                let heightCardW = floor(availH / (Theme.cardAspect * units))
+                return max(32, min(widthCardW, heightCardW))     // fit, but keep cards tappable
+            }()
             let overlap = (cardW * Theme.cardAspect * 0.40).rounded()
 
             ZStack {
@@ -60,13 +69,16 @@ struct ContentView: View {
                         DailyHUD(game: game)   // live objectives while playing a challenge
                     }
                     if landscape {
-                        // Board scrolls vertically and centers within the wide viewport.
-                        ScrollView(.vertical, showsIndicators: false) {
-                            boardStack(cardW: cardW, overlap: overlap)
-                                .frame(maxWidth: .infinity)   // centre the fixed-width board
-                        }
-                    } else {
+                        // No scroll (would fight the cards' minimumDistance:0 drags). The fixed-width
+                        // board is centred in the wide viewport; cards were shrunk above to fit height.
                         boardStack(cardW: cardW, overlap: overlap)
+                            .frame(maxWidth: .infinity)   // centre the fixed-width board
+                        Spacer(minLength: 0)
+                    } else {
+                        upperArea(cardW: cardW)
+                            .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
+                        tableauArea(cardW: cardW, overlap: overlap)
+                            .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
                         Spacer(minLength: 0)
                     }
                 }
