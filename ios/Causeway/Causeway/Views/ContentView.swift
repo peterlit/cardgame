@@ -47,26 +47,24 @@ struct ContentView: View {
             // under the foundations (12-across, not 15) frees vertical + horizontal room so the cards
             // grow. The rail and foundations run PARALLEL to the tableau (each owns the full height
             // independently), which is what makes it fit iPhone landscape's short height. Portrait keeps
-            // its exact, well-tested stacked layout. Nothing scrolls (a ScrollView would fight the
-            // cards' minimumDistance:0 drag).
+            // its exact, well-tested stacked layout. The tableau/foundations never scroll (a ScrollView
+            // would fight the cards' minimumDistance:0 drag); the rail DOES scroll (it holds no cards).
             let landscape = geo.size.width > geo.size.height
             let portraitCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
             let landscapeFan: CGFloat = 0.34   // roomier tableau fan now the tableau owns the height
+            // Height available to the landscape board (rail · foundations · tableau) once the slim
+            // header and any HUD/demo bar are removed. Bounds the rail's ScrollView so no control ever
+            // clips off the bottom (which it would on short/notched phones and whenever the HUD shows).
+            let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? 50 : 0
+            let landscapeBoardH = max(150, geo.size.height - 64 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
             let cardW: CGFloat = {
                 guard landscape else { return portraitCardW }
-                // The tableau owns the height; the left rail + foundations run parallel to it and are
-                // short enough (foundations 2 rows + free cells 1 row = 3 card-heights) that they fit
-                // within the same height. Reserve a column length so cards stay a stable size and
-                // short-column states keep a bottom margin.
                 // Size for the CURRENT tallest column (min 8 so a fresh 7-card deal nearly fills the
                 // height and the cards are big); if play grows a column past that, cards shrink to keep
                 // it on-screen rather than clipping.
                 let reserve = max(8, game.tableau.map(\.count).max() ?? 7)
                 let units = 1 + landscapeFan * CGFloat(reserve - 1)          // tallest tableau column, card-heights
-                // A DailyHUD / demoBar renders an extra bar above the board; account for it.
-                let hudBar: CGFloat = (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? 50 : 0
-                let availH = max(150, geo.size.height - 60 - hudBar)         // minus the slim header (toolbar now in the rail)
-                let heightCardW = floor(availH / (Theme.cardAspect * units))
+                let heightCardW = floor(landscapeBoardH / (Theme.cardAspect * units))
                 // Width: left rail + 4 foundation columns + 8 tableau columns (= 12 card-widths).
                 let widthCardW = floor((geo.size.width - outerPad * 2 - landscapeRailW - gap * 13 - 20) / 12)
                 return max(30, min(widthCardW, heightCardW))
@@ -89,7 +87,7 @@ struct ContentView: View {
                         // Three columns: controls rail (left) · foundations + free cells · tableau
                         // (fills the rest, full height). No scroll.
                         HStack(alignment: .top, spacing: 10) {
-                            landscapeRail
+                            landscapeRail(boardH: landscapeBoardH)
                             foundationsAndCells(cardW: cardW)
                                 .zIndex(dragInUpper ? 10 : 0)          // a dragged free-cell card floats over the tableau
                             tableauArea(cardW: cardW, overlap: overlap)
@@ -147,27 +145,31 @@ struct ContentView: View {
 
     /// Landscape LEFT rail — the toolbar controls as a narrow vertical column of full-width pills,
     /// so the top of the screen is freed for a taller board. Same actions as the portrait `toolbar`.
-    private var landscapeRail: some View {
-        VStack(spacing: 6) {
-            railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
-            railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
-                .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
-            railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
-            railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-            railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
-            if game.canOfferFinish {
-                railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+    /// Scrolls inside `boardH` so the bottom controls stay reachable on short phones / while the HUD
+    /// bar is showing (the rail holds no cards, so scrolling can't fight a card drag).
+    private func landscapeRail(boardH: CGFloat) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 6) {
+                railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+                railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
+                    .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+                railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+                railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+                if game.canOfferFinish {
+                    railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                }
+                railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
+                    dealText = "\(game.seed)"; showDeal = true
+                }
+                if !game.pool.isEmpty {
+                    railPill("Daily") { showDaily = true }
+                }
+                railPill("Wins") { showWins = true }
+                railPill("How to play") { showRules = true }
             }
-            railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                dealText = "\(game.seed)"; showDeal = true
-            }
-            if !game.pool.isEmpty {
-                railPill("Daily") { showDaily = true }
-            }
-            railPill("Wins") { showWins = true }
-            railPill("How to play") { showRules = true }
         }
-        .frame(width: landscapeRailW)
+        .frame(width: landscapeRailW, height: boardH)
     }
     /// A rail button — like `pill` but filled to the rail width, left-aligned, compact.
     private func railPill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
