@@ -203,7 +203,7 @@ struct DailyView: View {
                 // A flawless day shows a ⭐ in the marker slot (flawless implies all three tiers), so
                 // it never overlaps the date; other days show the earned-tier dots.
                 if rec?.flawless == true {
-                    Text("🌟").font(.system(size: 11))
+                    Text("🌟").font(.system(size: 11)).frame(height: 6)   // same reserved height as the dots row → no date jitter
                 } else {
                     HStack(spacing: 2) {
                         ForEach(dots, id: \.self) { t in
