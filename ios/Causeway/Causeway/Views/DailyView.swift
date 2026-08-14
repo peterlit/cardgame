@@ -218,9 +218,26 @@ struct DailyView: View {
             backupNote = "That file isn't a Causeway stats backup."
             return
         }
-        let addedDays = game.dailyStore.merge(backup.dailyInts)
-        let addedDeals = game.winStore.merge(backup.winsInts)
-        backupNote = "Imported — merged \(backup.daily.count) days (\(addedDays) new) and \(backup.wins.count) deals (\(addedDeals) new)."
+        // Sanitize before merging so a hand-edited or corrupt file can't inject phantom days/deals or
+        // poison a best score: keep only in-range keys, and drop non-positive moves/times. (Our own
+        // exports always pass these, so a normal backup is unaffected.)
+        let dayMax = max(0, todayIndex() + 2)   // days run epoch→today; small grace for clock skew
+        let validDaily = backup.dailyInts
+            .filter { (0...dayMax).contains($0.key) }
+            .mapValues { r in
+                TierResult(bronze: r.bronze, silver: r.silver, gold: r.gold, flawless: r.flawless,
+                           moves: (r.moves ?? 0) > 0 ? r.moves : nil,
+                           elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil)
+            }
+        let validWins = backup.winsInts.filter {
+            (1...Game.maxSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0
+        }
+        let addedDays = game.dailyStore.merge(validDaily)
+        let addedDeals = game.winStore.merge(validWins)
+        let skipped = (backup.daily.count - validDaily.count) + (backup.wins.count - validWins.count)
+        var note = "Imported — merged \(validDaily.count) days (\(addedDays) new) and \(validWins.count) deals (\(addedDeals) new)."
+        if skipped > 0 { note += " Skipped \(skipped) invalid entr\(skipped == 1 ? "y" : "ies")." }
+        backupNote = note
     }
 
     // MARK: month calendar
