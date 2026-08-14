@@ -250,4 +250,13 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     iPhone landscape's short (~393pt) height. Reuses the same card gestures + board-space drop zones
     (layout-agnostic); z-index floats a dragged run over the side columns and a dragged free-cell over
     the tableau. Verified on-device (landscape cards visibly larger + space filled; portrait unchanged).
-    67 tests green. Safety tag `pre-landscape-v2`.
+    67 tests green. Safety tag `pre-landscape-v2`. Review loop converged in 2 rounds: round 1 caught a
+    real ship-blocker (M1) — the 10-pill rail had no height bound, so on short/notched phones and on ANY
+    phone while the Daily/demo HUD bar shows, the bottom controls clipped off-screen and were untappable;
+    fixed by bounding the rail to a HUD-aware `landscapeBoardH` and wrapping it in a ScrollView (safe: the
+    rail holds no cards, so it can't fight the card drag). Round 2 confirmed M1 closed and tightened a
+    ~6-10pt chrome underestimate (subtrahend 64→72) so the rail viewport clears the home-indicator zone,
+    plus enabled the scroll indicator. Deferred known-minors (pre-existing): the 30pt min-card clip on
+    pathological 17+ card columns (no-scroll tableau by design); the play-driven whole-board resize when
+    the tallest column crosses 8 (user-approved); a latent height-limited-device free-cell clip with no
+    trigger on current iPhones.

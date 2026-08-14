@@ -82,7 +82,12 @@ are done or added.
   beneath · tableau (fills the rest). Toolbar off the top + free-cells-under-foundations (15→12
   across) make tableau cards width-bound ~58pt (was height-bound ~46pt). Reserve floor 11→8 fills
   the bottom gap; columns past 8 shrink to avoid clipping. Portrait untouched. iOS-only
-  (`ContentView.swift`). Safety tag `pre-landscape-v2`.
+  (`ContentView.swift`). Safety tag `pre-landscape-v2`. Review loop (2 rounds) caught + fixed a
+  ship-blocker: the button rail had no height bound, clipping controls off-screen on short phones /
+  during the Daily HUD → now a HUD-aware `landscapeBoardH`-bounded ScrollView.
+- **Known-minor (landscape, deferred)** — very long tableau columns (17+ cards) clip past the 30pt
+  min card-size floor (no-scroll tableau by design); whole-board resize when the tallest column
+  crosses 8 (user-approved play-driven resizing). Both pre-existing / accepted.
 
 ### daily HUD on-track indicator + calendar star (2026-08-14)
 - **Daily HUD "on-track"** — the live objectives HUD now shows a green ✓ for a Silver/Gold objective
