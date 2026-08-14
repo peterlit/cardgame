@@ -286,4 +286,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Daily screen with Export (`.fileExporter` → dated .json) + Import (`.fileImporter`, security-scoped,
     rejects non-Causeway files) + a status line. iOS-only for now; the JSON format is platform-agnostic
     so web (localStorage) could read the same files later. Verified the full round-trip on-device
-    (export writes JSON to Files → import decodes + merges + reports). 67 tests green.
+    (export writes JSON to Files → import decodes + merges + reports). 67 tests green. Review loop:
+    confirmed import is non-destructive for our own exports (merge is add/keep-better only; malformed/
+    empty/truncated files are rejected pre-merge since synthesized Decodable throws on missing keys).
+    Round 1 found a real risk for hand-edited/corrupt-but-valid files — unbounded junk keys (phantom
+    days/deals) and a min()-poisoned best (moves:0) persisting irreversibly. Fixed: importStats now
+    clamps daily keys to 0…todayIndex()+2 and win seeds to 1…Game.maxSeed, requires win moves/secs >0,
+    drops non-positive daily moves/elapsed, and reports the actually-merged counts + any skipped
+    entries. Accepted pre-existing minor (not a regression): win record merge takes min moves and min
+    secs independently (also in `record()`).
