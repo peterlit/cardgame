@@ -213,7 +213,7 @@
     padding:8px 3px; text-align:center; }
   .dstreak .ic{ font-size:16px; } .dstreak .cur{ font-family:Georgia,serif; font-size:22px; font-weight:700; color:var(--gold); line-height:1.1; }
   .dstar{ font-size:12px; color:var(--gold); font-weight:700; letter-spacing:.02em; }
-  .dstar-c{ position:absolute; top:1px; right:2px; font-size:10px; line-height:1; }
+  .dstar-c{ font-size:11px; line-height:1; }
   .dstreak .l{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:.75; font-weight:600; }
   .dstreak .b{ font-size:10.5px; opacity:.6; }
   .dcard{ background:#fff; color:#33403c; border:1px solid #000; border-radius:12px; padding:13px 14px; margin-bottom:14px; }
@@ -1407,9 +1407,11 @@ function renderDailyCal(){
     const idx=dayIndexFor(y,m,d); const rec=dailyStore.days[idx];
     const avail=idx>=0 && idx<dailyPool.length && idx<=ti;
     const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
+    // Flawless days show a ⭐ in the marker slot (in place of the tier dots — flawless implies all
+    // three), so it never overlaps the date number.
     const dots=rec?['bronze','silver','gold'].filter(t=>rec[t]).map(t=>`<i class="d3" style="background:${DOTCOL[t]}"></i>`).join(''):'';
-    const star=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':'';
-    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}>${star}<span class="dn">${d}</span><span class="dd">${dots}</span></div>`;
+    const marks=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':dots;
+    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}><span class="dn">${d}</span><span class="dd">${marks}</span></div>`;
   }
   document.getElementById("dailyGrid").innerHTML=html;
 }
@@ -1432,6 +1434,21 @@ function objViolated(obj, t){
     default: return false;
   }
 }
+// Is this objective already LOCKED IN — guaranteed to be earned on ANY completion (so the player is
+// "on track" just by clearing the deal)? Achievement objectives only; the move/undo/free-cell budgets
+// can still be blown, so they're never secured until the deal is actually done. UI-only hint.
+function objSecured(obj, up, down, t){
+  if(objViolated(obj,t)) return false;
+  switch(obj.id){
+    case 'aces-first':       return up.every(u=>u>=1);      // all four Aces home first
+    case 'kings-first':      return down.every(d=>d<=13);   // all four Kings down before any Ace
+    case 'suits-top-down':   return down.every(d=>d<=13);   // every suit's King down
+    case 'jacks-down-first': return down.every(d=>d<=11);   // all four Jacks down
+    case 'down-openers-20':  return down.every(d=>d<=13);   // all four down-foundations opened (within 20, else violated)
+    case 'suit-sprint':      return [0,1,2,3].some(s=>down[s]===up[s]+1);  // one whole suit home
+    default: return false;   // move/undo/cell budgets — not securable until win
+  }
+}
 // Compact live objectives HUD shown over the board during a challenge attempt.
 function renderDailyHud(){
   const hud=document.getElementById("dailyHud"); if(!hud) return;
@@ -1439,7 +1456,12 @@ function renderDailyHud(){
   const c=dailyChallenge(challengeDay,dailyPool);
   const won=isWon();
   const t={won,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder};
-  const live=obj=> won ? (evaluate(obj,{...t,won:true})?'ok':'no') : (objViolated(obj,t)?'no':'live');
+  // 'ok' (green ✓) once won OR already secured (on track); 'no' if impossible; else 'live' (·).
+  const live=obj=>{
+    if(won) return evaluate(obj,{...t,won:true})?'ok':'no';
+    if(objViolated(obj,t)) return 'no';
+    return objSecured(obj,state.up,state.down,t) ? 'ok' : 'live';
+  };
   const mark=s=> s==='ok'?'✓':(s==='no'?'✗':'·');
   const line=(medal,obj)=>{const s=live(obj); return `<span class="hobj ${s}">${medal}<span class="hmk">${mark(s)}</span> ${obj.label}</span>`;};
   const bs=won?'ok':'live';

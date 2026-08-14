@@ -221,3 +221,17 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (portrait smart-move to the now-left foundation; landscape tableau tops fully visible). Review loop
     converged: drag/z-order confirmed sound by construction; fixed a landscape height-budget minor
     (account for the 2-row toolbar + daily HUD bar) + a stale comment. 67 tests green.
+60. From real device play (3 screenshots): (A) show an "on-track" indicator in the live objectives HUD
+    as soon as a Silver/Gold objective is GUARANTEED just by finishing the deal — not only at the win
+    overlay. Added `objSecured(obj, up, down, t)` (web `index.html` + iOS `Daily.swift`): an achievement
+    objective is "secured" once its locked-in board condition holds (all four Kings down for
+    kings-first / suits-top-down / down-openers-20-within-20; all Aces up for aces-first; all Jacks down
+    for jacks-down-first; one whole suit home for suit-sprint) and it isn't already violated. The HUD's
+    live state now returns 'ok' (green ✓) for a secured objective mid-attempt, not just at win; budget
+    objectives (moves/no-undo/cells) stay '·' until the deal is actually done, since they can still be
+    blown. (B) The calendar Flawless 🌟 no longer overlaps the date — moved from an absolute top-right
+    corner overlay into the day-cell's marker slot (replacing the tier dots, since flawless implies all
+    three). Both platforms mirrored; parity drift-guards keep the Swift `objSecured` pinned. Verified on
+    web (HUD DOM shows 🥈✓/🥇✓ with all Kings down on Deal #10003 before winning; calendar star measured
+    0px overlap with the date) and on the iOS simulator (identical challenge renders; live HUD renders).
+    67 tests green.

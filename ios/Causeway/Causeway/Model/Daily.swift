@@ -365,6 +365,23 @@ func objViolated(_ obj: Objective, _ t: Attempt) -> Bool {
     }
 }
 
+/// Is `obj` already LOCKED IN — guaranteed to be earned on ANY completion (so the player is "on
+/// track" just by clearing the deal)? Achievement objectives only; the move/undo/free-cell budgets
+/// can still be blown, so they're never secured until the deal is done. UI-only hint (mirrors the
+/// web objSecured). `up`/`down` are the live foundation ranks.
+func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool {
+    if objViolated(obj, t) { return false }
+    switch obj.id {
+    case "aces-first":       return up.allSatisfy { $0 >= 1 }       // all four Aces home first
+    case "kings-first":      return down.allSatisfy { $0 <= 13 }    // all four Kings down before any Ace
+    case "suits-top-down":   return down.allSatisfy { $0 <= 13 }    // every suit's King down
+    case "jacks-down-first": return down.allSatisfy { $0 <= 11 }    // all four Jacks down
+    case "down-openers-20":  return down.allSatisfy { $0 <= 13 }    // all four down-foundations opened
+    case "suit-sprint":      return (0..<4).contains { down[$0] == up[$0] + 1 }  // one whole suit home
+    default:                 return false   // move/undo/cell budgets — not securable until win
+    }
+}
+
 // MARK: - Pool (baked JSON, loaded from the app bundle)
 
 struct PoolSeed: Decodable, Equatable {

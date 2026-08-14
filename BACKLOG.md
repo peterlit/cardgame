@@ -77,6 +77,19 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
+### daily HUD on-track indicator + calendar star (2026-08-14)
+- **Daily HUD "on-track"** — the live objectives HUD now shows a green ✓ for a Silver/Gold objective
+  as soon as it is *secured* (guaranteed to be earned on any completion), not only at the win overlay.
+  New `objSecured(obj, up, down, t)` on both platforms (web `index.html`, iOS `Daily.swift`): achievement
+  objectives flip to ✓ when their locked-in board condition holds and they aren't already violated
+  (kings-first / suits-top-down / down-openers-20 → all four Kings down; aces-first → all Aces up;
+  jacks-down-first → all Jacks down; suit-sprint → one whole suit home). Budget objectives
+  (moves/no-undo/cells) stay neutral '·' pre-win since they can still be blown. Parity drift-guards
+  pin the Swift mirror.
+- **Calendar Flawless star** — the 🌟 no longer overlaps the date number: moved from an absolute
+  top-right corner overlay into the day-cell marker slot (replaces the tier dots — flawless implies all
+  three). Both platforms.
+
 ## Open — high value
 - **DAILY — Daily Challenges feature (design approved; Phase 0 landed).** MobilityWare-style dated
   challenges: a "Deal of the Day" with 🥉 Bronze (win, required) + one 🥈 Silver + one 🥇 Gold

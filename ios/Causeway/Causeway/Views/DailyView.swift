@@ -192,22 +192,25 @@ struct DailyView: View {
         let rec = days[idx]
         let avail = idx >= 0 && idx < pool.count && idx <= ti
         let dots = ["bronze", "silver", "gold"].filter { rec?[$0] == true }
-        return ZStack(alignment: .topTrailing) {
+        return ZStack {
             RoundedRectangle(cornerRadius: 8)
                 .fill(idx == dayView ? Theme.gold.opacity(0.28) : Color.gray.opacity(avail ? 0.12 : 0.04))
                 .overlay(RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(idx == ti ? Theme.gold : .clear, lineWidth: 1.5))
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 Text("\(day)").font(.system(size: 12, weight: .medium))
                     .foregroundStyle(avail ? Color.primary : Color.secondary.opacity(0.5))
-                HStack(spacing: 2) {
-                    ForEach(dots, id: \.self) { t in
-                        Circle().fill(dotColor(t)).frame(width: 5, height: 5)
-                    }
-                }.frame(height: 5)
-            }
-            if rec?.flawless == true {
-                Text("🌟").font(.system(size: 9)).padding(2)
+                // A flawless day shows a ⭐ in the marker slot (flawless implies all three tiers), so
+                // it never overlaps the date; other days show the earned-tier dots.
+                if rec?.flawless == true {
+                    Text("🌟").font(.system(size: 11))
+                } else {
+                    HStack(spacing: 2) {
+                        ForEach(dots, id: \.self) { t in
+                            Circle().fill(dotColor(t)).frame(width: 5, height: 5)
+                        }
+                    }.frame(height: 6)
+                }
             }
         }
         .frame(height: 40)
@@ -282,7 +285,9 @@ struct DailyHUD: View {
         if t.won { return evaluate(obj, Attempt(won: true, moves: t.moves, elapsed: t.elapsed,
                                                 cellUses: t.cellUses, undos: t.undos,
                                                 foundationOrder: t.foundationOrder)) ? .ok : .no }
-        return objViolated(obj, t) ? .no : .live
+        if objViolated(obj, t) { return .no }
+        // On track: green ✓ as soon as the tier is locked in (guaranteed just by clearing the deal).
+        return objSecured(obj, t, up: game.up, down: game.down) ? .ok : .live
     }
     private func objChip(_ medal: String, _ label: String, state: ObjState) -> some View {
         let mark = state == .ok ? "✓" : (state == .no ? "✗" : "·")
