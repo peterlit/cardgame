@@ -226,7 +226,7 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     overlay. Added `objSecured(obj, up, down, t)` (web `index.html` + iOS `Daily.swift`): an achievement
     objective is "secured" once its locked-in board condition holds (all four Kings down for
     kings-first / suits-top-down / down-openers-20-within-20; all Aces up for aces-first; all Jacks down
-    for jacks-down-first; one whole suit home for suit-sprint) and it isn't already violated. The HUD's
+    for jacks-down-first; ≥3 whole suits home for suit-sprint) and it isn't already violated. The HUD's
     live state now returns 'ok' (green ✓) for a secured objective mid-attempt, not just at win; budget
     objectives (moves/no-undo/cells) stay '·' until the deal is actually done, since they can still be
     blown. (B) The calendar Flawless 🌟 no longer overlaps the date — moved from an absolute top-right
@@ -234,4 +234,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     three). Both platforms mirrored; parity drift-guards keep the Swift `objSecured` pinned. Verified on
     web (HUD DOM shows 🥈✓/🥇✓ with all Kings down on Deal #10003 before winning; calendar star measured
     0px overlap with the date) and on the iOS simulator (identical challenge renders; live HUD renders).
-    67 tests green.
+    Review loop (skeptical pass) caught a real false-positive: suit-sprint was "secured" at just ONE suit
+    home, but the objective needs each suit finished before the next starts, so one suit home doesn't
+    guarantee it on every completion — proved a winning line that fails the checker; fixed to ≥3 suits
+    home (only one left, no interleave possible). Also fixed an iOS calendar date-jitter (flawless star
+    now reserves the same height:6 as the dots row). 67 tests green.
+61. From landscape device play: "unused space at the bottom and on the sides; make the cards bigger."
+    Redesigned the iOS landscape board (portrait untouched) into three columns — a narrow vertical
+    button rail (left) · foundations with the free cells directly beneath them · tableau (fills the
+    rest). Moving the toolbar off the top frees the full board height, and free-cells-under-foundations
+    drops the across-count 15→12 (4 foundation + 8 tableau), so the tableau cards become WIDTH-bound at
+    ~58pt (max for 8 columns) instead of height-bound at ~46pt. Lowered the landscape reserve floor 11→8
+    so a fresh 7-card deal nearly fills the height (kills the bottom gap); columns growing past 8 shrink
+    to stay on-screen rather than clip. Rail + foundations run parallel to the tableau so all three fit
+    iPhone landscape's short (~393pt) height. Reuses the same card gestures + board-space drop zones
+    (layout-agnostic); z-index floats a dragged run over the side columns and a dragged free-cell over
+    the tableau. Verified on-device (landscape cards visibly larger + space filled; portrait unchanged).
+    67 tests green. Safety tag `pre-landscape-v2`.

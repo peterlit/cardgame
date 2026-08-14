@@ -77,6 +77,13 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
+### landscape redesign v2 — left rail + bigger cards (2026-08-14)
+- **Landscape layout** — three columns: vertical button rail (left) · foundations with free cells
+  beneath · tableau (fills the rest). Toolbar off the top + free-cells-under-foundations (15→12
+  across) make tableau cards width-bound ~58pt (was height-bound ~46pt). Reserve floor 11→8 fills
+  the bottom gap; columns past 8 shrink to avoid clipping. Portrait untouched. iOS-only
+  (`ContentView.swift`). Safety tag `pre-landscape-v2`.
+
 ### daily HUD on-track indicator + calendar star (2026-08-14)
 - **Daily HUD "on-track"** — the live objectives HUD now shows a green ✓ for a Silver/Gold objective
   as soon as it is *secured* (guaranteed to be earned on any completion), not only at the win overlay.
