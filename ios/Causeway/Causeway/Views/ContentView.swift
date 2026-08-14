@@ -56,7 +56,9 @@ struct ContentView: View {
             // header and any HUD/demo bar are removed. Bounds the rail's ScrollView so no control ever
             // clips off the bottom (which it would on short/notched phones and whenever the HUD shows).
             let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? 50 : 0
-            let landscapeBoardH = max(150, geo.size.height - 64 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
+            // Chrome above the board = topPad 6 + header (~40) + two 12pt VStack gaps ≈ 70; use 72 so
+            // the rail's bounded viewport stays clear of the home-indicator zone on short phones.
+            let landscapeBoardH = max(150, geo.size.height - 72 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
             let cardW: CGFloat = {
                 guard landscape else { return portraitCardW }
                 // Size for the CURRENT tallest column (min 8 so a fresh 7-card deal nearly fills the
@@ -148,7 +150,7 @@ struct ContentView: View {
     /// Scrolls inside `boardH` so the bottom controls stay reachable on short phones / while the HUD
     /// bar is showing (the rail holds no cards, so scrolling can't fight a card drag).
     private func landscapeRail(boardH: CGFloat) -> some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
             VStack(spacing: 6) {
                 railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
                 railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
