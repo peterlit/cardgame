@@ -7,3 +7,6 @@
 # Xcode user state
 ios/**/xcuserdata/
 ios/**/*.xcuserstate
+
+# Downloaded app data containers (personal stats backups — not source)
+*.xcappdata/
