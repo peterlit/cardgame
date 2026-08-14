@@ -42,7 +42,7 @@ struct ContentView: View {
         GeometryReader { geo in
             // Landscape uses a SIDE-BY-SIDE layout — foundations | tableau | free cells — so the
             // tableau owns the full height and its top cards aren't hidden under an upper row.
-            // Cards are sized to fit both the 11-across width (2 foundation + 8 tableau + 1 free-cell
+            // Cards are sized to fit both the 15-across width (4 foundation + 8 tableau + 3 free-cell
             // columns) and the tableau height. Portrait keeps its exact, well-tested stacked layout.
             // Neither scrolls (a ScrollView would fight the cards' minimumDistance:0 drag).
             let landscape = geo.size.width > geo.size.height
@@ -55,7 +55,9 @@ struct ContentView: View {
                 // stay a stable size and short-column states keep bottom margin.
                 let reserve = max(11, game.tableau.map(\.count).max() ?? 7)
                 let units = 1 + landscapeFan * CGFloat(reserve - 1)          // tallest tableau column, card-heights
-                let availH = max(160, geo.size.height - 116)                 // minus header + toolbar chrome
+                // A DailyHUD / demoBar renders an extra bar above the board; account for it.
+                let hudBar: CGFloat = (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? 50 : 0
+                let availH = max(150, geo.size.height - 124 - hudBar)         // minus header + toolbar chrome (+ HUD bar)
                 let heightCardW = floor(availH / (Theme.cardAspect * units))
                 // Width across the side-by-side layout: 4 foundation + 8 tableau + 3 free-cell = 15.
                 let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 13 - 24) / 15)
