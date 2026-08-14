@@ -3,7 +3,43 @@
   "round_start_sha": "ea5f8d2",
   "max_rounds": 5,
   "findings": [
-    {"id":"F1-landscape-availH-chrome","severity":"minor","region":"ios/Causeway/Causeway/Views/ContentView.swift:58","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"Landscape availH = geo.height - 116 treats chrome as fixed, ignoring the FlowLayout toolbar wrapping to 2 rows AND the DailyHUD/demoBar that adds an extra bar above the board during a daily challenge or the win-demo. With this commit's fan 0.24->0.34 and constant 138->116, a moderately long column can clip at the bottom earlier than the documented known-minor — worst case the bottom (draggable) card runs off-screen. Fix: subtract the HUD/demo bar height from availH when one is showing (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil), and give a bit more base chrome margin, so an ~11-card column still fits even with the HUD bar."},
-    {"id":"F2-stale-11-across-comment","severity":"minor","region":"ios/Causeway/Causeway/Views/ContentView.swift:43-46","first_seen_round":1,"introduced_by_fix":false,"status_history":[{"round":1,"status":"open"}],"current_status":"open","note":"Header comment says cards fit an '11-across width (2 foundation + 8 tableau + 1 free-cell columns)' but the layout + formula are 15-across (4 foundation + 8 tableau + 3 free-cell). Contradicts the correct comment at the width formula. Fix the comment to 15-across."}
+    {
+      "id": "F1-landscape-availH-chrome",
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:58",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Landscape availH = geo.height - 116 treats chrome as fixed, ignoring the FlowLayout toolbar wrapping to 2 rows AND the DailyHUD/demoBar that adds an extra bar above the board during a daily challenge or the win-demo. With this commit's fan 0.24->0.34 and constant 138->116, a moderately long column can clip at the bottom earlier than the documented known-minor \u2014 worst case the bottom (draggable) card runs off-screen. Fix: subtract the HUD/demo bar height from availH when one is showing (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil), and give a bit more base chrome margin, so an ~11-card column still fits even with the HUD bar."
+    },
+    {
+      "id": "F2-stale-11-across-comment",
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:43-46",
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "closed"
+        }
+      ],
+      "current_status": "closed",
+      "note": "Header comment says cards fit an '11-across width (2 foundation + 8 tableau + 1 free-cell columns)' but the layout + formula are 15-across (4 foundation + 8 tableau + 3 free-cell). Contradicts the correct comment at the width formula. Fix the comment to 15-across."
+    }
   ]
 }
