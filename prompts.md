@@ -210,3 +210,14 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     no-scroll fit-to-height layout that keeps portrait's exact drag mechanics) + tightened two weak
     tests; one documented landscape known-minor (long-column clipping on small phones). Published an
     owner-facing shipping-status page (Artifact). 67 tests green.
+59. Restart the simulator (dedicated instance, no conflict with the parallel session) and verify
+    landscape on-device. Cleared the CoreSimulator wedge at the device level (shut down my sims,
+    fresh dedicated Causeway-Dev) without touching the other session. Then, from the on-device view,
+    two follow-ups the user asked for: (a) redesign landscape as a SIDE-BY-SIDE layout — foundations
+    (left) · tableau (middle, full height) · free cells (right) — so the tableau's top cards are no
+    longer hidden under an upper row; (b) swap free cells ↔ foundations left/right in BOTH orientations
+    (foundations left, free cells right) for MobilityWare-FreeCell muscle memory. Reuses the existing
+    drag atoms (drop zones in "board" space, layout-agnostic). Verified both orientations on-device
+    (portrait smart-move to the now-left foundation; landscape tableau tops fully visible). Review loop
+    converged: drag/z-order confirmed sound by construction; fixed a landscape height-budget minor
+    (account for the 2-row toolbar + daily HUD bar) + a stale comment. 67 tests green.
