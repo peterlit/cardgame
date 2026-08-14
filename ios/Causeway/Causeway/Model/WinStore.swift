@@ -32,6 +32,24 @@ final class WinStore: ObservableObject {
         save()
     }
 
+    /// Merge imported wins (from a stats backup), keeping the best (fewest moves / least time)
+    /// per deal — never loses a locally-solved deal. Returns deals newly added.
+    @discardableResult
+    func merge(_ incoming: [Int: WinRecord]) -> Int {
+        let before = wins.count
+        for (seed, rec) in incoming {
+            if let prev = wins[seed] {
+                wins[seed] = WinRecord(moves: min(prev.moves, rec.moves),
+                                       secs: min(prev.secs, rec.secs),
+                                       date: max(prev.date, rec.date))
+            } else {
+                wins[seed] = rec
+            }
+        }
+        save()
+        return wins.count - before
+    }
+
     /// Contiguous [start, end] runs of solved deal numbers, ascending.
     func ranges() -> [ClosedRange<Int>] {
         let nums = wins.keys.sorted()

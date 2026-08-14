@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Challenges & Streaks screen — the native mirror of the web Daily overlay: four streaks
 /// (Play / Silver / Gold / Flawless), the selected day's tiered challenge card, and a month
@@ -9,6 +10,12 @@ struct DailyView: View {
 
     /// Which day the card is showing (defaults to today, clamped into the pool).
     @State private var dayView: Int = 0
+
+    // Stats backup (Export/Import) — a local, iCloud-free way to save/restore progress.
+    @State private var showExporter = false
+    @State private var showImporter = false
+    @State private var exportDoc = StatsBackupDocument(data: Data())
+    @State private var backupNote: String?
 
     private var days: [Int: TierResult] { game.dailyStore.days }
     private var pool: [PoolSeed] { game.pool }
@@ -23,6 +30,7 @@ struct DailyView: View {
                     streaksRow
                     dayCard
                     calendar
+                    backupSection
                 }
                 .padding()
             }
@@ -31,6 +39,14 @@ struct DailyView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         .onAppear { dayView = clampedToday }
+        .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .json,
+                      defaultFilename: exportFilename) { result in
+            if case .failure = result { backupNote = "Export cancelled or failed." }
+            else { backupNote = "Stats exported." }
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+            importStats(result)
+        }
     }
 
     private var clampedToday: Int { min(max(0, todayIndex()), max(0, pool.count - 1)) }
@@ -155,6 +171,56 @@ struct DailyView: View {
                 .foregroundStyle(Theme.ink)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: stats backup (local export / import)
+
+    private var backupSection: some View {
+        VStack(spacing: 8) {
+            Text("BACKUP").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                Button {
+                    let backup = StatsBackup.make(daily: game.dailyStore.days, wins: game.winStore.wins)
+                    exportDoc = StatsBackupDocument(data: backup.encoded())
+                    backupNote = nil
+                    showExporter = true
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+                }
+                Button {
+                    backupNote = nil
+                    showImporter = true
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
+                }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .buttonStyle(.bordered)
+            .tint(Theme.gold)
+            Text(backupNote ?? "Save your streaks & solved deals to a file, or restore them. Importing merges — it never erases progress.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.top, 4)
+    }
+
+    private var exportFilename: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        return "Causeway-Stats-\(f.string(from: Date()))"
+    }
+
+    /// Merge an imported backup into the live stores (never destructive) and report the result.
+    private func importStats(_ result: Result<URL, Error>) {
+        guard case .success(let url) = result else { backupNote = "Import cancelled."; return }
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url), let backup = StatsBackup.decode(data) else {
+            backupNote = "That file isn't a Causeway stats backup."
+            return
+        }
+        let addedDays = game.dailyStore.merge(backup.dailyInts)
+        let addedDeals = game.winStore.merge(backup.winsInts)
+        backupNote = "Imported — merged \(backup.daily.count) days (\(addedDays) new) and \(backup.wins.count) deals (\(addedDeals) new)."
     }
 
     // MARK: month calendar
@@ -297,5 +363,18 @@ struct DailyHUD: View {
             Text("\(medal)\(mark)").font(.system(size: 11, weight: .bold)).foregroundStyle(color)
             Text(label).font(.system(size: 10)).foregroundStyle(.white).lineLimit(1)
         }
+    }
+}
+
+/// Carries the stats-backup JSON as a `.json` file for `.fileExporter` / `.fileImporter`.
+struct StatsBackupDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    var data: Data
+    init(data: Data) { self.data = data }
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
     }
 }

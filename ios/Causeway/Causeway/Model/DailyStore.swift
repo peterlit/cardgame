@@ -18,6 +18,16 @@ final class DailyStore: ObservableObject {
         save()
     }
 
+    /// Merge imported records (from a stats backup) into the store, OR-accumulating tiers and
+    /// keeping best moves/time — never downgrades a locally-earned tier. Returns days newly added.
+    @discardableResult
+    func merge(_ incoming: [Int: TierResult]) -> Int {
+        let before = days.count
+        for (day, res) in incoming { days[day] = mergeTiers(days[day], res) }
+        save()
+        return days.count - before
+    }
+
     // MARK: persistence
 
     private struct Persisted: Codable {
