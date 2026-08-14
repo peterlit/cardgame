@@ -47,15 +47,18 @@ struct ContentView: View {
             // smaller. Portrait keeps its exact, well-tested layout (width-driven card size).
             let landscape = geo.size.width > geo.size.height
             let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
+            let landscapeFan: CGFloat = 0.24   // tight tableau fan in landscape so more of a growing column fits
             let cardW: CGFloat = {
                 guard landscape else { return widthCardW }
-                let longest = max(7, game.tableau.map(\.count).max() ?? 7)
-                let units = 3.1 + 0.30 * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights (compressed fan in landscape)
-                let availH = max(160, geo.size.height - 132)     // minus header/toolbar chrome
+                // Size for a reserved column length (not just the current longest) so cards stay a
+                // stable size as columns grow, and short-column states keep margin at the bottom.
+                let longest = max(9, game.tableau.map(\.count).max() ?? 7)
+                let units = 3.15 + landscapeFan * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights
+                let availH = max(160, geo.size.height - 138)             // minus header + 2-row toolbar chrome
                 let heightCardW = floor(availH / (Theme.cardAspect * units))
-                return max(32, min(widthCardW, heightCardW))     // fit, but keep cards tappable
+                return max(32, min(widthCardW, heightCardW))             // fit, but keep cards tappable
             }()
-            let overlapFactor: CGFloat = landscape ? 0.30 : 0.40
+            let overlapFactor: CGFloat = landscape ? landscapeFan : 0.40
             let overlap = (cardW * Theme.cardAspect * overlapFactor).rounded()
 
             ZStack {

@@ -32,7 +32,7 @@ The app is offline, SwiftUI, iPhone-only, iOS 17.0+. No network, no tracking, no
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| F1 | **Landscape support (iOS)** | ✅ code / 🕒 visual | Enabled landscape orientations (Info.plist, both configs). In landscape the board **does not scroll** (a ScrollView would fight the cards' `minimumDistance:0` drag) — instead cards shrink to fit the shorter height and the board centres, so landscape uses the *exact same* drag/tap/coordinate mechanics as portrait; the fan is compressed (overlap 0.30 vs 0.40) to fit more cards. **Portrait is byte-identical.** Build-verified + review-looped. **Known minor:** an extreme long tableau column (~12+ cards) on a short landscape viewport (small phones) can clip its bottom cards off-screen — v1 landscape is portrait-primary; the follow-up is a side-by-side landscape layout, not a ScrollView. **On-device landscape pass deferred** to a healthy simulator (§6). |
+| F1 | **Landscape support (iOS)** | ✅ | Enabled landscape orientations (Info.plist, both configs). In landscape the board **does not scroll** (a ScrollView would fight the cards' `minimumDistance:0` drag) — instead cards shrink to fit the shorter height and the board centres, so landscape uses the *exact same* drag/tap/coordinate mechanics as portrait; the tableau fan is compressed (overlap 0.24 vs 0.40) and sized for a reserved column length so cards stay stable and leave bottom margin. **Portrait is byte-identical.** **Verified on-device** (iPhone 17 Pro sim): landscape renders cleanly — header, wrapped toolbar, free cells + foundations, and the centred 8-column tableau, with margin on a fresh deal; portrait unchanged. Residual known-minor: a very long column deep in a hard game can still clip in landscape on a small phone — the future upgrade is a side-by-side landscape layout, not a ScrollView. |
 | F2 | **Copyright / About screen** | ✅ | Added an "About" section — app name, version (`CFBundleShortVersionString (CFBundleVersion)`), © line, one-line credit — to the iOS How-to-play (`Views/Extras.swift`) and the web rules panel (`index.html`). |
 | F3 | **Test on different iOS versions** | 🕒 | Documented compatibility (deployment target 17.0; no `#available` guards; no >17 APIs; `onChange(of:){_,_ in}` is 17+, matching target; appearance locked to `.light`). Only iOS 26.5 runtime is installed locally → a real 17/18 pass is owner action O4. |
 | F4 | **Expand test coverage to guard regressions** | ✅ | Done (T1/T2/T4 + T3's once-only gate). 67 tests green. See §4. |
@@ -59,17 +59,15 @@ target; `MemoryFootprint` uses long-available mach APIs; `preferredColorScheme(.
 dark-mode variance. Conclusion: source is 17.0-safe. Local limitation: only the **iOS 26.5** simulator
 runtime is installed, so a real iOS 17/18 device/simulator pass remains owner action **O4**.
 
-## 6. Environment note — simulator
+## 6. Environment note — simulator (resolved)
 
-During this work the host **CoreSimulator wedged**: launching the Causeway app was denied by
-SpringBoard (`FBSOpenApplicationServiceErrorDomain`/`SBMainWorkspace`) on both the existing device and
-a freshly-created clean simulator, and screenshots returned "No Image available to encode" — while
-Safari launched fine (so the infra partly works). A **parallel Claude session is running its own iOS
-simulator on this host**, and the fix (restarting the shared CoreSimulator service) would disrupt it,
-so per instruction it was avoided. The app is unaffected: it launched fine earlier this session, the
-changes here are post-`main` Swift/layout code, and every change is verified by a successful
-`xcodebuild` compile plus (for shared logic) the web app and the Node suite. **Deferred to a healthy
-simulator:** the on-device landscape screenshot and a final visual smoke test.
+Mid-work the host **CoreSimulator wedged** (SpringBoard denied every app launch — even on a fresh
+clean sim — while Safari launched). It was **cleared** by shutting down this session's own simulators,
+restarting the Simulator GUI, and booting a fresh **dedicated** device (`Causeway-Dev`) — without
+touching the parallel session's simulator. Landscape and portrait were then **verified on-device**
+(iPhone 17 Pro simulator). Rotation itself was driven by a temporary landscape-only build (System
+Events UI-scripting is TCC-blocked here); the orientation plist was reverted afterward — the shipping
+build supports portrait + landscape.
 
 ## 7. Verified-OK (no action needed)
 
