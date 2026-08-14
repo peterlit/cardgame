@@ -216,6 +216,9 @@ test('streaks: current run ending at today, plus longest ever, per tier', () => 
   const s = streaks(rec, 9);
   assert.equal(s.play.current, 1);    // only day 9 ends the run (gap at 7,8)
   assert.equal(s.play.best, 4);       // days 3-6
+  assert.equal(s.play.total, 5);      // total (lifetime) days with bronze: 3,4,5,6,9
+  assert.equal(s.silver.total, 3);    // 3,5,6
+  assert.equal(s.gold.total, 1);      // 5 only — non-consecutive totals differ from streaks
   assert.equal(s.silver.best, 2);     // days 5-6 (and 3 alone)
   const s6 = streaks(rec, 6);
   assert.equal(s6.play.current, 4);   // 3-6 all bronze, ends at today=6

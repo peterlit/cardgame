@@ -215,7 +215,8 @@
   .dstar{ font-size:12px; color:var(--gold); font-weight:700; letter-spacing:.02em; }
   .dstar-c{ font-size:11px; line-height:1; }
   .dstreak .l{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:.75; font-weight:600; }
-  .dstreak .b{ font-size:10.5px; opacity:.6; }
+  .dstreak .t{ font-size:10.5px; opacity:.78; font-weight:600; margin-top:1px; }
+  .dstreak .b{ font-size:10.5px; opacity:.55; }
   .dcard{ background:#fff; color:#33403c; border:1px solid #000; border-radius:12px; padding:13px 14px; margin-bottom:14px; }
   .dhd{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
   .dhd .dday{ font-family:Georgia,serif; font-size:17px; font-weight:700; }
@@ -1200,7 +1201,7 @@ function streaks(records,todayIndex){
     for(const d of days){run=(prev!=null&&d===prev+1)?run+1:1;best=Math.max(best,run);prev=d;}
     let i=played(todayIndex)?todayIndex:(played(todayIndex-1)?todayIndex-1:null); let cur=0;
     while(i!=null&&has(i,tier)){cur++;i--;}
-    return{current:cur,best};
+    return{current:cur,best,total:days.length};
   };
   return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};
 }
@@ -1356,7 +1357,7 @@ function renderDaily(){
   const s=streaks(dailyStore.days, ti);
   document.getElementById("dailyStreaks").innerHTML=
     [['🔥','Play',s.play],['🥈','Silver',s.silver],['🥇','Gold',s.gold],['🌟','Flawless',s.flawless]].map(([ic,l,v])=>
-      `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="b">best ${v.best}</div></div>`).join('');
+      `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="t">${v.total} total</div><div class="b">best ${v.best}</div></div>`).join('');
   renderDailyCard(); renderDailyCal();
 }
 function renderDailyCard(){

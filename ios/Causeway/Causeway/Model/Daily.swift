@@ -280,7 +280,7 @@ func mergeTiers(_ prev: TierResult?, _ attempt: TierResult) -> TierResult {
         elapsed: minOpt(p.elapsed, attempt.elapsed))
 }
 
-struct StreakRun: Equatable { let current: Int; let best: Int }
+struct StreakRun: Equatable { let current: Int; let best: Int; let total: Int }
 struct Streaks: Equatable { let play, silver, gold, flawless: StreakRun }
 
 /// Streaks derived from the per-day record map. Catch-up-friendly: a streak is the longest run of
@@ -300,7 +300,7 @@ func streaks(_ records: [Int: TierResult], _ todayIndex: Int) -> Streaks {
                     : (records[todayIndex - 1] != nil ? todayIndex - 1 : nil)
         var cur = 0
         while let ii = i, let r = records[ii], has(r) { cur += 1; i = ii - 1 }
-        return StreakRun(current: cur, best: best)
+        return StreakRun(current: cur, best: best, total: days.count)   // total = all days ever holding the tier
     }
     return Streaks(play: tierRun { $0.bronze }, silver: tierRun { $0.silver },
                    gold: tierRun { $0.gold }, flawless: tierRun { $0.flawless })

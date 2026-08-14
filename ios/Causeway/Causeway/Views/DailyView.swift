@@ -48,7 +48,8 @@ struct DailyView: View {
                     Text("\(run.current)").font(.system(size: 24, weight: .bold, design: .serif))
                         .foregroundStyle(Theme.gold)
                     Text(label).font(.system(size: 11, weight: .semibold))
-                    Text("best \(run.best)").font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text("\(run.total) total").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                    Text("best \(run.best)").font(.system(size: 10)).foregroundStyle(.secondary.opacity(0.7))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)

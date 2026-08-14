@@ -135,7 +135,7 @@ export function streaks(records, todayIndex) {
     let i = played(todayIndex) ? todayIndex : (played(todayIndex - 1) ? todayIndex - 1 : null);
     let cur = 0;
     while (i != null && has(i, tier)) { cur++; i--; }
-    return { current: cur, best };
+    return { current: cur, best, total: days.length };   // total = all days ever holding the tier
   };
   return { play: tierRun('bronze'), silver: tierRun('silver'), gold: tierRun('gold'), flawless: tierRun('flawless') };
 }
