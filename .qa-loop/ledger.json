@@ -1,0 +1,108 @@
+{
+  "round": 1,
+  "build_sha": "1fd938c",
+  "max_rounds": 5,
+  "findings": [
+    {
+      "id": "bug/WF-11:cancel-note-not-updated",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-11",
+      "test_case": "TC-11.5",
+      "build_sha": "1fd938c",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/wf11-import-cancel-note.png"
+        ]
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Cancelling the file importer/exporter leaves the default helper text, not 'Import cancelled.'/'Export cancelled or failed.'. SwiftUI .fileImporter/.fileExporter onCompletion not invoked on interactive cancel; Import also sets backupNote=nil first. Data-safe; missing feedback."
+    },
+    {
+      "id": "ux/WF-11:singular-plural-grammar",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-11",
+      "test_case": "TC-11.4",
+      "build_sha": "1fd938c",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/wf11-import-edited-merged-skipped.png",
+          "evidence/round-1/wf9-wins-empty.png"
+        ]
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Count-of-1 renders plural nouns: '1 days','1 deals' (DailyView.importStats) and '1 deals solved' (WinsView). Should be '1 day'/'1 deal'. The entr(y/ies) path already pluralizes; fix is localized."
+    },
+    {
+      "id": "ux/WF-6:demo-done-leaves-empty-board",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.3",
+      "build_sha": "1fd938c",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/wf6-demo-done-emptyboard.png"
+        ]
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Tapping Done on the demo-complete banner leaves an inert fully-solved board (Won still 0) with no guidance. Not a trap. Consider having Done re-deal the seed (Replay)."
+    },
+    {
+      "id": "ux/Main:clock-runs-during-modal-sheets",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "P-C",
+      "build_sha": "1fd938c",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/wf-clock-runs-in-menus.png"
+        ]
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Solve clock keeps ticking while modal sheets (Daily/Wins/How to play) are open (0:21->3:40 with 0 moves), inflating recorded time. Judgment call \u2014 proposal."
+    }
+  ]
+}

@@ -77,6 +77,22 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
+### QA loop — round 1 findings (2026-08-14)
+Simulator-driven UX/QA loop (`.qa-loop/REPORT.md`) converged round 1: no blockers/majors.
+- **Fix (auto, minor)** — file-picker Cancel shows the default BACKUP helper text instead of
+  "Import cancelled." / "Export cancelled or failed." (SwiftUI `.fileImporter`/`.fileExporter`
+  `onCompletion` isn't called on interactive cancel; Import also nils the note first). Data-safe.
+- **Fix (auto, minor)** — count-of-1 grammar: "1 days" / "1 deals" (`DailyView.importStats`) and
+  "1 deals solved · 1 ranges" (`WinsView`) should be "1 day" / "1 deal" / "1 range".
+- **Proposal (decide)** — demo "Done" leaves an inert fully-solved board (Won still 0, no
+  guidance); consider Done → Replay the seed.
+- **Proposal (decide)** — solve clock keeps ticking while modal sheets (Daily/Wins/How-to-play)
+  are open, inflating recorded time; consider pausing on sheet-present.
+- **Coverage gaps** — WF-4 scored win overlay and WF-12 landscape were code-reviewed only (env
+  can't rotate the simulator / deal not hand-solvable this session); verify on device.
+- **NFR** — idle CPU ~0–2%, no network; RSS 181→~357 MB then plateaued — inconclusive for a leak,
+  worth a New game/Undo ×10 loop.
+
 ### stats backup + flawless total (2026-08-14)
 - **Local Export/Import (iOS)** — a "Backup" section on the Daily screen exports stats (daily records
   + solved deals) to a dated `.json` and imports/merges them back. `StatsBackup` = versioned

@@ -10,3 +10,6 @@ ios/**/*.xcuserstate
 
 # Downloaded app data containers (personal stats backups — not source)
 *.xcappdata/
+
+# QA loop evidence (screenshots, samples — not source)
+.qa-loop/evidence/
