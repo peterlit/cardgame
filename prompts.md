@@ -259,4 +259,15 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     plus enabled the scroll indicator. Deferred known-minors (pre-existing): the 30pt min-card clip on
     pathological 17+ card columns (no-scroll tableau by design); the play-driven whole-board resize when
     the tallest column crosses 8 (user-approved); a latent height-limited-device free-cell clip with no
-    trigger on current iPhones.
+    trigger on current iPhones. Follow-up: user confirmed the play-driven resizing looks good, and
+    verified there was no leftover landscape-only lock (git tree, no commit, and the built Info.plist all
+    list portrait + both landscape — the temp screenshot hack was fully reverted).
+62. Bug report: earned Flawless on two non-consecutive days (Aug 12 + 14; Aug 13 played but not flawless)
+    yet the summary card showed "1". Root cause: the four cards are consecutive-day STREAKS (🔥), so a
+    flawless streak of 1 is technically correct (Aug 13 breaks the run) — no data loss (Aug 12's 🌟 is
+    recorded). Per the user's choice, added a lifetime `total` (all days ever holding the tier) shown as a
+    "N total" line between the label and "best N", so the card reads "🌟 1 / 2 total / best 1" — streak,
+    count, and best run all visible. Added `total: days.length` to `streaks()` across canonical
+    (tests/daily.mjs) + web (index.html) + iOS (Daily.swift StreakRun), rendered on both platforms; the
+    streaks drift guard pins the unchanged return lines. Added total assertions to the streak test.
+    Verified on web (Flawless → "2 total") and the iOS card layout. 67 tests green.
