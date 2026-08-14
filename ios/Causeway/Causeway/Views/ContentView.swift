@@ -40,23 +40,26 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geo in
-            // Landscape: the wide viewport would blow card size up to fill 8 columns, and the tall
-            // tableau overflows the short height. Rather than scroll (whose pan gesture fights each
-            // card's minimumDistance:0 DragGesture), shrink the cards to fit the shorter height so
-            // the board NEVER scrolls — identical drag/tap/coordinate behavior as portrait, just
-            // smaller. Portrait keeps its exact, well-tested layout (width-driven card size).
+            // Landscape uses a SIDE-BY-SIDE layout — foundations | tableau | free cells — so the
+            // tableau owns the full height and its top cards aren't hidden under an upper row.
+            // Cards are sized to fit both the 11-across width (2 foundation + 8 tableau + 1 free-cell
+            // columns) and the tableau height. Portrait keeps its exact, well-tested stacked layout.
+            // Neither scrolls (a ScrollView would fight the cards' minimumDistance:0 drag).
             let landscape = geo.size.width > geo.size.height
-            let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
-            let landscapeFan: CGFloat = 0.24   // tight tableau fan in landscape so more of a growing column fits
+            let portraitCardW = floor((geo.size.width - outerPad * 2 - gap * 7) / 8)
+            let landscapeFan: CGFloat = 0.34   // roomier tableau fan now the tableau owns the height
             let cardW: CGFloat = {
-                guard landscape else { return widthCardW }
-                // Size for a reserved column length (not just the current longest) so cards stay a
-                // stable size as columns grow, and short-column states keep margin at the bottom.
-                let longest = max(9, game.tableau.map(\.count).max() ?? 7)
-                let units = 3.15 + landscapeFan * CGFloat(longest - 1)   // upper rows + tableau fan, in card-heights
-                let availH = max(160, geo.size.height - 138)             // minus header + 2-row toolbar chrome
+                guard landscape else { return portraitCardW }
+                // The tableau (middle) owns the height; the side panels are short (foundations 2 rows,
+                // free cells 1 row) so they don't drive card size. Reserve a column length so cards
+                // stay a stable size and short-column states keep bottom margin.
+                let reserve = max(11, game.tableau.map(\.count).max() ?? 7)
+                let units = 1 + landscapeFan * CGFloat(reserve - 1)          // tallest tableau column, card-heights
+                let availH = max(160, geo.size.height - 116)                 // minus header + toolbar chrome
                 let heightCardW = floor(availH / (Theme.cardAspect * units))
-                return max(32, min(widthCardW, heightCardW))             // fit, but keep cards tappable
+                // Width across the side-by-side layout: 4 foundation + 8 tableau + 3 free-cell = 15.
+                let widthCardW = floor((geo.size.width - outerPad * 2 - gap * 13 - 24) / 15)
+                return max(30, min(widthCardW, heightCardW))
             }()
             let overlapFactor: CGFloat = landscape ? landscapeFan : 0.40
             let overlap = (cardW * Theme.cardAspect * overlapFactor).rounded()
@@ -73,16 +76,22 @@ struct ContentView: View {
                         DailyHUD(game: game)   // live objectives while playing a challenge
                     }
                     if landscape {
-                        // No scroll (would fight the cards' minimumDistance:0 drags). The fixed-width
-                        // board is centred in the wide viewport; cards were shrunk above to fit height.
-                        boardStack(cardW: cardW, overlap: overlap)
-                            .frame(maxWidth: .infinity)   // centre the fixed-width board
+                        // Side-by-side: foundations (left) · tableau (middle, full height) · free
+                        // cells (right). Centred; no scroll.
+                        HStack(alignment: .top, spacing: 12) {
+                            foundationsSide(cardW: cardW)
+                            tableauArea(cardW: cardW, overlap: overlap)
+                                .zIndex(dragColumn != nil ? 10 : 1)   // a dragged run floats over the side panels
+                            freeCellsSide(cardW: cardW)
+                                .zIndex(dragInUpper ? 10 : 0)          // a dragged free-cell card floats over the tableau
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
                         Spacer(minLength: 0)
                     } else {
                         upperArea(cardW: cardW)
-                            .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
+                            .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the foundations/tableau
                         tableauArea(cardW: cardW, overlap: overlap)
-                            .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
+                            .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the upper row
                         Spacer(minLength: 0)
                     }
                 }
@@ -127,17 +136,28 @@ struct ContentView: View {
         } message: { Text("Every remaining card can go home. Send them all now?") }
     }
 
-    /// The free-cells/foundations row plus the tableau — the draggable play area. Pinned to the
-    /// board's natural width (8 cards + gaps) so it can centre within a wider (landscape) viewport
-    /// without stretching the internal HStacks.
-    private func boardStack(cardW: CGFloat, overlap: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            upperArea(cardW: cardW)
-                .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the tableau
-            tableauArea(cardW: cardW, overlap: overlap)
-                .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the free cells
+    /// Landscape LEFT panel — the eight foundations as up/down rows (same short 4-wide arrangement as
+    /// portrait) so the panel sits at the top and the tableau owns the height. Reuses `foundationRow`.
+    private func foundationsSide(cardW: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            groupLabel("FOUNDATIONS")
+            VStack(spacing: gap) {
+                foundationRow(dir: .up, cardW: cardW)
+                foundationRow(dir: .down, cardW: cardW)
+            }
         }
-        .frame(width: cardW * 8 + gap * 7)
+    }
+    /// Landscape RIGHT panel — the three free cells in a short row.
+    private func freeCellsSide(cardW: CGFloat) -> some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            groupLabel("FREE CELLS")
+            HStack(spacing: gap) {
+                ForEach(0..<Game.cellCount, id: \.self) { i in
+                    cellView(i, cardW: cardW)
+                        .zIndex(drag?.source == .cell(i) ? 5 : 0)   // dragged cell floats over its neighbours
+                }
+            }
+        }
     }
 
     // MARK: header + toolbar
@@ -199,21 +219,22 @@ struct ContentView: View {
 
     private func upperArea(cardW: CGFloat) -> some View {
         HStack(alignment: .top) {
+            // Foundations on the LEFT, free cells on the RIGHT (matches MobilityWare FreeCell muscle memory).
             VStack(alignment: .leading, spacing: 4) {
+                groupLabel("FOUNDATIONS")
+                VStack(spacing: gap) {
+                    foundationRow(dir: .up, cardW: cardW)
+                    foundationRow(dir: .down, cardW: cardW)
+                }
+            }
+            Spacer(minLength: gap)
+            VStack(alignment: .trailing, spacing: 4) {
                 groupLabel("FREE CELLS")
                 HStack(spacing: gap) {
                     ForEach(0..<Game.cellCount, id: \.self) { i in
                         cellView(i, cardW: cardW)
                             .zIndex(drag?.source == .cell(i) ? 5 : 0)   // dragged cell floats over its neighbours
                     }
-                }
-            }
-            Spacer(minLength: gap)
-            VStack(alignment: .trailing, spacing: 4) {
-                groupLabel("FOUNDATIONS")
-                VStack(spacing: gap) {
-                    foundationRow(dir: .up, cardW: cardW)
-                    foundationRow(dir: .down, cardW: cardW)
                 }
             }
         }
