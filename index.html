@@ -1445,7 +1445,7 @@ function objSecured(obj, up, down, t){
     case 'suits-top-down':   return down.every(d=>d<=13);   // every suit's King down
     case 'jacks-down-first': return down.every(d=>d<=11);   // all four Jacks down
     case 'down-openers-20':  return down.every(d=>d<=13);   // all four down-foundations opened (within 20, else violated)
-    case 'suit-sprint':      return [0,1,2,3].some(s=>down[s]===up[s]+1);  // one whole suit home
+    case 'suit-sprint':      return [0,1,2,3].filter(s=>down[s]===up[s]+1).length>=3;  // ≥3 suits home (only one left; no interleave possible)
     default: return false;   // move/undo/cell budgets — not securable until win
   }
 }

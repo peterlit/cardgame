@@ -377,7 +377,7 @@ func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool 
     case "suits-top-down":   return down.allSatisfy { $0 <= 13 }    // every suit's King down
     case "jacks-down-first": return down.allSatisfy { $0 <= 11 }    // all four Jacks down
     case "down-openers-20":  return down.allSatisfy { $0 <= 13 }    // all four down-foundations opened
-    case "suit-sprint":      return (0..<4).contains { down[$0] == up[$0] + 1 }  // one whole suit home
+    case "suit-sprint":      return (0..<4).filter { down[$0] == up[$0] + 1 }.count >= 3  // ≥3 suits home (only one left; no interleave possible)
     default:                 return false   // move/undo/cell budgets — not securable until win
     }
 }
