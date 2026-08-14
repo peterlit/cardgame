@@ -271,3 +271,19 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (tests/daily.mjs) + web (index.html) + iOS (Daily.swift StreakRun), rendered on both platforms; the
     streaks drift guard pins the unchanged return lines. Added total assertions to the streak test.
     Verified on web (Flawless → "2 total") and the iOS card layout. 67 tests green.
+63. Support: user's physical iPhone was orientation-locked to landscape. Diagnosed as a STALE
+    landscape-only build on the device — the temporary landscape-only pbxproj I used for rotated
+    screenshots briefly touched the shared working tree; a device build/run during that window shipped
+    landscape-only, and reverting the source didn't rebuild the phone. Current source is clean (both
+    configs list all 3 orientations; built Info.plist confirms; no lock code). Fix without data loss:
+    reinstall the new build OVER the app (Xcode Run is non-destructive to the UserDefaults container) —
+    do NOT delete the app (that wipes stats). Corrected my earlier wrong "delete first" advice.
+64. Feature (user asked, iCloud vs local discussed): added a LOCAL Export/Import of stats so streaks +
+    solved deals aren't a single-device single-point-of-failure — no iCloud entitlements / privacy
+    surface. `StatsBackup` = versioned "causeway-stats" JSON of the daily record map + wins map. New
+    `DailyStore.merge` / `WinStore.merge` are NON-DESTRUCTIVE (OR-accumulate tiers, keep best time/moves)
+    so importing only ever adds/keeps-better — never erases. UI: a "Backup" section at the bottom of the
+    Daily screen with Export (`.fileExporter` → dated .json) + Import (`.fileImporter`, security-scoped,
+    rejects non-Causeway files) + a status line. iOS-only for now; the JSON format is platform-agnostic
+    so web (localStorage) could read the same files later. Verified the full round-trip on-device
+    (export writes JSON to Files → import decodes + merges + reports). 67 tests green.

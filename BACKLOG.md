@@ -77,6 +77,20 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
+### stats backup + flawless total (2026-08-14)
+- **Local Export/Import (iOS)** — a "Backup" section on the Daily screen exports stats (daily records
+  + solved deals) to a dated `.json` and imports/merges them back. `StatsBackup` = versioned
+  "causeway-stats" JSON; `DailyStore.merge`/`WinStore.merge` are non-destructive (OR-accumulate tiers,
+  keep best) so import never erases. No iCloud entitlements. Format is platform-agnostic. iOS-only for
+  now (`StatsBackup.swift`, `DailyView.swift` backup section).
+- **Flawless (and all tiers) now show a lifetime `total`** alongside the consecutive-day streak, so
+  two non-consecutive flawless days read as "2 total" not just a streak of "1".
+- **Follow-up (offered, not done): iCloud Key-Value sync** — `NSUbiquitousKeyValueStore` for automatic
+  hands-off backup/restore across the user's devices; low privacy surface (user's own private iCloud).
+  Needs the iCloud KVS entitlement + merge-on-change (reuses `mergeTiers`) + signed-out fallback.
+- **Follow-up (parity): web Export/Import** — mirror the iOS backup on web (localStorage → download /
+  upload the same `causeway-stats` JSON) so files move between prototype and app.
+
 ### landscape redesign v2 — left rail + bigger cards (2026-08-14)
 - **Landscape layout** — three columns: vertical button rail (left) · foundations with free cells
   beneath · tableau (fills the rest). Toolbar off the top + free-cells-under-foundations (15→12
