@@ -80,6 +80,7 @@ pin('Model/Game.swift', 'recordWin once-only gate', [
 // (The iOS copy validates each token and returns false on a malformed/inapplicable one — pure
 // defense against bad baked data; the applied semantics below are identical to web/rules.mjs.)
 pin('Model/Game.swift', 'applyDemoToken token format', [
+  'let col = n(1)',                                                        // F/C read their column from field 1
   'let c = tableau[col].removeLast()',                                     // F = column-top → foundation
   'if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }',
   'let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)',
@@ -88,14 +89,34 @@ pin('Model/Game.swift', 'applyDemoToken token format', [
 ]);
 
 // Cross-copy: the web applyDemoToken must interpret the SAME token format (so a baked line plays
-// identically on both). Pinned here alongside the iOS copy so a one-sided edit trips CI.
+// identically on both). Pinned here alongside the iOS copy so a one-sided edit trips CI. Both
+// copies validate each token and return false on a malformed/inapplicable one (defense against
+// bad baked data); the applied semantics are identical to tools/solver rules.mjs.
 test('web applyDemoToken shares the iOS/solver token format', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   for (const s of [
-    "case 'F': card=t[+f[1]].pop(); if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;",
-    "case 'G': card=cells[+f[1]]; cells[+f[1]]=null; if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;",
-    "case 'C': card=t[+f[1]].pop(); cells[cells.indexOf(null)]=card; break;",
+    "case 'F': { const c=col(1); if(c<0||!t[c].length) return false; card=t[c].pop(); if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break; }",
+    "case 'G': { const i=+f[1]; if(!(i>=0&&i<cells.length)||!cells[i]) return false; card=cells[i]; cells[i]=null; if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break; }",
+    "case 'C': { const c=col(1), e=cells.indexOf(null); if(c<0||!t[c].length||e<0) return false; cells[e]=t[c].pop(); break; }",
   ]) {
     assert.ok(html.includes(norm(s)), `index.html applyDemoToken token format drifted: ${s.slice(0, 50)}...`);
   }
+});
+
+// Cross-copy: leaving a demo must never leave a demo-touched board playable/scorable. iOS pins the
+// Stop/Done → restartDeal wiring and the finishDemo boardComplete guard; the web copy must keep
+// the mirror wiring (demoStop → restartDeal, all-cards-home guard in finishDemo, and demoAdvance
+// aborting to restartDeal on a bad token) or the two apps diverge on a scoring-integrity rule.
+test('web demo exit paths re-deal (no playable demo-touched board)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  for (const s of [
+    'document.getElementById("demoStop").onclick=()=>restartDeal();',
+    'if(!state.tableau.every(c=>c.length===0) || !state.cells.every(c=>c===null)){ restartDeal(); return; }',
+    'if(!applyDemoToken(demoMoves[demoIdx++])){ restartDeal(); return false; }',
+  ]) {
+    assert.ok(html.includes(norm(s)), `index.html demo exit integrity drifted: ${s.slice(0, 60)}...`);
+  }
+  const swift = read('Views/ContentView.swift');
+  assert.ok(swift.includes(norm('demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }')),
+    'ContentView demo Stop/Done no longer re-deals');
 });

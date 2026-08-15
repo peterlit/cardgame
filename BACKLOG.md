@@ -93,8 +93,11 @@ All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
   (env can't rotate the simulator / deal not hand-solvable this session); verify on device.
 - **NFR (open)** — idle CPU ~0–2%, no network; RSS 181→~357 MB then plateaued — inconclusive for a
   leak, worth a New game/Undo ×10 loop.
-- **Parity follow-up (open)** — the demo-Done and clock-pause behaviors are iOS-only so far; mirror
-  to web (`index.html`) for parity.
+- **Parity follow-up (DONE 2026-08-15, review-loop round 2)** — the demo-exit integrity rule is now
+  mirrored to web: `index.html`'s demo Stop/Done routes through `restartDeal()`, `finishDemo` re-deals
+  unless the line completed the board, and `applyDemoToken` validates tokens (aborting to a re-deal on
+  bad baked data) — matching iOS. Pinned by `tests/ios-parity.test.mjs` ("web demo exit paths
+  re-deal"). Clock-pause needs no mirror (it was reverted; both apps use continuous timing).
 
 ### QA loop — round 2 MAJOR fixes (2026-08-15)
 Both round-2 majors fixed (user-directed; simulator re-verification pending next qa-loop round):

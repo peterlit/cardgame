@@ -33,6 +33,13 @@ struct ContentView: View {
     // frames of every drop target in the "board" coordinate space for hit-testing on drop.
     @State private var drag: DragInfo?
     @State private var dropZones: [DropZoneFrame] = []
+    // Portrait tableau-shrink latch: the tallest column count that has been *seen* this deal.
+    // tableauArea sizes its shrink from max(live, latched), so within a deal the card size is
+    // monotone — a column crossing the threshold shrinks the cards once per new maximum, and a
+    // later move/undo that shortens the column can't grow them back (which would make the whole
+    // board pulse and re-flow on single-card moves). Reset when moveCount returns to 0 (new
+    // deal, replay, or a full undo). Landscape ignores it: its cardW already re-sizes live.
+    @State private var shrinkLatchCount = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     private let outerPad: CGFloat = 6
@@ -102,7 +109,11 @@ struct ContentView: View {
                         // GeometryReader is greedy, so it takes the remaining height (replacing the
                         // old trailing Spacer) and hands the tableau its true on-screen bound.
                         GeometryReader { tg in
-                            tableauArea(cardW: cardW, overlap: overlap, maxH: tg.size.height)
+                            tableauArea(cardW: cardW, overlap: overlap, maxH: tg.size.height,
+                                        latchedMax: shrinkLatchCount)
+                                // Keep a shrunk tableau centred under the full-width foundations
+                                // row instead of hugging the leading edge with a dead right margin.
+                                .frame(maxWidth: .infinity)
                         }
                         .zIndex(dragInUpper ? 0 : 1)           // ...otherwise the tableau floats over the upper row
                     }
@@ -123,7 +134,10 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
         }
-        .onChange(of: game.moveCount) { _, _ in
+        .onChange(of: game.moveCount) { _, count in
+            // Maintain the portrait shrink latch (every board mutation changes moveCount).
+            if count == 0 { shrinkLatchCount = 0 }
+            else { shrinkLatchCount = max(shrinkLatchCount, game.tableau.map(\.count).max() ?? 0) }
             // Self-heal a drag whose card was torn down mid-gesture by an async autoplay step
             // (its view — and gesture — vanish, so onEnded never fires, leaving `drag` stuck at
             // an elevated zIndex). Only clear when the source no longer holds its card, so an
@@ -397,20 +411,28 @@ struct ContentView: View {
 
     // MARK: tableau
 
-    /// A buried card stays readable while at least its rank band shows: top inset 0.05·w plus the
-    /// rank's cap height (~0.72 × the 0.50·w font) ≈ 0.41·w. Fan compression must not go below this.
-    private static let legibleOverlapUnit: CGFloat = 0.42
+    /// A buried card stays readable while its whole rank glyph shows. CardView's rank Text sits at
+    /// the 0.05·w top inset, and the glyph hangs from the line box by SF's ascent (~0.955 em of the
+    /// 0.50·w font), putting its baseline at ≈ 0.05 + 0.955·0.50 ≈ 0.53·w below the card top (the
+    /// cap top is at ~0.17·w, not at the inset — the ascent-to-cap gap pushes it down). Measured on
+    /// device at cardW 41: the digit spans y ≈ 7–22 pt = 0.17·w–0.53·w. Fan compression must not
+    /// go below this, else the bottom of every buried rank is clipped by the card above.
+    private static let legibleOverlapUnit: CGFloat = 0.53
 
-    private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat) -> some View {
+    private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat, latchedMax: Int = 0) -> some View {
         // If even the legibility-floor overlap can't fit the tallest column inside `maxH`,
         // shrink the TABLEAU's card size (the landscape strategy) instead of compressing the
         // fan into unreadable slivers. Portrait cards are otherwise width-sized, so this only
         // kicks in for unusually long columns on short screens; landscape already height-sizes
-        // its cards and won't trigger it. The 30pt clamp matches the landscape minimum.
+        // its cards (fan 0.34 ⇒ 0.34·aspect ≈ 0.57·w per card > the 0.53 floor) and never
+        // triggers it — its caller passes no latch. The portrait caller passes the deal-scoped
+        // shrinkLatchCount so the shrink is monotone within a deal (no per-move board pulsing).
+        // The 30pt clamp matches the landscape minimum. maxH == 0 is a transient sizing pass:
+        // keep the width-sized cards and let column()'s own fan floor absorb it for one frame.
         let unit = Self.legibleOverlapUnit
-        let maxCount = game.tableau.map(\.count).max() ?? 0
+        let maxCount = max(game.tableau.map(\.count).max() ?? 0, latchedMax)
         let w: CGFloat = {
-            guard maxCount > 1 else { return cardW }
+            guard maxCount > 1, maxH > 0 else { return cardW }
             let units = Theme.cardAspect + unit * CGFloat(maxCount - 1)   // tallest column, card-widths
             guard cardW * units > maxH else { return cardW }
             return max(30, min(cardW, floor(maxH / units)))
@@ -431,7 +453,7 @@ struct ContentView: View {
         // Legibility is guaranteed upstream: tableauArea shrinks the card size before the
         // fit here would ever compress past the readable rank band, so the 8pt floor is a
         // last-resort backstop only (the 30pt card-size clamp binding on a degenerate
-        // 20+-card column, or a transient zero-height layout pass).
+        // ~18+-card column on a short phone, or a transient zero-height layout pass).
         let ov = cards.count > 1
             ? max(8, min(overlap, floor((maxH - cardH) / CGFloat(cards.count - 1))))
             : overlap

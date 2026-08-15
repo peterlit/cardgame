@@ -470,8 +470,10 @@ function deal(theSeed){
   // deal() is the single demo-teardown chokepoint: any path that lays out a fresh board
   // ('n' shortcut, seed modal goDeal/dealRandom, winsPlay, restartDeal, showSolution) must
   // cancel a running "how to win" demo first, else the pending setTimeout(step) fires with
-  // demoing still true and applyDemoToken hits t[col].pop()===undefined → the loop dies with
-  // demoing stuck true and startDrag early-returns forever (input locked).
+  // demoing still true against the WRONG board — applyDemoToken now rejects the inapplicable
+  // token (returns false) and demoAdvance's abort path would restartDeal() the player's fresh
+  // board out from under them. (Before the guards this was worse: an undefined pop threw and
+  // wedged input with demoing stuck true.)
   // showSolution sets demoing=true AFTER deal() returns, so this doesn't self-cancel it.
   stopDemo();
   seed = theSeed>>>0;
@@ -1232,18 +1234,29 @@ function playChallenge(day){
    splits those. When playing, a timer auto-advances; when paused, the "Next" button advances one
    move at a time via demoStepOnce(). Completion drops demoing but leaves the bar showing "Done". */
 let demoing=false, demoPaused=false, demoStarted=false, demoTimer=null, demoMoves=null, demoIdx=0, demoTier='bronze', demoLabel='';
-// Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove). end: 0=up,1=down.
+// Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove and the iOS
+// Game.applyDemoToken). end: 0=up,1=down. Returns false on a malformed/inapplicable token (missing
+// card, no free cell, bad index) — defense in depth against bad baked data; the caller aborts the
+// demo on false instead of desyncing (or throwing inside the timer and wedging input).
 function applyDemoToken(tok){
   const f=tok.split(','), t=state.tableau, cells=state.cells, up=state.up, down=state.down;
+  const col=i=>{ const v=+f[i]; return Number.isInteger(v)&&v>=0&&v<t.length?v:-1; };
   let card;
   switch(f[0]){
-    case 'F': card=t[+f[1]].pop(); if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;
-    case 'G': card=cells[+f[1]]; cells[+f[1]]=null; if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break;
-    case 'T': { const run=t[+f[1]].splice(+f[2]); for(const c of run) t[+f[3]].push(c); break; }
-    case 'C': card=t[+f[1]].pop(); cells[cells.indexOf(null)]=card; break;
-    case 'X': card=cells[+f[1]]; cells[+f[1]]=null; t[+f[2]].push(card); break;
+    case 'F': { const c=col(1); if(c<0||!t[c].length) return false;
+                card=t[c].pop(); if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break; }
+    case 'G': { const i=+f[1]; if(!(i>=0&&i<cells.length)||!cells[i]) return false;
+                card=cells[i]; cells[i]=null; if(+f[2]) down[card.suit]=card.rank; else up[card.suit]=card.rank; break; }
+    case 'T': { const s=col(1), d=col(3), i=+f[2]; if(s<0||d<0||s===d||!(i>=0&&i<t[s].length)) return false;
+                const run=t[s].splice(i); for(const c of run) t[d].push(c); break; }
+    case 'C': { const c=col(1), e=cells.indexOf(null); if(c<0||!t[c].length||e<0) return false;
+                cells[e]=t[c].pop(); break; }
+    case 'X': { const i=+f[1], d=col(2); if(!(i>=0&&i<cells.length)||!cells[i]||d<0) return false;
+                card=cells[i]; cells[i]=null; t[d].push(card); break; }
+    default: return false;
   }
   moveCount++; setMoves(moveCount);
+  return true;
 }
 // Reflect the current demo state onto the bar (message + which controls show).
 function updateDemoBar(){
@@ -1255,7 +1268,7 @@ function updateDemoBar(){
   const TIER={bronze:'🥉 Clear the deal',silver:'🥈 Silver',gold:'🥇 Gold'};
   const tierName={bronze:'winning',silver:'Silver',gold:'Gold'}[demoTier]||'winning';
   if(done){
-    if(msg) msg.textContent=`That's a ${tierName} line — tap Replay to try it yourself.`;
+    if(msg) msg.textContent=`That's a ${tierName} line — tap Done to try it yourself.`;
     if(next) next.style.display="none";
     if(pause) pause.style.display="none";
     if(stop) stop.textContent="Done";
@@ -1273,11 +1286,20 @@ function updateDemoBar(){
 // Apply the next move; on the last one, flip to the completion banner. Returns whether it advanced.
 function demoAdvance(){
   if(!demoMoves || demoIdx>=demoMoves.length){ finishDemo(); return false; }
-  applyDemoToken(demoMoves[demoIdx++]); render();
+  // A token that can't apply means the baked line is out of sync with the board (corrupt /
+  // mis-rebuilt solutions data). Abort like a mid-demo Stop — re-deal the seed — rather than
+  // desync or leave a half-played board. (Parity with iOS demoAdvance.)
+  if(!applyDemoToken(demoMoves[demoIdx++])){ restartDeal(); return false; }
+  render();
   if(demoIdx>=demoMoves.length){ finishDemo(); return false; }
   return true;
 }
 function finishDemo(){
+  // Only a line that genuinely completed the board earns the "try it yourself" banner. If the
+  // line ran out with cards still on the table (an imperfect baked line), treat it like a
+  // mid-demo Stop and re-deal — a demo-touched partial board must never become playable or
+  // scorable. (Parity with iOS finishDemo's boardComplete guard.)
+  if(!state.tableau.every(c=>c.length===0) || !state.cells.every(c=>c===null)){ restartDeal(); return; }
   demoing=false; demoPaused=false;
   if(demoTimer){ clearTimeout(demoTimer); demoTimer=null; }
   updateDemoBar();
@@ -1560,7 +1582,11 @@ document.getElementById("newBtn").onclick=()=>{ stopDemo(); deal(randomSeed()); 
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=()=>{ stopDemo(); undo(); };
-document.getElementById("demoStop").onclick=stopDemo;
+// Both mid-demo "Stop" and post-line "Done" re-deal the seed (via restartDeal, hoisted below;
+// parity with iOS demoBar): a demo-touched board must never become playable — taking over the
+// app's own solution moves and finishing by hand would bank a genuine win + best time. The
+// player lands on a fresh board of the same deal, which they can still solve legitimately.
+document.getElementById("demoStop").onclick=()=>restartDeal();
 document.getElementById("demoPause").onclick=demoTogglePause;
 document.getElementById("demoNext").onclick=demoStepOnce;
 // Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
