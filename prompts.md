@@ -310,3 +310,21 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     pauses while a modal sheet is open. All state under `.qa-loop/` (REPORT.md). Coverage gaps: WF-4 win
     overlay + WF-12 landscape code-reviewed only (env can't rotate the sim). Also gave the plugin author
     feedback (sampler lifecycle, finding schema, deterministic-deal seeding, convergence-ignores-minors).
+66. Produce architectural documentation for both codebases (web prototype + iOS app) from a full
+    review of the code, git history and docs. Wrote `docs/architecture/{overview,web-prototype,app}.md`:
+    a shared overview (system context, the three-copies-plus-drift-guards strategy, shared domain
+    model, build-time solver pipeline, repo map, feature-parity matrix) and a detailed doc per
+    codebase (top-level architecture, module inventory with file:line citations, key flows as
+    sequence diagrams, persisted-data ER diagrams, and a candid "state of the architecture" section
+    covering decisions + inferred rationale, coupling/debt, cross-codebase inconsistencies and
+    grep-proven vestigial code). 20 Mermaid diagrams, all validated and each ≤11 nodes; module
+    inventory cross-checked against the directory tree. Verified independently rather than inferred:
+    the two baked JSON files are byte-identical between `data/` and the iOS bundle; **274 of 366**
+    pool records violate the `par = min(unconstrained, constraintPar)` invariant in
+    `solve.mjs:186-188` (they predate that change and append-only preserves them), so the `moves`
+    Silver is up to ~14% looser than intended; `suit-sprint` is supported by only 4 seeds and
+    selected on 3 days; `.card.hintsrc` (web) and `Theme.cardCream`/`cardTintBottom`/`background`,
+    `Suit.glyph`, `MemoryMonitor.stop()` (iOS) have zero callers; the `.unreadable` corruption-backup
+    keys are written but never read; and the live-HUD checkers (`objViolated`/`objSecured`) are a
+    third, entirely unguarded copy of the objective semantics on both platforms. Docs-only change;
+    67 tests still green.
