@@ -367,3 +367,16 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     positive** (0 reopened, 0 recurring regions — only the `net <= 0 for two rounds` signal fired,
     and `net = closed - new` makes every productive discovery round negative). No implementer or
     fix-review dispatch has run inside this loop yet; both majors are open.
+69. `While in demo mode the user should not be able to move cards … implement it as well as any
+    other remaining major findings from the qa loop that ended in thrashing, then run the review
+    loop and provide any feedback on the review loop plugin` — fixed both open round-2 majors.
+    (1) Demo-win exploit: input was already locked while `demoing`; the real hole was the demo
+    bar's mid-demo **Stop**, which left the app's solution moves on a playable board. Stop now
+    routes through `restartDeal()` like Done, so leaving a demo always lands on a fresh board of
+    the same seed — a demo-touched board can never be played or scored, and no win-tainting /
+    best-time reinterpretation is needed. Defense in depth: `undo()` no-ops while `demoing`, and
+    `canDrag` gates on `!game.demoing` so cards don't even lift. (2) Portrait tall-column clip
+    (also closes backlog M3): per-column fan compression against the measured board height
+    (greedy `GeometryReader` in portrait, `landscapeBoardH` backstop in landscape) — only the
+    overflowing column tightens, card size never changes, no per-move size thrash. Build green,
+    67 Node tests green. Then ran the review loop on the change.

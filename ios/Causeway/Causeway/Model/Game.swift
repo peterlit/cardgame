@@ -405,6 +405,9 @@ final class Game: ObservableObject {
     }
 
     func undo() {
+        if demoing { return }    // input is locked while a "how to win" line plays (defense in
+                                 // depth — the Undo button is disabled mid-demo anyway, since
+                                 // the demo deal empties `history`)
         stopDemo()               // an undo during the demo banner returns to normal play
         stopAutoplayPending()
         finishing = false        // halt any running finish cascade

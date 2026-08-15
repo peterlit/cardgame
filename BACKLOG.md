@@ -96,7 +96,25 @@ All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
 - **Parity follow-up (open)** — the demo-Done and clock-pause behaviors are iOS-only so far; mirror
   to web (`index.html`) for parity.
 
-### QA loop — round 2 findings (2026-08-15) — OPEN, no fix pass run yet
+### QA loop — round 2 MAJOR fixes (2026-08-15)
+Both round-2 majors fixed (user-directed; simulator re-verification pending next qa-loop round):
+- **DONE — demo progress can no longer bank a real win.** Input was already locked while
+  `demoing` (drop/smartMove guards; pause keeps `demoing` true); the hole was the demo bar's
+  mid-demo **Stop**, which called `stopDemo()` and left the solution's moves on a playable board
+  with no undo history. Now both Stop and Done route through `restartDeal()` — leaving a demo
+  always lands on a fresh board of the same seed, so a demo-touched board can never be played or
+  scored. This sidesteps the flagged trap: no win-tainting or best-time reinterpretation needed,
+  and a player who stops the demo early can still solve the same deal legitimately from scratch.
+  Defense in depth: `undo()` now no-ops while `demoing` (it called `stopDemo()` and would unlock
+  input), and cards can't even lift during a demo (`canDrag` gates on `!game.demoing`).
+- **DONE — portrait tall column can no longer clip off-screen (also closes M3).** Instead of
+  landscape's shrink-all-cards clamp (which the watch list flagged for per-move size thrash), each
+  tableau column now compresses **its own fan** just enough to fit the measured board height
+  (portrait: a greedy `GeometryReader` supplies the true remaining height; landscape gets
+  `landscapeBoardH` as a backstop for the 30pt cardW floor, retiring the "17+ cards clip past the
+  floor" known-minor). Card size and other columns' spacing never change; 8pt overlap floor.
+
+### QA loop — round 2 findings (2026-08-15) — minors/proposals OPEN, majors fixed above
 Second simulator-driven pass on `342e3c0` (`.qa-loop/REPORT.md`): 3 parallel testers, full pass,
 47/47 test cases, plus an uncontended perf lane. Round-1's three implemented fixes all **verified
 fixed on screen**. The loop aborted with `thrashing`, which is a **false positive** — 0 findings
@@ -173,9 +191,9 @@ implementer has never run inside the loop.
   (`ContentView.swift`). Safety tag `pre-landscape-v2`. Review loop (2 rounds) caught + fixed a
   ship-blocker: the button rail had no height bound, clipping controls off-screen on short phones /
   during the Daily HUD → now a HUD-aware `landscapeBoardH`-bounded ScrollView.
-- **Known-minor (landscape, deferred)** — very long tableau columns (17+ cards) clip past the 30pt
-  min card-size floor (no-scroll tableau by design); whole-board resize when the tallest column
-  crosses 8 (user-approved play-driven resizing). Both pre-existing / accepted.
+- **Known-minor (landscape, deferred)** — whole-board resize when the tallest column crosses 8
+  (user-approved play-driven resizing). The other half — very long columns (17+ cards) clipping
+  past the 30pt min card-size floor — is retired by the 2026-08-15 per-column fan compression.
 
 ### daily HUD on-track indicator + calendar star (2026-08-14)
 - **Daily HUD "on-track"** — the live objectives HUD now shows a green ✓ for a Silver/Gold objective
@@ -258,9 +276,6 @@ implementer has never run inside the loop.
   is error-prone and could break the build. Add an XCTest target in Xcode that asserts the
   Swift engine reproduces the same golden deal orders (`tests/engine.test.mjs` GOLDEN) and
   the same `isSafeAutoplay` cases, so both platforms are pinned to one contract. Ties to M8.
-- **M3 — Tableau overflow / no scrolling (iOS).** Fixed 0.40 overlap in a non-scrolling
-  VStack overflows on small screens / deep columns; cards become untappable. Add a
-  ScrollView or compress overlap adaptively.
 - **M7 — Accessibility (iOS).** No VoiceOver labels/actions; Dynamic Type ignored
   (all fixed `.system(size:)`, tap gestures not buttons).
 

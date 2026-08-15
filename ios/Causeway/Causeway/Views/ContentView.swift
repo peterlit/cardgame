@@ -92,16 +92,19 @@ struct ContentView: View {
                             landscapeRail(boardH: landscapeBoardH)
                             foundationsAndCells(cardW: cardW)
                                 .zIndex(dragInUpper ? 10 : 0)          // a dragged free-cell card floats over the tableau
-                            tableauArea(cardW: cardW, overlap: overlap)
+                            tableauArea(cardW: cardW, overlap: overlap, maxH: landscapeBoardH)
                                 .zIndex(dragColumn != nil ? 10 : 1)   // a dragged run floats over the side columns
                         }
                         Spacer(minLength: 0)
                     } else {
                         upperArea(cardW: cardW)
                             .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the foundations/tableau
-                        tableauArea(cardW: cardW, overlap: overlap)
-                            .zIndex(dragInUpper ? 0 : 1)       // ...otherwise the tableau floats over the upper row
-                        Spacer(minLength: 0)
+                        // GeometryReader is greedy, so it takes the remaining height (replacing the
+                        // old trailing Spacer) and hands the tableau its true on-screen bound.
+                        GeometryReader { tg in
+                            tableauArea(cardW: cardW, overlap: overlap, maxH: tg.size.height)
+                        }
+                        .zIndex(dragInUpper ? 0 : 1)           // ...otherwise the tableau floats over the upper row
                     }
                 }
                 .padding(.horizontal, outerPad)
@@ -362,7 +365,7 @@ struct ContentView: View {
                 CardView(card: c, width: cardW)
                     .matchedGeometryEffect(id: c.id, in: ns)
                     .offset(runOffset(.cell(i)))
-                    .gesture(cardGesture(for: .cell(i), canDrag: true))
+                    .gesture(cardGesture(for: .cell(i), canDrag: !game.demoing))
             } else {
                 SlotView(width: cardW)
             }
@@ -394,24 +397,32 @@ struct ContentView: View {
 
     // MARK: tableau
 
-    private func tableauArea(cardW: CGFloat, overlap: CGFloat) -> some View {
+    private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat) -> some View {
         let cardH = cardW * Theme.cardAspect
         return HStack(alignment: .top, spacing: gap) {
             ForEach(0..<Game.colCount, id: \.self) { col in
-                column(col, cardW: cardW, cardH: cardH, overlap: overlap)
+                column(col, cardW: cardW, cardH: cardH, overlap: overlap, maxH: maxH)
                     .zIndex(dragColumn == col ? 5 : 0)   // the column holding the dragged run floats over its neighbours
             }
         }
     }
-    private func column(_ col: Int, cardW: CGFloat, cardH: CGFloat, overlap: CGFloat) -> some View {
+    private func column(_ col: Int, cardW: CGFloat, cardH: CGFloat, overlap: CGFloat, maxH: CGFloat) -> some View {
         let cards = game.tableau[col]
-        let height = cards.isEmpty ? cardH : CGFloat(cards.count - 1) * overlap + cardH
+        // A long column compresses ITS OWN fan just enough to stay inside `maxH`, so the
+        // bottom card can never run off-screen (the tableau deliberately doesn't scroll).
+        // Card size and the other columns' spacing are untouched — no whole-board resize as
+        // one column grows. The 8pt floor keeps a sliver of every card visible/tappable even
+        // in degenerate cases (e.g. a transient zero-height layout pass).
+        let ov = cards.count > 1
+            ? max(8, min(overlap, floor((maxH - cardH) / CGFloat(cards.count - 1))))
+            : overlap
+        let height = cards.isEmpty ? cardH : CGFloat(cards.count - 1) * ov + cardH
         return ZStack(alignment: .top) {
             if cards.isEmpty {
                 SlotView(width: cardW)
             }
             ForEach(Array(cards.enumerated()), id: \.element.id) { idx, card in
-                tableauCard(col: col, idx: idx, card: card, cardW: cardW, overlap: overlap)
+                tableauCard(col: col, idx: idx, card: card, cardW: cardW, overlap: ov)
             }
         }
         .frame(width: cardW, height: height, alignment: .top)
@@ -427,7 +438,7 @@ struct ContentView: View {
             .offset(runOffset(.tableau(col: col, idx: idx))) // + follow the finger while dragging
             .zIndex(Double(idx))
             .gesture(cardGesture(for: .tableau(col: col, idx: idx),
-                                 canDrag: game.isSeqHead(col: col, idx: idx)))
+                                 canDrag: !game.demoing && game.isSeqHead(col: col, idx: idx)))
     }
 
     // MARK: "Show me how to win" status bar
@@ -446,12 +457,11 @@ struct ContentView: View {
                 // "Start" before the first play, "Pause" while playing, "Resume" once paused.
                 demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
             }
-            // Mid-demo "Stop" just exits; "Done" (after the line finished) re-deals the seed so the
-            // player lands on a playable board instead of an inert, already-solved one.
-            demoPill(game.demoing ? "Stop" : "Done") {
-                if game.demoing { withAnimation { game.stopDemo() } }
-                else { withAnimation { game.restartDeal() } }
-            }
+            // Both mid-demo "Stop" and post-line "Done" re-deal the seed: a demo-touched board
+            // must never become playable (taking over the app's own solution moves and finishing
+            // would bank a genuine win/best-time). The player lands on a fresh board of the same
+            // deal, which they can still solve legitimately.
+            demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
