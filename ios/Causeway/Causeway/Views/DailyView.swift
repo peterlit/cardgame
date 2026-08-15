@@ -39,13 +39,19 @@ struct DailyView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         .onAppear { dayView = clampedToday }
-        .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .json,
+        // onCancellation overloads (iOS 17+): the completion handler isn't called on an
+        // interactive cancel, so acknowledge cancel explicitly instead of leaving stale text.
+        .fileExporter(isPresented: $showExporter, document: exportDoc, contentTypes: [.json],
                       defaultFilename: exportFilename) { result in
-            if case .failure = result { backupNote = "Export cancelled or failed." }
-            else { backupNote = "Stats exported." }
+            backupNote = { if case .failure = result { return "Export failed." } else { return "Stats exported." } }()
+        } onCancellation: {
+            backupNote = "Export cancelled."
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json],
+                      allowsMultipleSelection: false) { result in
             importStats(result)
+        } onCancellation: {
+            backupNote = "Import cancelled."
         }
     }
 
@@ -209,9 +215,13 @@ struct DailyView: View {
         return "Causeway-Stats-\(f.string(from: Date()))"
     }
 
+    private func pl(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
+
     /// Merge an imported backup into the live stores (never destructive) and report the result.
-    private func importStats(_ result: Result<URL, Error>) {
-        guard case .success(let url) = result else { backupNote = "Import cancelled."; return }
+    /// (Cancel is handled by the importer's onCancellation, so a nil/empty selection here is a
+    /// genuine failure, not a user cancel.)
+    private func importStats(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result, let url = urls.first else { backupNote = "Import failed."; return }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url), let backup = StatsBackup.decode(data) else {
@@ -235,7 +245,7 @@ struct DailyView: View {
         let addedDays = game.dailyStore.merge(validDaily)
         let addedDeals = game.winStore.merge(validWins)
         let skipped = (backup.daily.count - validDaily.count) + (backup.wins.count - validWins.count)
-        var note = "Imported — merged \(validDaily.count) days (\(addedDays) new) and \(validWins.count) deals (\(addedDeals) new)."
+        var note = "Imported — merged \(pl(validDaily.count, "day")) (\(addedDays) new) and \(pl(validWins.count, "deal")) (\(addedDeals) new)."
         if skipped > 0 { note += " Skipped \(skipped) invalid entr\(skipped == 1 ? "y" : "ies")." }
         backupNote = note
     }

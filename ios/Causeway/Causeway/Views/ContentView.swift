@@ -131,6 +131,10 @@ struct ContentView: View {
         .sheet(isPresented: $showWins) { WinsView(game: game) }
         .sheet(isPresented: $showDaily) { DailyView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
+        // Pause the solve clock while any of these sheets is open (see Game.suspendClockForSheet).
+        .onChange(of: showWins) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
+        .onChange(of: showDaily) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
+        .onChange(of: showRules) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
         .alert("Play a deal", isPresented: $showDeal) {
             TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
             Button("Play") {
@@ -446,7 +450,12 @@ struct ContentView: View {
                 // "Start" before the first play, "Pause" while playing, "Resume" once paused.
                 demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
             }
-            demoPill(game.demoing ? "Stop" : "Done") { game.stopDemo() }
+            // Mid-demo "Stop" just exits; "Done" (after the line finished) re-deals the seed so the
+            // player lands on a playable board instead of an inert, already-solved one.
+            demoPill(game.demoing ? "Stop" : "Done") {
+                if game.demoing { withAnimation { game.stopDemo() } }
+                else { withAnimation { game.restartDeal() } }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)

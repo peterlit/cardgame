@@ -916,6 +916,21 @@ final class Game: ObservableObject {
     private func startTimer() { clock.start() }
     private func stopTimer() { clock.stop() }
 
+    // Pause the solve clock while a modal sheet (Daily / Wins / How to play) is open, so reading
+    // stats or rules mid-solve doesn't inflate the recorded time. Resumes only a game that was
+    // actually timing (started, not won) — a no-op otherwise.
+    private var clockSuspendedForSheet = false
+    func suspendClockForSheet() {
+        guard clock.isRunning else { return }
+        clockSuspendedForSheet = true
+        stopTimer()
+    }
+    func resumeClockAfterSheet() {
+        guard clockSuspendedForSheet else { return }
+        clockSuspendedForSheet = false
+        if started && !won { startTimer() }
+    }
+
     // helpers for views
     var nextSeed: Int { seed >= Game.maxSeed ? 1 : seed + 1 }
 }

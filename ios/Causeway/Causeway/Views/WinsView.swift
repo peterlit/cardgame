@@ -22,7 +22,7 @@ struct WinsView: View {
                             .foregroundStyle(.secondary).padding(.top, 24)
                     } else {
                         let ranges = store.ranges()
-                        Text("\(store.count) deals solved · \(ranges.count) ranges")
+                        Text("\(store.count) deal\(store.count == 1 ? "" : "s") solved · \(ranges.count) range\(ranges.count == 1 ? "" : "s")")
                             .font(.subheadline).foregroundStyle(.secondary)
                         LazyVGrid(columns: cols, spacing: 8) {
                             ForEach(ranges, id: \.lowerBound) { r in
