@@ -131,10 +131,6 @@ struct ContentView: View {
         .sheet(isPresented: $showWins) { WinsView(game: game) }
         .sheet(isPresented: $showDaily) { DailyView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
-        // Pause the solve clock while any of these sheets is open (see Game.suspendClockForSheet).
-        .onChange(of: showWins) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
-        .onChange(of: showDaily) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
-        .onChange(of: showRules) { _, open in open ? game.suspendClockForSheet() : game.resumeClockAfterSheet() }
         .alert("Play a deal", isPresented: $showDeal) {
             TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
             Button("Play") {
