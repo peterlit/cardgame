@@ -377,6 +377,24 @@ findings fixed:
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
   "winnable deals" mode and a "no more moves" indicator; soften "pure skill" if not.
 
+### review-loop residuals — qa-loop-majors loop, 2026-08-15 (converged round 2; open minors)
+Full report: `.review-loop/REPORT.md`. Four minors open at convergence:
+- **RL-1 — F-token parity pin is an unanchored substring.** `let col = n(1)` matches both case
+  `F` and case `C` in Game.swift, so mutating only `F` stays green; pin the contiguous case body
+  (reviewer supplied the exact normalized snippet in the ledger).
+- **RL-2 — iOS demo-exit guard unpinned.** The cross-copy test pins the three web guards but not
+  iOS `finishDemo`'s `boardComplete` guard (`boardComplete` appears in tests/ only in a comment);
+  drift protection is one-directional.
+- **RL-3 — Unshrunk portrait tableau centred ~3–3.5pt off the upper row.** The unconditional
+  `.frame(maxWidth: .infinity)` centres even the normal-width tableau; centre only when shrunk
+  (`alignment: w < cardW ? .center : .leading` inside `tableauArea`).
+- **RL-4 — Shrink-path trade-offs (design call).** Latch verified sound, but each new
+  tallest-column max still rescales all 52 cards, the 0.53 floor lowers the first trigger to
+  ~13 cards on a 4.7" phone, and the shrunk state shows two card sizes at once (upper row vs
+  tableau). Reviewer offered wontfix if the trade is declared deliberate — human decision.
+- **Simulator re-verification pending** — the loop never looked at a screen; next qa-loop round
+  should re-run TC-2.3 (tall column) and the WF-6 demo cases.
+
 ### review-loop residuals (converged round 2; open minors)
 - **F6b — Node test harness can silently diverge from the app.** `tests/engine.mjs` is a
   hand-copy of `index.html`'s engine, and the "drift guard" checks hardcoded strings against
