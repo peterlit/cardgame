@@ -15,8 +15,11 @@ numbered deals.
 ## Play it
 
 - **Web:** open [`index.html`](index.html) in any browser (or serve the folder, e.g.
-  `python3 -m http.server`). Works offline; win history is saved in the browser's local
-  storage (where the browser permits it — e.g. not in some private-browsing modes).
+  `python3 -m http.server`). Works offline; your progress (wins, daily records, the
+  in-progress game) is saved in the browser's local storage — where the browser permits
+  it, e.g. not in some private-browsing modes. *Daily Challenges need the page to be
+  served* (they load a data file), so opening `index.html` straight off the disk plays
+  fine but leaves the Daily button disabled.
 - **iOS:** a native SwiftUI app lives in [`ios/`](ios/). Open
   `ios/Causeway/Causeway.xcodeproj` in Xcode 16+ and Run. See
   [`ios/README.md`](ios/README.md) for build details.
@@ -28,16 +31,34 @@ numbered deals.
   direction (a pile can run up or down — pick a direction when you start it). Move a
   tidy run as a group if you have enough free cells / empty columns.
 - **Free cells:** 3 single-card parking spots.
-- **Controls:** tap a card then tap its destination; double-tap to auto-move a card
-  (or a valid run) to the first valid spot (foundation, then a matching column, then an
-  empty column, then a free cell).
+- **Controls:** **tap** a card (or a valid run) to send it to the best spot — a
+  foundation if it fits, otherwise onto another card, then an empty column, then a free
+  cell. **Drag** a card to place it somewhere specific. Everything is face-up — it's
+  pure skill.
+
+## Daily Challenges
+
+Every calendar day serves one featured deal with three graded objectives: 🥉 Bronze
+(clear the deal — keeps your streak), plus one 🥈 Silver and one 🥇 Gold constraint, such
+as "send all four Kings down before any Ace". Earn all three in a *single* run and the
+day is 🌟 **Flawless**. Past days stay replayable, streaks are catch-up friendly, and if
+you get stuck, "Show me how to win" plays a real winning line for any tier.
+
+The day's challenge is computed from the date — no server, no account — so every device
+shows the same one. Design notes: [`docs/daily-challenges.md`](docs/daily-challenges.md).
 
 ## Layout
 
 ```
 index.html   self-contained web prototype (HTML/CSS/JS)
 ios/         native SwiftUI app (engine + UI ported from the web build)
+data/        baked solver output — the certified daily pool + winning lines
+tools/       offline solver + pool/solution builders (build-time only, never shipped)
+tests/       canonical shared logic + the Node test suite (npm test)
+docs/        design specs and architecture documentation
 ```
 
 The web prototype and the iOS app share the same rules and deal numbering (a given
-deal number produces the identical layout on both).
+deal number produces the identical layout on both). They don't share code — the logic is
+maintained as parallel copies held in sync by drift-guard tests. See
+[`docs/architecture/overview.md`](docs/architecture/overview.md).

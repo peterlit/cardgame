@@ -391,12 +391,16 @@ The per-codebase documents carry the detailed critiques. At system level:
    append-only policy preserves them. Re-running `certify(10002)` today yields `par 77` where the
    file says `78`. Consequence: the `moves` Silver objective is up to ~14 % looser than intended on
    those days. Player-friendly, not a correctness break, but the data and the spec disagree.
-4. **Documentation has drifted from the code.** `docs/daily-challenges.md:3` still says "not yet
-   implemented" (it shipped on both platforms); its §4 catalogue lists objectives that were never
-   built (time cap, manual-win, `empty-column` — the last deliberately dropped and pinned as absent
-   at `tests/solver.test.mjs:114`). `docs/solver.md:59-60` says a `rules.mjs ↔ index.html` drift
-   guard does not exist, but it does (`tests/solver.test.mjs:24-47`). `ios/README.md:24` says the
-   target is "iPhone-only, **portrait**" — landscape has shipped.
+4. **Documentation drift — surveyed and repaired (2026-08-15).** A prior pass found four documents
+   describing a system that no longer existed: `docs/daily-challenges.md` said the feature was "not
+   yet implemented" and listed three objectives that were never built; `docs/solver.md` said the
+   `rules.mjs ↔ index.html` drift guard did not exist (it does, `tests/solver.test.mjs:24-47`);
+   `ios/README.md` said the target was portrait-only and omitted the entire daily feature; and the
+   root `README.md` still documented the removed tap-to-select control scheme. All four are now
+   corrected, with design intent preserved and "As built" notes recording where the shipped
+   behaviour diverged from the plan. **The underlying risk remains structural**: none of these
+   documents is verified by anything, so nothing stops them drifting again. Only the *code* copies
+   are guarded.
 5. **Objective supply is very thin in one place.** `suit-sprint` is supported by only **4** of 366
    seeds and is actually selected on **3** days. **(inference)** It survives as a catalogue entry
    more than as a real player-facing objective.

@@ -28,6 +28,15 @@ For each candidate seed (ID > 10,000), a certification record:
   found in any of our searches** (unconstrained *and* every constrained one — each constrained line
   is still a legal unconstrained win, and constrained sub-searches often beat the unconstrained
   line). It is a real upper bound on the optimum, not proven-minimal.
+
+  > **Shipped-data caveat.** `certify()` takes that minimum today (`solve.mjs:186-188`), but **274 of
+  > the 366 records in `data/daily-pool.json` predate that change** and store the *unconstrained*
+  > length instead, so their `par` is larger than `min(constraintPar)` (e.g. seed 10002: `par 78`,
+  > `min 77`; seed 10004: `par 97`, `min 85`). Because the pool is append-only (§5) they were never
+  > regenerated. The only consequence is that the `moves` Silver objective — `N = round(par × 1.2)`
+  > — is up to ~14 % looser than intended on those days, which errs toward the player. Regenerating
+  > would silently re-tune historical days, so it should not be done casually; if it ever is,
+  > migrate `moves` params for shipped dates rather than recomputing them.
 - `supports[]` are the **Certified** objectives this seed admits — a Silver/Gold objective is only
   ever offered by the daily generator on a seed that lists it. This is what guarantees every
   offered objective is beatable (§ solvability of ordering objectives).
@@ -56,8 +65,11 @@ means exactly what the app enforces:
   of k cards is one move).
 
 `rules.mjs` is pure functions over a plain `{tableau, cells, up, down}` state; unit-tested against
-hand-verified cases in `tests/solver.test.mjs`. *(Open item: a drift guard tying `rules.mjs` to
-`index.html`, like the engine harness has — see §7.)*
+hand-verified cases in `tests/solver.test.mjs`. A **drift guard** ties it to the shipped web engine:
+the first test in `tests/solver.test.mjs` (lines 24–47) reads `index.html` and asserts the canonical
+bodies — `isSeqHead`, `runDir`, `tailDir`, `canStackTableau`'s `conn`/`rdir`/`tdir` rules,
+`maxMovable`, and both foundation predicates — still appear there verbatim. Editing the rules in one
+place without the other fails CI.
 
 ---
 
@@ -133,8 +145,16 @@ candidates. Properties:
 - **Versioned:** `pool.version` guards the schema.
 - Resumable and idempotent (skips seeds already present).
 
-The initial pool is intentionally modest; it grows by re-running. Certification is ~10–15 s/seed
-(most of it the *unsupported* objectives exhausting their budget), so building is a batch job.
+The pool currently holds **366 seeds** (10001–10376 — a full year of daily challenges); it grows by
+re-running with a later `--start`. Of the seeds scanned in that range, 10 were rejected as not
+daily-eligible. Certification is ~10–15 s/seed (most of it the *unsupported* objectives exhausting
+their budget), so building is a batch job.
+
+**Objective supply is uneven**, which is worth knowing before tuning the generator: across the 366
+seeds, `cells-le-2` is supported by 366, `cells-le-1` by 364, `suits-top-down` by 353, `no-cells` by
+304, `kings-first` by 292, `aces-first` by 223, `jacks-down-first` by 184, `down-openers-20` by 147
+— and **`suit-sprint` by only 4** (seeds 10105, 10192, 10210, 10312), so it is actually chosen as
+the day's Gold on just 3 days of the year.
 
 ---
 
@@ -157,10 +177,10 @@ Documented per "proceed, but write down the questions." Implementation proceeded
 
 1. **`par` is near-optimal, not optimal.** Fine for generous move caps; revisit if we want tight
    "expert" caps (would need IDA*/optimal search — slower).
-2. **`rules.mjs` ↔ `index.html` drift.** The rules were hand-ported and unit-tested, but there's no
-   automated drift guard yet (the engine harness has one for the shared logic). **Recommended
-   next:** add a drift guard, or a verification pass that replays a claimed solution through the
-   app engine. Until then, the rule port is the single trust anchor.
+2. ~~**`rules.mjs` ↔ `index.html` drift.**~~ **Resolved.** A drift guard now pins the canonical rule
+   bodies in `index.html` (`tests/solver.test.mjs:24-47`, see §2), and baked solutions are
+   additionally replay-verified against the real rules and the runtime objective checkers at build
+   time and again in CI (`tests/solutions.test.mjs`).
 3. **Coverage.** The solver skips deals it can't crack within budget (`unknown`). That's acceptable
    — the pool only needs *enough* certified seeds, and skipping brutally-hard deals is arguably good
    for daily play — but it means the pool is a curated subset, not "all winnable deals."

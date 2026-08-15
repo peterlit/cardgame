@@ -556,11 +556,15 @@ Its background is `#687D78` (`:15`), which sits between the first two stops of t
 is `0xFFD777` (warm yellow). The launch screen was matched to a background that no longer ships, so
 launch flashes grey-green before a summer sky.
 
-### Documentation drift
+### Documentation drift — repaired 2026-08-15
 
-`ios/README.md` states the target is "iPhone-only, **portrait**" (`:24`) — landscape shipped at
-`ea5f8d2`/`9186185`. Its project layout section (`:41-59`) predates the entire daily-challenge
-feature and the memory work, omitting `Model/Daily.swift`, `Model/DailyStore.swift`,
-`Model/GameClock.swift`, `Model/MemoryMonitor.swift`, `Model/StatsBackup.swift`,
-`Views/DailyView.swift`, `Views/MemoryHUD.swift` and both bundled JSON files. Its storage section
-(`:70-71`) lists two keys where five live ones exist.
+`ios/README.md` had drifted badly: it stated the target was "iPhone-only, **portrait**" (landscape
+shipped at `ea5f8d2`/`9186185`), described the controls as "smart double-tap" (replaced by
+tap/drag at `f334972`), listed a project layout predating the entire daily-challenge feature and the
+memory work, and documented two `UserDefaults` keys where five live ones exist. It has been brought
+up to date, including the stats-backup feature and the absent-accessibility caveat (**M7**).
+
+Worth noting for future edits: the README's "no networking" claim was *technically* imprecise —
+the app does handle local `file://` URLs from the document picker for stats backup. The claim is now
+worded to say exactly that, since the privacy posture (nothing leaves the device unless the user
+exports it themselves) is the part that actually matters.

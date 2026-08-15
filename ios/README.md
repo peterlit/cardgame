@@ -1,9 +1,9 @@
 # Causeway — iOS (native SwiftUI)
 
 A native SwiftUI port of the Causeway browser prototype (`../index.html`). The game
-rules, seeded deals, safe auto-play, smart double-tap, win tracking, and the
-MobilityWare-style look are all reimplemented in Swift — same deal numbers as the web
-version (the `Mulberry32` RNG is ported verbatim).
+rules, seeded deals, safe auto-play, tap-to-smart-move / drag-to-place controls, Daily
+Challenges, win tracking, and the MobilityWare-style look are all reimplemented in Swift
+— same deal numbers as the web version (the `Mulberry32` RNG is ported verbatim).
 
 ## Requirements
 
@@ -21,7 +21,9 @@ To run on your own iPhone: select the project → target **Causeway** → **Sign
 Capabilities** → set your Apple ID team and a unique **Bundle Identifier** (currently
 `com.whimsicaldistractions.Causeway` — change it to your own). Free personal teams allow
 7-day on-device signing; a paid Apple Developer account is only needed for TestFlight /
-the App Store. The target is **iPhone-only, portrait**.
+the App Store. The target is **iPhone-only** (`TARGETED_DEVICE_FAMILY = 1`) and supports
+**portrait and both landscape orientations** — landscape uses a different board layout
+(controls in a left rail, foundations and free cells beside the tableau).
 
 ## If the project won't open
 
@@ -40,42 +42,82 @@ chokes on it, create the project fresh instead:
 
 ```
 Causeway/Causeway/
-  CausewayApp.swift        @main entry
-  Theme.swift              colours + palette
+  CausewayApp.swift        @main entry (forces light colour scheme)
+  Theme.swift              colours + palette + card aspect ratio
   LaunchScreen.storyboard  launch screen (native-resolution)
   PrivacyInfo.xcprivacy    privacy manifest
+  daily-pool.json          certified daily seeds — byte-identical copy of ../../data/
+  daily-solutions.json     baked "Show me how to win" lines — likewise
   Model/
     Cards.swift            Suit, Card, Mulberry32 RNG (ported from web)
-    Game.swift             engine + ObservableObject state (rules, autoplay, smart-move, undo)
-    WinStore.swift         persistence (UserDefaults) + range compression
+    Game.swift             engine + ObservableObject state (rules, autoplay, auto-finish,
+                           undo, persistence, daily scoring, demo playback)
+    Daily.swift            daily logic ported from tests/daily.mjs: calendar, objective
+                           checkers, date→challenge generator, streaks, bundle loader
+    DailyStore.swift       per-day tier records (UserDefaults, versioned)
+    WinStore.swift         solved deals (UserDefaults) + contiguous-range compression
+    GameClock.swift        isolated elapsed-time timer (kept off Game to avoid
+                           re-rendering the board every second)
+    StatsBackup.swift      portable JSON export/import of daily + win records
+    MemoryMonitor.swift    DebugFlags + phys_footprint sampler (debug HUD only)
   Views/
-    ContentView.swift      board, HUD, toolbar, win overlay, deal entry
+    ContentView.swift      board, toolbar/landscape rail, drag system, demo bar,
+                           win overlay, sheet hosting, live objectives HUD
     CardView.swift         card face + empty slot
-    SummerBackground.swift original sun-&-summer background (vector)
+    DailyView.swift        Challenges screen: streaks, day card, calendar, backup
     WinsView.swift         deal-number entry, range chips + drill-down detail
-    Extras.swift           FlowLayout + How-to-play rules sheet
+    SummerBackground.swift original sun-&-summer background (vector, Equatable)
+    Extras.swift           FlowLayout + How-to-play / About sheet
+    MemoryHUD.swift        debug memory overlay (off in release)
   Assets.xcassets/         AppIcon (opaque 1024) + AccentColor
-tools/make_icon.swift      app-icon generator
+tools/make_icon.swift      app-icon generator (standalone macOS script, not in the target)
 ```
+
+There is **no XCTest target**. The Swift port is instead pinned from the Node suite by
+`../tests/ios-parity.test.mjs`, which asserts the parity-critical Swift bodies (deal RNG,
+calendar, daily generator, objective checkers, streaks, the once-only win gate, the demo
+token applier) still match the canonical logic. See `../tests/README.md`.
 
 ## Privacy & security
 
 Causeway is fully offline and self-contained:
 
-- **No networking** — no `URLSession`, URLs, or sockets; nothing leaves the device.
+- **No networking** — no `URLSession`, no sockets, no requests of any kind; nothing is
+  sent off the device. (The app does handle local `file://` URLs, but only the
+  security-scoped ones the system document picker hands back for stats backup — see
+  below.)
 - **No web view or dynamic code execution.**
 - **No permissions** — no camera, location, contacts, notifications, pasteboard, or
-  device identifiers are requested.
+  device identifiers are requested. No entitlements file exists.
 - **No third-party dependencies** — Apple frameworks only (no supply-chain surface).
-- **Storage** — the win history (deal numbers, moves, times) and the auto-play preference
-  in `UserDefaults`, inside the app sandbox and encrypted at rest by iOS.
+- **Storage** — everything lives in `UserDefaults` inside the app sandbox, encrypted at
+  rest by iOS. Five keys:
+
+  | Key | Holds |
+  |---|---|
+  | `causeway.wins` | solved deals — deal number, best moves, best time, date |
+  | `causeway.daily` | per-day challenge records (tiers earned, best moves/time) |
+  | `causeway.game` | the in-progress board so backgrounding doesn't lose it |
+  | `causeway.autoplay` | auto-play on/off |
+  | `causeway.autofinishmode` | auto-finish Ask/On/Off |
+
+  (Plus `causeway.wins.unreadable` / `causeway.daily.unreadable`, written only if a store
+  ever fails to decode, so corrupt bytes are quarantined rather than overwritten.)
+- **Stats backup is user-initiated and local.** The Daily screen can export your records
+  to a JSON file and import one back, through the system document picker — the app never
+  reads or writes files you didn't pick, and nothing is uploaded. Import *merges* (it can
+  only add or improve a record, never delete one) and rejects files that aren't Causeway
+  backups.
 - A **Privacy Manifest** (`Causeway/PrivacyInfo.xcprivacy`) declares no tracking, no
   data collection, and the required-reason for `UserDefaults` (CA92.1).
 
 ## Status / known follow-ups
 
-- Builds and runs on device (iPhone 13 Pro, iOS 26). Broader device/orientation testing
-  is still pending — see the repo-root `BACKLOG.md`.
+- Builds and runs on device (iPhone 13 Pro, iOS 26); portrait and landscape both verified
+  on device. Testing on real iOS 17/18 hardware is still outstanding before submission —
+  see `../docs/shipping-readiness.md` and the repo-root `BACKLOG.md`.
+- **Accessibility is not done** — no VoiceOver labels or actions, and Dynamic Type is
+  ignored (all type is fixed `.system(size:)`). Tracked as **M7** in `BACKLOG.md`.
 - App icon: an opaque 1024px icon (two fanned cards, A♥/K♠ on teal) lives in
   `Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`. Regenerate it with
   `swift tools/make_icon.swift Causeway/Causeway/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.

@@ -1,8 +1,15 @@
 # Daily Challenges — design
 
-**Status:** design approved (concept level); not yet implemented. This document is the
-authoritative reference; every decision below was signed off during design review. Implementation
-begins with Phase 0 (the solver + pool).
+**Status: SHIPPED on both platforms** (web + iOS). This document is the original design record —
+every decision below was signed off during design review — kept for the *why*. Where the built
+feature differs from the plan, an **As built** note says so; §12 and §13 record how the open items
+and roadmap actually resolved.
+
+For how it is implemented rather than why, see
+[`architecture/overview.md`](architecture/overview.md) §5 and the per-platform docs. The canonical
+logic lives in `tests/daily.mjs`, mirrored into `index.html` and
+`ios/Causeway/Causeway/Model/Daily.swift`, with drift guards in `tests/daily.test.mjs` and
+`tests/ios-parity.test.mjs`.
 
 A MobilityWare-FreeCell-style daily-challenge feature for Causeway: each calendar day serves a
 featured deal with a small set of graded objectives; the player earns a badge per day and builds
@@ -72,22 +79,34 @@ All objectives are checkable from lightweight per-attempt telemetry (see §8). E
 - **Certified** — the objective restricts the winning line itself, so the deal must be proven
   winnable **subject to the constraint**, per seed. Offered only on seeds certified to support it.
 
-| # | Objective | Tier | Eligibility | Runtime check |
-|---|-----------|------|-------------|---------------|
-| 1 | Clear the deal | 🥉 | Universal (winnable + par) | `won` |
-| 2 | Win in ≤ N moves | 🥈 | Universal (par → N) | `moveCount ≤ N` |
-| 3 | Win in ≤ T time | 🥈 | Universal (soft, par-derived) | `elapsed ≤ T` |
-| 4 | Win without undo | 🥈 | Universal | `undoCount == 0` |
-| 5 | Manual win — no auto-play / auto-finish | 🥈 | Universal | automation-used flags false |
-| 6 | ≤ K free-cell uses (K = 1 or 2) | 🥈 | Certified | cumulative cell-entries ≤ K |
-| 7 | Start all four down-foundations within the first N moves | 🥈 | Certified (+par) | milestone + move index |
-| 8 | Empty a tableau column at some point | 🥈 | Certified | board-state event |
-| 9 | **No** free cell ever touched | 🥇 | Certified | cell-entries == 0 |
-| 10 | All **Kings down** before any Ace goes up | 🥇 | Certified | foundation order |
-| 11 | All **Jacks to the down-foundation** before any Ace goes up | 🥇 | Certified | foundation order |
-| 12 | **Every suit built top-down** — its King (down) home before its Ace (up) | 🥇 | Certified | foundation order |
-| 13 | All **Aces up** before any other card goes home (hard; rare) | 🥇 | Certified | foundation order |
-| 14 | **Suit sprint** — finish one whole suit before a second suit sends any card home | 🥈/🥇 | Certified | foundation order |
+| # | Objective | Tier | Eligibility | Runtime check | Shipped? |
+|---|-----------|------|-------------|---------------|----------|
+| 1 | Clear the deal | 🥉 | Universal (winnable + par) | `won` | ✅ (Bronze) |
+| 2 | Win in ≤ N moves | 🥈 | Universal (par → N) | `moveCount ≤ N` | ✅ `moves` |
+| 3 | Win in ≤ T time | 🥈 | Universal (soft, par-derived) | `elapsed ≤ T` | ❌ never built |
+| 4 | Win without undo | 🥈 | Universal | `undoCount == 0` | ✅ `no-undo` |
+| 5 | Manual win — no auto-play / auto-finish | 🥈 | Universal | automation-used flags false | ❌ never built |
+| 6 | ≤ K free-cell uses (K = 1 or 2) | 🥈 | Certified | cumulative cell-entries ≤ K | ✅ `cells-le-1`, `cells-le-2` |
+| 7 | Start all four down-foundations within the first N moves | 🥈 | Certified (+par) | milestone + move index | ✅ `down-openers-20` (N = 20) |
+| 8 | Empty a tableau column at some point | 🥈 | Certified | board-state event | ❌ **dropped** — vacuous |
+| 9 | **No** free cell ever touched | 🥇 | Certified | cell-entries == 0 | ✅ `no-cells` |
+| 10 | All **Kings down** before any Ace goes up | 🥇 | Certified | foundation order | ✅ `kings-first` |
+| 11 | All **Jacks to the down-foundation** before any Ace goes up | 🥇 | Certified | foundation order | ✅ `jacks-down-first` |
+| 12 | **Every suit built top-down** — its King (down) home before its Ace (up) | 🥇 | Certified | foundation order | ✅ `suits-top-down` |
+| 13 | All **Aces up** before any other card goes home (hard; rare) | 🥇 | Certified | foundation order | ✅ `aces-first` |
+| 14 | **Suit sprint** — finish one whole suit before a second suit sends any card home | 🥈/🥇 | Certified | foundation order | ✅ `suit-sprint` (Gold only) |
+
+**As built: 11 of the 14 shipped.** Two were never implemented — the **time cap** (#3, because a
+deterministic, fair time target could not be calibrated) and **manual win** (#5, which the
+automation policy in §5 made redundant: automation is the player's responsibility, not a tracked
+flag). One was **deliberately dropped**: #8 *empty a tableau column* is vacuously true of every win,
+since winning empties every column; it needs a non-trivial redefinition (e.g. "an empty column while
+≥ K cards remain") before it can mean anything. Its absence is pinned by a test
+(`tests/solver.test.mjs:114`) so it cannot be reintroduced by accident.
+
+Note also that `suit-sprint` ended up **Gold-only** rather than 🥈/🥇, and is supported by only 4 of
+the 366 pooled seeds — it is chosen on 3 days a year. The frozen id lists live at
+`tests/daily.mjs:59-61`.
 
 The two-way-foundation cluster (10–13) is the signature — nothing in FreeCell can pose "build from
 the top" objectives. Aces-first (13) is deliberately hard and therefore appears rarely, only on
@@ -162,6 +181,13 @@ iOS. Only seeds with `winnable: true` **and** at least one certified Gold-grade 
 "daily-eligible" (a day needs a real Gold). The pool file is **versioned** and **append-only** (see
 §7).
 
+> **As built** — `data/daily-pool.json` holds **366 seeds** (10001–10376), one per day for a year.
+> "Shared verbatim" is literally true: the file is byte-identical to the copy in the iOS bundle
+> (SHA-256 verified), as is `data/daily-solutions.json`, which was added later for "Show me how to
+> win". The web `fetch`es both from its own origin; iOS reads them from `Bundle.main`. One practical
+> consequence: opening `index.html` from `file://` cannot fetch, so Daily is disabled there while the
+> rest of the game plays normally.
+
 ---
 
 ## 7. Deterministic generation & frozen history
@@ -172,6 +198,23 @@ iOS. Only seeds with `winnable: true` **and** at least one certified Gold-grade 
 2. Pick a `seed` from the **frozen, append-only** daily-eligible list.
 3. Pick the Silver objective from the Silver-eligible set (rotating families for variety).
 4. Pick the Gold objective from that seed's certified Gold set.
+
+> **As built** (`tests/daily.mjs:72-83`, and mirrored verbatim on both platforms):
+>
+> - The day index is `daysFromCivil(y,m,d) - EPOCH_DAYS`, where `EPOCH_DAYS = daysFromCivil(2026, 8, 12)`
+>   — day 0 is 2026-08-12, using the device's **local** calendar date.
+> - The seed is **not drawn randomly**: day *D* maps directly to `pool.seeds[D]`. Append-only is what
+>   freezes history, exactly as intended, but by indexing rather than by a stable draw.
+> - The per-day RNG is `mulberry32((0x9e3779b9 ^ (dayIndex + 1)) >>> 0)` — a golden-ratio constant
+>   XORed with the day, not the date as `YYYYMMDD`. This formula is **frozen**; changing it would
+>   retroactively reshuffle every past day's objectives.
+> - Silver is drawn first, then Gold — from `SILVER_UNIVERSAL + (SILVER_CERTIFIED ∩ supports)` and
+>   `GOLD ∩ supports` respectively. **Draw order is load-bearing** and is pinned by the drift guards.
+> - There is **no objective-family rotation.** Variety comes from the per-day draw alone; the
+>   "rotating families" idea in step 3 was never implemented.
+>
+> A golden-master test (`tests/daily.test.mjs:66-70`) pins `(day → seed, silverId, goldId)` for a
+> frozen sample pool, so any reorder, mid-insert, or RNG change fails CI.
 
 **Freezing (critical).** Once a date has shipped, its challenge must never change — otherwise
 growing the pool or re-tuning par would silently rewrite old days and invalidate streaks and bests.
@@ -235,6 +278,14 @@ DailyStore {
 }
 ```
 
+> **As built** — the record is `TierResult` (`tests/daily.mjs`, `Model/Daily.swift:221`), with two
+> changes: a fourth boolean **`flawless`**, and the best-score fields named **`moves` / `elapsed`**
+> rather than `bestMoves` / `bestSecs`. The key is `dateKey = dayIndex` (an integer offset from the
+> 2026-08-12 epoch), not a date string. Tiers OR-accumulate and best scores take the minimum via
+> `mergeTiers`, so a later worse attempt can never lower a record. `DailyStore.version` is written
+> but, as of today, never actually validated on load — forward tolerance comes instead from a
+> permissive decoder that defaults every missing field.
+
 **Streaks are derived, not stored.** All six streak numbers are computed from `days` on demand, so
 there are no counters to drift:
 
@@ -243,6 +294,13 @@ there are no counters to drift:
 - 🥇 **Gold streak** — consecutive days with `gold`.
 - Each has a **current** value (the run of consecutive completed days ending at today, or yesterday
   if today isn't done yet) and an **all-time longest**.
+
+> **As built** — there are **four** streaks, not three: 🌟 Flawless joined the list. Each also
+> reports a third number, **`total`** (lifetime days holding that tier), because a streak alone was
+> misread — two non-consecutive Flawless days correctly showed a streak of 1, which looked like a
+> lost record. The cards now read *streak / N total / best N*. The current-run anchor is: today if
+> today was played **at all** (a played-but-missed today breaks that tier's run), else yesterday if
+> played, else nothing.
 
 **Catch-up friendly (decided).** Because past days are replayable, a streak is the longest run of
 consecutive calendar *dates* all completed **whenever** completed — finishing yesterday's deal today
@@ -259,7 +317,8 @@ A new screen (its own entry; the toolbar is already crowded), containing:
 - **Today's card:** Deal #, the three tiers with their objective text and 🥉/🥈/🥇 status, a **Play**
   button, and the visible Auto-play / Auto-finish state (per §5).
 - **Month calendar:** one cell per day showing completion (badge + which stars). Tap a past day to
-  play it; future days are locked. Optional monthly-completion badge.
+  play it; future days are locked. Optional monthly-completion badge. *(As built: the calendar
+  shipped; the monthly badge did not. Flawless days show a ⭐ in place of the tier dots.)*
 - **Live objectives HUD (during an attempt):** a small checklist over the board — the move counter
   ticks toward the cap; an ordering objective turns red the instant it's broken; etc. This live
   feedback is most of the feel.
@@ -282,18 +341,34 @@ A new screen (its own entry; the toolbar is already crowded), containing:
 
 ---
 
-## 12. Open items (to settle before/within implementation)
+## 12. Open items — how they resolved
 
-- **In-progress slot:** does starting a challenge replace the casual in-progress game (like dealing
-  a number does today), or does challenge play get its own resume slot? Leaning: reuse the single
-  game context for MVP; revisit if it feels wrong.
-- **Move-cap margins & time-cap formula:** exact `N = f(par)` per objective and the seconds-per-move
-  estimate for time caps — tune during Phase 1 with real play.
-- **Monthly badge:** whether completing a full month grants a distinct trophy (nice, Phase 2).
-- **Objective-family rotation:** the exact deterministic rotation that keeps variety high across a
-  week/month.
-- **Pool size / repeat spacing:** how many certified seeds to ship initially and how the generator
-  spaces repeats.
+- **In-progress slot** — ✅ **Settled as planned:** challenge play reuses the single game context.
+  `challengeDay` rides along with the saved game (`causeway.game` / the web `localStorage` twin), so
+  a challenge attempt survives backgrounding and reload. Starting a challenge re-deals, exactly like
+  entering a deal number.
+- **Move-cap margin** — ✅ **Settled:** `N = round(par × 1.2)` for the `moves` objective
+  (`tests/daily.mjs:42`). See the shipped-data caveat in [`solver.md`](solver.md) §1: on 274 of 366
+  days the stored `par` is the unconstrained length, making the cap up to ~14 % looser than intended.
+- **Time-cap formula** — ❌ **Moot:** the time-cap objective was never built (§4 #3).
+- **Monthly badge** — ❌ **Not built.** Never started; would be additive.
+- **Objective-family rotation** — ❌ **Not built.** The plain per-day RNG draw was judged sufficient
+  variety in practice (§7 *As built*).
+- **Pool size / repeat spacing** — ✅ **Settled:** 366 seeds, one per day for a year, each used
+  exactly once — so repeat spacing never arises. Growing the pool is `build-pool.mjs` with a later
+  `--start`; appended seeds extend the calendar without disturbing any past day.
+
+**Added after this design was written** (not anticipated here):
+
+- 🌟 **Flawless** — a fourth tier for earning Bronze + Silver + Gold in a *single* attempt, rather
+  than banking them across free retries. It gets its own streak, a calendar star, and a win-overlay
+  callout.
+- **"Show me how to win"** — a baked, replayable winning line per tier
+  (`data/daily-solutions.json`), animated as an assisted, pausable, single-steppable demo that is
+  never scored. See [`solver.md`](solver.md) § Solutions.
+- **Live objectives HUD** with "on track" detection — an objective shows a green ✓ the moment it is
+  *locked in* (guaranteed by any completion), not merely un-violated.
+- **Stats export/import** (iOS only) — a portable JSON backup of daily records and wins.
 
 ---
 
@@ -308,6 +383,14 @@ A new screen (its own entry; the toolbar is already crowded), containing:
 - **Phase 2 — full:** the month calendar, the full objective catalog (incl. all two-way-foundation
   ones), the live objectives HUD, monthly badges.
 - **Phase 3 — polish:** share cards, richer badges, animations.
+
+> **As delivered.** **Phase 0 ✅** (`tools/solver/`, output `data/daily-pool.json`; retired backlog
+> I2). **Phase 1 ✅ on both platforms** — the shared core landed as `tests/daily.mjs`, then was
+> inlined into `index.html` and ported to `Model/Daily.swift`. **Phase 2 ✅ except monthly badges** —
+> month calendar, the full *implemented* catalogue (§4) and the live objectives HUD all shipped.
+> **Phase 3 ⏳ not started** — share cards and richer badges remain open; animations effectively
+> landed along the way (card flight, sequential auto-finish reveal, demo playback). Two things not
+> on this roadmap also shipped: 🌟 Flawless and "Show me how to win" (see §12).
 
 ---
 

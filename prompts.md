@@ -328,3 +328,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     keys are written but never read; and the live-HUD checkers (`objViolated`/`objSecured`) are a
     third, entirely unguarded copy of the objective semantics on both platforms. Docs-only change;
     67 tests still green.
+67. Fix the documentation drift found in the architecture review. Four documents described a system
+    that no longer existed; all corrected against verified source, preserving the original design
+    intent and adding "As built" notes where the shipped behaviour diverged from the plan:
+    (a) root `README.md` — the Controls section still described the REMOVED tap-to-select /
+    double-tap model (now tap = smart-move, drag = place); added the missing Daily Challenges
+    section, the `file://`-disables-Daily caveat, and the full repo layout.
+    (b) `ios/README.md` — "iPhone-only, portrait" (landscape shipped), "smart double-tap", a project
+    layout predating the whole daily feature + memory work (7 files and 2 bundled JSONs missing),
+    2 UserDefaults keys documented where 5 live ones exist, and an imprecise "no URLs" privacy claim
+    (the app does handle picker-supplied `file://` URLs for stats backup); added the backup feature,
+    the no-XCTest note, and the M7 accessibility caveat.
+    (c) `docs/solver.md` — claimed in two places that the `rules.mjs ↔ index.html` drift guard did
+    not exist yet (it does, `tests/solver.test.mjs:24-47`); documented the shipped-`par` caveat
+    (274/366 records predate the min() change, loosening the `moves` cap ~14%) and the real pool
+    size + uneven objective supply (`suit-sprint` on 4 seeds / 3 days).
+    (d) `docs/daily-challenges.md` — still said "not yet implemented"; marked which 11 of the 14
+    catalogued objectives shipped (time-cap and manual-win never built, `empty-column` deliberately
+    dropped as vacuous and pinned absent by a test), corrected the generator description (frozen
+    `mulberry32((0x9e3779b9 ^ (dayIndex+1)) >>> 0)`, day→pool index rather than a draw, no
+    family rotation), the record shape (`flawless` + `moves`/`elapsed`), four streaks with `total`,
+    and resolved §12 open items + §13 roadmap. Also updated the architecture docs' own
+    "documentation has drifted" findings, which this task made stale. Docs-only; 67 tests green.
