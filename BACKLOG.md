@@ -83,8 +83,12 @@ All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
 - **DONE (auto)** — file-picker Cancel now shows "Import/Export cancelled." via the iOS 17
   `onCancellation:` overloads (onCompletion isn't called on interactive cancel).
 - **DONE (auto)** — count-of-1 grammar: "1 day" / "1 deal" / "1 range" (`importStats`, `WinsView`).
-- **DONE (proposal)** — demo "Done" now re-deals the seed (`restartDeal`) → playable board.
-- **DONE (proposal)** — solve clock pauses while a modal sheet is open (`Game.suspendClockForSheet`).
+- **DONE (proposal)** — demo "Done" now re-deals the seed (`restartDeal`) → playable board. (Review
+  note, accepted as-is: a daily demo's Replay board is casual/unscored since you saw the solution.)
+- **REVERTED (proposal)** — clock-pause-in-sheets (`2796867`): a follow-up skeptical review flagged it
+  as a metric-integrity regression (any sheet becomes a pause button → gameable daily best-times).
+  User chose continuous wall-clock timing. Original "reading a sheet inflates time" complaint judged
+  minor/self-inflicted and left as wall-clock.
 - **Coverage gaps (open)** — WF-4 scored win overlay and WF-12 landscape were code-reviewed only
   (env can't rotate the simulator / deal not hand-solvable this session); verify on device.
 - **NFR (open)** — idle CPU ~0–2%, no network; RSS 181→~357 MB then plateaued — inconclusive for a
