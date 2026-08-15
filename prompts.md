@@ -295,3 +295,18 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     drops non-positive daily moves/elapsed, and reports the actually-merged counts + any skipped
     entries. Accepted pre-existing minor (not a regression): win record merge takes min moves and min
     secs independently (also in `record()`).
+65. Landscape orientation-lock support saga: user's physical iPhone was stuck landscape-only despite a
+    correct committed pbxproj (all 3 orientations on both configs, device+sim Info.plist verified, no
+    lock code). Root cause was MINE: my temporary landscape-only pbxproj edits (for rotated screenshots)
+    raced with the user's open Xcode, which captured landscape-only into Deployment Info and persisted/
+    shipped it — surviving delete + clean-build + reboot. Fixed by re-checking Portrait+Landscape L/R in
+    Xcode → General → Deployment Info. Saved a memory ([[no-temp-pbxproj-edits]]) to never do throwaway
+    pbxproj edits in the working tree again.
+66. Ran the `qa-loop` plugin (simulator-driven UX/QA) on the iOS app. Drafted WORKFLOWS.md (12 workflows,
+    novice+power personas), signed off, exploration→TESTCASES.md, then a full round-1 pass via the
+    ux-tester subagent. Converged round 1: no blockers/majors, 4 minor findings. User accepted all 4;
+    fixed in `5b237b4`: (1) file-picker Cancel feedback via iOS 17 onCancellation overloads; (2) "1 day/
+    deal/range" singular grammar; (3) demo "Done" re-deals the seed to a playable board; (4) solve clock
+    pauses while a modal sheet is open. All state under `.qa-loop/` (REPORT.md). Coverage gaps: WF-4 win
+    overlay + WF-12 landscape code-reviewed only (env can't rotate the sim). Also gave the plugin author
+    feedback (sampler lifecycle, finding schema, deterministic-deal seeding, convergence-ignores-minors).

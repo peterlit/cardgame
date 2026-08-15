@@ -79,19 +79,18 @@ are done or added.
 
 ### QA loop — round 1 findings (2026-08-14)
 Simulator-driven UX/QA loop (`.qa-loop/REPORT.md`) converged round 1: no blockers/majors.
-- **Fix (auto, minor)** — file-picker Cancel shows the default BACKUP helper text instead of
-  "Import cancelled." / "Export cancelled or failed." (SwiftUI `.fileImporter`/`.fileExporter`
-  `onCompletion` isn't called on interactive cancel; Import also nils the note first). Data-safe.
-- **Fix (auto, minor)** — count-of-1 grammar: "1 days" / "1 deals" (`DailyView.importStats`) and
-  "1 deals solved · 1 ranges" (`WinsView`) should be "1 day" / "1 deal" / "1 range".
-- **Proposal (decide)** — demo "Done" leaves an inert fully-solved board (Won still 0, no
-  guidance); consider Done → Replay the seed.
-- **Proposal (decide)** — solve clock keeps ticking while modal sheets (Daily/Wins/How-to-play)
-  are open, inflating recorded time; consider pausing on sheet-present.
-- **Coverage gaps** — WF-4 scored win overlay and WF-12 landscape were code-reviewed only (env
-  can't rotate the simulator / deal not hand-solvable this session); verify on device.
-- **NFR** — idle CPU ~0–2%, no network; RSS 181→~357 MB then plateaued — inconclusive for a leak,
-  worth a New game/Undo ×10 loop.
+All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
+- **DONE (auto)** — file-picker Cancel now shows "Import/Export cancelled." via the iOS 17
+  `onCancellation:` overloads (onCompletion isn't called on interactive cancel).
+- **DONE (auto)** — count-of-1 grammar: "1 day" / "1 deal" / "1 range" (`importStats`, `WinsView`).
+- **DONE (proposal)** — demo "Done" now re-deals the seed (`restartDeal`) → playable board.
+- **DONE (proposal)** — solve clock pauses while a modal sheet is open (`Game.suspendClockForSheet`).
+- **Coverage gaps (open)** — WF-4 scored win overlay and WF-12 landscape were code-reviewed only
+  (env can't rotate the simulator / deal not hand-solvable this session); verify on device.
+- **NFR (open)** — idle CPU ~0–2%, no network; RSS 181→~357 MB then plateaued — inconclusive for a
+  leak, worth a New game/Undo ×10 loop.
+- **Parity follow-up (open)** — the demo-Done and clock-pause behaviors are iOS-only so far; mirror
+  to web (`index.html`) for parity.
 
 ### stats backup + flawless total (2026-08-14)
 - **Local Export/Import (iOS)** — a "Backup" section on the Daily screen exports stats (daily records
