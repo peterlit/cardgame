@@ -107,6 +107,16 @@ All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
 - **Follow-up (offered, not done): iCloud Key-Value sync** — `NSUbiquitousKeyValueStore` for automatic
   hands-off backup/restore across the user's devices; low privacy surface (user's own private iCloud).
   Needs the iCloud KVS entitlement + merge-on-change (reuses `mergeTiers`) + signed-out fallback.
+  - **Security review (done — cleared, requirements baked in):** No cross-app exposure risk. KVS is
+    isolated by app sandbox + team-scoped entitlement (`com.apple.developer.ubiquity-kvstore-identifier`,
+    default `<TeamID>.<bundleID>`) + code-signing, so no third-party app can read our store, and our app's
+    iCloud reach is scoped to its own ~1 MB container only (no path to Photos/Drive/other apps' data — so
+    even a compromised build can't pivot into the user's broader iCloud). Data is non-sensitive game
+    progress; encrypted in transit + at rest (E2EE only under Advanced Data Protection). Requirements when
+    building: (1) keep the DEFAULT per-app container — don't broaden the entitlement; (2) **sanitize on
+    read** from KVS exactly like `importStats` (clamp day/seed ranges, reject non-positive moves/secs) so a
+    corrupt/oversized value can't crash or poison a best-time; (3) **merge, don't overwrite** on
+    `didChangeExternallyNotification`; (4) store ONLY game progress — no ids/PII/secrets.
 - **Follow-up (parity): web Export/Import** — mirror the iOS backup on web (localStorage → download /
   upload the same `causeway-stats` JSON) so files move between prototype and app.
 
