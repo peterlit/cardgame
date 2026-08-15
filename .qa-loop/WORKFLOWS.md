@@ -74,9 +74,28 @@ Each has a stable ID and a reasonable-effort expectation.
   board reflows to the rail + foundations + tableau layout, all controls remain reachable
   (rail scrolls if needed), cards are comfortably large, and dragging still works.
 
+## Fixture policy
+
+The app exposes **no launch arguments, debug pickers, or seed overrides** — its only
+randomness levers are the deal number and the wall-clock date. Pin them like this:
+
+- **Deterministic start:** the app is uninstalled and reinstalled each round, so every
+  pass begins with zero stats, zero wins, and no daily records. Never test on leftover
+  state.
+- **Daily deal (date-derived, NOT pinnable):** `dayIndex = daysSince(2026-08-12)` and the
+  challenge is `daily-pool.json.seeds[dayIndex]`. On **2026-08-15** that is `dayIndex 3`
+  → **deal #10,004**, par 97, supports `no-cells / aces-first / suits-top-down /
+  cells-le-1 / cells-le-2`. Re-derive this if the loop runs on a different date; do not
+  hard-code #10,003 (that was dayIndex 2).
+- **Free play (pinnable):** for any test that needs a repeatable board, use **Deal #…**
+  and type an explicit number rather than New Game's random deal. Use **#10,004** so
+  free-play and daily testing share one board unless a test case names another.
+- **Gap:** because the daily challenge is wall-clock-derived with no override, daily
+  streak/tier behavior across day boundaries cannot be tested deterministically. A
+  proposal-routed finding recommending a debug date/seed override is in scope.
+
 ## Notes for the tester
-- Deterministic start: the app is reinstalled each round (no prior stats/wins).
-- The daily "Today" is deal #10,003 (Aug 14 2026 in this environment).
-- Landscape can't be driven by rotating via UI scripting in this env; assess landscape
-  from the layout code + any screenshot the harness supplies, and focus interactive
-  testing on portrait.
+- Landscape **is** interactively testable: `XCUIDevice.shared.orientation` works from an
+  XCUITest driver. Orientation resets to portrait on every `xcodebuild test` invocation,
+  so a landscape script must rotate as its first step. (Superseded the round-1 note that
+  claimed rotation was undrivable — corrected in round 2.)

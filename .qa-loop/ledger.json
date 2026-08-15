@@ -1,7 +1,7 @@
 {
-  "round": 1,
-  "build_sha": "1fd938c",
-  "max_rounds": 5,
+  "round": 2,
+  "build_sha": "342e3c0",
+  "max_rounds": 4,
   "findings": [
     {
       "id": "bug/WF-11:cancel-note-not-updated",
@@ -11,11 +11,30 @@
       "confidence": "confirmed",
       "region": "WF-11",
       "test_case": "TC-11.5",
-      "build_sha": "1fd938c",
+      "build_sha": "342e3c0",
       "evidence": {
         "screenshots": [
-          "evidence/round-1/wf11-import-cancel-note.png"
-        ]
+          "evidence/round-1/wf11-import-cancel-note.png",
+          "evidence/round-2/qa-worker-3/tc1105-after-cancel.png",
+          "evidence/round-2/qa-worker-3/tc1101-after-export-cancel.png"
+        ],
+        "repro": [
+          "fresh install of 342e3c0",
+          "launch",
+          "tap Daily",
+          "scroll to BACKUP",
+          "tap Import",
+          "tap Cancel in the Files sheet",
+          "read the note under Export/Import",
+          "tap Export",
+          "swipe the save sheet down to dismiss it (that sheet has no Cancel button)",
+          "read the note again"
+        ],
+        "measurements": {
+          "import_cancel_note": "Import cancelled.",
+          "export_cancel_note": "Export cancelled.",
+          "runs_reproduced": 2
+        }
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
@@ -23,10 +42,14 @@
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ],
-      "current_status": "open",
-      "note": "Cancelling the file importer/exporter leaves the default helper text, not 'Import cancelled.'/'Export cancelled or failed.'. SwiftUI .fileImporter/.fileExporter onCompletion not invoked on interactive cancel; Import also sets backupNote=nil first. Data-safe; missing feedback."
+      "current_status": "fixed",
+      "note": "Verified on screen on build 342e3c0, twice (once mid-session, once from a clean reinstall). Both branches now acknowledge: importer Cancel -> 'Import cancelled.', exporter swipe-dismiss -> 'Export cancelled.' (iOS 17+ onCancellation overloads in DailyView). Note for the record: the system save sheet exposes no Cancel button on iOS 26 \u2014 swipe-down is the only cancel gesture, which is Apple's UI, not the app's."
     },
     {
       "id": "ux/WF-11:singular-plural-grammar",
@@ -36,12 +59,35 @@
       "confidence": "confirmed",
       "region": "WF-11",
       "test_case": "TC-11.4",
-      "build_sha": "1fd938c",
+      "build_sha": "342e3c0",
       "evidence": {
         "screenshots": [
           "evidence/round-1/wf11-import-edited-merged-skipped.png",
-          "evidence/round-1/wf9-wins-empty.png"
-        ]
+          "evidence/round-1/wf9-wins-empty.png",
+          "evidence/round-2/qa-worker-3/tc1102-after-import-one.png",
+          "evidence/round-2/qa-worker-3/tc0902-wins-one.png",
+          "evidence/round-2/qa-worker-3/tc1104-after-import-tampered.png"
+        ],
+        "repro": [
+          "fresh install of 342e3c0",
+          "put a backup holding exactly 1 day + 1 deal in On My iPhone",
+          "launch",
+          "tap Daily",
+          "scroll to BACKUP",
+          "tap Import",
+          "pick that file",
+          "read the note",
+          "tap Done",
+          "tap Wins",
+          "read the count line"
+        ],
+        "measurements": {
+          "daily_note": "Imported \u2014 merged 1 day (1 new) and 1 deal (1 new).",
+          "wins_count_line": "1 deal solved \u00b7 1 range",
+          "plural_control_daily": "Imported \u2014 merged 2 days (2 new) and 3 deals (3 new).",
+          "plural_control_wins": "5 deals solved \u00b7 3 ranges",
+          "skipped_singular_control": "Skipped 3 invalid entries."
+        }
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
@@ -49,10 +95,14 @@
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ],
-      "current_status": "open",
-      "note": "Count-of-1 renders plural nouns: '1 days','1 deals' (DailyView.importStats) and '1 deals solved' (WinsView). Should be '1 day'/'1 deal'. The entr(y/ies) path already pluralizes; fix is localized."
+      "current_status": "fixed",
+      "note": "Both reported sites now inflect correctly, verified on screen: DailyView.importStats via the new pl() helper, and WinsView's count line (deal/deals and range/ranges). Plural counts still read correctly, so the fix is not a blanket singularisation."
     },
     {
       "id": "ux/WF-6:demo-done-leaves-empty-board",
@@ -62,11 +112,23 @@
       "confidence": "confirmed",
       "region": "WF-6",
       "test_case": "TC-6.3",
-      "build_sha": "1fd938c",
+      "build_sha": "342e3c0",
       "evidence": {
         "screenshots": [
-          "evidence/round-1/wf6-demo-done-emptyboard.png"
-        ]
+          "evidence/round-1/wf6-demo-done-emptyboard.png",
+          "evidence/round-2/qa-worker-2/tc6.3-demo-complete-banner.png",
+          "evidence/round-2/qa-worker-2/tc6.3-after-done-redealt.png"
+        ],
+        "repro": [
+          "launch",
+          "tap Daily",
+          "tap the 'Clear' pill under 'Show me how to win:'",
+          "tap Start, wait ~30s for the line to reach 97/97",
+          "tap Done on the completion banner"
+        ],
+        "measurements": {
+          "moves_after_done": 0
+        }
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
@@ -74,10 +136,14 @@
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ],
-      "current_status": "open",
-      "note": "Tapping Done on the demo-complete banner leaves an inert fully-solved board (Won still 0) with no guidance. Not a trap. Consider having Done re-deal the seed (Replay)."
+      "current_status": "fixed",
+      "note": "Re-ran on 342e3c0: the banner now reads \"That's a winning line - tap Replay to try it yourself.\" and Done re-deals the same seed (Moves 0, full tableau, demo bar gone). The inert solved board is gone. Nit only: the banner tells you to tap Replay while the button next to it is labelled Done - both do the same thing."
     },
     {
       "id": "ux/Main:clock-runs-during-modal-sheets",
@@ -103,6 +169,597 @@
       ],
       "current_status": "open",
       "note": "Solve clock keeps ticking while modal sheets (Daily/Wins/How to play) are open (0:21->3:40 with 0 moves), inflating recorded time. Judgment call \u2014 proposal."
+    },
+    {
+      "id": "bug/Main:portrait-tall-column-clipped-offscreen",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "TC-2.3",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-1/build-06-13cards.png",
+          "evidence/round-2/qa-worker-1/bug-portrait-column-clip-14cards.png",
+          "evidence/round-2/qa-worker-1/bug-portrait-column-clip-16cards.png",
+          "evidence/round-2/qa-worker-1/bug-portrait-clip-undo-proves-2d.png"
+        ],
+        "repro": [
+          "cold launch (portrait, iPhone 17 Pro, 402x874 pt)",
+          "tap 'Deal #<seed>' pill, clear the field, type 10004, tap Play",
+          "drag 10H (col7 bottom) onto column 1 (lands on JC)",
+          "drag 4H (col8 bottom) into free cell 1",
+          "drag 9S (col8 bottom) onto column 1",
+          "drag JD (col7 bottom) onto column 2 (10C)",
+          "drag QH (col7 bottom) onto column 8 (KC)",
+          "drag 8H (col7 bottom) onto column 1",
+          "drag 7C (col6 bottom) onto column 1",
+          "drag 6H (col3 bottom) onto column 1  -> column 1 = 12 cards, bottom card touches the screen edge",
+          "drag 8S (col4 bottom) onto column 7 (9H)",
+          "drag 5S (col4 bottom) onto column 1 -> 13 cards, bottom card sits in the home-indicator zone",
+          "drag 4H (free cell 1) onto column 1 -> 14 cards, bottom card is cut in half by the screen edge (screenshot bug-portrait-column-clip-14cards.png)",
+          "drag 3C (col4 bottom) onto column 1 -> 15 cards",
+          "drag 2D (col3 bottom) onto column 1 -> 16 cards; the 16th card is 100% off-screen, cannot be seen, tapped or dragged (screenshot bug-portrait-column-clip-16cards.png)",
+          "tap at the very bottom of column 1 (x=28,y=862 pt): Moves stays 13, nothing responds",
+          "tap Undo once: 2D reappears at the bottom of column 3, proving the invisible card really was in column 1"
+        ],
+        "measurements": {
+          "portrait_card_width_pt": 45,
+          "card_height_pt": 75.3,
+          "fan_overlap_pt": 30,
+          "tableau_top_pt": 425,
+          "screen_height_pt": 874,
+          "column_height_formula_pt": "30*(N-1)+75",
+          "cards_when_bottom_card_first_clipped": 13,
+          "cards_when_a_card_is_fully_offscreen": 15
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Portrait keeps a fixed portraitCardW (ContentView.swift:53) and the tableau never scrolls (comment at ContentView.swift:50-51), so a growing column just runs off the bottom of the screen. Landscape already solves exactly this by shrinking cardW to the current tallest column (ContentView.swift:62-73) - portrait needs the same clamp (or a smaller fan/overlap) once 30*(N-1)+75 exceeds the available board height. Long alternating runs in one column are normal Causeway play, so this is reachable in ordinary play, not just a stress test. Undo is the only recovery; a player who keeps stacking simply loses access to those cards. Inference (untested): with the Daily objectives HUD on screen the tableau starts ~40-50 pt lower, so clipping would begin ~1.5 cards earlier."
+    },
+    {
+      "id": "bug/WF-6:demo-progress-counts-as-a-real-win",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.3",
+      "build_sha": "342e3c0",
+      "fix_risk": "metric-integrity",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/bug-demo-71of97-paused.png",
+          "evidence/round-2/qa-worker-2/bug-demo-stopped-71moves.png",
+          "evidence/round-2/qa-worker-2/bug-assisted-win-overlay.png",
+          "evidence/round-2/qa-worker-2/bug-repro-demo-64of78.png",
+          "evidence/round-2/qa-worker-2/bug-repro-won2.png"
+        ],
+        "repro": [
+          "launch (fresh install, Won 0)",
+          "tap Daily",
+          "tap the 'Clear' pill under 'Show me how to win:' (deal #10,004)",
+          "tap Start; after ~18s tap Pause (bar shows 'Winning line - 71 / 97')",
+          "tap Stop -> demo bar clears, board keeps the 71 assisted moves, Undo is disabled",
+          "play out the remainder by tapping exposed cards, then tap the gold Finish pill",
+          "win overlay: 'You solved it! Deal #10,004 - 123 moves - 3:29'; Won 1; Deal pill now shows a check"
+        ],
+        "measurements": {
+          "run1_demo_moves": 71,
+          "run1_recorded_moves": 123,
+          "run1_recorded_secs": 209,
+          "run2_demo_moves": 64,
+          "run2_recorded_moves": 92,
+          "run2_recorded_secs": 29,
+          "persisted_wins_json": "{\"10002\":{\"secs\":29,\"moves\":92},\"10004\":{\"secs\":209,\"moves\":123}}"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP (metric-integrity): Stop mid-demo leaves the app's own solution moves on the board with no undo history; finishing from there is recorded as a genuine win in causeway.wins (Won +1, deal check-mark, best moves/time). Run 2 banked a 29-second 'best time' for a 92-move deal after the demo played 64 of those moves. showSolution() already protects the daily tiers (it clears challengeDay - verified: after the assisted win of #10,004 the Daily card still showed Bronze unearned and all streaks 0), so the Wins store is simply missing the same guard. Careful with the obvious fix: refusing to record any win after a demo would also punish a player who stops the demo at move 1 and genuinely solves the deal, and it changes already-persisted best-times semantics. Suggest tainting the game only while assisted moves remain on the board (clear the taint on Replay/new deal), or recording assisted wins without a time/moves best."
+    },
+    {
+      "id": "bug/DailyView:calendar-weekday-header-missing-letters",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.4",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/bug-calendar-weekday-header.png",
+          "evidence/round-2/qa-worker-2/tc5.1-daily-sheet.png"
+        ],
+        "repro": [
+          "launch",
+          "tap Daily",
+          "scroll to the August 2026 calendar",
+          "read the weekday header row"
+        ],
+        "measurements": {
+          "expected_header": "S M T W T F S",
+          "actual_header": "S M T W _ F _"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Thursday and Saturday have no letter: DailyView.calendar uses ForEach([\"S\",\"M\",\"T\",\"W\",\"T\",\"F\",\"S\"], id: \\.self) and the duplicate ids collapse the repeated cells. Column positions are still correct (Aug 1 lands under Saturday), so only the labels are missing. Fix: enumerate with offsets / a unique id."
+    },
+    {
+      "id": "ux/WF-5:hud-objective-labels-truncated",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.2",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/tc5.2-hud-objectives-truncated.png",
+          "evidence/round-2/qa-worker-2/tc5.2-board-hud.png"
+        ],
+        "repro": [
+          "launch",
+          "tap Daily",
+          "tap Play (deal #10,004)",
+          "read the objectives capsule over the board"
+        ],
+        "measurements": {
+          "silver_full": "Win in 116 moves or fewer",
+          "silver_shown": "Win in 116 moves or...",
+          "gold_full": "Win without ever using a free cell",
+          "gold_shown": "Win without ever usin..."
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "DailyHUD.objChip uses lineLimit(1) in a single-row capsule, so on a 402pt-wide phone the gold objective is cut before its constraint ('Win without ever usin...'): while playing you cannot tell what gold asks for without reopening Daily. Bronze fits. Cheap fixes: two lines / smaller font for the two long chips, or shorter HUD labels ('<=116 moves', 'no free cells')."
+    },
+    {
+      "id": "ux/WF-7:deal-field-no-clear-affordance",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-7",
+      "test_case": "TC-7.1",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/tc7.1-deal-alert.png",
+          "evidence/round-2/qa-worker-2/tc7.1-field-appends-no-selectall.png"
+        ],
+        "repro": [
+          "launch",
+          "tap the 'Deal #<seed>' pill (field is prefilled with the current seed, e.g. 10004)",
+          "tap the field and type 1 -> the field reads 100041 (append, no select-all)",
+          "to enter 10003 you must tap backspace once per prefilled digit, then type 5 digits, then Play"
+        ],
+        "measurements": {
+          "taps": 12,
+          "expected_taps": 3,
+          "backspaces_forced": 5
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "WF-7 budgets <=3 interactions to open/type/play. The prefilled seed is neither selected on focus nor clearable: a power user pays 5 extra backspace taps every time. Fix is small: select-all on focus (or .clearButtonMode-style affordance) in the alert's TextField. The empty-field placeholder '1-1,000,000' is good and should stay."
+    },
+    {
+      "id": "ux/WF-5:no-hook-to-reach-daily-earned-state",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.3",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/tc5.1-daily-today.png"
+        ],
+        "repro": [
+          "launch",
+          "tap Daily -> the only way to earn Bronze is to actually solve that day's ~97-move deal",
+          "'Show me how to win' deliberately clears challengeDay, so the demo can never produce a daily record",
+          "there is no launch argument, debug panel or date/seed override"
+        ],
+        "measurements": {
+          "daily_par_moves": 97
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Testability, not a user-facing defect: TC-5.3 ('Replay to improve' label, streak/total/best update, tier check-marks) is unreachable in QA because the daily deal is wall-clock derived and the only route to a record is solving a par-97 deal by hand. A debug-only launch argument (e.g. -CausewayDebugDayIndex / -CausewayDebugDailyResult, compiled out of Release) would make the whole daily surface testable and would also close the WORKFLOWS.md fixture gap about day-boundary streak behaviour. Human call - this adds a code path to a shipping app."
+    },
+    {
+      "id": "ux/WF-9:deal-number-format-inconsistent",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-9",
+      "test_case": "TC-9.2",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-3/tc0902b-wins-ranges.png",
+          "evidence/round-2/qa-worker-3/fmt-range-detail-10004.png",
+          "evidence/round-2/qa-worker-3/tc0902-after-row-tap.png",
+          "evidence/round-2/qa-worker-3/wf9-11-cold-launch.png",
+          "evidence/round-2/qa-worker-3/tc1102-after-import-one.png"
+        ],
+        "repro": [
+          "fresh install of 342e3c0",
+          "launch \u2014 the toolbar deal pill reads 'Deal #865788' (no thousands separator)",
+          "tap Daily \u2014 the Today card reads 'Deal #10,004' (with separator); tap Done",
+          "with wins recorded for deals 10004-10006, tap Wins",
+          "the range chip reads '10004\u201310006' (no separator)",
+          "tap that chip \u2014 the rows read 'Deal #10,004', 'Deal #10,005', 'Deal #10,006' (with separator)",
+          "tap the 10,005 row \u2014 the board pill it lands on reads 'Deal #10005' (no separator)"
+        ],
+        "measurements": {
+          "wins_chip": "10004\u201310006",
+          "wins_detail_rows": "Deal #10,004 | Deal #10,005 | Deal #10,006",
+          "board_pill_after_row_tap": "Deal #10005 \u2713",
+          "wins_field_placeholder": "Number 1\u20131,000,000",
+          "daily_card": "Deal #10,004"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Same number, three renderings, two of them one tap apart inside the Wins sheet. Cause: SwiftUI Text(\"Deal #\\(seed)\") is a LocalizedStringKey and group-formats the Int, while WinsView's chip (DealFormat.rangeLabel, WinStore.swift:97) and ContentView's pill(\"Deal #\\(game.seed)\") build plain Strings and don't. Either direction is an acceptable fix as long as one formatter is used everywhere (chips, pill, rows, win overlay, placeholder); the placeholder 'Number 1\u20131,000,000' suggests grouped is the house style. Polish only \u2014 no behaviour or stored data involved."
+    },
+    {
+      "id": "ux/WF-8:autoplay-safe-only-unexplained",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-8",
+      "test_case": "TC-8.2",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/tc8.2-a-deal10004-fresh.png",
+          "evidence/round-2/qa-worker-2/tc8.2-b-ace-exposed-autoplay-on-9s-not-sent.png",
+          "evidence/round-2/qa-worker-2/tc8.2-c-tap-sends-ace-2d-in-cell-still-not-autoplayed.png",
+          "evidence/round-2/qa-worker-2/tc8.2-d-autoplay-stops-with-10-sendable-cards.png"
+        ],
+        "repro": [
+          "launch (fresh install; Auto-play: On by default)",
+          "tap Deal # pill, tap the text field, Select All, type 10004, tap Play",
+          "tap the 6H at the bottom of column 3 (it stacks on the 7C)",
+          "tap the 2D now at the bottom of column 3 (it parks in a free cell)",
+          "the AD is now the exposed bottom card of column 3 and the diamond up-foundation is empty",
+          "wait 9 s: with Auto-play: On the AD is NOT sent home (screenshot b)",
+          "tap the AD: it goes home instantly (screenshot c) - so the app agrees the move is legal and good",
+          "wait 5 s more: the 2D sitting in a free cell, whose only destination is now the diamond up-foundation, is also NOT auto-played"
+        ],
+        "measurements": {
+          "seconds_waited_ace": 9,
+          "seconds_waited_2d": 5,
+          "auto_moves_made": 0,
+          "later_board_sendable_cards": 12,
+          "later_board_auto_moves_made": 2
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "NOT a behaviour bug - I read Game.swift. isSafeAutoplay() (Game.swift:576-585) is deliberately stricter than FreeCell: a card only goes home once BOTH opposite-colour neighbours (rank-1 and rank+1) are already resolved on a foundation, because Causeway tableau piles build in both directions so even an Ace can be a needed base. The behaviour is sound; the LABEL is the problem. 'Auto-play: On' is the only string the user ever sees - the How to play sheet (Extras.swift RulesView: Goal / The catch / Tableau / Free cells / Controls / About) never mentions Auto-play or Auto-finish at all - so an exposed Ace with an empty foundation reads as 'auto-play is broken'. Two independent testers hit this in round 2 (qa-worker-1 reported the same AD case on a random deal). Cheap fix: name it what it is ('Auto-play safe moves: On') and/or add one line to How to play, e.g. 'Auto-play only sends cards that can never be needed on the tableau - tap any other card to send it yourself.' Note the trap: making Auto-play aggressive instead would remove real skill decisions and could strand a deal, so do not 'fix' the rule."
+    },
+    {
+      "id": "bug/Main:clock-pauses-while-app-backgrounded",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "P-C",
+      "build_sha": "342e3c0",
+      "fix_risk": "metric-integrity",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/pc-c-clock-fg20s-bg20s-fg20s.png",
+          "evidence/round-2/qa-worker-2/pc-b-clock-209-215-216.png"
+        ],
+        "repro": [
+          "launch, play deal #10004, make a move so the clock is running",
+          "note the Time readout",
+          "press Home (app backgrounds; ContentView.onChange(scenePhase) persists)",
+          "wait 20 s on the Home screen",
+          "reactivate the app and read Time again"
+        ],
+        "measurements": {
+          "foreground_control_wall_s": 20.2,
+          "foreground_control_clock_s": 20,
+          "background_wall_s": 23.7,
+          "background_clock_s": 6,
+          "lost_s": 17.7,
+          "second_foreground_control_wall_s": 20.2,
+          "second_foreground_control_clock_s": 20
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "GameClock is a 1 Hz Timer, so suspension stops it and only the persisted integer `elapsed` is restored: switching apps is a free pause button, and recordWin() stores clock.elapsed as the best time (Game.swift:752). Measured precisely: 20 s foreground = +20 s (twice), but 23.7 s spanning a 20 s background = +6 s. TRAP: this is the same metric family as the deliberately-kept ux/Main:clock-runs-during-modal-sheets (commit 2796867 chose continuous timing for honest best-times); the consistent fix is a wall-clock anchor recomputed on foreground, but that also charges the player for phone calls/interruptions, and it retroactively changes what a 'best time' means. Human call - do not silently flip it, and if it is fixed, make sure a restored anchor cannot double-count the already-persisted elapsed."
+    },
+    {
+      "id": "ux/Main:undo-stack-lost-on-relaunch",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "P-C",
+      "build_sha": "342e3c0",
+      "fix_risk": "state-migration",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-2/pc-a-toolbar-before-bg-resume-coldlaunch.png",
+          "evidence/round-2/qa-worker-2/pc-d-coldlaunch-board-restored.png"
+        ],
+        "repro": [
+          "launch, play deal #10004, make 3 moves (Undo pill is enabled)",
+          "press Home, wait, reactivate: Undo is still enabled (row 1, second pill)",
+          "kill and cold-launch the app",
+          "the board, seed, moves (3) and elapsed all restore correctly, but Undo is greyed out - the whole undo stack is gone"
+        ],
+        "measurements": {
+          "moves_restored": 3,
+          "undo_steps_available_before": 3,
+          "undo_steps_available_after_relaunch": 0
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Deliberate per the comment on persist() ('Cheap: board only, no undo history'), so this may be a wontfix - but in a pure-skill game where Undo is a primary control, resuming a session with zero undo depth is a real loss the code comment hides. Backgrounding keeps it, only a cold launch loses it, so the exposure is eviction/relaunch. TRAP: persisting history changes the SavedGame Codable shape, so it needs an optional field + a decode fallback or every in-progress game on an upgraded install is discarded."
+    },
+    {
+      "id": "bug/Main:landscape-disabled-undo-blank",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.1",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-3/wf12-landscape-fresh-deal10004.png",
+          "evidence/round-2/qa-worker-3/wf12-undo-pill-landscape-blank.png",
+          "evidence/round-2/qa-worker-3/wf12-undo-pill-portrait-legible.png",
+          "evidence/round-2/qa-worker-3/wf12-landscape-drag-landed.png"
+        ],
+        "repro": [
+          "launch app (fresh, or any state where nothing can be undone)",
+          "rotate device to landscape (XCUIDevice.shared.orientation = .landscapeLeft)",
+          "look at the second pill in the left control rail, between 'New game' and 'Replay'"
+        ],
+        "measurements": {
+          "landscape_disabled_undo_label_visible": false,
+          "portrait_disabled_undo_label_visible": true,
+          "rail_pill_index": 2,
+          "reproductions": 3
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "ContentView.swift:156-157 - railPill(\"Undo\", systemImage:) .disabled(!canUndo).opacity(0.4) with .buttonStyle(.plain). In landscape the disabled pill renders as a featureless white capsule: neither the arrow.uturn.backward glyph nor the word 'Undo' is discernible at 3x zoom, so the rail shows an unexplained blank button. The identical disabled state in the portrait toolbar (default button style, 13pt) is faint but readable. Verified the pill is correct once enabled (after 1 move it reads '\u21b6 Undo'). Seen on 3 separate launches. Not a size problem - the pill is 118pt wide and 'Undo' fits."
+    },
+    {
+      "id": "ux/WF-12:landscape-cards-no-bigger-than-portrait",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.3",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/qa-worker-3/wf12-landscape-fresh-deal10004.png",
+          "evidence/round-2/qa-worker-3/wf12-portrait-fresh.png"
+        ],
+        "repro": [
+          "launch app",
+          "tap 'Deal #...' , clear the field, type 10004, tap Play",
+          "compare the board in portrait, then rotate to landscape and compare again"
+        ],
+        "measurements": {
+          "portrait_card_width_pt": 45,
+          "landscape_card_width_pt": 45,
+          "landscape_screen_pt": "874x402",
+          "tableau_bottom_edge_pt": 286,
+          "unused_height_below_tableau_pt": 116,
+          "unused_fraction_of_screen_height": 0.29,
+          "measurement_method": "column pitch measured off the 3x screenshot, +/-2pt"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "The landscape branch's comment (ContentView.swift:44-51) says moving the toolbar into a rail and the cells under the foundations 'frees vertical + horizontal room so the cards grow'. Measured, they do not: cardW is width-constrained by widthCardW = (geo.width - 12 - railW 118 - 13*gap - 20)/12 (line 71), which on iPhone 17 Pro landscape (geo.width ~756pt after the 2x59pt safe-area insets) yields ~45pt - identical to portraitCardW (45pt) - while heightCardW would allow ~54pt. Net effect: rotating to landscape gains the player nothing in card size and leaves a 116pt (29%) empty band under the tableau. Structural (the 12-card-width three-column split is the cause), so routed as a proposal rather than a patch."
+    },
+    {
+      "id": "ux/WF-11:export-picker-no-progress-indicator",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-11",
+      "test_case": "P-E",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-2/perf/export-t+0.4s-button-pressed.png",
+          "evidence/round-2/perf/export-t+1.5s-no-response-no-spinner.png",
+          "evidence/round-2/perf/export-t+2.1s-still-no-response.png",
+          "evidence/round-2/perf/export-t+2.8s-files-sheet-settled.png",
+          "evidence/round-2/perf/export-latency-frames.txt"
+        ],
+        "repro": [
+          "cold launch the app (terminate + launch)",
+          "tap Daily",
+          "scroll the Daily sheet to the bottom (BACKUP section)",
+          "tap Export",
+          "watch: the pill shows its press highlight for ~0.35s, then the screen is byte-for-byte frozen for ~1.4s with no spinner before the Files save sheet starts sliding up"
+        ],
+        "measurements": {
+          "trials": 3,
+          "first_export_after_launch_touch_to_first_visible_change_ms": [
+            1850,
+            1700,
+            1800
+          ],
+          "first_export_after_launch_touch_to_sheet_settled_ms": [
+            2900,
+            2200,
+            2300
+          ],
+          "dead_time_after_press_highlight_fades_ms": 1400,
+          "warm_second_export_touch_to_first_visible_change_ms": 750,
+          "warm_second_export_touch_to_settled_ms": 1200,
+          "import_touch_to_first_visible_change_ms": 900,
+          "screenshot_sampling_interval_ms": 160,
+          "progress_indicator_present": false,
+          "identical_frames_during_stall": "film_cold3/205.png and 209.png are byte-identical (348186 bytes each)"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Heuristic latency finding: screenshots at ~160ms cadence can only see stalls, not dropped frames. Most of the cost is UIDocumentPicker's first-use warm-up inside the app process (it recurs after every cold launch, not just once per install), so the app cannot make it fast \u2014 but it can show a spinner / disabled state, or pre-warm the picker. Double-tapping during the stall was tested and is harmless (only one sheet is presented). Everything else measured in this lane was fast: cold launch to painted board <=0.9s, Daily/Wins/How-to-play sheets settle in ~1.0-1.1s, New game redeal settles in ~1.65s."
+    },
+    {
+      "id": "ux/Main:no-debug-seed-or-date-override",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "P-D",
+      "build_sha": "342e3c0",
+      "evidence": {
+        "screenshots": [],
+        "repro": [
+          "grep the app sources: no ProcessInfo.processInfo.arguments / launchArguments / CommandLine reader anywhere in ios/Causeway/Causeway",
+          "Model/Daily.swift:39 derives today's dayIndex straight from Calendar.current + Date() with no override",
+          "consequence: a tester can pin the free-play board (Deal #10,004) but cannot pin the daily challenge date, so streak / tier / calendar behaviour across a day boundary cannot be exercised deterministically"
+        ],
+        "measurements": {
+          "launch_argument_hooks_found": 0,
+          "date_override_hooks_found": 0,
+          "pinnable_today": "deal number only"
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Testability, not user-visible. WORKFLOWS.md Fixture policy already names this gap and puts the proposal in scope. Suggested shape: a DEBUG-only launch argument (e.g. -causewayDayIndex N / -causewaySeed N) read once at startup, so daily streak/tier rollover becomes reproducible. Trap: any override that persists into a Release build would let a player farm daily streaks \u2014 it must be #if DEBUG and must not write to the daily record store."
     }
-  ]
+  ],
+  "parallel_testers": 3,
+  "emit_regression_tests": false
 }

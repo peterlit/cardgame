@@ -1,0 +1,266 @@
+{
+  "rounds": {
+    "2": {
+      "TC-1.1": {
+        "status": "passed",
+        "reason": "How to play states both-ended foundations + tap/drag controls; first tap on JC (deal #10004) moved it onto QD, Moves 1, clock started, Undo enabled.",
+        "persona": "novice"
+      },
+      "TC-1.2": {
+        "status": "passed",
+        "reason": "4D (no foundation/tableau home) tapped straight into a free cell as last resort; a buried card taps do nothing at all, but that is silent-by-design and not filed.",
+        "persona": "novice"
+      },
+      "TC-2.1": {
+        "status": "passed",
+        "reason": "Deal #835046: one tap on AD sent it to the diamonds UP foundation, correct target, Moves 1, no confirmation.",
+        "persona": "novice"
+      },
+      "TC-2.2": {
+        "status": "passed",
+        "reason": "Tapping JC in the QD-JC-10H run moved JC+10H together onto QH in column 7 and counted as a single move.",
+        "persona": "power"
+      },
+      "TC-2.3": {
+        "status": "passed",
+        "reason": "Drag of 3D landed in free cell 3 exactly where released (cell 2 left empty); illegal drop (2C onto 6H) snapped back with no move counted; pickup needed no press-and-hold (0 ms hold, ~180 ms drag worked). Long-column clipping found while extending this case -> bug/Main:portrait-tall-column-clipped-offscreen.",
+        "persona": "power"
+      },
+      "TC-2.4": {
+        "status": "passed",
+        "reason": "Buried 8D did not lift when dragged, no move, no stuck zIndex artifact; tapping it is a silent no-op.",
+        "persona": "power"
+      },
+      "TC-2.5": {
+        "status": "passed",
+        "reason": "Screenshot taken ~700 ms after the tap already showed the move completed; no >1s stall observed. Functional lane - no timing finding filed.",
+        "persona": "novice"
+      },
+      "TC-3.1": {
+        "status": "passed",
+        "reason": "One tap on New game loaded deal #835046 (was #10004), Moves 0, Time 0:00, board reshuffled.",
+        "persona": "novice"
+      },
+      "TC-3.2": {
+        "status": "passed",
+        "reason": "After 3 moves, one tap on Replay restored deal #10004 to its exact initial layout, Moves 0, Time 0:00.",
+        "persona": "power"
+      },
+      "TC-3.3": {
+        "status": "passed",
+        "reason": "One tap on Undo reversed the last move (3D back from free cell 3 to column 1) and Moves 6->5.",
+        "persona": "novice"
+      },
+      "TC-3.4": {
+        "status": "passed",
+        "reason": "At Moves 0 the Undo pill is dimmed (~40% opacity) and tapping it does nothing.",
+        "persona": "novice"
+      },
+      "TC-3.5": {
+        "status": "passed",
+        "reason": "Six undos walked the 6-move game back one move per tap to Moves 0 with the board byte-identical to the initial deal #10004 and Undo then disabled; run-move undo restored the run correctly. (Two taps were dropped by the harness mid-run - re-tapped one at a time and each decremented exactly one move; harness quirk, not app behaviour.)",
+        "persona": "power"
+      },
+      "TC-5.1": {
+        "status": "passed",
+        "reason": "Daily sheet legible; 4 streak cards all 0/0 total/best 0; Today = Deal #10,004 as the fixture predicts",
+        "persona": "novice"
+      },
+      "TC-5.2": {
+        "status": "passed",
+        "reason": "Play is one tap, board loads #10004 with the objectives HUD (HUD truncation filed separately)",
+        "persona": "power"
+      },
+      "TC-5.3": {
+        "status": "blocked",
+        "reason": "Cannot reach a daily-bronze state: the only legitimate route is solving the par-97 daily by hand; the demo deliberately clears challengeDay and no debug/state override exists (finding ux/WF-5:no-hook-to-reach-daily-earned-state)",
+        "persona": "power"
+      },
+      "TC-5.4": {
+        "status": "passed",
+        "reason": "Days 12/13 switch the card (deals #10,001/#10,002), today (15) stays gold-outlined, locked day 16 ignores taps; weekday header bug filed",
+        "persona": "novice"
+      },
+      "TC-6.1": {
+        "status": "passed",
+        "reason": "Clear demo opens paused at 'Winning line - 0 / 97' with Next/Start/Stop",
+        "persona": "novice"
+      },
+      "TC-6.2": {
+        "status": "passed",
+        "reason": "Next steps one move each; Start auto-advances (label -> Pause); Pause -> '(paused)' + Resume",
+        "persona": "novice"
+      },
+      "TC-6.3": {
+        "status": "passed",
+        "reason": "Stop clears the bar and unlocks input; Done on the completion banner now re-deals the seed (prior finding fixed) - but assisted moves left by Stop are scorable (new major finding)",
+        "persona": "novice"
+      },
+      "TC-6.4": {
+        "status": "passed",
+        "reason": "Gold demo names '\ud83e\udd47 Gold: Win without ever using a free cell - 0 / 109'; Silver only offered where a line exists (Aug 13 -> deal #10,002, 0 / 85)",
+        "persona": "novice"
+      },
+      "TC-7.1": {
+        "status": "passed",
+        "reason": "Deal #10003 loads, but 12 taps vs the 3-tap budget because the prefilled seed cannot be cleared (finding filed)",
+        "persona": "power"
+      },
+      "TC-7.2": {
+        "status": "passed",
+        "reason": "Random loaded deal #168178",
+        "persona": "power"
+      },
+      "TC-7.3": {
+        "status": "passed",
+        "reason": "Blank field + Play dismisses with the current deal intact, no crash; placeholder shows '1-1,000,000'",
+        "persona": "power"
+      },
+      "TC-7.4": {
+        "status": "passed",
+        "reason": "9999999 clamps to Deal #1000000 and 0 clamps to Deal #1, no crash; clamp is silent but the pill shows the loaded seed",
+        "persona": "power"
+      },
+      "TC-7.5": {
+        "status": "passed",
+        "reason": "Cancel dismisses with the same deal and no move counted",
+        "persona": "power"
+      },
+      "TC-9.1": {
+        "status": "passed",
+        "reason": "Empty Wins sheet on a fresh install: 'No wins yet \u2014 go solve one!', Play disabled with an empty field, Done dismisses.",
+        "persona": "novice"
+      },
+      "TC-9.2": {
+        "status": "passed",
+        "reason": "1 win -> '1 deal solved \u00b7 1 range'; 5 wins -> '5 deals solved \u00b7 3 ranges' with chips 56 / 777 / 10004\u201310006; chip drills in, row tap loads the deal and dismisses. Number formatting inconsistency filed separately.",
+        "persona": "power"
+      },
+      "TC-9.3": {
+        "status": "passed",
+        "reason": "Typed 12345 -> board Deal #12345; typed 9999999 -> clamped to Deal #1000000, no dead end; Play stays disabled while the field is empty.",
+        "persona": "power"
+      },
+      "TC-10.1": {
+        "status": "passed",
+        "reason": "Goal / The catch / Tableau / Free cells / Controls all present; both-ended foundations and tap-vs-drag explained.",
+        "persona": "novice"
+      },
+      "TC-10.2": {
+        "status": "passed",
+        "reason": "About shows 'Causeway \u00b7 v1.0 (1)', '\u00a9 2026 Whimsical Distractions. All rights reserved.' and the tagline.",
+        "persona": "novice"
+      },
+      "TC-10.3": {
+        "status": "passed",
+        "reason": "Done returns to the board in one tap.",
+        "persona": "novice"
+      },
+      "TC-11.1": {
+        "status": "passed",
+        "reason": "Exporter prefills 'Causeway-Stats-2026-08-15' (.json); Save -> 'Stats exported.'; swipe-dismiss -> 'Export cancelled.' (the system save sheet has no Cancel button, swipe-down is the only cancel affordance).",
+        "persona": "power"
+      },
+      "TC-11.2": {
+        "status": "passed",
+        "reason": "Import of a 1-day/1-deal backup reported 'Imported \u2014 merged 1 day (1 new) and 1 deal (1 new).'; re-importing the app's own export reported '4 days (0 new) and 5 deals (0 new)' and wins stayed at 5 \u2014 merge never erased.",
+        "persona": "power"
+      },
+      "TC-11.3": {
+        "status": "passed",
+        "reason": "Non-Causeway JSON rejected with 'That file isn't a Causeway stats backup.'; no state change, no crash.",
+        "persona": "power"
+      },
+      "TC-11.4": {
+        "status": "passed",
+        "reason": "Hand-edited backup (day 9999, seed 2000000, moves/secs 0) -> 'Imported \u2014 merged 1 day (1 new) and 1 deal (1 new). Skipped 3 invalid entries.'; zero-value scores not persisted.",
+        "persona": "power"
+      },
+      "TC-11.5": {
+        "status": "passed",
+        "reason": "Importer Cancel -> note reads 'Import cancelled.'; no stats changed.",
+        "persona": "power"
+      },
+      "TC-4.1": {
+        "status": "passed",
+        "reason": "Auto-finish: Ask -> board made finishable, first real move raised the 'Ready to finish / Every remaining card can go home. Send them all now?' alert with Finish / Not yet; Finish cascaded to the win overlay 'You solved it!' + 'Deal #10,004 - 97 moves - 2:05' + Play deal #10005 / Random / Close. Daily-tier variant of the overlay not exercised (casual play, challengeDay nil).",
+        "persona": "power"
+      },
+      "TC-4.2": {
+        "status": "passed",
+        "reason": "'Not yet' dismissed the alert, gold Finish pill appeared in the toolbar, safe-autoplay resumed (85 -> 87 moves) and the prompt did not re-appear for the rest of the game; Finish pill then completed it.",
+        "persona": "power"
+      },
+      "TC-4.3": {
+        "status": "passed",
+        "reason": "Close -> solved board, Won 1 persisted across a relaunch (fresh random deal, no stale overlay); Play deal #10005 loaded seed 10005 at 0 moves; Random loaded #417581. Deal pill shows the check-mark. Note: 'Won' counts DISTINCT deals, so a 2nd/3rd win of #10,004 left it at 1 (Wins sheet is titled 'Deals won' - self-consistent, not filed).",
+        "persona": "power"
+      },
+      "TC-4.4": {
+        "status": "passed",
+        "reason": "Auto-finish: Off -> finishable board produced no prompt; gold Finish pill offered after the first real move (canOfferFinish needs `started`); tapping it cascaded to the win overlay ('97 moves - 0:38').",
+        "persona": "power"
+      },
+      "P-A": {
+        "status": "passed",
+        "reason": "Daily / Wins ('Deals won') / How to play all dismiss via Done AND via swipe-down; the Wins range drill-in also swipe-dismisses and has a back chevron; 'Play a deal' alert exits via Cancel keeping the current deal; 'Ready to finish' exits via Not yet. No sheet trapped the user.",
+        "persona": "power"
+      },
+      "P-B": {
+        "status": "passed",
+        "reason": "Overlay appeared only on the 3 genuine wins; running the 'Clear' demo to 97/97 left a fully solved board with NO overlay and Won unchanged (banner + Done only); no overlay on relaunch after a win. Close / Play deal #next / Random each exit it correctly.",
+        "persona": "power"
+      },
+      "TC-8.1": {
+        "status": "passed",
+        "reason": "Auto-play pill flips On/Off on every tap and the Off state survives both a cold relaunch and a simulator reboot",
+        "persona": "power"
+      },
+      "TC-8.2": {
+        "status": "passed",
+        "reason": "Off: zero automatic moves on a board with 12 sendable cards. On: only provably-safe cards move (2 of 12). The AD-not-auto-played lead reproduces exactly but matches isSafeAutoplay(); filed as ux/WF-8:autoplay-safe-only-unexplained (label/help, not behaviour)",
+        "persona": "power"
+      },
+      "TC-8.3": {
+        "status": "passed",
+        "reason": "Ask -> On -> Off -> Ask -> On -> Off across six taps, order exact; Off persisted across relaunch",
+        "persona": "power"
+      },
+      "TC-8.4": {
+        "status": "passed",
+        "reason": "Off: gold Finish pill, no prompt. Ask: 'Ready to finish' alert with Not yet / Finish. On: cascaded with no prompt to the win overlay (97 moves)",
+        "persona": "power"
+      },
+      "P-C": {
+        "status": "passed",
+        "reason": "board, seed, moves, elapsed and both settings restore after background+resume and after cold launch; two side findings filed (clock stops while backgrounded; undo stack lost on cold launch)",
+        "persona": "power"
+      },
+      "TC-12.1": {
+        "status": "failed",
+        "reason": "Layout reflow itself is correct (rail / foundations+free cells / tableau, header kept, portrait toolbar hidden, verified by live rotation), but the rail renders the disabled Undo control as an unlabeled blank capsule - bug/Main:landscape-disabled-undo-blank.",
+        "persona": "novice"
+      },
+      "TC-12.2": {
+        "status": "passed",
+        "reason": "All 9 rail controls reachable; with the daily HUD the rail viewport shrinks and 'How to play' sits below the fold, but the rail scrolls (indicator appears while dragging) and reveals it; How to play / Daily sheets open and dismiss in landscape.",
+        "persona": "novice"
+      },
+      "TC-12.3": {
+        "status": "passed",
+        "reason": "Drag (J-clubs col1 -> col7) and tap-to-smart-move (K-spades -> down foundation) both land in landscape; cardW never floored to 30 (measured ~45pt) and cards visibly shrank 43->39pt when a column grew from 8 to 9, so the tableau stays on screen.",
+        "persona": "power"
+      },
+      "P-D": {
+        "status": "passed",
+        "reason": "No idle-CPU drain and no leak. Idle CPU (ps cumulative-CPU-time delta over 30-60s windows, driver detached): fresh board no clock 0.0%; portrait board clock running 0.6% (0.39 CPU-s / 60s); landscape board clock running 1.0%; landscape + daily-objectives HUD clock running 0.7% - all far under the ~20% drain threshold, and the rail ScrollView costs nothing while the HUD ticks. Repeated-action loops: 12x (drag card to free cell + Undo) 354.2->354.5MB; 15x New game + 15x Replay 354.4->355.1MB, settling 354.9MB - flat, no monotonic climb. Demo auto-run: 15-16% CPU, RSS 386->396->392MB (returns). Network 0 bytes in/out for the whole session. Note MemoryMonitor/MemoryHUD are gated off (DebugFlags.memoryHUD = false) so no in-app readout was available; measurements come from samples.jsonl plus ps.",
+        "persona": "power"
+      },
+      "P-E": {
+        "status": "failed",
+        "reason": "One stall found and filed as ux/WF-11:export-picker-no-progress-indicator - first Export after a cold launch freezes the screen ~1.7-1.85s after the touch (3 trials) with no spinner, settling at 2.2-2.9s. Everything else met the bar: cold launch to painted board <=0.9s (3 trials), Daily sheet first open settles 1.0s, Wins 1.1s, How to play 1.07s, New game redeal 1.65s, warm Export 1.2s, Import 1.8s. Designed animation rates confirmed uncontended: demo auto-advance 25.1s for the 97-move bronze line = 0.259 s/move (design 0.24; 72 moves in 18.0s = 0.250 s/move on a second trial); auto-finish cascade 12 cards in ~2.2s = ~0.18 s/card (design 0.16) with the win overlay 0.38s after the last card.",
+        "persona": "power"
+      }
+    }
+  }
+}

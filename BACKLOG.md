@@ -96,6 +96,51 @@ All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:
 - **Parity follow-up (open)** — the demo-Done and clock-pause behaviors are iOS-only so far; mirror
   to web (`index.html`) for parity.
 
+### QA loop — round 2 findings (2026-08-15) — OPEN, no fix pass run yet
+Second simulator-driven pass on `342e3c0` (`.qa-loop/REPORT.md`): 3 parallel testers, full pass,
+47/47 test cases, plus an uncontended perf lane. Round-1's three implemented fixes all **verified
+fixed on screen**. The loop aborted with `thrashing`, which is a **false positive** — 0 findings
+reopened, 0 recurring regions; only the `net <= 0 for two rounds` signal fired, and any productive
+discovery round is net-negative by construction. Rounds 1 and 2 were both discovery passes; the
+implementer has never run inside the loop.
+
+- **MAJOR (auto) — demo progress banks a real win.** Stop mid-demo leaves the app's solution moves
+  on the board with no undo history; finishing from there records a genuine win in `causeway.wins`
+  (one run banked a 29 s "best time" for a 92-move deal after the demo played 64 of them).
+  `showSolution()` already clears `challengeDay` to protect the daily tiers — the Wins store is
+  missing the same guard. Reproduced by two testers. *Trap (metric-integrity):* blanket-refusing
+  post-demo wins punishes a player who stops at move 1 and genuinely solves it, and it re-interprets
+  already-persisted best-times. Prefer tainting only while assisted moves remain on the board.
+- **MAJOR (auto) — portrait tall column runs offscreen.** Fixed `portraitCardW`
+  (`ContentView.swift:53`) + a non-scrolling tableau: bottom card clipped at 13 cards, fully
+  invisible/untappable at 15; Undo is the only recovery. Landscape already shrinks `cardW` to the
+  tallest column (`ContentView.swift:62-73`) and was re-tested as **not** affected. Reachable in
+  ordinary play. *Watch:* the clamp resizes cards mid-game — check for per-move size thrash.
+- **Minors (auto)** — calendar weekday header drops Thu/Sat (duplicate `ForEach` ids); daily HUD
+  truncates the gold objective (`lineLimit(1)`); Deal # field neither selects-on-focus nor clears
+  (12 taps vs the 3 budgeted); deal number rendered three ways (`10004–10006` / `Deal #10005` /
+  `Deal #10,004`) two taps apart in Wins; "Auto-play: On" label overpromises (the *rule* is correct
+  — `isSafeAutoplay()` needs both opposite-colour neighbours resolved because piles build both ways
+  — but `RulesView` never mentions Auto-play, so an ignored Ace reads as broken; **do not** make
+  Auto-play aggressive); backgrounding pauses the clock (23.7 s wall over a 20 s background advanced
+  it 6 s) and `recordWin()` banks that as best time; landscape rail's disabled Undo renders as a
+  featureless blank capsule; cold-launch Export stalls ~1.8 s with no spinner (`UIDocumentPicker`
+  warm-up — can't be made fast, but can show progress).
+- **Proposals (human call)** — landscape cards measure 45pt, *identical* to portrait, with a 116pt
+  (29%) empty band, so rotating gains nothing (structural: the 12-card-width split); a `#if DEBUG`
+  day-index/seed override to make daily streak/tier rollover testable (TC-5.3 is permanently blocked
+  without it) — must not survive into Release or players farm streaks. Also: `clock-runs-during-
+  modal-sheets` is still carried as an open proposal but was **already decided** in `2796867`
+  (continuous timing) — close it as wontfix, and decide it together with the background-pause bug,
+  which is the same metric family pointing the other way.
+- **Perf lane clean** — idle CPU 0.0–1.0%, RSS flat over 12 undo cycles and 15 New game + 15 Replay
+  (retires the round-1 inconclusive leak note), cold launch ≤0.9 s, demo 0.259 s/move vs 0.24
+  designed, auto-finish ~0.18 s/card, 0 network bytes.
+- **Coverage gaps closed since round 1** — landscape rotation *is* drivable
+  (`XCUIDevice.shared.orientation` from an XCUITest driver; resets to portrait each `xcodebuild
+  test` run), so WF-12 ran interactively rather than by code review, and WF-4's win overlay was
+  driven to a real win. Only TC-5.3 remains blocked.
+
 ### stats backup + flawless total (2026-08-14)
 - **Local Export/Import (iOS)** — a "Backup" section on the Daily screen exports stats (daily records
   + solved deals) to a dated `.json` and imports/merges them back. `StatsBackup` = versioned

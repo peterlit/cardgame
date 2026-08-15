@@ -350,3 +350,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     family rotation), the record shape (`flawless` + `moves`/`elapsed`), four streaks with `total`,
     and resolved §12 open items + §13 roadmap. Also updated the architecture docs' own
     "documentation has drifted" findings, which this task made stale. Docs-only; 67 tests green.
+68. `/qa-loop max 3 rounds, use 3 testers` — second simulator-driven UX/QA pass, on `342e3c0`.
+    Continued the round-1 ledger (rounds 2..4 budgeted). Provisioned 3 worker simulators and ran a
+    full pass in two waves (WF-1..3 / WF-5..7 / WF-9..11, then WF-4+P-A/P-B / WF-8+P-C / WF-12),
+    followed by a single uncontended perf lane with the NFR sampler attached: **47/47 test cases
+    run**, 45 passed, 1 failed, 1 blocked. Round-1's three fixes (`5b237b4`) all verified fixed on
+    screen. Found 11 new findings — 2 majors (demo progress banks a real win in `causeway.wins`,
+    reproduced by two testers; portrait tall columns run offscreen and become untappable at 15
+    cards), 7 auto minors, and 4 proposals. Perf lane clean (no leak across 12 undo + 15 New game +
+    15 Replay cycles; idle CPU ≤1%; only stall is the cold-launch `UIDocumentPicker` warm-up).
+    Two harness corrections worth keeping: landscape rotation **is** drivable via
+    `XCUIDevice.shared.orientation` from an XCUITest driver (round 1 wrongly recorded it as
+    impossible, so WF-12 had been code-reviewed only), and the round-1 fixture note hard-coded the
+    wrong daily deal (#10,003 = dayIndex 2; today is #10,004) — WORKFLOWS.md now derives it and
+    carries a real Fixture policy section. The loop aborted with `thrashing`; diagnosed as a **false
+    positive** (0 reopened, 0 recurring regions — only the `net <= 0 for two rounds` signal fired,
+    and `net = closed - new` makes every productive discovery round negative). No implementer or
+    fix-review dispatch has run inside this loop yet; both majors are open.
