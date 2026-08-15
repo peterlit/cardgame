@@ -77,11 +77,14 @@ pin('Model/Game.swift', 'recordWin once-only gate', [
 
 // ---- "Show me how to win" token applier: MUST match the web + solver token semantics ----
 // F = column-top → foundation; G = free cell → foundation; end 0=up / 1=down; T/C/X per rules.mjs.
+// (The iOS copy validates each token and returns false on a malformed/inapplicable one — pure
+// defense against bad baked data; the applied semantics below are identical to web/rules.mjs.)
 pin('Model/Game.swift', 'applyDemoToken token format', [
-  'let c = tableau[n(1)].removeLast()',
+  'let c = tableau[col].removeLast()',                                     // F = column-top → foundation
   'if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }',
   'let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)',
-  'if let e = cells.firstIndex(where: { $0 == nil }) { cells[e] = c }',   // C = park to first empty cell
+  'let e = cells.firstIndex(where: { $0 == nil }) else { return false }',  // C = park to first empty cell
+  'cells[e] = tableau[col].removeLast()',
 ]);
 
 // Cross-copy: the web applyDemoToken must interpret the SAME token format (so a baked line plays

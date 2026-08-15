@@ -841,21 +841,32 @@ final class Game: ObservableObject {
     }
 
     /// Apply the next move (animated); on the last one, flip to the completion banner. Returns
-    /// whether it advanced (false once the line is finished).
+    /// whether it advanced (false once the line is finished or the line proved malformed).
     @discardableResult
     private func demoAdvance() -> Bool {
         guard demoIdx < demoMoves.count else { finishDemo(); return false }
-        withAnimation(.easeOut(duration: 0.22)) { self.applyDemoToken(self.demoMoves[self.demoIdx]) }
+        var applied = false
+        withAnimation(.easeOut(duration: 0.22)) { applied = self.applyDemoToken(self.demoMoves[self.demoIdx]) }
+        // A token that can't apply means the baked line is out of sync with the board (corrupt /
+        // mis-rebuilt solutions data). Abort like a mid-demo Stop — re-deal the seed — rather than
+        // desync (and eventually trap) or leave a half-played board.
+        guard applied else { restartDeal(); return false }
         demoIdx += 1
         if demoIdx >= demoMoves.count { finishDemo(); return false }
         return true
     }
 
     private func finishDemo() {
+        // The unlock is conditional: only a line that genuinely completed the board earns the
+        // "try it yourself" banner. If the line ran out with cards still on the table (an
+        // imperfect baked line), treat it like a mid-demo Stop and re-deal — a demo-touched
+        // partial board must never become playable/scorable. This enforces in code the
+        // invariant that previously rested on the solutions JSON being perfect.
+        guard boardComplete else { restartDeal(); return }
         demoing = false
         demoPaused = false
         let name = demoTier == "gold" ? "Gold" : demoTier == "silver" ? "Silver" : "winning"
-        demoDoneMessage = "That's a \(name) line — tap Replay to try it yourself."
+        demoDoneMessage = "That's a \(name) line — tap Done to try it yourself."
     }
 
     /// Start / pause / resume the auto-advance.
@@ -885,31 +896,45 @@ final class Game: ObservableObject {
     }
 
     /// Apply one solution token directly to the board (mirrors tools/solver rules.mjs applyMove and
-    /// the web applyDemoToken). Fields are comma-separated; end 0=up, 1=down.
-    private func applyDemoToken(_ tok: String) {
+    /// the web applyDemoToken). Fields are comma-separated; end 0=up, 1=down. Returns false if the
+    /// token is malformed or doesn't apply to the current board (missing card, no free cell, bad
+    /// index) — defense in depth against bad baked data; the caller aborts the demo on false.
+    private func applyDemoToken(_ tok: String) -> Bool {
         let p = tok.split(separator: ",")
-        func n(_ j: Int) -> Int { Int(p[j]) ?? 0 }
-        switch p[0] {
+        func n(_ j: Int) -> Int { j < p.count ? (Int(p[j]) ?? -1) : -1 }
+        guard let kind = p.first else { return false }
+        switch kind {
         case "F":
-            let c = tableau[n(1)].removeLast()
+            let col = n(1)
+            guard col >= 0, col < tableau.count, !tableau[col].isEmpty else { return false }
+            let c = tableau[col].removeLast()
             if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }
         case "G":
-            let idx = n(1); guard let c = cells[idx] else { return }
+            let idx = n(1)
+            guard idx >= 0, idx < cells.count, let c = cells[idx] else { return false }
             cells[idx] = nil
             if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }
         case "T":
             let src = n(1), idx = n(2), dst = n(3)
+            guard src >= 0, src < tableau.count, dst >= 0, dst < tableau.count, src != dst,
+                  idx >= 0, idx < tableau[src].count else { return false }
             let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)
             tableau[dst].append(contentsOf: run)
         case "C":
-            let c = tableau[n(1)].removeLast()
-            if let e = cells.firstIndex(where: { $0 == nil }) { cells[e] = c }
+            let col = n(1)
+            guard col >= 0, col < tableau.count, !tableau[col].isEmpty,
+                  let e = cells.firstIndex(where: { $0 == nil }) else { return false }
+            cells[e] = tableau[col].removeLast()
         case "X":
-            let idx = n(1); guard let c = cells[idx] else { return }
-            cells[idx] = nil; tableau[n(2)].append(c)
-        default: break
+            let idx = n(1), dst = n(2)
+            guard idx >= 0, idx < cells.count, let c = cells[idx],
+                  dst >= 0, dst < tableau.count else { return false }
+            cells[idx] = nil; tableau[dst].append(c)
+        default:
+            return false
         }
         moveCount += 1
+        return true
     }
     private func onWin() {
         recordWin()   // no-op if the winning step already recorded it

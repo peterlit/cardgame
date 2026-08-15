@@ -397,11 +397,29 @@ struct ContentView: View {
 
     // MARK: tableau
 
+    /// A buried card stays readable while at least its rank band shows: top inset 0.05·w plus the
+    /// rank's cap height (~0.72 × the 0.50·w font) ≈ 0.41·w. Fan compression must not go below this.
+    private static let legibleOverlapUnit: CGFloat = 0.42
+
     private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat) -> some View {
-        let cardH = cardW * Theme.cardAspect
+        // If even the legibility-floor overlap can't fit the tallest column inside `maxH`,
+        // shrink the TABLEAU's card size (the landscape strategy) instead of compressing the
+        // fan into unreadable slivers. Portrait cards are otherwise width-sized, so this only
+        // kicks in for unusually long columns on short screens; landscape already height-sizes
+        // its cards and won't trigger it. The 30pt clamp matches the landscape minimum.
+        let unit = Self.legibleOverlapUnit
+        let maxCount = game.tableau.map(\.count).max() ?? 0
+        let w: CGFloat = {
+            guard maxCount > 1 else { return cardW }
+            let units = Theme.cardAspect + unit * CGFloat(maxCount - 1)   // tallest column, card-widths
+            guard cardW * units > maxH else { return cardW }
+            return max(30, min(cardW, floor(maxH / units)))
+        }()
+        let ov = w < cardW ? (overlap * w / cardW).rounded() : overlap   // keep the fan proportional
+        let cardH = w * Theme.cardAspect
         return HStack(alignment: .top, spacing: gap) {
             ForEach(0..<Game.colCount, id: \.self) { col in
-                column(col, cardW: cardW, cardH: cardH, overlap: overlap, maxH: maxH)
+                column(col, cardW: w, cardH: cardH, overlap: ov, maxH: maxH)
                     .zIndex(dragColumn == col ? 5 : 0)   // the column holding the dragged run floats over its neighbours
             }
         }
@@ -410,9 +428,10 @@ struct ContentView: View {
         let cards = game.tableau[col]
         // A long column compresses ITS OWN fan just enough to stay inside `maxH`, so the
         // bottom card can never run off-screen (the tableau deliberately doesn't scroll).
-        // Card size and the other columns' spacing are untouched — no whole-board resize as
-        // one column grows. The 8pt floor keeps a sliver of every card visible/tappable even
-        // in degenerate cases (e.g. a transient zero-height layout pass).
+        // Legibility is guaranteed upstream: tableauArea shrinks the card size before the
+        // fit here would ever compress past the readable rank band, so the 8pt floor is a
+        // last-resort backstop only (the 30pt card-size clamp binding on a degenerate
+        // 20+-card column, or a transient zero-height layout pass).
         let ov = cards.count > 1
             ? max(8, min(overlap, floor((maxH - cardH) / CGFloat(cards.count - 1))))
             : overlap

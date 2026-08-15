@@ -159,6 +159,28 @@ implementer has never run inside the loop.
   test` run), so WF-12 ran interactively rather than by code review, and WF-4's win overlay was
   driven to a real win. Only TC-5.3 remains blocked.
 
+### review-loop round 1 on the QA-round-2 major fixes (2026-08-15)
+Adversarial review of `66d1682` (demo-exit re-deal + per-column fan compression); all in-scope
+findings fixed:
+- **DONE — demo unlock is now code-enforced, not data-enforced.** `finishDemo()` only shows the
+  "try it yourself" banner when the board is genuinely complete (`boardComplete`); an imperfect
+  baked line re-deals like a mid-demo Stop, so a demo-touched partial board can never become
+  playable/scorable. `applyDemoToken` is now fully defensive (returns Bool; bounds/emptiness
+  guards on every case — the old code could destroy a card on `C` with no free cell, silently
+  desync on `G`/`X`, or trap on `removeLast()` of an empty column); a token that doesn't apply
+  aborts the demo via `restartDeal()`. All 922 baked lines were verified clean, so this was
+  unreachable with shipped data — the fix closes the invariant in code. Drift-guard snippets in
+  `tests/ios-parity.test.mjs` re-pinned to the new (semantically identical) applier.
+- **DONE — portrait fan compression got a legibility floor.** Compression never squeezes a buried
+  card below its readable rank band (~0.42·cardW: 0.05·w top inset + ~0.36·w rank cap); when even
+  that can't fit the tallest column, `tableauArea` shrinks the tableau's card size (the landscape
+  strategy, 30pt clamp) instead of fanning into unreadable slivers. The 8pt overlap floor remains
+  only as a last-resort backstop (degenerate 20+-card columns on short phones).
+- **DONE** — end-of-demo banner copy now says "tap Done" (the demo bar's actual button), not
+  "tap Replay".
+- **DECLINED (→ open minor DV-1 below)** — pre-existing, outside the reviewed diff: Daily
+  "Play"/"Show me how to win" silently discard an in-progress casual game.
+
 ### stats backup + flawless total (2026-08-14)
 - **Local Export/Import (iOS)** — a "Backup" section on the Daily screen exports stats (daily records
   + solved deals) to a dated `.json` and imports/merges them back. `StatsBackup` = versioned
@@ -283,6 +305,10 @@ implementer has never run inside the loop.
 - **M8 — Verify buildability from the committed project.** App builds/runs for the owner,
   but `project.pbxproj` was hand-authored (no `productReference`); confirm a clean clone
   opens & archives in Xcode 16.
+- **DV-1 — Daily "Play"/"Show me how to win" silently discard an in-progress game.**
+  `playChallenge()`/`showSolution()` call `deal()` + `persist()`, overwriting the saved casual
+  game (any moves/elapsed) with no confirmation or undo. Add a confirm when a different game is
+  in progress (`started && moveCount > 0`). Pre-existing; flagged in review-loop 2026-08-15.
 - **L2 — Web hotkeys fire while typing / under the win overlay** ("n" discards the game;
   Cmd+Z reverts under the overlay). Guard on focus/overlay state.
 - **L5 — `record()` chimera bests.** `min(moves)`/`min(secs)` taken independently can store
