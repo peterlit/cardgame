@@ -1,65 +1,96 @@
-# Review-loop final report — side-by-side landscape layout + L↔R swap (iOS)
+# Review-loop final report — qa-loop round-2 major fixes (demo-exit integrity + tableau fan compression)
 
-**Result: CONVERGED** (round 1, all findings closed). 0 open blockers/majors/minors.
+**Result: CONVERGED** (round 2): 0 open blockers, 0 open majors, none newly introduced this
+round. 4 open minors remain (2 partial, 2 new) — mop-up candidates, none ship-blocking.
 
-Scope: commit `ea5f8d2` — the landscape redesign (foundations · tableau · free cells, side by side)
-plus swapping free cells and foundations left↔right in both orientations. Fixes in `faa59ce`.
+Scope: commit `66d1682` (mid-demo Stop re-deals so a demo-touched board can never be played or
+scored; per-column tableau fan compression against measured board height), then the loop's own
+fix commits `0894907` (round 1) and `101beb5` (round 2).
+
+## Why it stopped
+
+Round 2 closed the round-1 major (the same demo-Stop exploit was live in the web prototype)
+and introduced no new blockers/majors. The convergence condition — no open or newly-introduced
+blockers/majors — fired.
 
 ## Trend
 
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Net | Decision |
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
-| 1 | 0 | 0 | 0 | 2 | 2 | 0 | -2 | converged |
+| 1 | 0 | 1 | 4 | 2 | 4 | 0 | -2 | continue |
+| 2 | 0 | 0 | 4 | 3 | 2 | 0 | +1 | converged |
 
-## What the review confirmed sound (the headline risks)
+(Seed = round 0: 1 major + 3 minors against `66d1682`. The round-1 "new major" was the web
+parity gap, not a reopen; nothing reopened in either round.)
 
-The two things most likely to break in a layout this different — **drag hit-testing** and **z-order** in
-the new side-by-side arrangement — are correct by construction, and the reviewer proved why:
+## Closed along the way
 
-- **Drag targeting is layout-agnostic.** Every drop target reports its rect via
-  `GeometryReader.frame(in: .named("board"))`, and the card `DragGesture` resolves by testing the
-  finger's `v.location` (same "board" space) against those rects. Moving the panels beside the tableau
-  changes where the rects land but keeps both operands in one coordinate space, so tableau→foundation
-  (now far left), cell→tableau (cell now far right), and tableau→cell all still resolve correctly. The
-  three panels never overlap horizontally, so `.first(where:)` can't mis-pick.
-- **Z-order is cosmetic only.** Drop targets are passive probes; the gesture lives on the *dragged*
-  card, so z-order can't affect whether a drop lands. And the elevation is still right: a dragged cell
-  raises `freeCellsSide` above everything; a dragged run raises `tableauArea` above both panels; no
-  `.clipped()` cuts a floating card.
+- **Seed major** — iOS `finishDemo()` unlocked input without verifying the board was actually
+  complete, and `applyDemoToken` applied tokens blind (a bad `C` token destroyed a card; a
+  desync could trap on `removeLast()`). The "demo boards are never playable" guarantee rested
+  on the bundled solutions JSON being perfect. Now: `finishDemo()` only unlocks on
+  `boardComplete`, otherwise it re-deals; every token is validated and a failed token aborts
+  the demo to a re-deal. (Reviewer independently simulated all 922 baked lines — none actually
+  misbehave today; the fix makes the invariant code-enforced instead of data-dependent.)
+- **Round-1 major** — the exact original exploit (Stop mid-demo, finish by hand, bank a win +
+  best time) was still live in the **web prototype**. Web now mirrors iOS: Stop/Done re-deal,
+  `finishDemo` guards completion, token applier validated, and a cross-copy parity test pins
+  the wiring on both platforms.
+- Minors: demo banner copy ("tap Done"), legibility floor constant corrected 0.42 → 0.53
+  (SF-ascent derivation, verified against CardView), portrait shrunk-tableau centering,
+  transient zero-height layout pass no longer collapses card size.
+- Wontfix (recorded): `showSolution`/`playChallenge` silently discard an in-progress casual
+  game — pre-existing, out of scope; filed as backlog item **DV-1** with a concrete fix shape.
 
-Portrait was confirmed byte-identical except the intended L↔R swap; `runOffset`/drag self-heal are
-layout-agnostic; `boardStack` fully removed with no stale references.
+## Open findings (all minor)
 
-## What the review caught
+- **partial** `test/ios-parity.test.mjs:f-token-field-pin-loosened` — the re-added pin
+  `let col = n(1)` is an unanchored substring that also matches case `C`, so mutating only
+  case `F` to `n(2)` stays green. Pin the contiguous case body instead (reviewer supplied the
+  exact normalized snippet).
+- **open** `test/ios-parity.test.mjs:ios-demo-exit-guards-unpinned` — the new cross-copy test
+  pins the three web guards but not the iOS `finishDemo` `boardComplete` guard (the word
+  appears only in a comment); drift protection is currently one-directional.
+- **open** `layout/ContentView.swift:tableau-centering-misaligns-unshrunk` — the unconditional
+  `.frame(maxWidth: .infinity)` centres the *non*-shrunk tableau too, offsetting it ~3–3.5pt
+  from the full-width upper row on 375/390pt devices. Fix: center only when shrunk.
+- **partial** `layout/ContentView.swift:tableau-shrink-detaches-from-upper-row` — the shrink
+  latch is sound (monotone, written only in the `moveCount` onChange, reset exactly at fresh
+  deal), but each *new* tallest-column maximum still rescales all 52 cards, the 0.53 floor
+  lowered the first trigger to ~13 cards on a 4.7" phone, and the shrunk state renders two
+  card sizes at once (upper row vs tableau). Reviewer explicitly offered to flip this to
+  wontfix if the trade is argued as deliberate — it is a design call for the human.
 
-- **F1 [minor] — landscape `availH` underestimated the chrome.** The height budget used a fixed
-  `- 116`, ignoring the toolbar wrapping to two rows AND the `DailyHUD`/`demoBar` that adds an extra
-  bar above the board during a daily challenge or the win-demo — so a moderately long column could
-  clip off the bottom (its bottom, draggable card off-screen) earlier than the documented known-minor,
-  especially with the HUD showing. **Fixed:** `availH` now subtracts a 50pt HUD bar when one is present
-  and carries a bit more base margin (`geo.height - 124 - hudBar`), keeping an ~11-card column on-screen
-  even with the HUD. The fresh-deal on-device check hadn't surfaced this (short columns, no HUD).
-- **F2 [minor] — stale comment.** The header comment said "11-across (2+8+1)"; the layout and formula
-  are 15-across (4 foundation + 8 tableau + 3 free-cell). Corrected.
+## Disputed items
 
-## On-device verification (this session)
+None — no finding ended in `disputed`; the one declined finding (DV-1) was accepted by the
+reviewer as a justified wontfix with a backlog entry.
 
-Simulator restored (fresh dedicated `Causeway-Dev`, isolated from the parallel session). Verified both
-orientations render on a fresh deal: portrait shows foundations-left / free-cells-right and a tapped
-Ace smart-moves to the (now left) foundation; landscape shows the side-by-side layout with the tableau
-tops fully visible and well-sized cards. (A real landscape *drag-and-drop* wasn't exercised — see the
-skim list — but the mechanism is the same board-space hit-test used everywhere, confirmed above.)
+## HUMAN SKIM LIST — read these diffs
 
-## HUMAN SKIM LIST
+1. **`0894907` — Game.swift `finishDemo`/`applyDemoToken` rewrite.** The demo-integrity
+   invariant now lives here: unlock-only-on-`boardComplete` plus a validating token applier
+   that aborts to `restartDeal()`. Look here because both agents agreed this is *the* guard —
+   if its logic is subtly wrong (e.g. a path that re-deals when it shouldn't, eating a
+   legitimate demo), nothing else catches it.
+2. **`101beb5` — index.html demo Stop/Done + `applyDemoToken` guards.** A hand-mirrored port
+   of the Swift logic into the web prototype's inline script. Same-family agents porting their
+   own fix is exactly where a shared blind spot would land; the parity test pins text, not
+   behavior.
+3. **`101beb5`/`0894907` — ContentView.swift `tableauArea` shrink path + `shrinkLatchCount`.**
+   New @State driving whole-board card size from a `moveCount` onChange. Look here because
+   layout/@State feedback loops and the two-card-sizes-on-screen trade are visual judgments a
+   reviewer can only partially verify by reading (`swiftc -parse` passed; no simulator
+   screenshot was taken this loop).
+4. **`66d1682` — the original per-column fan compression + portrait GeometryReader swap.** It
+   replaced the portrait Spacer with a greedy GeometryReader; drop zones, zIndex and
+   matchedGeometryEffect were reasoned about, not exercised on screen.
+5. **`101beb5` — tests/ios-parity.test.mjs re-pins.** Twice now a re-pin shipped weaker than
+   claimed (the F-token substring; the unpinned iOS guard). Skim the pinned snippets and ask
+   "would this fail if the code regressed?"
 
-1. **One real landscape drag on device.** Everything says it works (layout-agnostic hit-testing), but
-   the only thing not physically exercised this session is a landscape drag-and-drop: drag a tableau
-   run onto a left-side foundation, and drag a right-side free-cell card onto a tableau column.
-2. **Landscape with a long column + the daily HUD showing** — the F1 fix targets exactly this; worth an
-   eyeball that the bottom card of a ~11-card column stays reachable while a daily challenge's objective
-   bar is up.
-
-## Verdict
-Converged: a substantial landscape redesign whose two riskiest seams (drag targeting, z-order) are
-sound by construction, with one real height-budget minor and a stale comment fixed. Full on-device
-render verification in both orientations; a landscape drag is the one thing left to eyeball.
+**Verification run:** iOS `xcodebuild` BUILD SUCCEEDED each round; `npm test` 68/68 (one test
+added); all 922 baked solution lines replayed clean through both the iOS-semantics and the new
+guarded web applier; web Undo second-door checked closed (demo never snapshots history).
+**Not run:** any simulator/on-screen check of the new portrait layout — the next qa-loop round
+should re-verify TC-2.3 (tall column) and the demo WF-6 cases on screen.

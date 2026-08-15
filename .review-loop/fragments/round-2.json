@@ -1,7 +1,4 @@
 {
-  "round": 2,
-  "round_start_sha": "0894907",
-  "max_rounds": 5,
   "findings": [
     {
       "id": "correctness/Game.swift:finish-demo-unlocks-unverified-board",
@@ -14,18 +11,9 @@
       "note": "Round 2: re-verified, unchanged by this round's diff. Game.swift:865 guard boardComplete else { restartDeal(); return }, and every applyDemoToken case guards before mutating (902-938). Additionally verified this round that no iOS path unlocks a demo board through Undo: applyDemoToken never snapshots history and deal() clears it, so canUndo is false throughout a demo and the Undo pill is disabled.",
       "first_seen_round": 0,
       "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "fixed" },
+        { "round": 2, "status": "fixed" }
       ]
     },
     {
@@ -39,18 +27,9 @@
       "note": "VERIFIED FIXED, derivation re-checked against CardView rather than taken on trust. ContentView.swift:420 is now 0.53. Independent check of the text model: CardView.swift:29-30 applies .padding(.top, width*0.05); the rank Text uses .system(size: width*0.50) (CardView.swift:54) and sits in an HStack whose default .center alignment does NOT shift it, because the rank's line box (~1.19 em = 0.60w) is taller than the 0.36w suit pip (CardView.swift:26), so the line box top stays at 0.05w. SF ascent ~0.955 em => baseline (= glyph bottom, digits have no descender) at 0.05 + 0.955*0.50 = 0.528w. 0.53 is right; 0.42 was not. Landscape bypass re-verified numerically: Theme.cardAspect = (92/66)*1.2 = 1.67273, landscapeFan 0.34 => 0.5687 w per card > 0.53, so cardW*(aspect+0.53(n-1)) <= landscapeBoardH always holds for reserve >= maxCount (ContentView.swift:74-79); in the only other case (heightCardW < 30, the max(30,...) clamp binding) tableauArea returns 30 too, so no visual change. Consequence to be aware of, not a defect: the shrink threshold on a 375x667 phone with the HUD bar up drops from ~n>=16 to ~n>=13, so the whole-board rescale (see the tableau-shrink finding) is now reachable in ordinary play, not just in degenerate columns.",
       "first_seen_round": 0,
       "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "partial"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "partial" },
+        { "round": 2, "status": "fixed" }
       ]
     },
     {
@@ -64,18 +43,9 @@
       "note": "Round 2: the web copy was flipped to 'tap Done to try it yourself.' (index.html:1271) and that is now CORRECT there too, because index.html:1274 relabels the Stop button to 'Done' and index.html:1589 wires it to restartDeal() -- so on both platforms the named button exists and does what the sentence promises.",
       "first_seen_round": 0,
       "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "fixed" },
+        { "round": 2, "status": "fixed" }
       ]
     },
     {
@@ -89,24 +59,19 @@
       "note": "Unchanged and still deferred as BACKLOG DV-1. Do not re-litigate.",
       "first_seen_round": 0,
       "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "wontfix"
-        },
-        {
-          "round": 2,
-          "status": "wontfix"
-        }
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "wontfix" },
+        { "round": 2, "status": "wontfix" }
       ]
     },
     {
       "id": "correctness/index.html:demo-stop-leaves-solved-board-playable",
       "claim": "The web prototype's demo bar wires BOTH 'Stop' and the post-line 'Done' to stopDemo(), which only clears the demoing flag -- so a 95%-solved auto-played board becomes immediately playable and a hand-finished win banks a fabricated best time.",
-      "evidence": {},
+      "evidence": [
+        "index.html:1589",
+        "index.html:1297-1306",
+        "index.html:512"
+      ],
       "severity": "major",
       "region": "index.html:1280-1310, 1589",
       "introduced_by_fix": false,
@@ -114,20 +79,17 @@
       "note": "VERIFIED FIXED, and I hunted for a second door rather than just reading the one line. (a) index.html:1589 demoStop.onclick = () => restartDeal(); restartDeal (1594-1599) calls stopDemo() then deal(seed), which resets startTime/moveCount/winRecorded/history (469-501). (b) finishDemo (1297-1306) re-deals unless every tableau column is empty AND every cell is null -- semantically identical to Game.boardComplete (Game.swift:358-359). (c) The Undo door is closed by accident but genuinely: applyDemoToken never snapshot()s and deal() sets history=[], so render() disables undoBtn (index.html:1032) for the whole demo, and the Cmd+Z handler (index.html:1641), which does NOT call stopDemo, hits undo()'s empty-history early return (707) -- so neither can strand demoing=false on a half-played board. (d) No win/clock leak: applyDemoToken never routes through commitMove, onWin is only reachable from commitMove/runAutoplay/the finish timer (727/682/867), runAutoplay early-returns on !startTime (676), and saveGame early-returns on demoing (514). (e) No re-entrancy: restartDeal -> stopDemo clears demoMoves/demoTimer, demoTick already nulled demoTimer and does not re-arm on a false demoAdvance, and stopDemo's own early-return guard (1314) makes deal()'s second stopDemo a no-op. (f) Empirically the abort branches are dead on shipped data: I replayed all 922 baked lines (366 seeds x bronze/silver/gold) against the new guarded applier over tests/engine.mjs deal() -- 0 tokens rejected, 0 lines ending on an incomplete board -- so the new re-deal-on-failure paths never fire in normal use.",
       "first_seen_round": 1,
       "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
+        { "round": 1, "status": "open" },
+        { "round": 2, "status": "fixed" }
       ]
     },
     {
       "id": "correctness/index.html:apply-demo-token-unguarded",
       "claim": "The web applyDemoToken had every defect just removed from the Swift copy: 'C' wrote cells[-1] and destroyed a card with no free cell, 'F'/'C' popped an empty column and threw on card.suit inside the setTimeout chain, wedging input with demoing stuck true.",
-      "evidence": {},
+      "evidence": [
+        "index.html:1241-1260",
+        "index.html:1287-1296"
+      ],
       "severity": "minor",
       "region": "index.html:1236-1306",
       "introduced_by_fix": false,
@@ -135,20 +97,18 @@
       "note": "VERIFIED FIXED. Every case now guards before mutating and returns false (index.html:1246-1256), including a default: return false; the caller aborts to restartDeal (1292). No half-applied token: each guard precedes the first write, and moveCount++/setMoves only run on the success path (1258). Replayed all 922 baked lines through the new applier: 0 rejections, so the guards do not break real data. Residual, NOT worth fixing but worth knowing: the two parsers disagree on MALFORMED tokens with empty fields, because Swift's split(separator:) drops empty subsequences while JS's split(',') keeps them -- 'F,,1' becomes col=1/end=up on iOS but col=0/end=down on web. Both stay memory-safe and both eventually trip a later guard and re-deal, and the shipped JSON is validated by tests, so this is cosmetic divergence in a defense-in-depth path only.",
       "first_seen_round": 1,
       "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
+        { "round": 1, "status": "open" },
+        { "round": 2, "status": "fixed" }
       ]
     },
     {
       "id": "layout/ContentView.swift:tableau-shrink-detaches-from-upper-row",
       "claim": "The card-size shrink applies to the tableau only: the tableau hugged the leading edge leaving a dead right margin, and w was recomputed from the live tallest column every body pass so single moves re-scaled all 52 cards and the board pulsed.",
-      "evidence": {},
+      "evidence": [
+        "ios/Causeway/Causeway/Views/ContentView.swift:111-117",
+        "ios/Causeway/Causeway/Views/ContentView.swift:137-140",
+        "ios/Causeway/Causeway/Views/ContentView.swift:432-441"
+      ],
       "severity": "minor",
       "region": "ios/Causeway/Causeway/Views/ContentView.swift:422-448",
       "introduced_by_fix": true,
@@ -156,20 +116,18 @@
       "note": "Latch mechanism audited and it is sound as far as it goes: shrinkLatchCount is written ONLY in .onChange(of: game.moveCount) (ContentView.swift:137-140), never in body, so there is no @State/body feedback loop; the write is max(latch, live) so it is monotone within a deal; and the only reset (count == 0) is safe because moveCount == 0 holds exactly on the fresh-deal board -- deal() zeroes it and undo() restores it from the snapshot, so an undo-to-zero lands on the 7-card initial layout where live max (7) is correct anyway. Restore-on-launch is also fine (latch starts 0, maxCount = max(live, 0) = live). Landscape genuinely bypasses it: line 102 passes no latch, and its own height-sizing keeps 0.34*1.67273 = 0.5687 > the 0.53 floor. TWO THINGS REMAIN. (1) The latch only kills grow-back; every NEW maximum still re-scales all 52 tableau cards inside the caller's withAnimation, so on a 375x667 phone a column growing 13 -> 14 -> 15 re-flows the whole board three times on three ordinary single-card moves (and the 0.53 constant lowered that first trigger from n>=16 to n>=13). If that is the accepted trade, say so and I will flip this to wontfix; the cheap alternative is still to quantise w into ~4pt buckets so consecutive maxima usually land in the same bucket. (2) Unaddressed side effect of shrinking the tableau only: in the shrunk state portrait shows two card sizes at once -- upper-row cards stay at cardW while tableau cards are w (375x667 with a 15-card column: 41pt vs floor(316/9.09) = 34pt, ~20% smaller) -- and matchedGeometryEffect (ContentView.swift:477) animates that size jump every time a card moves between a free cell and the tableau. The maxH == 0 sub-issue IS fixed (line 435 now guards maxH > 0).",
       "first_seen_round": 1,
       "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "partial"
-        }
+        { "round": 1, "status": "open" },
+        { "round": 2, "status": "partial" }
       ]
     },
     {
       "id": "test/ios-parity.test.mjs:f-token-field-pin-loosened",
       "claim": "The drift-guard re-pin dropped coverage: nothing asserted that the F token reads its column from field 1, so an edit changing F (or C) to read n(2) would keep all pins green while making the iOS demo replay a baked line differently from index.html and tools/solver.",
-      "evidence": {},
+      "evidence": [
+        "tests/ios-parity.test.mjs:83",
+        "ios/Causeway/Causeway/Model/Game.swift:908",
+        "ios/Causeway/Causeway/Model/Game.swift:924"
+      ],
       "severity": "minor",
       "region": "tests/ios-parity.test.mjs:82-90",
       "introduced_by_fix": true,
@@ -177,14 +135,8 @@
       "note": "The added pin does not close the hole, and I proved it rather than eyeballing it. 'let col = n(1)' occurs TWICE in Game.swift (case F at :908 and case C at :924) and the pin is an unanchored substring test, so a one-sided edit still passes: I applied exactly the mutation the finding describes (case F's 'let col = n(1)' -> 'let col = n(2)', leaving C alone) to an in-memory copy and all four applyDemoToken pins still matched. It now only catches the case where BOTH F and C change together. Fix, matching how the web half of the same file already pins whole case bodies: replace the one-liner with the contiguous body 'case \"F\": let col = n(1) guard col >= 0, col < tableau.count, !tableau[col].isEmpty else { return false } let c = tableau[col].removeLast()' -- I verified that string matches the current normalised source, so it is a drop-in. npm test re-run this round: 68/68 green, as claimed.",
       "first_seen_round": 1,
       "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "partial"
-        }
+        { "round": 1, "status": "open" },
+        { "round": 2, "status": "partial" }
       ]
     },
     {
@@ -199,14 +151,7 @@
       "region": "tests/ios-parity.test.mjs:105-122",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "CONFIRMED by reading the test body and grepping: the token 'boardComplete' appears in tests/ only inside the comment at ios-parity.test.mjs:107, never in an assert. Two-line fix: add 'guard boardComplete else { restartDeal(); return }' and 'guard applied else { restartDeal(); return false }' to the Swift snippet list in that test (both strings match the current normalised Game.swift).",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        }
-      ]
+      "note": "CONFIRMED by reading the test body and grepping: the token 'boardComplete' appears in tests/ only inside the comment at ios-parity.test.mjs:107, never in an assert. Two-line fix: add 'guard boardComplete else { restartDeal(); return }' and 'guard applied else { restartDeal(); return false }' to the Swift snippet list in that test (both strings match the current normalised Game.swift)."
     },
     {
       "id": "layout/ContentView.swift:tableau-centering-misaligns-unshrunk",
@@ -221,14 +166,7 @@
       "region": "ios/Causeway/Causeway/Views/ContentView.swift:111-117",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "CONFIRMED by reading the layout, not run. upperArea (287-307) is an HStack with a Spacer, so it always spans the full width with foundations pinned left; tableauArea returns a plain HStack of fixed-width columns (442-447), which .frame(maxWidth: .infinity) then centres (GeometryReader content was previously placed at topLeading). Arithmetic: hstackW = geo.width - 12 - ((geo.width - 40) mod 8), so the offset is that remainder / 2, i.e. 0-3.5pt. Fix is one line and keeps the intended behaviour: move the frame inside tableauArea where w is in scope and use .frame(maxWidth: .infinity, alignment: w < cardW ? .center : .leading), so centring applies only when the shrink is actually active.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        }
-      ]
+      "note": "CONFIRMED by reading the layout, not run. upperArea (287-307) is an HStack with a Spacer, so it always spans the full width with foundations pinned left; tableauArea returns a plain HStack of fixed-width columns (442-447), which .frame(maxWidth: .infinity) then centres (GeometryReader content was previously placed at topLeading). Arithmetic: hstackW = geo.width - 12 - ((geo.width - 40) mod 8), so the offset is that remainder / 2, i.e. 0-3.5pt. Fix is one line and keeps the intended behaviour: move the frame inside tableauArea where w is in scope and use .frame(maxWidth: .infinity, alignment: w < cardW ? .center : .leading), so centring applies only when the shrink is actually active."
     }
   ]
 }

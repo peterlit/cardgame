@@ -1,0 +1,94 @@
+[
+  {
+    "id": "correctness/Game.swift:finish-demo-unlocks-unverified-board",
+    "claim": "The whole 'a demo-touched board can never be played or scored' guarantee has exactly one hole left: finishDemo() sets demoing = false unconditionally when the token list runs out, without checking the board is actually complete. It is safe today only because of an unasserted property of a bundled data file. applyDemoToken has no validation at all: a 'G'/'X' token naming an empty cell silently `return`s (skipping the move and desyncing every later token), a 'C' token with all three cells full DESTROYS the card (tableau[n].removeLast() happens before the `if let e = cells.firstIndex(...)` that may fail), and any desync then hits tableau[n].removeLast() on an empty column, which traps and kills the app. If a solutions rebuild ever emits a line that does not fully solve, the demo ends with demoing=false on a partially-solved board with empty history and started=false, i.e. exactly the exploit this commit set out to close: one tap starts the clock at 0 and auto-finish banks a genuine win + best time in causeway.wins. I simulated all 922 baked lines (366 seeds x bronze/silver/gold) against the iOS deal + applyDemoToken semantics: all 922 currently end with tableau and cells empty and all four suits closed, so this is not reachable with the shipped daily-solutions.json. The fix is cheap: in finishDemo(), if !boardComplete, re-deal (or stay locked) instead of unlocking.",
+    "evidence": [
+      "ios/Causeway/Causeway/Model/Game.swift:854",
+      "ios/Causeway/Causeway/Model/Game.swift:855",
+      "ios/Causeway/Causeway/Model/Game.swift:889",
+      "ios/Causeway/Causeway/Model/Game.swift:897",
+      "ios/Causeway/Causeway/Model/Game.swift:904",
+      "ios/Causeway/Causeway/Model/Game.swift:906",
+      "ios/Causeway/Causeway/Views/ContentView.swift:464"
+    ],
+    "severity": "major",
+    "region": "ios/Causeway/Causeway/Model/Game.swift:846-913",
+    "introduced_by_fix": false,
+    "current_status": "open",
+    "note": "Not reachable with shipped data (verified by simulating all 922 lines); the finding is that the invariant is enforced by a JSON asset rather than by code, and the same function crashes on a malformed line.",
+    "first_seen_round": 0,
+    "status_history": [
+      {
+        "round": 0,
+        "status": "open"
+      }
+    ]
+  },
+  {
+    "id": "layout/ContentView.swift:fan-compression-no-legibility-floor",
+    "claim": "Portrait has no card-size clamp at all (portraitCardW is derived purely from screen width), so per-column fan compression is now the ONLY height accommodation and it degrades all the way to an 8pt visible strip. CardView draws the rank at font size width*0.50 with a width*0.05 top inset, so at portrait cardW ~41 the rank digit occupies roughly y=7..22 of the card. On a 4.7in phone with the DailyHUD or demo bar showing, remaining tableau height is ~250pt, so a 15-card column computes ov = floor((250-69)/14) = 12pt: buried cards show only the top ~5pt of a ~15pt digit, and 6/8/9/0 become indistinguishable. The original QA major (bottom card untappable) is traded for unreadable buried cards. The 8pt floor bounds the layout, not legibility - the floor should be tied to the card's readable header (~cardW*0.45), with the overflow handled by shrinking cardW (as landscape does) or scrolling.",
+    "evidence": [
+      "ios/Causeway/Causeway/Views/ContentView.swift:53",
+      "ios/Causeway/Causeway/Views/ContentView.swift:416",
+      "ios/Causeway/Causeway/Views/ContentView.swift:417",
+      "ios/Causeway/Causeway/Views/CardView.swift:24",
+      "ios/Causeway/Causeway/Views/CardView.swift:29",
+      "ios/Causeway/Causeway/Views/CardView.swift:73"
+    ],
+    "severity": "minor",
+    "region": "ios/Causeway/Causeway/Views/ContentView.swift:409-430",
+    "introduced_by_fix": true,
+    "current_status": "open",
+    "note": "Numbers derived from a 375pt-wide portrait layout (cardW=41, cardH=68.6) and a measured-by-hand ~250pt tableau leftover with the HUD bar up; worth a simulator check on iPhone SE with a 15-card column before deciding severity.",
+    "first_seen_round": 0,
+    "status_history": [
+      {
+        "round": 0,
+        "status": "open"
+      }
+    ]
+  },
+  {
+    "id": "ux/Game.swift:demo-done-banner-names-missing-button",
+    "claim": "The end-of-demo banner says 'tap Replay to try it yourself' but the demo bar's only button is now labelled 'Done'; the 'Replay' pill lives in the separate toolbar/rail. The player is told to tap a control that is not in the bar they are reading, and the button that is there ('Done') gives no hint it will re-deal. One-line string fix.",
+    "evidence": [
+      "ios/Causeway/Causeway/Model/Game.swift:858",
+      "ios/Causeway/Causeway/Views/ContentView.swift:464"
+    ],
+    "severity": "minor",
+    "region": "ios/Causeway/Causeway/Model/Game.swift:854-859",
+    "introduced_by_fix": false,
+    "current_status": "open",
+    "note": "",
+    "first_seen_round": 0,
+    "status_history": [
+      {
+        "round": 0,
+        "status": "open"
+      }
+    ]
+  },
+  {
+    "id": "dataloss/DailyView.swift:show-solution-discards-in-progress-game",
+    "claim": "Tapping a 'show a winning line' pill calls showSolution(), which calls deal() and then persist() - silently destroying an in-progress game (any number of moves, any elapsed time) with no confirmation and no undo, including a different seed's game and an active daily-challenge attempt. Same for the 'Play' button via playChallenge(). Now that leaving a demo also always re-deals, a mis-tap on this pill is unrecoverable in two ways rather than one.",
+    "evidence": [
+      "ios/Causeway/Causeway/Views/DailyView.swift:170",
+      "ios/Causeway/Causeway/Views/DailyView.swift:154",
+      "ios/Causeway/Causeway/Model/Game.swift:819",
+      "ios/Causeway/Causeway/Model/Game.swift:822",
+      "ios/Causeway/Causeway/Model/Game.swift:187"
+    ],
+    "severity": "minor",
+    "region": "ios/Causeway/Causeway/Model/Game.swift:819-833",
+    "introduced_by_fix": false,
+    "current_status": "open",
+    "note": "PRE-EXISTING and outside the diff for 66d1682 - raised because it sits on the same enter/leave-demo path this commit reworked. Cheap to wontfix with a one-line rationale if the loop wants to stay scoped.",
+    "first_seen_round": 0,
+    "status_history": [
+      {
+        "round": 0,
+        "status": "open"
+      }
+    ]
+  }
+]

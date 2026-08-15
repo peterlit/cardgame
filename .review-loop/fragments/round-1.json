@@ -1,0 +1,141 @@
+{
+  "findings": [
+    {
+      "id": "correctness/Game.swift:finish-demo-unlocks-unverified-board",
+      "claim": "The whole 'a demo-touched board can never be played or scored' guarantee has exactly one hole left: finishDemo() sets demoing = false unconditionally when the token list runs out, without checking the board is actually complete; applyDemoToken has no validation (C destroys a card when no cell is free, G/X silently desync, a desync then traps on removeLast of an empty column).",
+      "evidence": [
+        "ios/Causeway/Causeway/Model/Game.swift:865",
+        "ios/Causeway/Causeway/Model/Game.swift:853",
+        "ios/Causeway/Causeway/Model/Game.swift:902-938"
+      ],
+      "severity": "major",
+      "region": "ios/Causeway/Causeway/Model/Game.swift:843-938",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "VERIFIED FIXED on the iOS side. Checked, not taken on trust: (a) finishDemo:865 guards boardComplete and re-deals otherwise; (b) every applyDemoToken case places its guards BEFORE any mutation, so a false return leaves the board byte-identical -- no half-applied token; (c) p.first is nil-safe (a token like ',,,' splits to [] and returns false) so the old p[0] trap is gone; (d) n(j) bounds-checks j, so short tokens no longer read out of range; (e) the abort path is re-entrancy-safe: restartDeal -> stopDemo bumps demoGen, deal()'s own stopDemo early-returns (guard demoing || demoDoneMessage), demoAdvance returns false so scheduleDemoStep does not re-arm, and any in-flight asyncAfter bails on the stale gen; (f) restartDeal is called OUTSIDE the withAnimation closure, so the re-deal is not animated into the fan; (g) grepped every stopDemo() caller (deal, newRandomGame, restartDeal, showSolution, and no view) -- there is no path that clears demoing without an immediate re-deal, so the invariant now holds structurally; (h) a completed demo board cannot be banked: canOfferFinish/runAutoFinish/maybeAutoFinish all require started (false throughout a demo) and !checkWin(). npm test 67/67 confirmed locally. Residual (not worth a finding): an aborted line re-deals with no message, so with corrupt data 'Show me how to win' would look like it did nothing."
+    },
+    {
+      "id": "layout/ContentView.swift:fan-compression-no-legibility-floor",
+      "claim": "Portrait fan compression had no legibility floor and degraded to an 8pt strip, making buried ranks unreadable.",
+      "evidence": [
+        "ios/Causeway/Causeway/Views/ContentView.swift:402",
+        "ios/Causeway/Causeway/Views/ContentView.swift:410-419",
+        "ios/Causeway/Causeway/Views/ContentView.swift:435-437",
+        "ios/Causeway/Causeway/Views/CardView.swift:30-31",
+        "ios/Causeway/Causeway/Views/CardView.swift:55"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:400-437",
+      "introduced_by_fix": true,
+      "current_status": "partial",
+      "note": "Core handled (the 8pt/12pt sliver is gone; I verified the arithmetic: with w = floor(maxH/(aspect + 0.42*(n-1))), column()'s floor((maxH-cardH)/(n-1)) lands at ~0.42w for the tallest column, and the max(8,...) backstop only binds past ~27 cards, so it is genuinely dead). Landscape provably never triggers the shrink: 0.42/cardAspect = 0.42/1.6727 = 0.251 < landscapeFan 0.34, so cardW*units <= landscapeBoardH always. REMAINING EDGE: the 0.42 constant is derived from a wrong text-layout model. The comment at ContentView.swift:400-401 assumes the rank glyph starts at the 0.05*w top padding, but CardView renders the rank as a Text whose line box (~1.17em tall) sits at the padding top, and SF's ascent-to-cap gap (ascent 0.955em - cap 0.714em = 0.241em at a 0.50*w font = 0.12*w) pushes the cap DOWN. The digit therefore spans ~0.17w..0.53w, not 0.05w..0.41w -- which is exactly what round 0 measured independently (y=7..22 at cardW=41 => 0.17w..0.53w). A 0.42w floor hides the bottom ~30% of the rank cap. To actually show the whole digit the constant must be ~0.53 (0.05 + 0.955*0.50); note that raising it also lowers the column count at which the card-size shrink kicks in, which interacts with the new finding below.",
+      "first_seen_round": 0,
+      "status_history": [
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "partial" }
+      ]
+    },
+    {
+      "id": "ux/Game.swift:demo-done-banner-names-missing-button",
+      "claim": "The end-of-demo banner said 'tap Replay to try it yourself' while the demo bar's only button is 'Done'.",
+      "evidence": [
+        "ios/Causeway/Causeway/Model/Game.swift:869",
+        "ios/Causeway/Causeway/Views/ContentView.swift:483"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Model/Game.swift:859-870",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified: Game.swift:869 now reads 'tap Done to try it yourself' and ContentView.swift:483 renders that exact button label ('Done' when !demoing) wired to restartDeal(). The web copy (index.html:1258) still says 'tap Replay', but on the web that is CORRECT -- the web toolbar has a Replay button that re-deals, and the web's Done does something different (see the new index.html findings).",
+      "first_seen_round": 0,
+      "status_history": [
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "fixed" }
+      ]
+    },
+    {
+      "id": "dataloss/DailyView.swift:show-solution-discards-in-progress-game",
+      "claim": "Tapping a 'show a winning line' pill calls showSolution(), which calls deal() and then persist() - silently destroying an in-progress game with no confirmation and no undo. Same for 'Play' via playChallenge().",
+      "evidence": [
+        "ios/Causeway/Causeway/Views/DailyView.swift:170",
+        "ios/Causeway/Causeway/Views/DailyView.swift:154",
+        "ios/Causeway/Causeway/Model/Game.swift:819",
+        "ios/Causeway/Causeway/Model/Game.swift:822",
+        "ios/Causeway/Causeway/Model/Game.swift:187"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Model/Game.swift:819-833",
+      "introduced_by_fix": false,
+      "current_status": "wontfix",
+      "note": "Accepted. It is genuinely pre-existing and outside the reviewed diff, and the deferral is recorded with a concrete fix shape -- I verified BACKLOG.md now carries DV-1 naming playChallenge()/showSolution() and the 'started && moveCount > 0' confirm. Do not re-litigate in later rounds unless the demo entry path is touched again.",
+      "first_seen_round": 0,
+      "status_history": [
+        { "round": 0, "status": "open" },
+        { "round": 1, "status": "wontfix" }
+      ]
+    },
+    {
+      "id": "correctness/index.html:demo-stop-leaves-solved-board-playable",
+      "claim": "The web prototype's demo bar wires BOTH 'Stop' and the post-line 'Done' to stopDemo() (index.html:1563), which only clears the demoing flag and hides the bar -- it never re-deals. So the exact exploit the iOS side just spent two rounds closing is wide open on the web, and it needs no corrupt data: click 'Show me how to win', let the baked line auto-play 90% of the deal, click Stop, and the 95%-solved board is immediately playable again (startDrag's only gate is `isWon() || demoing`, index.html:512). The next manual move sets startTime=Date.now() from scratch (index.html:679, 722) and, on completion, onWin -> recordWin writes wins[seed] with secs measured from that moment -- a fabricated best time plus a solved-deal checkmark on a deal the player never solved. Auto-finish makes it one click (canOfferFinish only needs startTime, index.html:914). The iOS code comment at ContentView.swift:479-482 states this is forbidden behaviour; the web copy does it.",
+      "evidence": [
+        "index.html:1563",
+        "index.html:1291-1296",
+        "index.html:512",
+        "index.html:679",
+        "index.html:722",
+        "index.html:1108-1121",
+        "index.html:914",
+        "ios/Causeway/Causeway/Views/ContentView.swift:479-483"
+      ],
+      "severity": "major",
+      "region": "index.html:1280-1300, 1563",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "CONFIRMED by reading the code, not run. Pre-existing and web-side, so a scoped deferral to BACKLOG (like DV-1) is a defensible answer -- but the loop should record it, because the just-landed iOS fix makes the two copies diverge on an integrity rule that tests/ios-parity.test.mjs exists to keep in sync. Fix shape: point demoStop.onclick at restartDeal (matching ios ContentView.swift:483)."
+    },
+    {
+      "id": "correctness/index.html:apply-demo-token-unguarded",
+      "claim": "The web applyDemoToken (index.html:1236-1247) still has every defect just removed from the Swift copy: `case 'C'` does cells[cells.indexOf(null)]=card, so with no free cell it writes cells[-1] and the popped card vanishes from the deck; `case 'F'/'C'` pop() an empty column, yielding undefined and throwing on card.suit. That throw happens inside the setTimeout demoTick, so it escapes silently, the timer chain dies with demoing stuck true, and startDrag early-returns forever -- input is permanently locked until reload. index.html:473 already documents this exact lockup as a known hazard. Web finishDemo (index.html:1280) also has no boardComplete guard, the counterpart of the guard just added at Game.swift:865.",
+      "evidence": [
+        "index.html:1236-1247",
+        "index.html:1280-1284",
+        "index.html:473-475",
+        "index.html:1287-1291"
+      ],
+      "severity": "minor",
+      "region": "index.html:1236-1300",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "Same reachability caveat as the original iOS finding (needs malformed baked data, and all 922 shipped lines are clean), so this is a parity/defence-in-depth item, not a live bug. Only worth doing together with the index.html:demo-stop finding above."
+    },
+    {
+      "id": "layout/ContentView.swift:tableau-shrink-detaches-from-upper-row",
+      "claim": "The new card-size shrink applies to the tableau only, and the tableau HStack is content-sized inside a full-width GeometryReader in a VStack(alignment: .leading), so once it triggers the whole tableau becomes narrower and hugs the LEFT edge while the foundations/free cells above stay at the original width: on a 375pt phone with a 15-card column, w drops 41->33 and the tableau is 8*33+7*4=292pt against the upper row's 356pt, leaving a 64pt dead margin down the right side of the board. Worse, w is recomputed every body pass from game.tableau.map(\\.count).max(), so every move that changes the tallest column's height re-scales ALL 52 tableau cards (~2.6pt per card at the threshold) inside the caller's withAnimation -- the whole board pulses and re-flows horizontally on single-card moves, which is precisely the 'no whole-board resize as one column grows' property the replaced comment at ContentView.swift:429-434 used to guarantee.",
+      "evidence": [
+        "ios/Causeway/Causeway/Views/ContentView.swift:410-422",
+        "ios/Causeway/Causeway/Views/ContentView.swift:80",
+        "ios/Causeway/Causeway/Views/ContentView.swift:104-106",
+        "ios/Causeway/Causeway/Views/ContentView.swift:273-293"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:404-426",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "CONFIRMED by reading the layout, not run. Kept at minor because of reachability: I computed the trigger threshold as cardW*(1.6727 + 0.42*(n-1)) > maxH, which needs roughly a 14-20 card column (375x667 with the HUD bar up: maxH ~316 => n>=16; 393x852 with HUD: maxH ~418 => n>=20; 320x568: n>=14). Note the threshold DROPS if the 0.42 constant is corrected upward per the legibility finding, so fix the two together. Two cheap mitigations: centre the tableau (.frame(maxWidth: .infinity) on the HStack) so it stays aligned with the upper row, and quantise w (e.g. step in 4pt buckets or derive it from a monotonically-latched max column count) so a single move cannot re-scale the board. SUSPECTED extra: on a transient maxH == 0 layout pass the guard falls through to max(30, floor(0)) = 30, so all tableau cards would briefly render at the 30pt minimum -- previously such a pass only collapsed the fan, not the card size."
+    },
+    {
+      "id": "test/ios-parity.test.mjs:f-token-field-pin-loosened",
+      "claim": "The drift-guard re-pin quietly dropped coverage: the old F pin was 'let c = tableau[n(1)].removeLast()', which asserted that F reads its column from field 1. The new pin is 'let c = tableau[col].removeLast()' and nothing pins 'let col = n(1)', so an edit changing F (or C) to read n(2) as the column would keep all five pins green while making the iOS demo replay a baked line differently from index.html and tools/solver -- the precise divergence this file exists to catch.",
+      "evidence": [
+        "tests/ios-parity.test.mjs:82-88",
+        "ios/Causeway/Causeway/Model/Game.swift:908",
+        "ios/Causeway/Causeway/Model/Game.swift:924"
+      ],
+      "severity": "minor",
+      "region": "tests/ios-parity.test.mjs:78-88",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "The rest of the re-pin is legitimate -- the T pin is unchanged and the two-line C pin is as strong as the one it replaced. One-line fix: add 'let col = n(1)' to the snippet list. Verified npm test is 67/67 green as claimed."
+    }
+  ]
+}
