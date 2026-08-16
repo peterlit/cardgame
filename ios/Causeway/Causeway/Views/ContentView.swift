@@ -18,6 +18,21 @@ private struct DropZonesKey: PreferenceKey {
     }
 }
 
+/// A brief horizontal wiggle — the "this card can't move" refusal cue. `shakes` is a monotone
+/// counter shared by all cards; animating it +1 sweeps sin through 3π and lands back at zero
+/// translation (sin(k·3π) = 0 for every integer k), so cards always rest exactly on their fan
+/// position. `amplitude` (not animatable) gates the cue to the one touched card — everyone else
+/// runs the same sweep at amplitude 0, which keeps each card's animatable value continuous and
+/// avoids a newly-touched card animating through the counter's full accumulated history.
+private struct ShakeEffect: GeometryEffect {
+    var shakes: CGFloat
+    var amplitude: CGFloat
+    var animatableData: CGFloat { get { shakes } set { shakes = newValue } }
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: amplitude * sin(shakes * .pi * 3), y: 0))
+    }
+}
+
 struct ContentView: View {
     @StateObject private var game = Game()
     @Namespace private var ns
@@ -56,6 +71,13 @@ struct ContentView: View {
     // chrome wobble it guards against (Finish pill row, demo headline wrap) never changes the
     // root size, so this reset can't reintroduce the pulse.
     @State private var latchedBoardH: CGFloat = 0
+    // Refusal cue for touching a card that cannot move (not a run head): which spot is
+    // shaking and a monotone trigger the ShakeEffect animates on. Deliberately NOT fired for
+    // movable cards whose smart-move finds no target — tap is the primary control and cueing
+    // every fruitless tap would be noise; the cue answers only "did the app register my touch
+    // on this un-liftable card?".
+    @State private var shakeSpot: Spot?
+    @State private var shakeTrigger: CGFloat = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     private let outerPad: CGFloat = 6
@@ -208,13 +230,16 @@ struct ContentView: View {
         .sheet(isPresented: $showWins) { WinsView(game: game) }
         .sheet(isPresented: $showDaily) { DailyView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
+        // Two actions ONLY (side-by-side row): with three, landscape's auto-raised number pad
+        // (~170pt of a 402pt height) pushed Random/Cancel below the visible alert with no scroll
+        // hint, leaving destructive "Play" as the only visible exit. A "Random" action here was
+        // redundant anyway — the always-visible "New game" pill is the same call.
         .alert("Play a deal", isPresented: $showDeal) {
             TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
+            Button("Cancel", role: .cancel) {}
             Button("Play") {
                 if let n = Int(dealText) { withAnimation { game.deal(seed: n) } }
             }
-            Button("Random") { withAnimation { game.newRandomGame() } }
-            Button("Cancel", role: .cancel) {}
         } message: { Text("Enter a deal number to play that exact deal.") }
         .alert("Ready to finish", isPresented: $game.promptAutoFinish) {
             Button("Finish") { withAnimation { game.runAutoFinish() } }
@@ -229,23 +254,35 @@ struct ContentView: View {
     private func landscapeRail(boardH: CGFloat) -> some View {
         ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
             VStack(spacing: 6) {
+                // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
+                // hierarchies exists at a time, so UI tests address either orientation uniformly.
                 railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+                    .accessibilityIdentifier("toolbar.newgame")
                 railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
                     .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                    .accessibilityIdentifier("toolbar.undo")
                 railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+                    .accessibilityIdentifier("toolbar.replay")
                 railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+                    .accessibilityIdentifier("toolbar.autoplay")
                 railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+                    .accessibilityIdentifier("toolbar.autofinish")
                 if game.canOfferFinish {
                     railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                        .accessibilityIdentifier("toolbar.finish")
                 }
                 railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
                     dealText = "\(game.seed)"; showDeal = true
                 }
+                .accessibilityIdentifier("toolbar.deal")
                 if !game.pool.isEmpty {
                     railPill("Daily") { showDaily = true }
+                        .accessibilityIdentifier("toolbar.daily")
                 }
                 railPill("Wins") { showWins = true }
+                    .accessibilityIdentifier("toolbar.wins")
                 railPill("How to play") { showRules = true }
+                    .accessibilityIdentifier("toolbar.howtoplay")
             }
         }
         .frame(width: landscapeRailW, height: boardH)
@@ -264,7 +301,10 @@ struct ContentView: View {
             .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
             .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
         }
-        .buttonStyle(.plain)
+        // NO .buttonStyle(.plain) here — the plain style preserves the explicit near-white label
+        // color when the button is DISABLED, which over the faded capsule rendered the disabled
+        // Undo as a blank white pill. The default style greys a disabled label (like the portrait
+        // toolbar's pill), keeping it legible.
     }
     /// Landscape middle column — foundations (up/down rows) with the free cells directly beneath,
     /// so both sit to the left of the tableau and the tableau owns the remaining width.
@@ -290,43 +330,62 @@ struct ContentView: View {
     // MARK: header + toolbar
 
     private var header: some View {
-        HStack(alignment: .bottom) {
+        // While a demo line plays (or its completion banner shows), the board's move count is the
+        // APP'S, not the player's — showing it against the stopped clock reads as a perfect
+        // zero-second game. Blank both readouts for the demo's duration; Won stays (it's real).
+        let demoActive = game.demoing || game.demoDoneMessage != nil
+        return HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Causeway").font(.system(size: 22, weight: .bold, design: .serif))
                 Text("build each suit from both ends").font(.system(size: 11)).opacity(0.65)
             }
             Spacer()
-            stat("Moves", "\(game.moveCount)")
-            ClockStat(clock: game.clock)   // observes only the clock, so its 1 Hz tick
-            stat("Won", "\(game.winStore.count)")   // doesn't re-render the board
+            stat("Moves", demoActive ? "—" : "\(game.moveCount)", id: "stat.moves")
+            if demoActive {
+                stat("Time", "—", id: "stat.time")
+            } else {
+                ClockStat(clock: game.clock)   // observes only the clock, so its 1 Hz tick
+            }
+            stat("Won", "\(game.winStore.count)", id: "stat.won")   // doesn't re-render the board
         }
     }
-    private func stat(_ label: String, _ value: String) -> some View {
+    private func stat(_ label: String, _ value: String, id: String) -> some View {
         VStack(spacing: 1) {
             Text(label).font(.system(size: 12)).opacity(0.8)
             Text(value).font(.system(size: 18, weight: .bold, design: .serif))
+                .accessibilityIdentifier(id)   // the VALUE carries the id, so tests read it directly
         }
     }
 
     private var toolbar: some View {
         FlowLayout(spacing: 8) {
             pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+                .accessibilityIdentifier("toolbar.newgame")
             pill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
                 .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                .accessibilityIdentifier("toolbar.undo")
             pill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+                .accessibilityIdentifier("toolbar.replay")
             pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+                .accessibilityIdentifier("toolbar.autoplay")
             pill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+                .accessibilityIdentifier("toolbar.autofinish")
             if game.canOfferFinish {
                 pill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                    .accessibilityIdentifier("toolbar.finish")
             }
             pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
                 dealText = "\(game.seed)"; showDeal = true
             }
+            .accessibilityIdentifier("toolbar.deal")
             if !game.pool.isEmpty {
                 pill("Daily") { showDaily = true }
+                    .accessibilityIdentifier("toolbar.daily")
             }
             pill("Wins") { showWins = true }
+                .accessibilityIdentifier("toolbar.wins")
             pill("How to play") { showRules = true }
+                .accessibilityIdentifier("toolbar.howtoplay")
         }
     }
     private func pill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
@@ -413,6 +472,14 @@ struct ContentView: View {
                 // it would fire a stray smartMove and clear `drag`, snapping the in-flight drag
                 // back. Only the owning card (or a fresh tap, drag == nil) may resolve here.
                 guard drag == nil || drag?.source == spot else { return }
+                if !canDrag, !game.demoing {
+                    // The touch landed on a card that cannot move (buried / not a run head):
+                    // acknowledge it with a shake so silence never reads as a dropped touch.
+                    // Suppressed while demoing (ALL input is locked then, not just this card).
+                    shakeSpot = spot
+                    withAnimation(.linear(duration: 0.3)) { shakeTrigger += 1 }
+                    return
+                }
                 let travelled = hypot(v.translation.width, v.translation.height)
                 withAnimation(.easeOut(duration: 0.18)) {
                     if travelled < tapSlop {
@@ -530,7 +597,13 @@ struct ContentView: View {
             }
         }
         .frame(width: cardW, height: height, alignment: .top)
-        .background(dropZone(.column(col)))
+        // The drop frame extends past the cards down to the tableau's bottom (`maxH`): the empty
+        // strip below a column belongs to no other target, so a run released a few points below
+        // the column's last card should land ON that column, not silently snap back. (The web
+        // mirror gives every column the tallest column's hit height for the same reason.)
+        .background(alignment: .top) {
+            dropZone(.column(col)).frame(height: max(height, maxH), alignment: .top)
+        }
     }
 
     /// A single tableau card: single tap = smart-move; drag = manual placement. Only cards
@@ -540,6 +613,9 @@ struct ContentView: View {
             .matchedGeometryEffect(id: card.id, in: ns)
             .offset(y: CGFloat(idx) * overlap)              // fan the pile
             .offset(runOffset(.tableau(col: col, idx: idx))) // + follow the finger while dragging
+            // Refusal wiggle when this (unmovable) card was touched; amplitude 0 for the rest.
+            .modifier(ShakeEffect(shakes: shakeTrigger,
+                                  amplitude: shakeSpot == .tableau(col: col, idx: idx) ? 4 : 0))
             .zIndex(Double(idx))
             .gesture(cardGesture(for: .tableau(col: col, idx: idx),
                                  canDrag: !game.demoing && game.isSeqHead(col: col, idx: idx)))
@@ -553,19 +629,23 @@ struct ContentView: View {
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundStyle(Color(hex: 0xF4EFE2))
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("demo.headline")
             Spacer(minLength: 6)
             if game.demoing {
                 if game.demoPaused {
                     demoPill("Next") { game.demoStepOnce() }
+                        .accessibilityIdentifier("demo.next")
                 }
                 // "Start" before the first play, "Pause" while playing, "Resume" once paused.
                 demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
+                    .accessibilityIdentifier("demo.start")   // one id for Start/Pause/Resume (same control)
             }
             // Both mid-demo "Stop" and post-line "Done" re-deal the seed: a demo-touched board
             // must never become playable (taking over the app's own solution moves and finishing
             // would bank a genuine win/best-time). The player lands on a fresh board of the same
             // deal, which they can still solve legitimately.
             demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }
+                .accessibilityIdentifier(game.demoing ? "demo.stop" : "demo.done")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -641,6 +721,7 @@ private struct ClockStat: View {
         VStack(spacing: 1) {
             Text("Time").font(.system(size: 12)).opacity(0.8)
             Text(DealFormat.time(clock.elapsed)).font(.system(size: 18, weight: .bold, design: .serif))
+                .accessibilityIdentifier("stat.time")
         }
     }
 }

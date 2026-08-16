@@ -1010,6 +1010,14 @@ function render(animate=true){
   const tab=document.getElementById("tableau"); tab.innerHTML="";
   const ov=getComputedStyle(document.documentElement).getPropertyValue("--overlap");
   const overlap=parseInt(ov);
+  const chpx=parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ch"));
+  // Every column's hit box gets the TALLEST column's height: the empty strip below a shorter
+  // column's last card belongs to no other target, so a run released there should land on that
+  // column instead of silently snapping back. Cards are absolutely positioned, so equalizing
+  // heights changes no visible layout (the grid row is the tallest column anyway). Mirrors the
+  // iOS column dropZone frames extending to the tableau's bottom.
+  const tallest=Math.max(1, ...state.tableau.map(t=>t.length));
+  const colH=((tallest-1)*overlap + chpx)+"px";
   for(let col=0;col<NCOLS;col++){
     const colEl=document.createElement("div"); colEl.className="col"; colEl.dataset.col=col;
     const t=state.tableau[col];
@@ -1025,8 +1033,8 @@ function render(animate=true){
         el.addEventListener("pointerdown", e=>startDrag(e, loc));   // tap = smart-move, drag = place
         colEl.appendChild(el);
       });
-      colEl.style.height=((t.length-1)*overlap + parseInt(getComputedStyle(document.documentElement).getPropertyValue("--ch")))+"px";
     }
+    colEl.style.height=colH;
     tab.appendChild(colEl);
   }
   document.getElementById("undoBtn").disabled = history.length===0;
@@ -1097,8 +1105,12 @@ function dragCancel(){
 }
 
 /* ---------- stats / timer ---------- */
-function setMoves(n){ document.getElementById("moves").textContent=n; }
-function setTime(s){ document.getElementById("time").textContent=fmtTime(s); }
+// While a demo line plays (or its completion banner shows), the board's move count is the APP'S,
+// not the player's, and the clock never ran — show em-dashes so the header can't read as a
+// perfect zero-second game. (demoActive is safe here: these run only after startup completes.)
+function demoActive(){ const b=document.getElementById("demoBar"); return demoing || (b && b.classList.contains("show")); }
+function setMoves(n){ document.getElementById("moves").textContent = demoActive() ? "—" : n; }
+function setTime(s){ document.getElementById("time").textContent = demoActive() ? "—" : fmtTime(s); }
 function startTimer(){ stopTimer(); timerId=setInterval(()=>{ setTime(Math.floor((Date.now()-startTime)/1000)); },500); }
 function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 
@@ -1344,6 +1356,11 @@ function showSolution(seed, tier, label){
   tier = tier || 'bronze';
   const tokens = solutionLine(seed, tier);
   if(!tokens) return;
+  // The demo re-deals the board: never silently discard an in-progress daily attempt (moves
+  // made, not yet won). No restore-after-demo — resuming a demo-touched flow is the
+  // "finish the app's own line" scoring hole. (Parity with iOS DailyView's confirmation.)
+  if(challengeDay!=null && moveCount>0 &&
+     !confirm("Watching a demo re-deals the board, so your current daily attempt (moves and time) will be discarded. Continue?")) return;
   stopDemo();
   closeDaily();
   deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
@@ -1353,6 +1370,7 @@ function showSolution(seed, tier, label){
   demoing=true; demoPaused=true; demoStarted=false; demoMoves=tokens.split(' '); demoIdx=0;
   demoTier=tier; demoLabel=label||'';
   const bar=document.getElementById("demoBar"); if(bar) bar.classList.add("show");
+  setMoves(0); setTime(0);   // re-blank the header now the bar is up (demoActive) — see setMoves
   updateDemoBar();
   render();
 }
@@ -1602,8 +1620,13 @@ function refreshAutoFinishBtn(){
   const label = autoFinishMode==="ask"?"Ask":autoFinishMode==="on"?"On":"Off";
   document.getElementById("autoBtn").textContent = "Auto-finish: " + label;
 }
-document.getElementById("autoBtn").onclick=()=>{   // cycle Ask -> On -> Off
-  autoFinishMode = autoFinishMode==="ask"?"on":autoFinishMode==="on"?"off":"ask";
+// Cycle Ask -> Off -> On (parity with iOS AutoFinishMode.next): "On" is the only state whose
+// mere selection can instantly end a finishable game (maybeAutoFinish below), so it must never
+// be a pass-through — from the default Ask you reach Off without ever touching On. Landing on
+// On deliberately still finishes a decided board: that's the shortcut back to the cascade after
+// the "Ready to finish" prompt was deferred.
+document.getElementById("autoBtn").onclick=()=>{
+  autoFinishMode = autoFinishMode==="ask"?"off":autoFinishMode==="off"?"on":"ask";
   lsSet("causeway.autofinishmode", autoFinishMode);
   refreshAutoFinishBtn();
   maybeAutoFinish();   // e.g. switching to On finishes now if the board is already decided

@@ -2,9 +2,26 @@
 
 Derived by driving the booted simulator (portrait, 402x874 pt tap space) and
 reading the SwiftUI/model source. These are replayable scripts; each round the app
-is reinstalled fresh (no prior stats/wins). "Today" = daily deal **#10,003**
-(Aug 14 2026); the daily pool spans **Aug 12 (index 0) → Aug 14 (today)**, later
-days locked.
+is reinstalled fresh (no prior stats/wins).
+
+**Derive "today" at test time — never hard-code a daily deal number or objective
+label.** `dayIndex = daysSince(2026-08-12)` from the *device's* local date; the
+challenge deal is `data/daily-pool.json.seeds[dayIndex].seed`; Silver/Gold come
+from the frozen per-day RNG (Mulberry32 seeded `0x9e3779b9 ^ (dayIndex + 1)`,
+silver pool `["moves","no-undo"]` + the seed's certified silver ids, gold pool =
+the seed's supported GOLD ids, `moves` param = `round(par * 1.2)`), and the "show
+me how to win" pills follow `data/daily-solutions.json.solutions["<seed>"]` (a
+Silver pill appears only when a distinct `silver` line exists — for the whole
+current pool head there is none, so expect **Clear + Gold only**). A ready-made
+deriver is checked in at `.qa-loop/tools/derive_daily.py`
+(`python3 derive_daily.py [dayIndex]`); it was verified against the live screen
+for dayIndex 0, 3 and 4.
+
+**Midnight hazard (observed, not a bug):** the app recomputes `todayIndex()` on
+every render, so a session that crosses local midnight sees the Daily card, its
+objectives, the demo lines and the calendar highlight flip **live, with no
+relaunch** — seen 2026-08-15 23:59 → 2026-08-16 00:00 (Deal #10,004 → #10,005).
+If a case flips mid-run, say so in the result instead of filing it.
 
 ## Screen map (confirmed live)
 
@@ -20,13 +37,17 @@ days locked.
   numberPad keyboard (digits only — no minus/letters), buttons `Play` /
   `Random` / `Cancel`.
 - **Daily sheet** ("Daily Challenges"): 4 streak cards (Play/Silver/Gold/Flawless,
-  each: current big number, "N total", "best N"); Today card (Deal #10,003; Bronze
-  "Clear the deal", Silver "Open all four down-foundations within your first 20
-  moves", Gold "Send all four Kings to the down-foundation before any Ace"; each
-  with a checkmark circle); `Play` button; "Show me how to win:" row with
-  `🥉 Clear` / `🥈 Silver` / `🥇 Gold` pills; month calendar (Aug 2026; 12/13/14
-  tappable, 14 gold-outlined = today, 15+ dimmed/locked); BACKUP section with
-  `Export` / `Import` and a note. `Done` (top-right) dismisses.
+  each: current big number, "N total", "best N"); the selected day's card — headed
+  **Today** for `todayIndex()`, else "<Mon D>" — with `Deal #<derived seed>` (grouped
+  digits) and Bronze "Clear the deal" / Silver / Gold rows carrying the DERIVED
+  objective labels and a checkmark circle each; a gold `Play` button ("Replay to
+  improve ↻" once bronze is banked, "Unlocks <Mon D>" for a future day); a "Show me
+  how to win:" row of pills (`🥉 Clear`, plus `🥈 Silver` / `🥇 Gold` only when
+  `daily-solutions.json` holds that tier's line — currently Clear + Gold), shown only
+  for days ≤ today; the month calendar (days in the pool up to today are tappable,
+  today is gold-outlined, the selected day gets a tint, later days are dimmed and
+  inert); BACKUP section with `Export` / `Import` and a note. `Done` (top-right)
+  dismisses. **Derive every number/label here at test time** — see the header.
 - **Wins sheet** ("Deals won"): "Play a deal" field (Number 1–1,000,000) with a
   `Play` button disabled while the field is empty/<1; empty state "No wins yet —
   go solve one!"; once wins exist, "N deals solved · M ranges" and tappable range
@@ -94,6 +115,10 @@ Note on tap mapping: screenshots return a larger PNG; multiply screenshot px by
   press-and-hold delay) and drops exactly where released if legal; if released over
   no/illegal zone it snaps back with no move counted.
 - **Effort bar:** pickup is instant; drop lands where released.
+- **Note:** the drop is resolved against the target column's *frame*, so a release
+  below the column's last card lands outside its drop zone and snaps back. Repeated
+  legal drops onto one column is also the practical way to build a tall column —
+  see TC-2.6.
 
 **TC-2.4 (Both) — Drag an unmovable/buried card.**
 1. Cold launch. Attempt to drag a buried card (not a run head).
@@ -106,6 +131,62 @@ Note on tap mapping: screenshots return a larger PNG; multiply screenshot px by
    tap.
 - **Expected:** animation begins within ~0.18 s; a >1 s visible no-response with no
   motion is a (heuristic) finding.
+
+**TC-2.6 (Both) — Portrait tall column: the column's fan compresses, then the whole
+board shrinks ONCE.** *(Rewritten 2026-08-16. Supersedes the old "clipping at
+13–15 cards" expectation that the round-2 ledger filed under TC-2.3 as
+`bug/Main:portrait-tall-column-clipped-offscreen` — this case is that finding's
+regression test.)*
+1. Cold launch. Tap `Deal #…`, enter the **current day's daily deal number**
+   (derive it — see the header), tap `Play`. Portrait, no daily HUD.
+2. Grow ONE column (col 0) as far as legality allows. Verified drag sequence for
+   deal **#10,004** on iPhone 17 Pro (device pt; 0-based column centres
+   x = 28, 77, 126, 175, 224, 272, 321, 370; free cell 1 at (274,296); the bottom
+   card of an N-card column is centred at y = 462 + 30·(N−1)):
+   1. `drag 321 612 → 28 600` (10♥ c6→c0, col0 = 8)
+   2. `drag 370 612 → 274 296` (4♥ c7→free cell 1)
+   3. `drag 370 582 → 28 600` (9♠ c7→c0, 9)
+   4. `drag 321 582 → 77 600` (J♦ c6→c1)
+   5. `drag 321 552 → 370 560` (Q♥ c6→c7 onto K♣)
+   6. `drag 321 522 → 28 600` (8♥ c6→c0, 10)
+   7. `drag 272 612 → 28 600` (7♣ c5→c0, 11)
+   8. `drag 126 642 → 28 600` (6♥ c2→c0, 12)
+   9. `drag 175 642 → 321 470` (8♠ c3→c6 onto 9♥)
+   10. `drag 175 612 → 28 600` (5♠ c3→c0, **13**)
+   11. `drag 274 296 → 28 600` (4♥ cell→c0, 14)
+   12. `drag 175 582 → 28 600` (3♣ c3→c0, 15)
+   13. `drag 126 612 → 28 600` (2♦ c2→c0, **16**)
+   Screenshot after each add; compare that column's fan pitch with a neighbour's,
+   and the card width of the FOUNDATIONS / FREE CELLS rows.
+3. On the shrunken board, tap the **bottom** card of the tall column (after the
+   shrink col 0 is centred at x ≈ 36 and its bottom card at y ≈ 800), then tap
+   `Undo`.
+- **Expected (all four legs):**
+  a. **Never clipped.** At every count the bottom card is fully on screen, above the
+     home-indicator zone, and still hit-testable. A card cut by the screen edge, or
+     one that swallows a tap, is a blocker-grade bug.
+  b. **Fan compression first.** The tall column compresses only ITS OWN fan; every
+     other column keeps the normal pitch and the card SIZE does not change. Measured:
+     pitch 30 pt at ≤12 cards → 28 pt at 13 → 24 pt at 15, card width 45 pt
+     throughout.
+  c. **One uniform board shrink at the legibility floor.** When that column's fan
+     would drop below the legibility floor, the WHOLE board switches to one smaller
+     shared card size — foundations, free cells and tableau together, never two card
+     sizes on screen at once — and the narrower tableau re-centres. Measured on
+     iPhone 17 Pro portrait: fires on the **16th** card (45 pt → ~44 pt).
+  d. **Monotone within the deal.** Shortening the column again must NOT grow the
+     board back. Verified: tapping the 16-card column's bottom card parked it in a
+     free cell (Moves +1) and the board stayed small; `Undo` restored 16 cards, still
+     small. Only a new deal / `Replay` / `New game` restores full size.
+- **Threshold is device- and chrome-dependent — derive it, don't hard-code 16.** The
+  shrink starts at the smallest N where
+  `floor((boardH − 32) / (3·1.6727 + 0.53·(N−1))) < portraitCardW`, with
+  `portraitCardW = floor((screenW − 12 − 28) / 8)` and `boardH` = the height of the
+  foundations+tableau area (≈612 pt here). A taller phone shrinks later; the daily
+  HUD or the demo bar steals height, so it shrinks **earlier** on a challenge board.
+- **Effort bar / evidence:** `wf2-tall-13cards-fan-compressed.png`,
+  `wf2-tall-15cards-no-shrink-yet.png`, `wf2-tall-16cards-uniform-board-shrink.png`,
+  `wf2-tall-bottom-card-tappable-no-regrow.png` (round-0 exploration).
 
 ---
 
@@ -168,56 +249,136 @@ Note on tap mapping: screenshots return a larger PNG; multiply screenshot px by
 
 ## WF-5 — Daily Challenge: read objectives, play, read stats (Both)
 
+*All expectations below are DERIVED — run `derive_daily.py` (no argument = today)
+before the case and compare its output to the screen. Do not paste a deal number
+into an expectation.*
+
 **TC-5.1 (Both) — Open Daily and read objectives + streaks.**
-1. Cold launch. Tap `Daily`.
-- **Expected:** sheet titled "Daily Challenges"; 4 streak cards each showing
-  current / "N total" / "best N" (all 0 on fresh install); Today card = Deal
-  #10,003 with legible Bronze/Silver/Gold objective text and checkmark circles.
-- **Effort bar:** streak vs total vs best must be distinguishable; objectives legible
-  without truncation.
+1. Derive today: `python3 .qa-loop/tools/derive_daily.py`.
+2. Cold launch. Tap `Daily`.
+- **Expected:** sheet titled "Daily Challenges"; four streak cards (Play / Silver /
+  Gold / Flawless) each showing a big current number, "N total" and "best N" (all 0
+  on a fresh install); the card is headed **"Today"** with `Deal #<derived seed>`
+  (grouped, e.g. "Deal #10,005"); Bronze = "Clear the deal", Silver and Gold text
+  **exactly** matching the derived labels, each with an empty checkmark circle; a
+  gold `Play` button; a "Show me how to win:" row whose pills match the derived
+  set (Clear + Gold for every day in the current pool head — a `Silver` pill must
+  appear only if `daily-solutions.json` has a distinct `silver` line for that seed);
+  then the month calendar and the BACKUP section. `Done` (top-right) dismisses.
+- **Effort bar:** streak vs total vs best distinguishable at a glance; no objective
+  text truncated on this card (it wraps to 2 lines when long — verified for
+  "For every suit, send its King home before its Ace").
 
 **TC-5.2 (Both) — Play hands off to the board with the live HUD.**
 1. In Daily, tap `Play`.
-- **Expected:** sheet dismisses; board shows the daily seed (#10,003) with the
-  DailyHUD capsule (🥉 Clear / 🥈 <silver label> / 🥇 <gold label>, each ·/✓/✗).
-  One tap from the card to playing.
+- **Expected:** one tap; sheet dismisses; the `Deal #` pill shows the derived daily
+  seed; Moves 0, Time 0:00; a DailyHUD capsule replaces nothing else and sits under
+  the toolbar showing three medal chips (🥉 Clear the deal · 🥈 <silver label> ·
+  🥇 <gold label>), each with ·/✓/✗ state.
+- **Watch:** the HUD renders all three labels on ONE 402 pt line — the Silver and
+  Gold labels are visibly truncated with "…" (see Candidate concerns CC-1). WF-5
+  asks for legible objectives; decide whether that is a finding when you reproduce.
 
 **TC-5.3 (Both) — Replay-to-improve label after a bronze.**
 1. Win the daily once (bronze earned). Re-open `Daily`.
 - **Expected:** the Play button now reads "Replay to improve ↻" (grey, not gold);
-  streak/total/best update; Today card checkmarks reflect earned tiers.
+  Play streak/total/best update from 0; the Today card's Bronze circle is checked and
+  the Silver/Gold circles reflect what that attempt actually met.
 
-**TC-5.4 (Both) — Inspect a past/other day via calendar.**
-1. In Daily, tap day `12` then `13` in the calendar.
-- **Expected:** the day card updates to that day's deal + objectives; today (14) is
-  gold-outlined; locked future days (15+) are dimmed and NOT tappable.
-- **Edge:** tapping a locked future day does nothing (avail=false).
+**TC-5.4 (Both) — Inspect a past / future day via the calendar.**
+1. In Daily, scroll to the calendar. Tap an earlier day inside the pool (e.g. the
+   12th, dayIndex 0).
+2. Tap a day AFTER today (locked).
+3. Tap today again.
+- **Expected:** selecting a past day retitles the card from "Today" to "<Mon D>" and
+  swaps in that day's derived deal + objectives (verified: Aug 12 → "Deal #10,001",
+  Silver "Win in 100 moves or fewer", Gold "Send all four Aces home before any other
+  card"); the selected day gets a filled tint while **today keeps the gold outline**;
+  days after today are dimmed and inert (verified: tapping tomorrow changes nothing);
+  tapping today restores the "Today" card.
+- **Edge:** the daily is catch-up-friendly — `Play` on a past (unlocked) day calls
+  `playChallenge(day)` and IS scored against that day (HUD present, `dayIndex <=
+  today` guard in Game.swift). A future day shows "Unlocks <Mon D>" instead of a
+  Play button and offers no "show me how to win" pills.
 
 ---
 
 ## WF-6 — "Show me how to win" demo (Novice)
 
-**TC-6.1 (Novice) — Discover and start the Clear demo.**
+*Rewritten 2026-08-16 for the NEW intended exit behavior (WORKFLOWS.md WF-6): both
+mid-demo `Stop` and post-line `Done` re-deal the same seed to a FRESH board, the
+board is fully input-locked while the demo bar is up (a card must not even lift
+under a drag), and nothing a demo plays can ever be banked as a win/best-time or a
+daily tier. These cases are the regression test for the round-2 finding
+`bug/WF-6:demo-progress-counts-as-a-real-win`. Derive the day's seed and labels
+first (see header).*
+
+**TC-6.1 (Novice) — Discover and start the Clear demo; it opens paused/ready.**
 1. Cold launch. Tap `Daily`. Under "Show me how to win:" tap `🥉 Clear`.
-- **Expected:** sheet dismisses to the board; a demo status bar appears ("Winning
-  line — 0 / N") and it opens PAUSED/ready (does NOT auto-run). Controls: `Next`,
-  `Start`, `Stop`.
+- **Expected:** the sheet dismisses to the board; the `Deal #` pill shows the derived
+  daily seed; a dark demo bar sits where the HUD/toolbar gap is, reading
+  `Winning line — 0 / <bronze line length>` (derive the length from
+  `daily-solutions.json`; e.g. 97 for #10,004, 86 for #10,005) with pills
+  `Next` (236,263) · `Start` (297,263) · `Stop` (357,263).
+- **It must NOT auto-run:** the counter stays at `0 / N` and the pill says `Start`
+  (not `Pause`) until the user acts. Moves 0, Time 0:00, `Undo` disabled.
 
-**TC-6.2 (Novice) — Step and run the demo.**
-1. From TC-6.1, tap `Next` a few times (each advances one move), then tap `Start`
-   (auto-advances; label becomes `Pause`), then `Pause` (label → `Resume`).
-- **Expected:** progress counter increments clearly; input to the board is locked
-  while demoing; nothing is scored.
+**TC-6.2 (Novice) — Step, run, pause, resume.**
+1. From TC-6.1 tap `Next` three times.
+2. Tap `Start`, wait ~3 s, then tap the same pill (now `Pause`).
+- **Expected:** each `Next` advances the counter by exactly 1 (verified 0→3) and
+  animates one move. `Start` auto-advances at ~0.25 s/move, hides `Next` and shows
+  `Pause` + `Stop` only, and the headline gains a trailing "…". `Pause` restores
+  `Next` / `Resume` / `Stop` and the headline reads `N / total (paused)` — which
+  wraps to two lines and nudges the pills to y≈266 (re-read them from a screenshot).
+  Moves/Time in the header are not the player's score and nothing is committed.
 
-**TC-6.3 (Novice) — Stop returns control cleanly.**
-1. From a running/paused demo, tap `Stop`.
-- **Expected:** demo bar clears (or shows a `Done` end-state that dismisses), board
-  input unlocks, no lingering demo state; the board is back to a playable deal.
+**TC-6.3 (Novice) — Mid-demo `Stop` re-deals the SAME seed to a fresh board.**
+1. From a stepped or running demo (any progress > 0), tap `Stop`.
+- **Expected:** the demo bar disappears; the board is the **fresh initial layout of
+  the same deal** — every column back to its dealt 6–7 cards, free cells empty,
+  foundations empty, `Moves 0`, `Time 0:00`, `Undo` disabled, `Deal #` unchanged.
+  The assisted position must NOT survive (that was the round-2 bug: it let the
+  player finish the app's own line and bank it as a win/best time).
+- **Fail conditions:** any card still sitting where the demo left it; Moves > 0; a
+  `Finish` pill offered; the win overlay appearing.
 
-**TC-6.4 (Novice) — Silver / Gold demos.**
-1. In Daily, tap `🥈 Silver` then (fresh) `🥇 Gold`.
-- **Expected:** the demo bar headline names the tier + its objective label; only
-  offered when a certified line exists (hasSilverLine / hasGoldLine).
+**TC-6.4 (Novice) — Run the line to the end, then `Done`.**
+1. Start the Clear demo and tap `Start`; let it run to `N / N` (~25 s for a 97-move
+   line; ~22 s for 86).
+2. Read the bar, then tap `Done`.
+- **Expected:** at the end the bar becomes a banner — "That's a **winning** line —
+  tap Done to try it yourself." (Silver/Gold lines say "a Silver/Gold line") — with a
+  single `Done` pill at (355,265); `Next`/`Start`/`Stop` are gone. `Done` re-deals
+  the same seed to a fresh board exactly like `Stop`: Moves 0, full columns.
+- **Nothing is banked:** `Won` stays 0, the win overlay never appears, `Wins` still
+  reads "No wins yet — go solve one!", and the Daily card's tier circles and all four
+  streak cards stay at 0. (Verified end-to-end on a fresh install with the 97-move
+  #10,004 Clear line.)
+
+**TC-6.5 (Novice) — Input is locked while the demo bar is up, including drag-LIFT.**
+1. Start the Clear demo, tap `Next` a few times so the board is mid-line.
+2. Attempt a normal drag on a movable-looking bottom card (e.g. press col 0's bottom
+   card at (28,681) and drag it slowly, ~2.5 s, to another column).
+3. Attempt a plain tap on an exposed card that would obviously smart-move.
+- **Expected:** the card does not lift, tilt, or follow the finger at ALL — not just
+  "the move is refused" (`canDrag = !demoing && isSeqHead`). The progress counter,
+  Moves and the whole board must be unchanged. Verified with a host filmstrip across
+  the 3.3 s drag: every frame byte-identical to the pre-drag frame (imgdiff MAD
+  0.000), counter still `3 / 97`.
+- **Fail:** any lift/ghost/zIndex artifact, any move applied, any counter change.
+
+**TC-6.6 (Novice) — Silver / Gold demo lines.**
+1. In Daily, tap the `🥇 Gold` pill (and `🥈 Silver` on any day whose seed has a
+   distinct silver line — derive; there is none in the current pool head).
+2. Tap `Next` once, then `Stop`.
+- **Expected:** the bar headline names the tier AND its derived objective label —
+  e.g. `🥇 Gold: Win without ever using a free cell — 0 / 109` — with the same
+  Next/Start/Stop pills; the total matches that tier's line length in
+  `daily-solutions.json` (gold 109 for #10,004). `Stop` re-deals as in TC-6.3.
+- **Discoverability:** the pill row appears only for `dayIndex <= today` and only
+  when a baked line exists; a day with no solution shows no "Show me how to win" row
+  at all.
 
 ---
 
@@ -391,3 +552,40 @@ branch (`geo.size.width > geo.size.height`) and any harness screenshot.
   climbing monotonically over a repeated New game / Undo loop (≥10x) → suspected leak.
 - **P-E (latency):** timestamp screenshots around New game, Play (daily), and finish
   cascade; >1 s visible stall with no indicator → heuristic finding.
+
+---
+
+## Candidate concerns (round-0 exploration HYPOTHESES — reproduce or dismiss in round 1)
+
+*Not findings. Each needs a fresh-launch repro with evidence before it may enter a
+LEDGER fragment.*
+
+- **CC-1 (WF-5, DailyHUD) — the live objectives HUD truncates Silver and Gold.**
+  On the 402 pt portrait board the HUD renders all three chips on one line, so the
+  two longer labels are cut: "🥈 · Win in 103 moves or…" and "🥇 · For every suit,
+  send i…". The full text exists only on the Daily card, so a player chasing Gold
+  cannot read what Gold is while playing. Hypothesis: WF-5's "objectives are
+  legible" is not met for any label longer than ~22 characters (most of the GOLD
+  catalogue). Check landscape too (the HUD is 50 pt there). Evidence:
+  `evidence/round-0-explore/wf5-hud-objectives-truncated.png`.
+
+- **CC-2 (WF-6 × WF-5) — watching a demo silently discards an in-progress daily
+  attempt AND drops the player out of challenge mode.** Repro seen: Daily → `Play`
+  → make 1 real move (HUD up, `Undo` enabled) → Daily → `🥉 Clear` → the demo bar
+  replaces the HUD and `Undo` is greyed (history emptied) → `Stop` → the board is a
+  *casual* fresh deal of the same seed with **no HUD**; the attempt and the
+  challenge binding are both gone with no warning, and the player must reopen
+  Daily → Play to be scored again. Hypothesis: with 30+ moves of real progress this
+  is silent data loss on the user's main scored activity; the "never leave a demo
+  board playable" rule may be over-applying to the pre-demo attempt. Evidence:
+  `wf5-daily-attempt-in-progress.png`, `wf6-stop-drops-out-of-challenge.png`.
+  NOTE for whoever fixes it: restoring the pre-demo attempt is state-migration-ish
+  and must not re-open the "finish the app's line and bank it" hole.
+
+- **CC-3 (WF-6, header) — the completed-demo banner leaves "Moves 97 / Time 0:00"
+  in the header.** After the Clear line finishes, the header shows the demo's move
+  count against a zero clock while the "tap Done to try it yourself" banner is up.
+  Hypothesis: a novice reads it as their own 97-move, 0-second game. Cosmetic and
+  cheap (blank or label the counters while `demoing || demoDoneMessage != nil`),
+  but confirm a novice actually misreads it before filing. Evidence:
+  `wf6-demo-line-complete-done-banner.png`.

@@ -45,6 +45,24 @@ struct CardView: View {
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.28), radius: 1, x: 0, y: 1)
+        // Stable programmatic handle + VoiceOver semantics. Identifier format "card.<S><rank>"
+        // with S ∈ S/H/D/C and rank 1–13, e.g. "card.H10" = 10♥ — unique per card, orientation-
+        // and position-independent, so UI tests can address cards without raw coordinates.
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("card.\(Self.suitLetters[card.suit.rawValue])\(card.rank)")
+        .accessibilityLabel("\(rankName) of \(Self.suitNames[card.suit.rawValue])")
+    }
+
+    private static let suitLetters = ["S", "H", "D", "C"]
+    private static let suitNames = ["spades", "hearts", "diamonds", "clubs"]
+    private var rankName: String {
+        switch card.rank {
+        case 1: return "ace"
+        case 11: return "jack"
+        case 12: return "queen"
+        case 13: return "king"
+        default: return "\(card.rank)"
+        }
     }
 
     /// J / Q / K figure symbol (crown for K, open crown for Q, person for J).

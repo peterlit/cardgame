@@ -47,8 +47,12 @@ Each has a stable ID and a reasonable-effort expectation.
 
 - **WF-6 — "Show me how to win" demo (novice).** From the Daily card, use Clear/Silver/
   Gold "show me how to win", including step (Next) and Stop. Expectation: the demo is
-  discoverable, starts paused/ready (doesn't auto-run), steps clearly, and Stop returns
-  control cleanly.
+  discoverable, starts paused/ready (doesn't auto-run), and steps clearly. **Intended
+  exit behavior (changed 2026-08-15):** BOTH mid-demo Stop and post-line Done re-deal
+  the same seed to a fresh board — a demo-touched board is never left playable, cards
+  cannot be moved (or even lifted by a drag) while the demo bar is up, and no play after
+  a demo exit can bank the demo's progress as a win/best-time. A demo board that becomes
+  movable, or a win recorded on demo-played moves, is a major bug, not the old behavior.
 
 - **WF-7 — Play a specific deal number (power).** Use "Deal #…" to enter and play an
   exact deal (and the Random option). Expectation: <= 3 taps to open, type, and play;
@@ -83,13 +87,17 @@ randomness levers are the deal number and the wall-clock date. Pin them like thi
   pass begins with zero stats, zero wins, and no daily records. Never test on leftover
   state.
 - **Daily deal (date-derived, NOT pinnable):** `dayIndex = daysSince(2026-08-12)` and the
-  challenge is `daily-pool.json.seeds[dayIndex]`. On **2026-08-15** that is `dayIndex 3`
-  → **deal #10,004**, par 97, supports `no-cells / aces-first / suits-top-down /
-  cells-le-1 / cells-le-2`. Re-derive this if the loop runs on a different date; do not
-  hard-code #10,003 (that was dayIndex 2).
+  challenge is `daily-pool.json.seeds[dayIndex]`. **Derive it at test time from the
+  device's date** — do not hard-code. Reference: 2026-08-15 → dayIndex 3 → deal #10,004
+  (par 97, supports `no-cells / aces-first / suits-top-down / cells-le-1 / cells-le-2`);
+  2026-08-16 → dayIndex 4 → deal #10,005 (par 86, adds `kings-first`). **Midnight
+  hazard:** a run started late in the evening can cross the day boundary mid-pass — the
+  Daily card, its objectives, and the demo lines all flip. If that happens mid-test-case,
+  note it in the result rather than filing the flip as a bug.
 - **Free play (pinnable):** for any test that needs a repeatable board, use **Deal #…**
-  and type an explicit number rather than New Game's random deal. Use **#10,004** so
-  free-play and daily testing share one board unless a test case names another.
+  and type an explicit number rather than New Game's random deal. Use **the current
+  day's daily deal number** (per the derivation above) so free-play and daily testing
+  share one board unless a test case names another.
 - **Gap:** because the daily challenge is wall-clock-derived with no override, daily
   streak/tier behavior across day boundaries cannot be tested deterministically. A
   proposal-routed finding recommending a debug date/seed override is in scope.
@@ -99,3 +107,13 @@ randomness levers are the deal number and the wall-clock date. Pin them like thi
   XCUITest driver. Orientation resets to portrait on every `xcodebuild test` invocation,
   so a landscape script must rotate as its first step. (Superseded the round-1 note that
   claimed rotation was undrivable — corrected in round 2.)
+- **Portrait tall columns (changed 2026-08-15):** growing one column no longer clips it
+  off-screen. Intended behavior now: the column's fan compresses first; when the tallest
+  column can't fit even at the legibility floor (~15 cards on a 4.7" phone, later on
+  taller phones), the WHOLE board — foundations, free cells, and tableau — shrinks to
+  one smaller shared card size (uniform; never two card sizes at once), monotone within
+  a deal (it does not grow back until a new deal/replay). Clipping or an untappable
+  bottom card is a bug; a one-time uniform shrink at a new tallest-column maximum is
+  the design.
+- The `Causeway` scheme contains a dangling testable reference (`CausewayUITests` — a
+  parked, never-persisted Xcode target). `build-for-testing` succeeds; ignore it.

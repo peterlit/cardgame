@@ -17,6 +17,11 @@ struct DailyView: View {
     @State private var exportDoc = StatsBackupDocument(data: Data())
     @State private var backupNote: String?
 
+    /// A demo request made while a daily attempt is in progress, parked behind the
+    /// "end your attempt?" confirmation (nil = no confirmation showing).
+    private struct PendingDemo { var seed: Int; var tier: String; var label: String }
+    @State private var pendingDemo: PendingDemo?
+
     private var days: [Int: TierResult] { game.dailyStore.days }
     private var pool: [PoolSeed] { game.pool }
 
@@ -52,6 +57,23 @@ struct DailyView: View {
             importStats(result)
         } onCancellation: {
             backupNote = "Import cancelled."
+        }
+        // Watching a demo re-deals the board (Game.showSolution → deal), which would silently
+        // discard an in-progress daily attempt — confirm first. Mirrors the web's confirm().
+        .alert("End your daily attempt?", isPresented: Binding(
+            get: { pendingDemo != nil },
+            set: { if !$0 { pendingDemo = nil } })
+        ) {
+            Button("Show demo", role: .destructive) {
+                if let p = pendingDemo {
+                    game.showSolution(p.seed, tier: p.tier, label: p.label)
+                    pendingDemo = nil
+                    dismiss()
+                }
+            }
+            Button("Keep playing", role: .cancel) { pendingDemo = nil }
+        } message: {
+            Text("Watching a demo re-deals the board, so your current attempt (moves and time) will be discarded. You can replay the challenge afterwards.")
         }
     }
 
@@ -161,14 +183,23 @@ struct DailyView: View {
                     .foregroundStyle(replay ? Theme.ink : Color(hex: 0x3A2B00))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("daily.play")
         }
     }
 
     /// A per-tier "show a winning line" button — hands off to the demo (assisted, unscored).
+    /// The demo re-deals the board, so with a daily attempt in progress (moves made, not yet
+    /// won) it must CONFIRM before silently throwing that attempt away. Deliberately no
+    /// restore-the-attempt-after-the-demo: resuming a demo-touched flow is exactly the
+    /// "finish the app's own line" scoring hole the demo teardown exists to close.
     private func showPill(_ seed: Int, _ tier: String, _ title: String, _ label: String) -> some View {
         Button {
-            game.showSolution(seed, tier: tier, label: label)
-            dismiss()
+            if game.challengeDay != nil && game.moveCount > 0 && !game.won {
+                pendingDemo = PendingDemo(seed: seed, tier: tier, label: label)
+            } else {
+                game.showSolution(seed, tier: tier, label: label)
+                dismiss()
+            }
         } label: {
             Text(title)
                 .font(.system(size: 13, weight: .semibold))
@@ -177,6 +208,7 @@ struct DailyView: View {
                 .foregroundStyle(Theme.ink)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("daily.demo.\(tier)")
     }
 
     // MARK: stats backup (local export / import)
@@ -184,21 +216,28 @@ struct DailyView: View {
     private var backupSection: some View {
         VStack(spacing: 8) {
             Text("BACKUP").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+            // The FIRST UIDocumentPicker presentation in a process blocks the main thread for
+            // ~1–1.8 s (system cost; recurs each cold launch, and pre-warming it would just move
+            // the stall into the Daily sheet's open). So acknowledge the tap immediately — flip
+            // the note to "Opening Files…" — and present on a later runloop turn so that frame
+            // actually reaches the screen before the freeze.
             HStack(spacing: 10) {
                 Button {
                     let backup = StatsBackup.make(daily: game.dailyStore.days, wins: game.winStore.wins)
                     exportDoc = StatsBackupDocument(data: backup.encoded())
-                    backupNote = nil
-                    showExporter = true
+                    backupNote = "Opening Files…"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { showExporter = true }
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
                 }
+                .accessibilityIdentifier("daily.export")
                 Button {
-                    backupNote = nil
-                    showImporter = true
+                    backupNote = "Opening Files…"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { showImporter = true }
                 } label: {
                     Label("Import", systemImage: "square.and.arrow.down").frame(maxWidth: .infinity)
                 }
+                .accessibilityIdentifier("daily.import")
             }
             .font(.system(size: 14, weight: .semibold))
             .buttonStyle(.bordered)
@@ -268,7 +307,9 @@ struct DailyView: View {
                 }.font(.system(size: 11)).foregroundStyle(.secondary)
             }
             LazyVGrid(columns: calCols, spacing: 4) {
-                ForEach(["S", "M", "T", "W", "T", "F", "S"], id: \.self) { d in
+                // Positional id, NOT \.self: "T" (Thu) and "S" (Sat) duplicate Tue/Sun's letters,
+                // and identity-collapsed duplicates rendered as two blank header columns.
+                ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { _, d in
                     Text(d).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -364,14 +405,27 @@ struct DailyHUD: View {
     var body: some View {
         if let c = game.liveChallenge {
             let t = game.liveAttempt()
-            HStack(spacing: 8) {
-                objChip("🥉", "Clear the deal", state: t.won ? .ok : .live)
-                objChip("🥈", c.silver.label, state: liveState(c.silver, t))
-                objChip("🥇", c.gold.label, state: liveState(c.gold, t))
+            // A player chasing Silver/Gold must be able to READ Silver/Gold while playing:
+            // try the compact one-line row first (it fits in landscape), and when it can't fit
+            // untruncated — portrait's ~402pt one-lined all three chips and cut Silver/Gold to
+            // "Win in 103 moves or…" — stack the chips with fully wrapped labels instead.
+            // (The web HUD wraps via flex-wrap for the same reason.)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { chips(c, t, oneLine: true) }
+                    .padding(.horizontal, 10).padding(.vertical, 7)
+                    .background(Capsule().fill(Color.black.opacity(0.55)))
+                VStack(alignment: .leading, spacing: 3) { chips(c, t, oneLine: false) }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.55)))
             }
-            .padding(.horizontal, 10).padding(.vertical, 7)
-            .background(Capsule().fill(Color.black.opacity(0.55)))
         }
+    }
+
+    @ViewBuilder private func chips(_ c: Challenge, _ t: Attempt, oneLine: Bool) -> some View {
+        objChip("🥉", "Clear the deal", state: t.won ? .ok : .live, oneLine: oneLine)
+        objChip("🥈", c.silver.label, state: liveState(c.silver, t), oneLine: oneLine)
+        objChip("🥇", c.gold.label, state: liveState(c.gold, t), oneLine: oneLine)
     }
 
     private enum ObjState { case ok, no, live }
@@ -383,12 +437,14 @@ struct DailyHUD: View {
         // On track: green ✓ as soon as the tier is locked in (guaranteed just by clearing the deal).
         return objSecured(obj, t, up: game.up, down: game.down) ? .ok : .live
     }
-    private func objChip(_ medal: String, _ label: String, state: ObjState) -> some View {
+    private func objChip(_ medal: String, _ label: String, state: ObjState, oneLine: Bool) -> some View {
         let mark = state == .ok ? "✓" : (state == .no ? "✗" : "·")
         let color: Color = state == .ok ? .green : (state == .no ? Color(hex: 0xE8927C) : .white)
-        return HStack(spacing: 3) {
+        return HStack(alignment: .firstTextBaseline, spacing: 3) {
             Text("\(medal)\(mark)").font(.system(size: 11, weight: .bold)).foregroundStyle(color)
-            Text(label).font(.system(size: 10)).foregroundStyle(.white).lineLimit(1)
+            Text(label).font(.system(size: 10)).foregroundStyle(.white)
+                .lineLimit(oneLine ? 1 : nil)
+                .fixedSize(horizontal: false, vertical: true)   // wrap, never truncate, when stacked
         }
     }
 }

@@ -398,3 +398,18 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     hand-authored-pbxproj concern. Confirmed build-for-testing still succeeds despite the dangling
     scheme testable, so the state is harmless; parked per user decision as backlog UITEST-target
     (with resume steps) and committed the flag + orphan files as-is.
+72. *(qa-loop round 1 fix pass, agent-driven)* — addressed all 11 open auto-routed findings from
+    `.qa-loop/briefs/round-1-open-auto.json` on build 6ee255b. Majors: portrait daily HUD now
+    stacks/wraps the three objective chips via `ViewThatFits` (Silver/Gold fully readable); the
+    Daily demo pills confirm before discarding an in-progress daily attempt (no restore-after-demo,
+    per the banked-line trap; web `confirm()` mirror); the deal alert dropped its redundant
+    `Random` action (dup of New game) so Play/Cancel render side-by-side above the landscape
+    keyboard. Minors: column drop frames extend to the tableau bottom (web mirror: all `.col`
+    hit boxes get the tallest column's height); unmovable-card touches get a shake refusal cue
+    (`ShakeEffect`, never fires on movable-card taps); Moves/Time show "—" while a demo runs or
+    its banner shows (web mirror); calendar weekday `ForEach` id → positional; Auto-finish cycles
+    Ask→Off→On on both platforms (On never a pass-through, flip-to-On affordance kept per trap);
+    rail Undo readable when disabled (dropped `.buttonStyle(.plain)`); Export/Import taps paint
+    "Opening Files…" before the UIDocumentPicker warm-up stall; accessibility identifiers added
+    (cards `card.<S><rank>` + VoiceOver labels, `stat.*`, `demo.*`, `toolbar.*`, `daily.*`).
+    Build green, 68 Node tests green.

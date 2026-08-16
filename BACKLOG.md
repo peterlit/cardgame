@@ -137,16 +137,18 @@ implementer has never run inside the loop.
   invisible/untappable at 15; Undo is the only recovery. Landscape already shrinks `cardW` to the
   tallest column (`ContentView.swift:62-73`) and was re-tested as **not** affected. Reachable in
   ordinary play. *Watch:* the clamp resizes cards mid-game — check for per-move size thrash.
-- **Minors (auto)** — calendar weekday header drops Thu/Sat (duplicate `ForEach` ids); daily HUD
-  truncates the gold objective (`lineLimit(1)`); Deal # field neither selects-on-focus nor clears
+- **Minors (auto)** — FIXED in qa-loop round 1 (fix pass 2026-08-16): calendar weekday header
+  drops Thu/Sat (positional `ForEach` id); daily HUD truncates objectives (`ViewThatFits` →
+  stacked wrapped chips in portrait); landscape rail's disabled Undo blank capsule (dropped
+  `.buttonStyle(.plain)` — it kept the near-white label when disabled); cold-launch Export/Import
+  stall now acknowledged ("Opening Files…" note painted before the `UIDocumentPicker` warm-up,
+  which itself can't be made fast). Still open: Deal # field neither selects-on-focus nor clears
   (12 taps vs the 3 budgeted); deal number rendered three ways (`10004–10006` / `Deal #10005` /
   `Deal #10,004`) two taps apart in Wins; "Auto-play: On" label overpromises (the *rule* is correct
   — `isSafeAutoplay()` needs both opposite-colour neighbours resolved because piles build both ways
   — but `RulesView` never mentions Auto-play, so an ignored Ace reads as broken; **do not** make
   Auto-play aggressive); backgrounding pauses the clock (23.7 s wall over a 20 s background advanced
-  it 6 s) and `recordWin()` banks that as best time; landscape rail's disabled Undo renders as a
-  featureless blank capsule; cold-launch Export stalls ~1.8 s with no spinner (`UIDocumentPicker`
-  warm-up — can't be made fast, but can show progress).
+  it 6 s) and `recordWin()` banks that as best time.
 - **Proposals (human call)** — landscape cards measure 45pt, *identical* to portrait, with a 116pt
   (29%) empty band, so rotating gains nothing (structural: the 12-card-width split); a `#if DEBUG`
   day-index/seed override to make daily streak/tier rollover testable (TC-5.3 is permanently blocked
@@ -326,6 +328,9 @@ findings fixed:
   `playChallenge()`/`showSolution()` call `deal()` + `persist()`, overwriting the saved casual
   game (any moves/elapsed) with no confirmation or undo. Add a confirm when a different game is
   in progress (`started && moveCount > 0`). Pre-existing; flagged in review-loop 2026-08-15.
+  *Partially narrowed (qa-loop round 1 fix, 2026-08-16):* the demo pills now confirm before
+  discarding an in-progress **daily attempt** (`challengeDay != nil && moveCount > 0`, iOS +
+  web). Still open for the casual-game case and for the "Play" button.
 - **L2 — Web hotkeys fire while typing / under the win overlay** ("n" discards the game;
   Cmd+Z reverts under the overlay). Guard on focus/overlay state.
 - **L5 — `record()` chimera bests.** `min(moves)`/`min(secs)` taken independently can store

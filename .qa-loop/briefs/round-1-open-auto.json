@@ -1,10 +1,4 @@
 {
-  "round": 1,
-  "build_sha": "6ee255b",
-  "max_rounds": 3,
-  "parallel_testers": 3,
-  "emit_regression_tests": true,
-  "implemented_rounds": [],
   "findings": [
     {
       "id": "ux/WF-2:drop-below-column-refused",
@@ -43,12 +37,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "The strip below a column belongs to no other drop target, so extending each column's drop frame down to the tableau's bottom is unambiguous. TESTCASES TC-2.3 currently documents this as expected ('a release below the column's last card lands outside its drop zone'); this finding argues the documented behaviour is itself the defect."
     },
@@ -84,62 +72,8 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Applies to a plain tap on a buried card too (Moves unchanged, nothing drawn). Careful with the fix: tap is the primary control, so any refusal cue must not fire on ordinary taps of cards that ARE movable but have no target."
-    },
-    {
-      "id": "ux/WF-3:new-game-discards-progress-no-confirm",
-      "claim": "One tap on the primary gold 'New game' pill destroys an in-progress game with no confirmation and no way back: after 3 moves on deal #10,004 (clock 1:08) a single tap redealt to random deal #904390 with Moves 0, Undo immediately dimmed (history cleared), and the abandoned deal number no longer shown anywhere - the position is unrecoverable. 'New game' sits directly left of 'Undo', the other most-tapped pill.",
-      "type": "ux-design",
-      "routing": "proposal",
-      "severity": "minor",
-      "confidence": "confirmed",
-      "region": "WF-3",
-      "test_case": "TC-3.1",
-      "build_sha": "6ee255b",
-      "evidence": {
-        "screenshots": [
-          "evidence/round-1/qa-worker-1/wf3-newgame-destroys-inprogress.png"
-        ],
-        "repro": [
-          "fresh install, launch",
-          "Deal # pill -> play deal #10,004",
-          "make 3 moves (any); header reads Moves 3, Time 1:08",
-          "tap New game (51,135)",
-          "observe Deal #904390, Moves 0, Time 0:00, Undo dimmed",
-          "tap Undo (142,135): nothing happens - the 3-move position and its deal number are gone"
-        ],
-        "measurements": {
-          "taps_to_destroy": 1,
-          "taps_to_recover": null,
-          "new_game_pill_x_range_pt": [
-            7,
-            97
-          ],
-          "undo_pill_x_range_pt": [
-            103,
-            180
-          ],
-          "gap_between_pills_pt": 6
-        }
-      },
-      "first_seen_round": 1,
-      "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
-      "current_status": "open",
-      "fix_risk": "behavior-change",
-      "note": "TRAP: the obvious fix (confirmation alert when moves > 0) breaks WORKFLOWS.md's WF-3 effort bar 'each is one tap'. A non-conflicting alternative is making the redeal undoable (Undo restores the previous deal + history) or surfacing the abandoned deal number. Human should pick."
     },
     {
       "id": "ux/WF-5:daily-hud-truncates-objectives",
@@ -172,12 +106,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Same text wraps to 3 lines in the demo bar on the same screen width, so multi-line/wrapping in the HUD is demonstrably feasible."
     },
@@ -211,53 +139,8 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Cheap safe fix is a confirmation ('This ends your current daily attempt') before showSolution() re-deals; do NOT restore the pre-demo attempt after the demo, that reopens the 'finish the app's line' hole."
-    },
-    {
-      "id": "ux/WF-6:challenge-mode-silently-dropped-after-demo",
-      "claim": "Exiting a demo (Stop or Done) leaves the player on a fresh deal of the daily seed with challenge mode silently switched off \u2014 the objectives HUD is gone and Game.showSolution()/deal() has cleared challengeDay, so anything played from that board is casual play that banks no daily tier. Nothing on screen says so: same Deal #10,005, same board, no HUD, no message.",
-      "type": "ux-design",
-      "routing": "proposal",
-      "severity": "major",
-      "confidence": "confirmed",
-      "region": "WF-6",
-      "test_case": "TC-6.3",
-      "build_sha": "6ee255b",
-      "evidence": {
-        "screenshots": [
-          ".qa-loop/evidence/round-1/qa-worker-2/cc2-daily-attempt-discarded-and-hud-lost.png",
-          ".qa-loop/evidence/round-1/qa-worker-2/tc6.3-stop-fresh-board.png"
-        ],
-        "repro": [
-          "fresh install, launch",
-          "tap Daily, tap Play (deal #10,005) \u2014 HUD with the three medal chips is up",
-          "tap Daily, tap \ud83e\udd49 Clear, tap Next a few times",
-          "tap Stop",
-          "board is a fresh deal of #10,005 with NO objectives HUD; the only way back into scoring is Daily -> Play"
-        ],
-        "measurements": {
-          "hud_before": "present",
-          "hud_after_stop": "absent",
-          "onscreen_notice": "none"
-        }
-      },
-      "first_seen_round": 1,
-      "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
-      "current_status": "open",
-      "note": "TRAP: the obvious fix (re-arm challengeDay after a demo exit) would let a player watch the whole winning line and then bank Gold/Flawless off it \u2014 that is exactly what the 2026-08-15 contract removed. Prefer telling the user they left the challenge (or offering an explicit 'Restart the daily' affordance), not silently re-arming. Note Game.replay() already preserves challengeDay, so the two paths differ."
     },
     {
       "id": "ux/WF-6:demo-moves-counter-in-player-header",
@@ -286,51 +169,8 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Cheap fix: blank or dim the Moves/Time readout while demoing || demoDoneMessage != nil. Nothing is actually banked (verified Won 0, Wins empty, all daily records 0)."
-    },
-    {
-      "id": "ux/WF-5:no-seed-or-date-override-for-daily",
-      "claim": "The daily challenge is derived from the wall-clock date with no debug override, and the only way to bank a daily tier is to solve the deal by hand (86 moves for #10,005) now that demo progress is deliberately unbankable. TC-5.3 (post-bronze 'Replay to improve' state) and every day-boundary/streak behaviour are therefore untestable by playing; I had to seed a bronze record through the app's own Import to check the display at all.",
-      "type": "ux-design",
-      "routing": "proposal",
-      "severity": "minor",
-      "confidence": "confirmed",
-      "region": "WF-5",
-      "test_case": "TC-5.3",
-      "build_sha": "6ee255b",
-      "evidence": {
-        "screenshots": [
-          ".qa-loop/evidence/round-1/qa-worker-2/tc5.3-replay-to-improve-label.png",
-          ".qa-loop/evidence/round-1/qa-worker-2/tc5.3-streaks-after-bronze.png"
-        ],
-        "repro": [
-          "fresh install, launch",
-          "attempt TC-5.3: there is no launch argument, debug picker or seed/date override to reach a 'bronze already earned' state",
-          "workaround used: drop a crafted causeway-stats JSON into On My iPhone and Daily -> Import -> On My iPhone -> QA-Seed-Bronze.json",
-          "app reports 'Imported \u2014 merged 1 day (1 new) and 1 deal (1 new)'; Today card then shows a checked Bronze circle and a grey 'Replay to improve \u21bb' button, Play streak 1 / 1 total / best 1"
-        ],
-        "measurements": {
-          "manual_moves_to_win_daily": 86,
-          "blocked_test_cases": 1
-        }
-      },
-      "first_seen_round": 1,
-      "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
-      "current_status": "open",
-      "note": "Explicitly invited by the WORKFLOWS.md Fixture policy 'Gap' clause. A DEBUG-only launch argument (e.g. -causewayDayIndex / -causewaySeed) would make daily streak, tier and day-boundary behaviour testable without shipping anything to users. TRAP-adjacent: any override must be DEBUG-only or it becomes a cheat for streaks."
     },
     {
       "id": "bug/DailyView:calendar-weekday-header-dupes",
@@ -360,12 +200,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Reproduced on every visit to the Daily sheet (2 screenshots, plus the source cause). Fix: give the ForEach a positional id (e.g. Array(...).enumerated() / indices), not the string value."
     },
@@ -403,12 +237,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "fix_risk": "behavior-change",
       "note": "TRAP: the naive fix (stop calling maybeAutoFinish() from autoFinishMode.didSet) would also kill the intended 'flip Auto-finish to On to finish this board now' affordance, which is the app's only shortcut to a cascade once 'Not yet' has been tapped. Safer shapes: cycle Ask -> Off -> On so the destructive state is never a pass-through, or route a pass-through into On on an already-finishable board via the same 'Ready to finish' confirm instead of firing immediately."
@@ -447,12 +275,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Still present on 6ee255b; the same defect was filed in the previous (archived) loop on 342e3c0 under this same id and is carried in BACKLOG.md as an open minor. Verified the pill is fine once enabled (after one move it reads with the arrow glyph + 'Undo'), and fine in portrait when disabled, so it is the landscape rail's .buttonStyle(.plain) + .opacity(0.4) combination, not a width problem - 'Undo' fits easily in 117pt."
     },
@@ -494,12 +316,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "A landscape power user simply cannot see 'Random', and any user who opens the alert by accident has no visible way out except the destructive 'Play'. The actions ARE reachable by an undiscoverable scroll gesture inside the alert, so it is confusion rather than a hard block. Contributing cause is app-side, not just system layout: the field is auto-focused so the number pad eats ~170pt of the 402pt landscape height before the alert is even laid out. Cheapest fixes: do not auto-focus the field in landscape, or drop to two actions (Play/Cancel) with Random moved next to the field."
     },
@@ -557,12 +373,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Same id was filed in the previous (archived) loop against 342e3c0 and never fixed; re-measured here on 6ee255b and it still reproduces, now with the Import path measured too. The warm-vs-cold control (0.92 s vs 1.61 s in the SAME driver-attached session, alongside 0.76-1.43 s for every in-app sheet/redeal) rules out the XCUITest attachment as the cause: the cost is UIDocumentPicker's first presentation in the process, which the app cannot make fast \u2014 but it can show a spinner/disabled pill or pre-warm the picker off the main thread. Double-tapping during the stall was harmless in the archived pass (only one sheet presented). Everything else measured this round was fast: cold launch to painted board 0.90 s, auto-finish cascade 0.19 s/card with the win overlay 0.21 s after the last card, demo auto-advance 0.251-0.257 s/move (unchanged from the archive), idle CPU 0.0-0.9 %, no RSS growth over 22 New-game cycles, zero network bytes."
     },
@@ -592,12 +402,6 @@
       },
       "first_seen_round": 1,
       "introduced_by_fix": false,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        }
-      ],
       "current_status": "open",
       "note": "Highest-value identifiers to add: (1) CardView \u2014 e.g. 'card.<suit><rank>' or per-slot 'tableau.<col>.<idx>'; (2) header stat values in ContentView.stat \u2014 'stat.moves' / 'stat.time' / 'stat.won'; (3) demo bar pills and headline \u2014 'demo.next/start/stop/done', 'demo.headline'; (4) toolbar pills \u2014 'toolbar.deal', 'toolbar.daily', 'toolbar.undo'; (5) DailyView showPill tiers \u2014 'daily.demo.bronze/silver/gold'. With (1)+(2) the two round-1 regression tests could drop all raw coordinates and their positional staticText reads, and the TC-2.6 test could assert board-shrink monotonicity directly from element frames."
     }

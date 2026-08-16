@@ -15,10 +15,15 @@ enum DropTarget: Equatable { case column(Int), cell(Int), foundation(Suit, Dir) 
 
 /// How the game reacts when the board becomes finishable (every remaining card can cascade home).
 /// `.ask` (default) prompts; `.on` finishes automatically; `.off` waits for the Finish button.
+/// The pill cycles Ask → Off → On: `.on` is the only state whose mere selection can end a
+/// finishable game on the spot (didSet → maybeAutoFinish), so it must never be a pass-through —
+/// from the default Ask you reach Off without ever touching On. Landing on On deliberately still
+/// finishes a decided board immediately: that's the app's only shortcut back to the cascade once
+/// the "Ready to finish" prompt has been deferred with "Not yet".
 enum AutoFinishMode: String, CaseIterable {
     case ask, on, off
     var label: String { self == .ask ? "Ask" : self == .on ? "On" : "Off" }
-    var next: AutoFinishMode { self == .ask ? .on : self == .on ? .off : .ask }
+    var next: AutoFinishMode { self == .ask ? .off : self == .off ? .on : .ask }
 }
 
 private struct Snapshot {
