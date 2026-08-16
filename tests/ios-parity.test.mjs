@@ -87,12 +87,27 @@ pin('Model/Game.swift', 'applyDemoToken token format', [
       guard col >= 0, col < tableau.count, !tableau[col].isEmpty else { return false }
       let c = tableau[col].removeLast()
       if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }`,   // F = column-top → foundation
+  `case "G":
+      let idx = n(1)
+      guard idx >= 0, idx < cells.count, let c = cells[idx] else { return false }
+      cells[idx] = nil
+      if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }`,   // G = free cell → foundation
+  `case "T":
+      let src = n(1), idx = n(2), dst = n(3)
+      guard src >= 0, src < tableau.count, dst >= 0, dst < tableau.count, src != dst,
+            idx >= 0, idx < tableau[src].count else { return false }
+      let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)
+      tableau[dst].append(contentsOf: run)`,                                                    // T = run move src[idx...] → dst
   `case "C":
       let col = n(1)
       guard col >= 0, col < tableau.count, !tableau[col].isEmpty,
             let e = cells.firstIndex(where: { $0 == nil }) else { return false }
       cells[e] = tableau[col].removeLast()`,                                                    // C = park to first empty cell
-  'let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)',                 // T = run move
+  `case "X":
+      let idx = n(1), dst = n(2)
+      guard idx >= 0, idx < cells.count, let c = cells[idx],
+            dst >= 0, dst < tableau.count else { return false }
+      cells[idx] = nil; tableau[dst].append(c)`,                                                // X = free cell → tableau dst
 ]);
 
 // Cross-copy: the web applyDemoToken must interpret the SAME token format (so a baked line plays

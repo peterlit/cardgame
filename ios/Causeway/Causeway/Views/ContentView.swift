@@ -41,6 +41,19 @@ struct ContentView: View {
     // returns to 0 (new deal, replay, or a full undo). Landscape ignores it: its cardW already
     // re-sizes live.
     @State private var shrinkLatchCount = 0
+    // Portrait board-height latch — the same monotone-within-a-deal contract as
+    // shrinkLatchCount, in the other direction: the SMALLEST portrait board height seen this
+    // deal. The height feeding portraitFitCardW is card-size-independent but NOT constant:
+    // the toolbar's FlowLayout can gain/drop a whole row when the Finish pill appears
+    // mid-deal, and the demo bar's wrapping headline changes per step — unlatched, that
+    // wobble would rescale a shrunk board up AND down (exactly the pulse shrinkLatchCount
+    // exists to prevent, arriving through the height input). Holding the minimum keeps the
+    // shrink monotone. Reset alongside shrinkLatchCount at moveCount == 0, so a HUD/demo bar
+    // appearing with a NEW deal re-latches at the correct (shorter) height; rotation
+    // round-trips return to the same portrait height, so the latch is a no-op for them. A
+    // mid-deal window grow (e.g. iPad resize) stays latched until the next deal — the same
+    // accepted trade as a shortened column not growing the board back.
+    @State private var latchedBoardH: CGFloat = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     private let outerPad: CGFloat = 6
@@ -111,9 +124,13 @@ struct ContentView: View {
                         // flights jump sizes mid-flight). This outer GeometryReader spans exactly
                         // those two areas, and everything above it (header/toolbar/HUD) is
                         // card-size-independent, so portraitFitCardW is a one-shot pure function of
-                        // its height — no measure→resize feedback loop.
+                        // its height — no measure→resize feedback loop. Card-size-independent is
+                        // not constant, though (Finish pill row, demo headline wrap), so the
+                        // height is latched to its per-deal minimum — see latchedBoardH.
                         GeometryReader { bg in
-                            let w = portraitFitCardW(totalH: bg.size.height, widthCardW: cardW,
+                            let liveH = bg.size.height
+                            let boardH = latchedBoardH > 0 ? min(liveH, latchedBoardH) : liveH
+                            let w = portraitFitCardW(totalH: boardH, widthCardW: cardW,
                                                      tallest: max(game.tableau.map(\.count).max() ?? 0, shrinkLatchCount))
                             let pOverlap = w < cardW ? (overlap * w / cardW).rounded() : overlap
                             VStack(alignment: .leading, spacing: 12) {
@@ -130,6 +147,15 @@ struct ContentView: View {
                                         .frame(maxWidth: .infinity, alignment: w < cardW ? .center : .leading)
                                 }
                                 .zIndex(dragInUpper ? 0 : 1)           // ...otherwise the tableau floats over the upper row
+                            }
+                            // Maintain the height latch. `initial: true` covers re-entering
+                            // portrait (this GeometryReader leaves the hierarchy in landscape,
+                            // so plain onChange would miss the height it comes back with).
+                            // Body already uses min(liveH, latch), so a shrink applies the
+                            // same frame it happens — this only records it for later frames.
+                            .onChange(of: liveH, initial: true) { _, h in
+                                guard h > 0 else { return }   // transient zero-size sizing pass
+                                latchedBoardH = latchedBoardH > 0 ? min(latchedBoardH, h) : h
                             }
                         }
                     }
@@ -151,8 +177,8 @@ struct ContentView: View {
             if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
         }
         .onChange(of: game.moveCount) { _, count in
-            // Maintain the portrait shrink latch (every board mutation changes moveCount).
-            if count == 0 { shrinkLatchCount = 0 }
+            // Maintain the portrait shrink latches (every board mutation changes moveCount).
+            if count == 0 { shrinkLatchCount = 0; latchedBoardH = 0 }   // new deal: re-latch both
             else { shrinkLatchCount = max(shrinkLatchCount, game.tableau.map(\.count).max() ?? 0) }
             // Self-heal a drag whose card was torn down mid-gesture by an async autoplay step
             // (its view — and gesture — vanish, so onEnded never fires, leaving `drag` stuck at
@@ -445,7 +471,8 @@ struct ContentView: View {
     /// by column()'s per-column fan compression, which backstops the exact fit. Landscape never
     /// calls this — its cardW already height-sizes live (fan 0.34·aspect ≈ 0.57·w > the 0.53
     /// floor). The 30pt clamp matches the landscape minimum; the portrait caller passes the
-    /// deal-scoped shrinkLatchCount so the shrink is monotone within a deal (no per-move board
+    /// deal-scoped shrinkLatchCount AND a deal-scoped minimum-latched totalH (latchedBoardH),
+    /// so BOTH inputs are monotone within a deal (no per-move or per-chrome-row board
     /// pulsing). totalH == 0 is a transient sizing pass: keep width-sized cards for that frame.
     private func portraitFitCardW(totalH: CGFloat, widthCardW: CGFloat, tallest: Int) -> CGFloat {
         guard tallest > 1, totalH > 0 else { return widthCardW }
