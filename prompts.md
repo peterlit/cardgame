@@ -413,3 +413,19 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     "Opening Files…" before the UIDocumentPicker warm-up stall; accessibility identifiers added
     (cards `card.<S><rank>` + VoiceOver labels, `stat.*`, `demo.*`, `toolbar.*`, `daily.*`).
     Build green, 68 Node tests green.
+72. `Run a qa loop, max 3 rounds, use 3 testers, give me feedback on this latest version of the
+    qa-loop plugin when you are done` — loop 3 CONVERGED at round 3 on a full 51-case pass
+    (previous state archived; WORKFLOWS refreshed for the changed demo-exit/tall-column/daily
+    contracts). Round 1 full pass: 13 findings (3 majors). Implementer fixed all 11 auto-routed
+    in 5447237 (HUD wrap, daily-attempt confirm, two-action deal alert, drop zones to tableau
+    bottom, buried-card shake, demo header dashes, calendar ids, Ask→Off→On auto-finish cycle,
+    rail pill styling, "Opening Files…" acknowledgement, full accessibility-identifier pass);
+    fix review 11/11 sound. Round 2 targeted verified all 10 on screen → full_pass_required;
+    round 3 full pass confirmed convergence. Both prior-loop majors (demo banking, tall-column
+    clip) re-confirmed dead all three rounds. 4 regression XCUITests emitted skip-guarded into
+    the parked CausewayUITests dir (e02161a, 2b66b93), retrofitted to the new a11y ids. Open:
+    4 minors (re-win clock pair w/ metric-integrity trap, deal-number grouping, a11y gaps) +
+    3 proposals (challenge-mode-dropped-after-demo major, new-game confirm, debug date
+    override). Perf clean at baselines. Plugin feedback delivered (implemented_rounds fixed the
+    thrashing false positive; merge_coverage persona-collapse bug found; shared-/tmp worker
+    collision; regression writer blind to archived fixes).
