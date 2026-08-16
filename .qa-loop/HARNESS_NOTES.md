@@ -665,3 +665,412 @@ Other notes:
   demo 0.251-0.257 s/move; idle CPU 0.0-0.9 %, demo auto-run 17.0 %; RSS flat over 22 New-game
   cycles; zero network bytes. Only slow path remains the **first document-picker presentation per
   process (1.6-1.8 s frozen, no spinner)** - Export and Import both.
+
+## Round-2 additions (qa-worker-3, WF-11/12 + WF-1 smoke)
+
+- **Lane isolation used:** `/private/tmp/qa3-r2w1112/` (driver copy, `script.txt`, `out/`,
+  `run.sh <tag> "<script>"` pinning `-destination id=<udid>`). Both literals in
+  `QADriver.swift` re-pointed there. `xcodegen generate` ~5 s, `xcodebuild test` ~25-35 s.
+- **Driver additions worth keeping:** `tapid` / `tapidp` (identifier ==/BEGINSWITH), `ids`
+  (dumps identifier + label + isEnabled + frame for buttons/texts/fields/otherElements/cells),
+  `home`. NOTE: even though build 5447237 adds real `accessibilityIdentifier`s
+  (`toolbar.*`, `daily.*`, `demo.*`, `stat.*`), **`ids` and `labels` still came back EMPTY**
+  against the non-target app on this rig. Coordinate taps + screenshots remain the only
+  reliable channel; `tapb <label>` still works for sheet chrome ("Done").
+- **Deleting/moving files inside the simulator's data container is refused by the command
+  classifier** (`rm`/`mv` on `.../Devices/<udid>/data/...`). So the File Provider Storage
+  fixtures and any previously exported `Causeway-Stats-<date>.json` **cannot be cleaned up**
+  from the host - plan for the exporter to hit "Replace Existing Items?" on a same-day second
+  export (Replace at pt (200,460); it worked cleanly this round, ~2 s, file rewritten).
+- **Portrait deal alert on 5447237 is now TWO side-by-side actions**: `Cancel` (127,391) and
+  `Play` (275,391) - the old vertical `Play (200,335) / Random (200,391) / Cancel (200,447)`
+  coordinates are dead. Landscape: `Cancel` (362,179) / `Play` (511,179), both above the pad.
+  The field is pre-filled+focused with the pad up: one backspace (332,774) per existing digit.
+- **Catching a sub-second in-app note change:** run `film.sh <dir> <secs>`
+  (`xcrun simctl io ... screenshot` in a loop, filename = unix ts) in the BACKGROUND and start
+  the `xcodebuild test` ~0.5 s later - xcodebuild reaches its first script command in ~18-21 s,
+  so a 40 s film started first always brackets a tap that follows a short `sleep`. Trying to
+  start the film *after* polling the log for a marker missed the window (xcodebuild's stdout is
+  block-buffered into a file). Then `/private/tmp/qa2crop/stack out.png 0 2380 1206 160 <frames>`
+  reads the Daily backup note line from 5-7 frames in ONE Read call.
+- Daily sheet scrolled fully to the bottom (portrait, 2 x `scrollto 200 700 300`):
+  `Export` (106,772), `Import` (295,772), note line at y≈808. Importer file grid cells
+  (On My iPhone, 4 files): (71,258) (200,258) (331,258) / (71,456). Importer close X (309,110);
+  exporter `Save` (349,110), and the exporter has no Cancel - `drag 200 100 200 830 0.1`
+  dismisses it and yields "Export cancelled."
+- **Landscape geometry re-confirmed on 5447237 / deal #10005** (pt, no HUD): rail x=127,
+  y = 70/102/135/167/200/232/264/297/329 for New game/Undo/Replay/Auto-play/Auto-finish/
+  Deal #/Daily/Wins/How to play; tableau columns x = 419,468,517,566,615,664,713,762;
+  free cells (218/267/316, 290). **With the daily HUD** the rail scrolls and `How to play`
+  is below the fold - `drag 127 300 127 120 0.05` brings it fully into view; the board's
+  tableau column 0 bottom card is at ~(410,277).
+- Landscape sheet handling: `scrollto 437 350 120` scrolls the Daily sheet down safely;
+  `swipedown` scrolls it back up without dismissing.
+
+## Round-2 additions (qa-worker-2, WF-5/6/8 targeted lane, build 5447237)
+
+- **The app now ships accessibility identifiers — stop guessing coordinates.** Build
+  5447237 added `toolbar.{newgame,undo,replay,autoplay,autofinish,finish,deal,daily,
+  wins,howtoplay}`, `stat.{moves,time,won}` (on the VALUE text), `daily.{play,export,
+  import}`, `daily.demo.<tier>`, `demo.{headline,next,start,stop,done}` and
+  `card.<SUIT><RANK>` (e.g. `card.S13`, label "king of spades") on every card.
+  Two driver commands make that usable (added to my copy of `QADriver.swift`):
+  - `tapid <identifier>` — `descendants(matching:.any).matching(identifier == X).firstMatch`.
+    Immune to the FlowLayout pill reflow that has cost earlier rounds whole runs.
+  - `ids` — prints every element with a non-empty identifier as
+    `kind id=… label=… en=… frame`. `stat.moves`/`demo.headline` labels are a free
+    state oracle, and the `card.*` frames reconstruct the whole board:
+    group by frame.x → column, sort by y → the pile, which is how "the board is
+    byte-for-byte the dealt layout" gets proven without reading a screenshot.
+  - Exceptions with NO identifier yet: the win overlay's buttons, the alert buttons
+    (deal alert, Ready-to-finish, End-your-daily-attempt) and sheet chrome — use
+    `tapb <label>` / coordinates for those.
+- **`ids` and `labels` THROW while anything is animating** ("Failed to get matching
+  snapshot: No matches found for Element at index N") and that fails the whole
+  `xcodebuild test` invocation, abandoning the rest of the script (my demo kept
+  auto-running for another 70 moves after the run died). Never put `ids` inside a
+  running demo/cascade — `sleep` past it or use `shot` + crop instead.
+- **Orientation did NOT reset between `xcodebuild test` invocations this round**
+  (contradicting the round-1 note): a `rotate left` from a previous run was still in
+  effect, so a portrait coordinate script silently tapped nothing. Put an explicit
+  `rotate portrait` at the top of EVERY portrait script, not just landscape ones.
+- **Deal alert changed in 5447237**: the `Random` action is gone; it is now
+  `Cancel` (127,392) and `Play` (275,392) side by side with the field at (201,324).
+  `clearf|type 10169|tapb Play` drives it end-to-end — no more one-tap-per-digit
+  number-pad coordinates.
+- **Portrait tableau origin depends on the chrome above it** (iPhone 17 Pro, card i
+  top y = ORIGIN + 30·i): no HUD/bar **425**; one-line demo bar **479**; NEW stacked
+  daily HUD **498** (the old one-line HUD was 479); 4-line paused Gold demo headline
+  **513**. Foundations with the stacked HUD: up row top y≈373, down row top y≈412
+  (they were 296/375 with no HUD). Re-read from `ids` after any chrome change.
+- Daily sheet (unscrolled, portrait): `Play` (200,489), 🥉 Clear (115,564),
+  🥇 Gold (286,564), `Done` (350,101). "End your daily attempt?" alert:
+  `Keep playing` (126,516) / `Show demo` (275,516). "Ready to finish":
+  `Not yet` (126,496) / `Finish` (275,496).
+- Proving a demo-locked board is really frozen, cheaply: start the driver in the
+  background, poll the log for the `shot` that precedes the drag, then fire ~20
+  `xcrun simctl io … screenshot` frames from the host during a
+  `drag x1 y1 x2 y2 2.5`. 20/20 frames with one md5 = the card never lifted.
+- The 28-drag deal #10169 fixture from round 1 still replays perfectly (28/28, twice)
+  — regenerate the gesture list with `node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28`;
+  `gen2.mjs 10164 gold 7` is the Auto-play "exactly one safe card" fixture.
+- **VoiceOver-label smell (not filed, region Main):** the SF Symbols used for card
+  suits expose Apple's default labels — every heart pip reads
+  "Remove From Favorites", clubs/spades/diamonds read "Club"/"Spade"/"Diamond",
+  and court cards are `crown` / `person.fill`. Worth a look if an accessibility
+  workflow is ever added.
+
+## Round-2 additions (qa-worker-1, WF-2/3/7 functional lane, build 5447237)
+
+- **The app now has accessibility identifiers, and they change how this rig should be
+  driven.** `card.<S><rank>` (S ∈ S/H/D/C, rank 1–13), `stat.moves|time|won`,
+  `toolbar.newgame|undo|replay|autoplay|autofinish|finish|deal|daily|wins|howtoplay`,
+  `demo.headline|next|start|stop|done`. Add these to the QADriver switch — they replaced
+  screenshot-reading for me this round:
+  - `ids` — walk `app.buttons/staticTexts/otherElements/images`, skip empty identifiers,
+    print `id / label / value / isEnabled / frame`. **This is a complete board oracle**:
+    every card's exact pt frame, so column contents, fan pitch, card SIZE, free-cell/
+    foundation occupancy, Moves/Time/Won and every pill's enabled state come back in one
+    command. Comparing the sorted `(id,x,y)` list against an earlier `ids` proves
+    "board identical to the initial deal" far more cheaply than imgdiff.
+  - `tapid <id>` / `dragid <srcId> <dstId> [dur]` (`identifier ==` predicate).
+  - Card frames also give the geometry constants for free: portrait card i top
+    y = 425.33 + 30·i, card 45×75 pt, column x origins 6,55,104,153,202,251,300,349
+    (centres +22.5); bottom-card centre = top + 37.5; free cells y origin 258.67.
+- `labels` still comes back EMPTY against the non-target app, and it **throws while a
+  system alert is up**. `ids` works everywhere. `tapb <label>` still works for alert
+  chrome (`Play`, `Cancel`) — and a deliberate `tapb Random` printing `QA-MISS` after its
+  5 s wait is good *negative* evidence that an alert action no longer exists.
+- **`ids` right after a long script can blow the test timeout** ("Restarting after
+  unexpected exit, crash, or test timeout") and you lose the output — the taps still
+  landed. Keep ≤3–4 drags per invocation when the script ends in `ids`, or put `ids` in
+  its own tiny `activate|sleep 1|ids` run.
+- **Filming a 0.3 s in-app animation** (the new unmovable-card shake): XCUITest `tap()`
+  returns only after the app is idle, so an in-script `shot` ALWAYS misses it. Fire the
+  same tap 6–8× with ~1 s gaps and film the host in parallel
+  (`xcrun simctl io <udid> screenshot` loop, ~0.25 s/frame → caught 3 of 8), then
+  `imgdiff frame rest x y w h` over that card's rect. A 4 pt shake reads as MAD 32–44,
+  ~32–40 % pixels changed; the null case (no cue) is 93 consecutive frames at MAD 0.000.
+  Lane-safe film loop: `<lane>/film.sh <dir> <secs>` with the udid pinned.
+- **The deal alert now has TWO actions** (Random removed): Cancel (127,391), Play
+  (275,391) in portrait — the old (200,335)/(200,391)/(200,447) stack is gone. Pad keys
+  unchanged: 1 (68,613) 3 (332,613) 4 (68,667) 5 (200,667) 9 (332,721) 0 (200,770)
+  backspace (332,774). Field pre-filled + focused with the pad already up, so it is one
+  backspace per existing digit.
+- **Don't file "the card's suit Images are separate a11y elements" from a `dump`.** The
+  XCUITest tree lists the Image/StaticText children of `card.*` (labels include iOS's
+  `suit.heart.fill` → "Remove From Favorites"), but it lists the children of ordinary
+  SwiftUI `Button`s the same way, and those are definitely single VoiceOver stops — the
+  tree is not a VoiceOver traversal, so it cannot prove a mis-announcement either way.
+- Parallel-lane reminder that bit again: `.qa-loop/TESTCASES.md`, `HARNESS_NOTES.md` and
+  the evidence dir are all touched by several workers in the same round. Prefix your
+  evidence filenames with a per-lane tag (I used `r2b-`) — `evidence/round-2/qa-worker-1/`
+  already held an earlier round-2 pass's files with the obvious names.
+
+## Round-3 additions (qa-worker-3, WF-9/10/11 functional lane, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa3-r3w911/` (driver copy with both literals re-pointed, `run.sh <tag>
+  "<script>"` pinning `-destination id=<udid>`). `ids` and `labels` came back EMPTY again against
+  the non-target app — but `tapid toolbar.*` and `tapb <label>` both work, so drive chrome by
+  identifier/label and read state from screenshots.
+- **Timing a sub-second note change without guessing: `<lane>/orch.py`.** Usage
+  `python3 orch.py <tag> "<script>" "<marker-cmd>" <pre_s> <film_s>` — it starts `run.sh` in the
+  background, polls the log for the `QA-CMD <ts> <marker>` line (use a long `sleep 30` right before
+  the tap as the marker), sleeps until `ts+pre`, then films the host. The older "start the film N
+  seconds after launching xcodebuild" guess missed the window by 22 s this round; polling the marker
+  hit it twice in a row. Frame cadence ~0.17-0.20 s.
+- **"Opening Files…" acknowledgement is easy to re-verify**: crop raw px `0 2380 1206 130` out of
+  ~6 frames around the tap and `/private/tmp/qa2crop/stack` them — one Read shows the note flipping
+  from the previous message to "Opening Files…" (+0.46 s Export, +0.47 s Import on 2b66b93).
+- Portrait coordinates confirmed on 2b66b93 (Daily sheet scrolled to the bottom with 2 ×
+  `scrollto 200 700 300`): `Export` (106,772), `Import` (295,772), note line raw px y≈2400-2470.
+  Exporter `Save` (349,110); exporter has no Cancel — `drag 200 100 200 830 0.1` dismisses it and
+  yields "Export cancelled." Importer close `X` (311,110). Importer file grid (On My iPhone,
+  4 files): (200,257) (330,257) / (71,455). "Replace Existing Items?" `Replace` (200,460).
+- **Wins screen geometry (portrait, pt):** field (169,191), `Play` (357,191), `Done` (348,100);
+  first chip row y=283 with chips at x≈59,153,247,341. **The chip grid re-flows every time a win is
+  added** (a new range inserts alphabetically-by-lowerBound), so re-screenshot before tapping a chip.
+  Range-detail rows start at y=244 with 51 pt pitch; the back chevron is at (37,100).
+- `clearf` + `type <digits>` + `tapb Play` drives the Wins deal field end-to-end (no number-pad
+  coordinates needed). `Play` is `.disabled` for empty, "0" and for a 21-digit overflow
+  (`Int(...)` returns nil) — a screenshot of the greyed pill is the proof.
+- **Reading persisted stats to prove a merge:** `plistlib` on
+  `<sim>/data/Containers/Data/Application/<uuid>/Library/Preferences/com.whimsicaldistractions.Causeway.plist`,
+  keys `causeway.wins` / `causeway.daily` are JSON `Data` — decoding them before/after an import is
+  how "the non-backup file changed nothing" and "day 3's moves=100 was not poisoned by the file's
+  moves=0" get proved without any UI reading.
+- The round-2 File Provider fixtures (`qa-backup-A.json`, `qa-bad-entries.json`,
+  `qa-notabackup.json`) survive an app uninstall/install and are still the fastest way to seed a
+  populated Wins screen (5 wins across 3 ranges) — the app's own supported Import route.
+
+## Round-3 additions (qa-worker-1, WF-1/2/3 confirming pass, build 2b66b93)
+
+- **Lane isolation used:** `/private/tmp/qa1-r3-wf13/` (copy of the round-2 driver, both
+  literals in `QADriver.swift` re-pointed at `<lane>/script.txt` + `<lane>/out`,
+  `run.sh <tag> "<script>"` pinning `-destination id=<udid>`). `xcodegen generate` ~2 s,
+  `xcodebuild test` ~35-50 s per invocation. 22 invocations, zero stray-script incidents.
+- **`ids` works reliably against the non-target app on this device** (contradicting
+  qa-worker-3's round-2 note that it came back empty): every run returned the full
+  `card.*` / `toolbar.*` / `stat.*` / `daily.*` list. Two things that make it a complete
+  board oracle in one command, worth reusing verbatim:
+  - Parser: bucket `card.*` frames by rounded x -> column, sort by y -> the pile, and the
+    reported `{w,h}` IS the current card size, so board-shrink and fan-pitch assertions
+    need no pixel work at all. Kept at `/tmp/board.py` (12 lines; regenerate from the
+    regex `id='card\.([A-Z0-9]+)' lbl='[^']*' v=Optional\(\) en=true \{\{x, y\}, \{w, h`).
+  - Comparing the sorted `(id,x,y)` list from two `ids` dumps is the cheapest possible
+    "board is byte-for-byte the dealt layout" proof (used for Replay and for 5x Undo).
+  - **Split on `QA-IDS-END`, not on `QA-IDS`** when a script contains several `ids` calls,
+    or the last segment is empty and the parse silently yields nothing.
+- **Bucketing gotcha:** after the 16-card board shrink the tableau's top card sits at
+  y=419 pt, above the y<420 threshold an earlier parser used for "free cell vs tableau".
+  Free cells are x>=250 AND y<400; foundations are x<250 AND y<400 (up row y=258.67,
+  down row y=338 at full size).
+- **Auto-play defaults to On and a scripted line can desync on it.** One tap on
+  `toolbar.autoplay` before a long pinned drag sequence makes the app state match an
+  offline simulation exactly; the setting survives `New game` (it is a setting, not game
+  state), so turn it off once per install.
+- **TC-2.6's 13-drag tall-column script for deal #10,004 replays perfectly on 2b66b93**
+  (13/13 drags landed in 5 invocations of <=4 drags each). Measured ladder: pitch 30 pt
+  at <=12 cards -> 28.0 at 13 -> 24.0 at 15; the uniform board shrink fires on the 16th
+  card, 45x75 -> **43x71.67** pt (earlier rounds rounded this to "~44"), all 8 columns plus
+  the free-cell card in the same step, tableau left edge 6 -> 15 pt.
+- Deal-alert flow that worked first time on this build: `tapid toolbar.deal|sleep 2|clearf|
+  type 10004|tapb Play` — no number-pad coordinates needed at all.
+- Film + imgdiff rect for the unmovable-card shake at FULL card height is
+  `18 1456 135 225` (raw px) and reads MAD 13-19 / 13-17 % changed; the round-2 rect
+  (height 90) reads MAD ~44 for the same 4 pt displacement. **Compare MAD only against a
+  run that used the same rect.**
+
+## Round-3 additions (qa-worker-2, WF-5/6/7 confirming pass, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa2r3-wf567/` (driver copy, both literals in `QADriver.swift`
+  re-pointed, `run.sh <tag> "<script>"` pinning `-destination id=<udid>`, `film.sh <dir> <secs>`).
+- **`rotate` as the FIRST script command fails the whole run** — it queries the app frame, so a
+  script starting `rotate portrait|terminate|launch` dies with "Application ... is not running".
+  Order must be `launch|sleep 3|rotate portrait|...`.
+- **With the xcodeproj already generated, `xcodebuild test` reaches the first script command in
+  ~3 s, not the 18-21 s earlier rounds assumed.** A host film loop timed with "sleep 26 then film"
+  missed the drag window entirely. Start `film.sh` FIRST (background), sleep 1, then run the script,
+  and give the film enough seconds to cover the whole invocation.
+- **`ids` with the demo bar up can take ~54 s to return** (measured from the QA-CMD timestamps:
+  ids at t=624, next command at t=678). It still succeeds; just never assume the following command
+  happens promptly, and keep `ids` out of any timing-sensitive sequence.
+- **Do not split a log by searching for a command string** — the `QA-SCRIPT:` echo on line 2
+  contains the entire script, so the first match is always that echo (it silently merged two
+  `ids` dumps into one 104-card "board" for me). Match lines starting with `QA-CMD `.
+- **`tapid card.<SUIT><RANK>` is the cheapest way to make a specific real move** (e.g. `tapid card.S13`
+  smart-moves the king of spades home) — no board geometry needed, immune to HUD/demo-bar origin shifts.
+- **Cheap board-identity oracle:** parse `oth id='card.X' ... {{x, y}}` out of an `ids` dump, bucket
+  `col = round((x-6)/49)`, sort each bucket by y — comparing that dict against a dump of the freshly
+  dealt board proves "re-dealt to the exact initial layout" in one line of python (used for every
+  WF-6 Stop/Done case).
+- **Proving nothing was banked, without the UI:** `plutil -p "$(xcrun simctl get_app_container <udid>
+  com.whimsicaldistractions.Causeway data)/Library/Preferences/com.whimsicaldistractions.Causeway.plist"`
+  — after a full 86-move demo line plus a Gold line, only `causeway.game` exists; `causeway.wins` and
+  `causeway.daily` keys are absent entirely.
+- Geometry re-confirmed on 2b66b93 (portrait, iPhone 17 Pro): tableau card i top y = 425.33 + 30i with
+  no chrome, 499.33 + 30i with the stacked daily HUD; demo pills Next (236,264) / Start (297,264) /
+  Stop (358,264), paused y≈266, banner `Done` only at (356,266). Daily sheet unscrolled: Play (201,490),
+  🥉 Clear (115,565), 🥇 Gold (287,565). After one `scrollto 200 700 300` the August calendar day cells
+  are at pt x = 40/94/147/201/254/307/361 and rows y ≈ 486/526/566/606/646/686 (day 12 = (201,566),
+  today 16 = (40,606)). Deal alert: Cancel (127,391) / Play (275,391), pad up, field pre-filled.
+
+## Round-3 additions (qa-worker-2, WF-8 + P-C confirming pass, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa2r3-wf8pc/` (driver copy with both literals re-pointed, `run.sh <tag>
+  "<script>"` pinning `-destination id=<udid>`). 13 invocations, ~25-40 s each, zero stray scripts.
+  `tapid toolbar.*` and `tapb <label>` both work; `ids` was never needed this round.
+- **Cheapest WF-8 evidence pipeline:** one `shot` per state + `/private/tmp/qa2crop/stack out.png
+  0 340 1206 300 a.png b.png ...` → the whole pill-cycle sequence is ONE Read. The
+  Moves/Time/Won strip is raw px `780 190 426 130` (NOT the `600 400 606 130` rect an
+  earlier round recorded — that lands on the pills).
+- **Auto-play positive fixture re-verified on 2b66b93:** `node /private/tmp/qaw2r1wf8/gen2.mjs
+  10164 gold 7` — after the 7th scripted move KD is the only safe card and Auto-play On sends it
+  home by itself (Moves jumps 7 → 8, exactly one card). Negative half is free: `toolbar.autoplay`
+  → Off, `toolbar.replay`, replay the same 7 drags → Moves 7, KD still in c6. Both halves land
+  first try; all 7 drags fit in 2 invocations.
+- **28-drag #10169 fixture (`gen2.mjs 10169 bronze 28`) still replays 28/28** on this build in 5
+  invocations of ≤7 drags. Auto-play was left **Off** for it (also fine On). Moves checkpoints to
+  assert against: 7 / 14 / 21 / 27 / 28-with-prompt.
+- **Backgrounding + cold restore, the exact command shape that works:**
+  `home|sleep 5|terminate|sleep 3|launch|sleep 5|shot` — `home` alone is the scenePhase→persist
+  trigger, `terminate` is the kill, and the pair is the only way to test real restore.
+  `home|sleep 4|activate` (no terminate) is the resume case and keeps the undo stack.
+- **Proving "the board restored exactly":** crop raw px `0 700 1206 1700` (foundations + free
+  cells + tableau, excludes the clock) out of the before/after shots and compare md5 — byte-identical
+  is a stronger and far cheaper claim than reading cards off two screenshots.
+- **Elapsed-clock behaviour measured this round (2b66b93):** the clock does NOT accrue while
+  backgrounded. 0:52 at `home`, 0:58 six seconds after `launch`; the same 6-s-per-9-s-wall pattern
+  on the `home|activate` resume path. Any future "timer drift" claim must subtract the background
+  window.
+- **Persistence oracle without the UI:** `plutil`/`plistlib` on
+  `<container>/Library/Preferences/com.whimsicaldistractions.Causeway.plist` —
+  `causeway.autoplay` (Bool), `causeway.autofinishmode` (`ask|off|on`), `causeway.wins`,
+  and `causeway.game` (JSON Data with `seed`, `moveCount`, `elapsed`, `started`, `challengeDay`).
+  After a mid-demo `home`+kill it read `seed 10005 moves 0 elapsed 0 started false` — that is how
+  "the demo position was never banked" gets proved without any screenshot.
+- **The undo stack is the ONE thing not restored** across `home`+`terminate`+`launch` (Undo dims
+  with Moves 5 on the restored board); it does survive `home`+`activate`. Observed, judged expected
+  for an in-memory history, deliberately NOT filed — don't re-discover it as a bug.
+
+## Round-3 additions (qa-worker-1, WF-4 + P-A/P-B lane, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa1-r3-wf4/` (copy of the round-3 WF-1/3 driver with both literals in
+  `QADriver.swift` re-pointed, `run.sh <tag> "<script>"` pinning `-destination id=<udid>`).
+  33 invocations, ~35-45 s each, zero stray-script incidents. `ids` worked every single time.
+  Board parser kept at `<lane>/board.py` (`python3 board.py log-NN.txt` prints columns/cells/
+  foundations + card size straight out of the last `ids` dump).
+- **EVIDENCE-DIR COLLISION HAZARD:** `.qa-loop/evidence/round-3/qa-worker-1/` is shared by every
+  round-3 dispatch that happens to be worker-1 (the WF-1/2/3 pass had already written `r3-0*.png`
+  there). Name files `<workflow>-NN-*.png` (I used `wf4-`), not `r3-NN-*`, or you will silently
+  overwrite another lane's cited screenshot.
+- **The 28-drag deal #10169 bronze fixture replays perfectly on 2b66b93** — 3 full replays,
+  84/84 drags landed, in batches of 7 per invocation. Regenerate with
+  `node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28`. Works with Auto-play On *or* Off
+  (no safe autoplay card exists on that line before move 31). Load the deal with
+  `tapid toolbar.deal|sleep 2|clearf|type 10169|tapb Play`.
+- **Reaching every WF-4 route without re-dealing:** Undo from a completed board rewinds the
+  cascade one card per tap and clears `won` (the Finish pill re-arms), so one finishable board
+  yields as many win overlays as you want. But `Close` is the only overlay button that preserves
+  the board — `Play deal #<next>` and `Random` both destroy it, so budget one 28-drag replay per
+  destructive button. Also: `winRecorded` is only reset by `deal()`/`restore()`, so undo-re-wins
+  never re-record; a genuinely fresh replay of the same seed DOES update the best time
+  (wins store held the minimum, 262 s, after wins of 408/344/262 s).
+- **Auto-finish cycle order on 2b66b93 is Ask -> Off -> On** (confirmed). Mode changes still call
+  `maybeAutoFinish()` in `didSet`, so on an already-finishable board `-> On` wins instantly while
+  `-> Off` is a no-op. Ask prompt buttons `Not yet` (126,497) / `Finish` (275,497); the gold
+  `toolbar.finish` pill lands at (167,175) and pushes Wins/How-to-play onto a third row.
+- **Win-overlay buttons have no accessibility identifiers, but `tapb` works on their labels**:
+  `tapb Close`, `tapb Random`, `tapb Play deal #10170` (the label includes the seed). That is far
+  safer than the y=472/487/503 coordinate table, which shifts with the daily-medal line.
+- **Sheet swipe-dismiss confirmed for all three sheets** (Daily, Wins, How to play) with
+  `drag 200 100 200 820 0.1` from the sheet's title bar; `Done`/`tapb Done` works for all three,
+  and the deal alert's `Cancel` leaves seed + move count untouched.
+- **A win overlay's printed time can disagree with the header clock.** `GameClock` is a separate
+  ObservableObject, so only the header strip re-renders on a tick; the overlay's
+  `DealFormat.time(game.clock.elapsed)` text is whatever it was when the overlay was built. If you
+  are timing anything around a win, read `stat.time` from `ids`, not the overlay.
+
+## Round-3 additions (qa-worker-3, WF-12 landscape confirming pass, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa3-r3w12/` (driver copy, both literals in `QADriver.swift` re-pointed at
+  `<lane>/script.txt` + `<lane>/out`, `run.sh <tag> "<script>"` pinning `-destination id=<udid>`).
+  `xcodegen generate` ~2 s, `xcodebuild test` ~13-40 s. 28 invocations, no stray-script incidents.
+- **`ids` came back EMPTY on this device again** (worker-1 sees it full on theirs - it is
+  device/lane dependent, do not plan a run around it). **`tapid` still works even when `ids` is
+  empty**, and it is the cheapest orientation-independent driver: `tapid toolbar.deal|daily|wins|
+  howtoplay|undo|autofinish|finish`, `tapid daily.play`, `tapid daily.demo.bronze`,
+  `tapid demo.stop`, `tapid card.<SUIT><RANK>` (e.g. `card.H13` smart-moves the king of hearts).
+  That removes ALL rail-geometry guessing in landscape, where the rail shifts ~40 pt per chrome
+  change (HUD/demo bar) and scrolls.
+- **The rail's scroll offset persists** across sheet opens, alerts and further moves (it only resets
+  on a re-deal), so a script that scrolled the rail earlier can find `New game` off-screen later -
+  another reason to use `tapid` rather than pt(127, y).
+- Landscape geometry re-confirmed on 2b66b93 (iPhone 17 Pro, pt). No HUD: rail x=127, y = 70/102/135/
+  167/200/232/264/297/329; foundations up row y=109, down row y=189 at x=218/267/316/364; free cells
+  y=296 at x=218/267/316; tableau columns x = 419+49i, 7-card column bottom-card centre y ~250,
+  6-card ~225. With the daily HUD everything drops ~40 pt and columns become x = 410.5+46.4i.
+  **With the gold Finish pill the rail holds 10 pills (70..358 pt) and still needs no scroll.**
+- **Landscape alerts are all fine on this build** - deal alert, "End your daily attempt?",
+  "Ready to finish" and the 3-button win overlay each render both/all actions side by side above the
+  keypad. The round-1 "only one action visible, scroll the alert" quirk is gone. An open alert also
+  **survives a rotation** (landscape->portrait keeps the alert, the typed digits and the keypad).
+- **The 28-drag deal #10169 bronze fixture (`node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28`)
+  replays perfectly on 2b66b93** - 28/28 drags in 4 invocations of 7 (portrait, Auto-play left On,
+  `sleep 1` between drags), ending on the "Ready to finish" prompt at Moves 28. Rotating to landscape
+  with the prompt up is the cheap way to test the finish prompt + win overlay in landscape.
+- **Re-winning one board without the fixture:** on a won board, tapping `toolbar.autofinish` twice
+  (Ask->On->Off/On) is a no-op, then one `tapid toolbar.undo` clears `won` and re-arms the gold
+  Finish pill on a still-finishable board. Each re-win costs 2 taps. Caveat: the win record is not
+  rewritten (winRecorded), and the overlay's reported time under-reports by the cascade length in
+  that path (see finding bug/WinOverlay:rewin-time-understated).
+- Screenshot handling unchanged: PNGs stay in the portrait 1206x2622 frame in landscape;
+  `sips -r 270 --out X-rot.png X.png` for landscapeLeft, **`sips -r 90` for landscapeRight**.
+  `/private/tmp/qa2crop/{crop,stack}` still work and `stack out 1700 0 922 300 a b c` over the
+  rotated frames is the cheapest way to read the Moves/Time/Won strip across a sequence.
+
+## Round-3 additions (qa-worker-1, PERF lane P-D/P-E, build 2b66b93)
+
+- **Lane:** `/private/tmp/qa1perf-r3/` (copy of the round-3 WF-4 driver with both literals in
+  `QADriver.swift` re-pointed, `run.sh <tag> "<script>"` pinning `-destination id=<udid>`,
+  plus `tools/{film.py,cpuwin.py,coldlaunch.py,rss.py,imgdiff}` and `orch.py`/`orch2.py`).
+  **With the xcodeproj already generated an invocation is ~9 s end-to-end and reaches the first
+  script command in ~1.5 s** - the round-1 "18-21 s to the first command" assumption is dead,
+  so `orch.py` (poll the log for a `QA-CMD <ts> <marker>` line, then start the film) is the only
+  reliable way to bracket a tap; a fixed "sleep N then film" now overshoots badly.
+- `orch.py <tag> "<script>" "<marker-cmd>" <delay_s> <film_s>` and `orch2.py` (same, but runs
+  `cpuwin.py` instead of the film) both work verbatim. Use a long `sleep 6` immediately before
+  the action as the marker and `delay 0.4`; put the marker string nowhere else in the script.
+- **md5-per-frame is not enough on its own - three false signals to filter:**
+  1. `simctl io screenshot` PNGs can differ in md5 with `imgdiff` MAD 0.000 (metadata only).
+     Always confirm a "first change" frame with `imgdiff`.
+  2. The **elapsed clock ticks once a second** on a started board, so on any film longer than
+     ~1 s you get a change every ~5 frames that has nothing to do with your action. Same for the
+     iOS status-bar minute rollover (that is what looked like "the win overlay appeared 1.1 s
+     late" until the frames were actually read).
+  3. An open **alert blinks its text caret**, so the frames cycle between 3-4 hashes forever -
+     "settled" has to be judged visually there, not by a stable md5 run.
+- **A single anomalous host-screenshot capture time is not an app stall.** During the first
+  16-card board-shrink film one `simctl io screenshot` took 1.334 s (vs 0.20-0.25 s typical);
+  a second, identical run showed a perfectly uniform 0.197-0.220 s cadence and the ps-delta CPU
+  cost of the resizing drop was only +0.14 cpu-s over a non-resizing one. Reproduce before
+  believing a capture-gap.
+- **Measuring the CPU of something the driver starts, with the driver DETACHED:** launch
+  `run.sh` in the background with a script that ENDS right after the trigger
+  (`activate|sleep 1|tapid demo.start|sleep 1`), poll its log for `QA-DONE`, then run
+  `cpuwin.py`. The demo keeps auto-running after `xcodebuild` exits, so you get a clean,
+  attachment-free window. Same trick works for any self-running animation.
+- **Reading demo pacing without a film:** after the detached start, take 4 host screenshots ~4 s
+  apart recording `time.time()` around each, then `stack out 0 700 1206 120 <frames>` - one Read
+  gives four (count, timestamp) pairs. Measured 0.2492 s/move on 2b66b93.
+- `ids` came back EMPTY on this device this round (again device/lane dependent), but
+  `tapid toolbar.*` / `daily.*` / `demo.*` / `card.*` and `tapb <label>` all worked, and
+  `clearf|type <seed>|tapb Play` drives the deal alert with no pad coordinates.
+- Geometry **after** the 16-card portrait shrink (needed to keep driving the board): card
+  43 x 71.67 pt, tableau left edge 15, column centres x = 36.5 + 47*i, top card y origin 419,
+  non-tall columns' fan pitch 28.67 pt. `drag 130 598 36 600` moves c2's 6th card onto c0.
+- Round-3 numbers (full table in `.qa-loop/evidence/round-3/perf/r3perf-measurements.txt`):
+  cold launch <=0.94 s; Daily sheet cold-first-open 1.0-1.1 s vs 0.55 s warm; deal alert 0.83 s;
+  New game redeal 1.50-1.72 s; Replay redeal 1.43-1.48 s; daily Play handoff 1.19 s; cascade
+  8.50 s / 0.202 s per card; 16-card shrink ~1.05 s; idle 0.0-1.2 %; demo auto-run 15.3 %
+  (bronze) / 20.7 % (gold); RSS flat over 22 New-game cycles; zero network bytes in 372 samples.

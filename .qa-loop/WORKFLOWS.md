@@ -55,8 +55,10 @@ Each has a stable ID and a reasonable-effort expectation.
   movable, or a win recorded on demo-played moves, is a major bug, not the old behavior.
 
 - **WF-7 — Play a specific deal number (power).** Use "Deal #…" to enter and play an
-  exact deal (and the Random option). Expectation: <= 3 taps to open, type, and play;
-  out-of-range/blank input is handled without a crash or dead-end.
+  exact deal. Expectation: <= 3 taps to open, type, and play; out-of-range/blank input is
+  handled without a crash or dead-end. (Changed 2026-08-16: the alert has exactly two
+  actions, Play and Cancel — the old Random action was removed as redundant with the
+  always-visible New game pill; its removal is intended, not a regression.)
 
 - **WF-8 — Auto-play & Auto-finish settings (power).** Toggle Auto-play On/Off and cycle
   Auto-finish (Ask/On/Off). Expectation: labels reflect state immediately; behavior

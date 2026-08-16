@@ -115,16 +115,35 @@ Note on tap mapping: screenshots return a larger PNG; multiply screenshot px by
   press-and-hold delay) and drops exactly where released if legal; if released over
   no/illegal zone it snaps back with no move counted.
 - **Effort bar:** pickup is instant; drop lands where released.
-- **Note:** the drop is resolved against the target column's *frame*, so a release
-  below the column's last card lands outside its drop zone and snaps back. Repeated
-  legal drops onto one column is also the practical way to build a tall column —
-  see TC-2.6.
+- **Note (contract INVERTED 2026-08-16, build 5447237 — supersedes the old "a release
+  below the column's last card snaps back" expectation that `ux/WF-2:drop-below-column-refused`
+  argued was itself the defect):** every column's drop frame now extends from the column
+  top down to the **bottom of the tableau area**, so a legal run released anywhere in the
+  empty strip below a column must land ON that column. Regression check for that finding:
+  on deal #10,004, `drag 322 613 → 28 700` (20 pt below column 0's last card, whose bottom
+  edge is 680.3) and `drag 322 613 → 28 800` (120 pt below) must BOTH move 10♥ onto J♣
+  (Moves +1, card.H10 lands at x=6). A release at y≈860 is past the tableau area (the last
+  card's bottom edge is ≈836 pt) and correctly still snaps back — that is out-of-board, not
+  a refusal. Repeated legal drops onto one column is also the practical way to build a tall
+  column — see TC-2.6.
 
-**TC-2.4 (Both) — Drag an unmovable/buried card.**
-1. Cold launch. Attempt to drag a buried card (not a run head).
-- **Expected:** buried card does not lift (canDrag=false for non-seq-heads); a tap on
-  it is still accepted as a smart-move attempt. Verify no visual "stuck at elevated
-  zIndex" artifact remains after release.
+**TC-2.4 (Both) — Drag/tap an unmovable/buried card (refusal cue).**
+1. Cold launch. Attempt to drag a buried card (not a run head); then plain-tap it.
+- **Expected:** buried card does not lift (canDrag=false for non-seq-heads) and no move
+  is counted; no "stuck at elevated zIndex" artifact after release. **Added 2026-08-16
+  (build 5447237, fix for `ux/WF-2:unmovable-card-no-feedback`):** the touch must be
+  ACKNOWLEDGED with a ~0.3 s horizontal wiggle (±4 pt) of that one card, so silence is
+  never mistaken for a dropped touch. Deliberate non-goals to check for over-cueing: a
+  tap on a card that CAN be lifted but has no legal target stays silent (verified on a
+  free-cell card with no target), and the cue is suppressed while a demo line plays.
+- **How to see a 0.3 s animation:** XCUITest's `tap()` returns only after the app goes
+  idle, so a scripted `shot` right after the tap always misses it. Tap the buried card
+  6–8× with ~1 s gaps while a host screenshot loop films
+  (`xcrun simctl io <udid> screenshot`, ~4 fps), then `imgdiff` every frame against a rest
+  frame over that card's rect. Measured on deal #10,004, A♥ at column 0 index 2 (tap
+  28 500): 3 of 8 taps caught a displaced frame at MAD 32–44 / 32–40 % pixels changed;
+  the same 8-tap loop on a movable-but-targetless free-cell card gave MAD 0.000 in 93
+  consecutive frames.
 
 **TC-2.5 (Both) — Tap that briefly shows no visible response (latency probe).**
 1. Cold launch. Timestamp-screenshot immediately before and ~1 s after a smart-move
@@ -275,9 +294,13 @@ into an expectation.*
   seed; Moves 0, Time 0:00; a DailyHUD capsule replaces nothing else and sits under
   the toolbar showing three medal chips (🥉 Clear the deal · 🥈 <silver label> ·
   🥇 <gold label>), each with ·/✓/✗ state.
-- **Watch:** the HUD renders all three labels on ONE 402 pt line — the Silver and
-  Gold labels are visibly truncated with "…" (see Candidate concerns CC-1). WF-5
-  asks for legible objectives; decide whether that is a finding when you reproduce.
+- **HUD layout (changed 2026-08-16, build 5447237):** the HUD is a `ViewThatFits` —
+  landscape still renders all three chips on ONE line, and portrait (~402 pt), where
+  one line cannot fit them untruncated, STACKS the three chips in a rounded box with
+  fully wrapped labels. Expect NO "…" in either orientation; the portrait HUD is
+  ~28 pt taller than the old capsule and the tableau starts at y≈498 (card i top
+  y = 498 + 30·i) instead of 479. Any ellipsis in a HUD chip is a regression of
+  `ux/WF-5:daily-hud-truncates-objectives`.
 
 **TC-5.3 (Both) — Replay-to-improve label after a bronze.**
 1. Win the daily once (bronze earned). Re-open `Daily`.
@@ -321,7 +344,12 @@ first (see header).*
   `daily-solutions.json`; e.g. 97 for #10,004, 86 for #10,005) with pills
   `Next` (236,263) · `Start` (297,263) · `Stop` (357,263).
 - **It must NOT auto-run:** the counter stays at `0 / N` and the pill says `Start`
-  (not `Pause`) until the user acts. Moves 0, Time 0:00, `Undo` disabled.
+  (not `Pause`) until the user acts. `Undo` disabled.
+- **Header while the demo bar is up (changed 2026-08-16, build 5447237):** `Moves`
+  and `Time` both read an em-dash `—` (the demo's move count is the app's, not the
+  player's); `Won` keeps its real value. This holds for the whole demo — ready,
+  running, paused and on the completion banner. A real number in Moves/Time while
+  demoing is a regression of `ux/WF-6:demo-moves-counter-in-player-header`.
 
 **TC-6.2 (Novice) — Step, run, pause, resume.**
 1. From TC-6.1 tap `Next` three times.
@@ -335,6 +363,8 @@ first (see header).*
 
 **TC-6.3 (Novice) — Mid-demo `Stop` re-deals the SAME seed to a fresh board.**
 1. From a stepped or running demo (any progress > 0), tap `Stop`.
+0. *(Precondition for the confirm gate below: reach the demo from a board with NO
+   daily attempt in progress, or the "End your daily attempt?" alert fires first.)*
 - **Expected:** the demo bar disappears; the board is the **fresh initial layout of
   the same deal** — every column back to its dealt 6–7 cards, free cells empty,
   foundations empty, `Moves 0`, `Time 0:00`, `Undo` disabled, `Deal #` unchanged.
@@ -368,6 +398,25 @@ first (see header).*
   0.000), counter still `3 / 97`.
 - **Fail:** any lift/ghost/zIndex artifact, any move applied, any counter change.
 
+**TC-6.7 (Both) — Demo request with a daily attempt in progress must CONFIRM.**
+*(added 2026-08-16 for the fix to `ux/WF-6:demo-discards-daily-attempt-without-warning`)*
+1. `Daily` → `Play`, then make ≥1 move on the board (HUD up, Moves > 0, Undo enabled).
+2. `Daily` → tap any "Show me how to win" pill.
+- **Expected:** an alert "End your daily attempt?" / "Watching a demo re-deals the
+  board, so your current attempt (moves and time) will be discarded. You can replay
+  the challenge afterwards." with `Keep playing` (cancel) and `Show demo`
+  (destructive).
+3. Tap `Keep playing`, dismiss the sheet with `Done`.
+- **Expected:** the attempt is untouched — same Moves, the clock still running, Undo
+  still enabled, foundations unchanged, objectives HUD still up.
+4. Re-open `Daily`, tap the same pill, tap `Show demo`.
+- **Expected:** the sheet dismisses, the demo bar opens at `0 / N`, the board is
+  re-dealt and the attempt is gone (by design — there is deliberately no
+  restore-after-demo; see the trap note on the finding).
+- **Known gap (not covered by the gate):** the confirm only fires when
+  `challengeDay != nil && moveCount > 0`. A CASUAL game in progress (free play, or
+  the board left after a demo exit) is still re-dealt by a demo pill with no warning.
+
 **TC-6.6 (Novice) — Silver / Gold demo lines.**
 1. In Daily, tap the `🥇 Gold` pill (and `🥈 Silver` on any day whose seed has a
    distinct silver line — derive; there is none in the current pool head).
@@ -386,12 +435,27 @@ first (see header).*
 
 **TC-7.1 (Power) — Open, type, play an exact deal.**
 1. Cold launch. Tap `Deal #<seed>` pill. Clear the field, type `10003`, tap `Play`.
-- **Expected:** ≤3 taps to open→type→play (open pill, edit, Play). The named deal
-  loads (Deal # updates), Moves=0.
+- **Expected:** ≤3 taps to open→type→play (open pill, edit, Play) — chrome taps only;
+  the number pad costs one tap per digit and one backspace per pre-filled digit, which
+  round 1 accepted as within the bar. The named deal loads (Deal # updates), Moves=0.
+  Verified on build 5447237: 6 backspaces + `10003` + Play → Deal #10003, Moves 0.
 
-**TC-7.2 (Power) — Random from the deal alert.**
-1. Open the Deal alert. Tap `Random`.
-- **Expected:** a random deal loads; Deal # changes.
+**TC-7.2 (Power) — The deal alert has exactly two actions (contract CHANGED 2026-08-16,
+build 5447237).** *(Supersedes the old "Random from the deal alert" case: the `Random`
+action was removed as the portrait side of the fix for
+`ux/WF-12:deal-alert-actions-hidden-in-landscape`, where landscape's auto-raised number
+pad pushed Random/Cancel off the visible alert and left destructive `Play` as the only
+visible exit. WORKFLOWS.md's WF-7 line still mentions "(and the Random option)" — that
+sentence is now stale.)*
+1. Open the Deal alert. Enumerate its actions.
+- **Expected:** exactly `Cancel` (left) and `Play` (right), side by side, with the number
+  pad already up and the field pre-filled + focused. **No `Random` action** — a driver
+  `tapb Random` must report a miss.
+2. Dismiss the alert and tap the toolbar `New game` pill.
+- **Expected:** the random-deal capability the alert used to offer is still one tap away
+  and always visible (`New game` calls the same `newRandomGame()`); Deal # changes.
+- **Portrait action coordinates on iPhone 17 Pro (pt):** Cancel (127,391), Play (275,391)
+  — NOT the (200,335)/(200,391)/(200,447) three-action stack from earlier rounds.
 
 **TC-7.3 (Power) — Blank input (edge).**
 1. Open the Deal alert. Delete all digits (empty field). Tap `Play`.
@@ -405,11 +469,13 @@ first (see header).*
   the loaded Deal # is the clamped value, not the typed one.
 2. Repeat with `0` → clamps up to 1.
 - **Edge:** confirm whether the displayed pill matches the clamped seed (a mismatch
-  between typed and loaded value with no feedback is a candidate finding).
+  between typed and loaded value with no feedback is a candidate finding). Verified on
+  build 5447237: `9999999` → Deal #1000000, `0` → Deal #1, blank → deal unchanged.
 
 **TC-7.5 (Power) — Cancel leaves state untouched.**
 1. Open the Deal alert (prefilled with current seed). Tap `Cancel`.
 - **Expected:** alert dismisses, same deal, no move counted. CONFIRMED reachable.
+  Since 2026-08-16 `Cancel` is the LEFT of the alert's two actions (127,391).
 
 ---
 
@@ -425,16 +491,39 @@ first (see header).*
 - **Expected:** only safe cards auto-advance home; it must not bury or make unsafe
   automatic moves. With `Off`, no automatic moves occur.
 
-**TC-8.3 (Power) — Cycle Auto-finish Ask → On → Off.**
-1. Tap `Auto-finish: Ask` → `On` → `Off` → back to `Ask`.
-- **Expected:** label cycles in that exact order each tap; state persists across
-  relaunch.
+**TC-8.3 (Power) — Cycle Auto-finish Ask → Off → On.**
+*(order CHANGED 2026-08-16, build 5447237, for `ux/WF-8:autofinish-cycle-through-on-ends-game`:
+`.on` is the one state whose mere selection ends a finishable game, so it must never
+be a pass-through from the default.)*
+1. Tap `Auto-finish: Ask` → `Off` → `On` → back to `Ask`.
+- **Expected:** label cycles in that exact order, one tap each, updating immediately;
+  the mode persists across `terminate` + `launch` (verified with `On`). Reaching
+  `Off` from the default `Ask` must take exactly ONE tap and must never transit `On`.
 
-**TC-8.4 (Power) — Behavior matches label.**
-1. `Ask`: reach finishable board → prompt appears (see TC-4.1).
-2. `On`: reach finishable board → cascades automatically with no prompt.
-3. `Off`: reach finishable board → no prompt, `Finish` pill offered.
-- **Expected:** each mode behaves exactly as labeled.
+**TC-8.4 (Power) — Behavior matches label, on a real finishable board.**
+*Fixture (deterministic, ~4 min): `Deal #` → `10169` → `Play`, then replay the first
+28 tokens of that seed's bronze line as real drags. Regenerate the gesture list with
+`node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28` (portrait, no HUD, no demo bar:
+column centres x = 28,77,126,175,224,272,321,370; card i grab y = 425+30i+14, +37 for
+the last card; foundations x = 28,77,126,175 with up row y=296 / down row y=375; free
+cells x = 274,323,372 at y=296). Auto-play may stay `On` — this line has no safe
+autoplay before move 31. Verified 28/28 drags land, Moves = 28.*
+1. `Ask` (default): the 28th drag makes the board finishable → the "Ready to finish"
+   alert appears by itself ("Every remaining card can go home. Send them all now?"),
+   `Not yet` / `Finish`.
+2. Tap `Not yet` → the board stays playable, Moves unchanged, and the gold `Finish`
+   pill appears in the toolbar (id `toolbar.finish`).
+3. Tap the `Auto-finish` pill ONCE.
+- **Expected (the regression guard):** the label becomes `Auto-finish: Off` — NOT
+  `On` — and NOTHING happens to the board: Moves still 28, `Won` unchanged, no
+  cascade, no win overlay, `Finish` pill still offered. (`Off` behaving as labeled
+  and the one-tap Ask→Off route are the same assertion.)
+4. Tap the `Auto-finish` pill again → `On`.
+- **Expected:** landing on `On` deliberately DOES cascade immediately (the intended
+  shortcut): all remaining cards fly home, `Moves` ends at 70, the win overlay reads
+  "You solved it! · Deal #10,169 · 70 moves", `Won` +1, the `Deal #` pill gains ` ✓`.
+- **Note:** the destructive transition still exists at `Off → On`; that is the
+  deliberate shortcut, documented on `AutoFinishMode.next`.
 
 ---
 
