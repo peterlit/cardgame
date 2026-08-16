@@ -761,5 +761,5 @@
     }
   ],
   "parallel_testers": 3,
-  "emit_regression_tests": false
+  "emit_regression_tests": true
 }

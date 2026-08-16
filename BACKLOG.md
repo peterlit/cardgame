@@ -301,6 +301,20 @@ findings fixed:
   is error-prone and could break the build. Add an XCTest target in Xcode that asserts the
   Swift engine reproduces the same golden deal orders (`tests/engine.test.mjs` GOLDEN) and
   the same `isSafeAutoplay` cases, so both platforms are pinned to one contract. Ties to M8.
+- **UITEST-target — UI Testing Bundle add did not persist (PARKED 2026-08-15; user decision).**
+  Adding a `CausewayUITests` UI Testing Bundle in Xcode wrote the scheme testable (blueprint
+  `C761C35A30315F0500429DAC`), the two stock template files under `ios/Causeway/CausewayUITests/`,
+  and UI state — but `project.pbxproj` was never re-serialized (unchanged since Aug 14; zero
+  `CausewayUITests` references; `xcodebuild -list` shows only the app target), even after builds.
+  Strong evidence for the M8 hand-authored-pbxproj concern. Current state is harmless:
+  `build-for-testing` succeeds despite the dangling scheme testable, and the committed template
+  files/scheme entry are inert. `emit_regression_tests` is **true** in `.qa-loop/ledger.json`
+  (the qa loop's regression-test-writer emits `XCTSkip`-guarded tests and tolerates a missing
+  target). To resume: in Xcode check the project's TARGETS list for `CausewayUITests` → if
+  present, ⌘U (Product → Test) to force a project-file flush; if absent, re-add the target —
+  expect Xcode to collide with the existing `CausewayUITests/` files and the stale scheme
+  testable entry (delete/merge those first), and if the pbxproj still won't write, diagnose its
+  nonstandard bits (missing `productReference`) before retrying. Ties to F6/M8.
 - **M7 — Accessibility (iOS).** No VoiceOver labels/actions; Dynamic Type ignored
   (all fixed `.system(size:)`, tap gestures not buttons).
 

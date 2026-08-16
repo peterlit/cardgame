@@ -390,3 +390,11 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     RL-1/RL-2: parity pins re-anchored to contiguous case bodies (mutation-verified) and the iOS
     finishDemo/demoAdvance guards pinned. Build green, 68 tests green. Review loop re-run on the
     change.
+71. `Added a UI Testing Bundle target and set emit_regression_tests to true … Let's set the
+    regression tests build target aside. We will figure it out later` — verified the qa-loop flag
+    (true, kept) but found the Xcode target add never persisted: Xcode wrote the scheme testable +
+    template files, yet project.pbxproj was never re-serialized (zero CausewayUITests references;
+    xcodebuild -list shows only the app target) even after builds — strong evidence for the M8
+    hand-authored-pbxproj concern. Confirmed build-for-testing still succeeds despite the dangling
+    scheme testable, so the state is harmless; parked per user decision as backlog UITEST-target
+    (with resume steps) and committed the flag + orphan files as-is.
