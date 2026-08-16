@@ -80,12 +80,19 @@ pin('Model/Game.swift', 'recordWin once-only gate', [
 // (The iOS copy validates each token and returns false on a malformed/inapplicable one — pure
 // defense against bad baked data; the applied semantics below are identical to web/rules.mjs.)
 pin('Model/Game.swift', 'applyDemoToken token format', [
-  'let col = n(1)',                                                        // F/C read their column from field 1
-  'let c = tableau[col].removeLast()',                                     // F = column-top → foundation
-  'if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }',
-  'let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)',
-  'let e = cells.firstIndex(where: { $0 == nil }) else { return false }',  // C = park to first empty cell
-  'cells[e] = tableau[col].removeLast()',
+  // CONTIGUOUS case bodies, not bare fragments: `let col = n(1)` alone appears in both F and
+  // C, so an unanchored pin would stay green if only one of them drifted.
+  `case "F":
+      let col = n(1)
+      guard col >= 0, col < tableau.count, !tableau[col].isEmpty else { return false }
+      let c = tableau[col].removeLast()
+      if n(2) == 1 { down[c.suit.rawValue] = c.rank } else { up[c.suit.rawValue] = c.rank }`,   // F = column-top → foundation
+  `case "C":
+      let col = n(1)
+      guard col >= 0, col < tableau.count, !tableau[col].isEmpty,
+            let e = cells.firstIndex(where: { $0 == nil }) else { return false }
+      cells[e] = tableau[col].removeLast()`,                                                    // C = park to first empty cell
+  'let run = Array(tableau[src][idx...]); tableau[src].removeSubrange(idx...)',                 // T = run move
 ]);
 
 // Cross-copy: the web applyDemoToken must interpret the SAME token format (so a baked line plays
@@ -119,4 +126,11 @@ test('web demo exit paths re-deal (no playable demo-touched board)', () => {
   const swift = read('Views/ContentView.swift');
   assert.ok(swift.includes(norm('demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }')),
     'ContentView demo Stop/Done no longer re-deals');
+  // The iOS model-side guards, mirroring the three web pins above: finishDemo only unlocks a
+  // genuinely complete board, and demoAdvance aborts to a re-deal on a token that fails to apply.
+  const game = read('Model/Game.swift');
+  assert.ok(game.includes(norm('guard boardComplete else { restartDeal(); return }')),
+    'Game.finishDemo no longer guards the unlock on a complete board');
+  assert.ok(game.includes(norm('guard applied else { restartDeal(); return false }')),
+    'Game.demoAdvance no longer aborts to a re-deal on a bad token');
 });

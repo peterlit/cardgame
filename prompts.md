@@ -380,3 +380,13 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (greedy `GeometryReader` in portrait, `landscapeBoardH` backstop in landscape) — only the
     overflowing column tightens, card size never changes, no per-move size thrash. Build green,
     67 Node tests green. Then ran the review loop on the change.
+70. `Make the RL-1 through RL-4 fixes. Re RL-4 it probably makes sense to keep the card sizes the
+    same across foundation, free cells, and the main game area when it rescales` — fixed all four
+    review-loop residuals. RL-4 per the user's call: replaced the tableau-only shrink with a
+    whole-board uniform card size — `portraitFitCardW` solves the shared width from an outer
+    GeometryReader spanning the upper row + tableau (chrome above is card-size-independent, so
+    no feedback loop); the freed upper-row height raises the shrink threshold (4.7" phone: 15
+    cards vs 13) and one size renders everywhere. RL-3 folded in (centre only when shrunk).
+    RL-1/RL-2: parity pins re-anchored to contiguous case bodies (mutation-verified) and the iOS
+    finishDemo/demoAdvance guards pinned. Build green, 68 tests green. Review loop re-run on the
+    change.

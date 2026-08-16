@@ -377,23 +377,25 @@ findings fixed:
 - **I2 — No solvability guarantee / no stuck detection.** Consider a solver-backed
   "winnable deals" mode and a "no more moves" indicator; soften "pure skill" if not.
 
-### review-loop residuals — qa-loop-majors loop, 2026-08-15 (converged round 2; open minors)
-Full report: `.review-loop/REPORT.md`. Four minors open at convergence:
-- **RL-1 — F-token parity pin is an unanchored substring.** `let col = n(1)` matches both case
-  `F` and case `C` in Game.swift, so mutating only `F` stays green; pin the contiguous case body
-  (reviewer supplied the exact normalized snippet in the ledger).
-- **RL-2 — iOS demo-exit guard unpinned.** The cross-copy test pins the three web guards but not
-  iOS `finishDemo`'s `boardComplete` guard (`boardComplete` appears in tests/ only in a comment);
-  drift protection is one-directional.
-- **RL-3 — Unshrunk portrait tableau centred ~3–3.5pt off the upper row.** The unconditional
-  `.frame(maxWidth: .infinity)` centres even the normal-width tableau; centre only when shrunk
-  (`alignment: w < cardW ? .center : .leading` inside `tableauArea`).
-- **RL-4 — Shrink-path trade-offs (design call).** Latch verified sound, but each new
-  tallest-column max still rescales all 52 cards, the 0.53 floor lowers the first trigger to
-  ~13 cards on a 4.7" phone, and the shrunk state shows two card sizes at once (upper row vs
-  tableau). Reviewer offered wontfix if the trade is declared deliberate — human decision.
-- **Simulator re-verification pending** — the loop never looked at a screen; next qa-loop round
-  should re-run TC-2.3 (tall column) and the WF-6 demo cases.
+### review-loop residuals — qa-loop-majors loop, 2026-08-15 (converged round 2) — ALL FIXED same day
+Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all fixed:
+- **RL-1 DONE** — F/C token parity pins are now the CONTIGUOUS case bodies (the bare
+  `let col = n(1)` substring matched both cases, so an F-only mutation stayed green —
+  mutation-verified the new pin trips).
+- **RL-2 DONE** — the cross-copy demo-exit test now pins the iOS model guards too
+  (`finishDemo`'s `guard boardComplete else { restartDeal() … }` and `demoAdvance`'s
+  abort-to-re-deal), making drift protection two-directional.
+- **RL-3 DONE** — the tableau centres only when shrunk (`alignment: w < cardW ? .center :
+  .leading`); unshrunk keeps the exact pre-shrink leading alignment with the upper row.
+- **RL-4 DONE (user decision: uniform card size)** — the shrink is now WHOLE-BOARD: portrait's
+  `portraitFitCardW` computes one shared card width for foundations + free cells + tableau from
+  the height of an outer GeometryReader that spans exactly those areas (everything above it is
+  card-size-independent, so the fit is a one-shot pure function — no measure→resize feedback).
+  Shrinking the upper row frees height too, so the shared size stays as large as possible
+  (e.g. 4.7" phone: no shrink until a 15-card column, 41→39pt — vs the old tableau-only path
+  triggering at 13 with two card sizes on screen). Deal-scoped monotone latch unchanged.
+- **Simulator re-verification pending** — next qa-loop round should re-run TC-2.3 (tall column)
+  and the WF-6 demo cases on screen.
 
 ### review-loop residuals (converged round 2; open minors)
 - **F6b — Node test harness can silently diverge from the app.** `tests/engine.mjs` is a

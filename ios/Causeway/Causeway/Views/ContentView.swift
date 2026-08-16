@@ -33,12 +33,13 @@ struct ContentView: View {
     // frames of every drop target in the "board" coordinate space for hit-testing on drop.
     @State private var drag: DragInfo?
     @State private var dropZones: [DropZoneFrame] = []
-    // Portrait tableau-shrink latch: the tallest column count that has been *seen* this deal.
-    // tableauArea sizes its shrink from max(live, latched), so within a deal the card size is
-    // monotone — a column crossing the threshold shrinks the cards once per new maximum, and a
-    // later move/undo that shortens the column can't grow them back (which would make the whole
-    // board pulse and re-flow on single-card moves). Reset when moveCount returns to 0 (new
-    // deal, replay, or a full undo). Landscape ignores it: its cardW already re-sizes live.
+    // Portrait board-shrink latch: the tallest column count that has been *seen* this deal.
+    // portraitFitCardW sizes the shared board card width from max(live, latched), so within a
+    // deal the card size is monotone — a column crossing the threshold shrinks the board once
+    // per new maximum, and a later move/undo that shortens the column can't grow it back (which
+    // would make the whole board pulse and re-flow on single-card moves). Reset when moveCount
+    // returns to 0 (new deal, replay, or a full undo). Landscape ignores it: its cardW already
+    // re-sizes live.
     @State private var shrinkLatchCount = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
@@ -104,18 +105,33 @@ struct ContentView: View {
                         }
                         Spacer(minLength: 0)
                     } else {
-                        upperArea(cardW: cardW)
-                            .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the foundations/tableau
-                        // GeometryReader is greedy, so it takes the remaining height (replacing the
-                        // old trailing Spacer) and hands the tableau its true on-screen bound.
-                        GeometryReader { tg in
-                            tableauArea(cardW: cardW, overlap: overlap, maxH: tg.size.height,
-                                        latchedMax: shrinkLatchCount)
-                                // Keep a shrunk tableau centred under the full-width foundations
-                                // row instead of hugging the leading edge with a dead right margin.
-                                .frame(maxWidth: .infinity)
+                        // Portrait: the upper row and the tableau SHARE one card size — when a long
+                        // column forces a shrink, foundations, free cells and tableau all rescale
+                        // together (a split-size board reads wrong and makes matchedGeometryEffect
+                        // flights jump sizes mid-flight). This outer GeometryReader spans exactly
+                        // those two areas, and everything above it (header/toolbar/HUD) is
+                        // card-size-independent, so portraitFitCardW is a one-shot pure function of
+                        // its height — no measure→resize feedback loop.
+                        GeometryReader { bg in
+                            let w = portraitFitCardW(totalH: bg.size.height, widthCardW: cardW,
+                                                     tallest: max(game.tableau.map(\.count).max() ?? 0, shrinkLatchCount))
+                            let pOverlap = w < cardW ? (overlap * w / cardW).rounded() : overlap
+                            VStack(alignment: .leading, spacing: 12) {
+                                upperArea(cardW: w)
+                                    .zIndex(dragInUpper ? 10 : 0)      // a dragged free-cell card floats over the foundations/tableau
+                                // The inner GeometryReader is greedy, so it takes the remaining height
+                                // (replacing the old trailing Spacer) and hands the tableau its true
+                                // on-screen bound for column()'s exact-fit fan compression.
+                                GeometryReader { tg in
+                                    tableauArea(cardW: w, overlap: pOverlap, maxH: tg.size.height)
+                                        // Shrunk, the tableau is narrower than the full-width upper row:
+                                        // centre it. Unshrunk it spans the full width, so .leading keeps
+                                        // the exact pre-shrink alignment (no few-pt centring offset).
+                                        .frame(maxWidth: .infinity, alignment: w < cardW ? .center : .leading)
+                                }
+                                .zIndex(dragInUpper ? 0 : 1)           // ...otherwise the tableau floats over the upper row
+                            }
                         }
-                        .zIndex(dragInUpper ? 0 : 1)           // ...otherwise the tableau floats over the upper row
                     }
                 }
                 .padding(.horizontal, outerPad)
@@ -419,29 +435,31 @@ struct ContentView: View {
     /// go below this, else the bottom of every buried rank is clipped by the card above.
     private static let legibleOverlapUnit: CGFloat = 0.53
 
-    private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat, latchedMax: Int = 0) -> some View {
-        // If even the legibility-floor overlap can't fit the tallest column inside `maxH`,
-        // shrink the TABLEAU's card size (the landscape strategy) instead of compressing the
-        // fan into unreadable slivers. Portrait cards are otherwise width-sized, so this only
-        // kicks in for unusually long columns on short screens; landscape already height-sizes
-        // its cards (fan 0.34 ⇒ 0.34·aspect ≈ 0.57·w per card > the 0.53 floor) and never
-        // triggers it — its caller passes no latch. The portrait caller passes the deal-scoped
-        // shrinkLatchCount so the shrink is monotone within a deal (no per-move board pulsing).
-        // The 30pt clamp matches the landscape minimum. maxH == 0 is a transient sizing pass:
-        // keep the width-sized cards and let column()'s own fan floor absorb it for one frame.
-        let unit = Self.legibleOverlapUnit
-        let maxCount = max(game.tableau.map(\.count).max() ?? 0, latchedMax)
-        let w: CGFloat = {
-            guard maxCount > 1, maxH > 0 else { return cardW }
-            let units = Theme.cardAspect + unit * CGFloat(maxCount - 1)   // tallest column, card-widths
-            guard cardW * units > maxH else { return cardW }
-            return max(30, min(cardW, floor(maxH / units)))
-        }()
-        let ov = w < cardW ? (overlap * w / cardW).rounded() : overlap   // keep the fan proportional
-        let cardH = w * Theme.cardAspect
+    /// Portrait: ONE card width for the whole board. Width-bound normally; when the tallest
+    /// tableau column couldn't fit `totalH` even at the legibility-floor fan, shrink so the
+    /// upper row (two card-rows) and that column fit together — the shrink surrenders upper-row
+    /// height too, which is exactly what lets the shared size stay as large as possible.
+    /// `totalH` spans the upper row + tableau; the card-size-independent vertical chrome inside
+    /// it (FOUNDATIONS label ~12 + its 4pt spacing + the 4pt gap between foundation rows + the
+    /// 12pt VStack gap above the tableau) is ~32pt. A few points of estimate error are absorbed
+    /// by column()'s per-column fan compression, which backstops the exact fit. Landscape never
+    /// calls this — its cardW already height-sizes live (fan 0.34·aspect ≈ 0.57·w > the 0.53
+    /// floor). The 30pt clamp matches the landscape minimum; the portrait caller passes the
+    /// deal-scoped shrinkLatchCount so the shrink is monotone within a deal (no per-move board
+    /// pulsing). totalH == 0 is a transient sizing pass: keep width-sized cards for that frame.
+    private func portraitFitCardW(totalH: CGFloat, widthCardW: CGFloat, tallest: Int) -> CGFloat {
+        guard tallest > 1, totalH > 0 else { return widthCardW }
+        // Card-width units: 2 upper card-rows + 1 full card + (n-1) legibility-floor fan steps.
+        let units = 3 * Theme.cardAspect + Self.legibleOverlapUnit * CGFloat(tallest - 1)
+        let fit = floor((totalH - 32) / units)
+        return max(30, min(widthCardW, fit))
+    }
+
+    private func tableauArea(cardW: CGFloat, overlap: CGFloat, maxH: CGFloat) -> some View {
+        let cardH = cardW * Theme.cardAspect
         return HStack(alignment: .top, spacing: gap) {
             ForEach(0..<Game.colCount, id: \.self) { col in
-                column(col, cardW: w, cardH: cardH, overlap: ov, maxH: maxH)
+                column(col, cardW: cardW, cardH: cardH, overlap: overlap, maxH: maxH)
                     .zIndex(dragColumn == col ? 5 : 0)   // the column holding the dragged run floats over its neighbours
             }
         }
@@ -450,10 +468,10 @@ struct ContentView: View {
         let cards = game.tableau[col]
         // A long column compresses ITS OWN fan just enough to stay inside `maxH`, so the
         // bottom card can never run off-screen (the tableau deliberately doesn't scroll).
-        // Legibility is guaranteed upstream: tableauArea shrinks the card size before the
-        // fit here would ever compress past the readable rank band, so the 8pt floor is a
-        // last-resort backstop only (the 30pt card-size clamp binding on a degenerate
-        // ~18+-card column on a short phone, or a transient zero-height layout pass).
+        // Legibility is guaranteed upstream: portraitFitCardW shrinks the whole board's card
+        // size before the fit here would ever compress past the readable rank band, so the
+        // 8pt floor is a last-resort backstop only (the 30pt card-size clamp binding on a
+        // degenerate ~18+-card column on a short phone, or a transient zero-height pass).
         let ov = cards.count > 1
             ? max(8, min(overlap, floor((maxH - cardH) / CGFloat(cards.count - 1))))
             : overlap
