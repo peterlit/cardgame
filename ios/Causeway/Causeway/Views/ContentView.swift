@@ -37,9 +37,9 @@ struct ContentView: View {
     // portraitFitCardW sizes the shared board card width from max(live, latched), so within a
     // deal the card size is monotone — a column crossing the threshold shrinks the board once
     // per new maximum, and a later move/undo that shortens the column can't grow it back (which
-    // would make the whole board pulse and re-flow on single-card moves). Reset when moveCount
-    // returns to 0 (new deal, replay, or a full undo). Landscape ignores it: its cardW already
-    // re-sizes live.
+    // would make the whole board pulse and re-flow on single-card moves). Reset on every deal
+    // boundary (game.dealGeneration) and on a full undo back to move 0. Landscape ignores it:
+    // its cardW already re-sizes live.
     @State private var shrinkLatchCount = 0
     // Portrait board-height latch — the same monotone-within-a-deal contract as
     // shrinkLatchCount, in the other direction: the SMALLEST portrait board height seen this
@@ -48,11 +48,13 @@ struct ContentView: View {
     // mid-deal, and the demo bar's wrapping headline changes per step — unlatched, that
     // wobble would rescale a shrunk board up AND down (exactly the pulse shrinkLatchCount
     // exists to prevent, arriving through the height input). Holding the minimum keeps the
-    // shrink monotone. Reset alongside shrinkLatchCount at moveCount == 0, so a HUD/demo bar
-    // appearing with a NEW deal re-latches at the correct (shorter) height; rotation
-    // round-trips return to the same portrait height, so the latch is a no-op for them. A
-    // mid-deal window grow (e.g. iPad resize) stays latched until the next deal — the same
-    // accepted trade as a shortened column not growing the board back.
+    // shrink monotone. Reset alongside shrinkLatchCount on every deal boundary
+    // (game.dealGeneration — moveCount alone misses deal→deal hops where it never left 0) so a
+    // HUD/demo bar arriving or leaving with a NEW deal re-latches at that deal's correct
+    // height, and additionally whenever the CONTAINER size changes (rotation, any window
+    // resize): the latch is only meaningful for the geometry it was measured in, and the
+    // chrome wobble it guards against (Finish pill row, demo headline wrap) never changes the
+    // root size, so this reset can't reintroduce the pulse.
     @State private var latchedBoardH: CGFloat = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
@@ -170,15 +172,31 @@ struct ContentView: View {
                 }
             }
             .coordinateSpace(name: "board")
+            // The height latch is a function of THIS container size; any size change (rotation —
+            // including any interpolated intermediate frames SwiftUI may deliver mid-animation,
+            // which the `landscape` test can classify as portrait near-square — or a future
+            // resizable-window target) invalidates it. The next portrait liveH re-latches
+            // immediately, and the chrome wobble the latch exists for never changes the root
+            // size, so unlatching here can't cause pulsing. shrinkLatchCount is
+            // size-independent (a card count), so it stays.
+            .onChange(of: geo.size) { _, _ in latchedBoardH = 0 }
             .onPreferenceChange(DropZonesKey.self) { dropZones = $0 }
             .foregroundStyle(Theme.ink)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
         }
+        .onChange(of: game.dealGeneration) { _, _ in
+            // New deal (any path — New game, Replay, demo Stop/Done, Daily play, deal alert):
+            // both latches belong to the deal that just ended, and its chrome (demo bar, Daily
+            // HUD, Finish pill) may not exist on the new one. moveCount can't mark this
+            // boundary: a deal→deal hop with no move in between writes 0 over 0 and onChange
+            // (value comparison) never fires.
+            shrinkLatchCount = 0; latchedBoardH = 0
+        }
         .onChange(of: game.moveCount) { _, count in
             // Maintain the portrait shrink latches (every board mutation changes moveCount).
-            if count == 0 { shrinkLatchCount = 0; latchedBoardH = 0 }   // new deal: re-latch both
+            if count == 0 { shrinkLatchCount = 0; latchedBoardH = 0 }   // full undo to move 0: re-latch both
             else { shrinkLatchCount = max(shrinkLatchCount, game.tableau.map(\.count).max() ?? 0) }
             // Self-heal a drag whose card was torn down mid-gesture by an async autoplay step
             // (its view — and gesture — vanish, so onEnded never fires, leaving `drag` stuck at

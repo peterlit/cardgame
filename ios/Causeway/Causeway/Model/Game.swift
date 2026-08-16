@@ -46,6 +46,12 @@ final class Game: ObservableObject {
     @Published var selection: Spot?
     @Published var seed = 0
     @Published var moveCount = 0
+    /// Monotonic deal identity — bumped by every deal() (including a same-seed restartDeal), so the
+    /// UI can reset per-deal state on the deal BOUNDARY itself. moveCount alone can't mark it:
+    /// SwiftUI's onChange compares values, and a deal→deal hop where moveCount never left 0 (e.g.
+    /// demo Stop before Start, or Daily → Play → immediate New game) writes 0 over 0 and fires
+    /// nothing.
+    @Published private(set) var dealGeneration = 0
     @Published var won = false
 
     /// Elapsed clock, isolated so its 1 Hz tick doesn't re-render the board (see GameClock).
@@ -172,6 +178,7 @@ final class Game: ObservableObject {
         selection = nil
         history = []
         moveCount = 0
+        dealGeneration &+= 1
         clock.reset()
         won = false
         telem = Telemetry()      // fresh attempt; a plain deal is casual play until playChallenge sets challengeDay
