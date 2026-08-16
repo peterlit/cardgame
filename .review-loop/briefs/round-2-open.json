@@ -1,13 +1,13 @@
 [
   {
-    "id": "layout/ContentView.swift:fan-compression-no-legibility-floor",
-    "claim": "Portrait fan compression had no legibility floor and degraded to an 8pt strip, making buried ranks unreadable.",
+    "id": "test/ios-parity.test.mjs:g-t-x-token-bodies-unpinned",
+    "claim": "The RL-1 hardening pinned contiguous case bodies for F and C only; the iOS G, T and X token bodies are still matched by nothing that constrains their field indices or their destinations, so a one-sided iOS drift in three of the five tokens ships with CI fully green. The web copy pins case 'F'/'G'/'C', so the guard is one-directional for G, and T/X are unpinned on both sides.",
     "evidence": {},
     "severity": "minor",
-    "region": "ios/Causeway/Causeway/Views/ContentView.swift:400-437",
-    "introduced_by_fix": true,
+    "region": "tests/ios-parity.test.mjs:82-126",
+    "introduced_by_fix": false,
     "current_status": "partial",
-    "note": "Core handled (the 8pt/12pt sliver is gone; I verified the arithmetic: with w = floor(maxH/(aspect + 0.42*(n-1))), column()'s floor((maxH-cardH)/(n-1)) lands at ~0.42w for the tallest column, and the max(8,...) backstop only binds past ~27 cards, so it is genuinely dead). Landscape provably never triggers the shrink: 0.42/cardAspect = 0.42/1.6727 = 0.251 < landscapeFan 0.34, so cardW*units <= landscapeBoardH always. REMAINING EDGE: the 0.42 constant is derived from a wrong text-layout model. The comment at ContentView.swift:400-401 assumes the rank glyph starts at the 0.05*w top padding, but CardView renders the rank as a Text whose line box (~1.17em tall) sits at the padding top, and SF's ascent-to-cap gap (ascent 0.955em - cap 0.714em = 0.241em at a 0.50*w font = 0.12*w) pushes the cap DOWN. The digit therefore spans ~0.17w..0.53w, not 0.05w..0.41w -- which is exactly what round 0 measured independently (y=7..22 at cardW=41 => 0.17w..0.53w). A 0.42w floor hides the bottom ~30% of the rank cap. To actually show the whole digit the constant must be ~0.53 (0.05 + 0.955*0.50); note that raising it also lowers the column count at which the card-size shrink kicks in, which interacts with the new finding below.",
+    "note": "iOS HALF VERIFIED FIXED BY MUTATION, not eyeballed. I rsync'd the tree to a scratch copy and re-ran all five prior mutations against tests/ios-parity.test.mjs: (a) G let idx = n(1)->n(2), (b) G up/down swapped, (c) T append contentsOf to tableau[src], (d) T fields reordered n(3)/n(2)/n(1), (e) X tableau[0].append(c) \u2014 each now 10 pass / 1 fail (baseline 11/11, full npm test 68/68, and I diffed the mutated file each time to confirm the edit landed). NAMED RESIDUAL, in scope of the original claim ('T/X are unpinned on both sides'): the web pin list at tests/ios-parity.test.mjs:119-125 still covers only F/G/C, so index.html:1250 (case 'T') and index.html:1254 (case 'X') are unpinned. A web-side drift \u2014 e.g. t[d].push(...run) becoming t[s].push(...run), or 'X' pushing to column 0 \u2014 makes index.html replay a baked line differently from iOS and tools/solver with CI fully green. Two more strings in the same array closes it.",
     "first_seen_round": 0,
     "status_history": [
       {
@@ -21,67 +21,21 @@
     ]
   },
   {
-    "id": "correctness/index.html:demo-stop-leaves-solved-board-playable",
-    "claim": "The web prototype's demo bar wires BOTH 'Stop' and the post-line 'Done' to stopDemo() (index.html:1563), which only clears the demoing flag and hides the bar -- it never re-deals. So the exact exploit the iOS side just spent two rounds closing is wide open on the web, and it needs no corrupt data: click 'Show me how to win', let the baked line auto-play 90% of the deal, click Stop, and the 95%-solved board is immediately playable again (startDrag's only gate is `isWon() || demoing`, index.html:512). The next manual move sets startTime=Date.now() from scratch (index.html:679, 722) and, on completion, onWin -> recordWin writes wins[seed] with secs measured from that moment -- a fabricated best time plus a solved-deal checkmark on a deal the player never solved. Auto-finish makes it one click (canOfferFinish only needs startTime, index.html:914). The iOS code comment at ContentView.swift:479-482 states this is forbidden behaviour; the web copy does it.",
+    "id": "layout/ContentView.swift:height-latch-survives-dealless-movecount",
+    "claim": "The new latchedBoardH reset is keyed on a moveCount TRANSITION to 0, but latchedBoardH (unlike shrinkLatchCount) is written independently of moveCount \u2014 so any deal-to-deal hop with no move in between never resets it and the fresh deal inherits the previous deal's chrome-shrunk height for its entire life. Concrete repro, no rotation needed: tap 'Show me how to win' (showSolution -> deal() sets moveCount 0, demo bar appears, liveH drops ~43pt, latch = short), then tap Stop BEFORE pressing Start (the demo opens paused/not-started, so moveCount never leaves 0) -> restartDeal() -> deal() assigns moveCount = 0 over 0, .onChange(of: game.moveCount) does not fire (SwiftUI compares values; @Published firing is irrelevant), the demo bar disappears and liveH grows back, but latchedBoardH is still the short value. Same via Daily -> Play a challenge (DailyHUD up, latch short) -> make no moves -> New game (challengeDay nil, HUD gone, moveCount 0->0). The whole board is then sized for chrome that is not on screen: on 375x667 with a 13-card column that is fit=(364-32)/11.36=29 -> the 30pt clamp instead of 34pt cards, plus a permanent ~43-62pt dead strip under the tableau, for the rest of the deal. The comment at ContentView.swift:51-52 asserts the opposite ('Reset alongside shrinkLatchCount at moveCount == 0, so a HUD/demo bar appearing with a NEW deal re-latches at the correct (shorter) height'). Fix: reset latchedBoardH on a deal identity, not on a moveCount edge \u2014 e.g. bump a dealID in Game.deal() and .onChange(of: game.dealID), or additionally reset on .onChange(of: game.challengeDay) / demo-bar visibility.",
     "evidence": [
-      "index.html:1563",
-      "index.html:1291-1296",
-      "index.html:512",
-      "index.html:679",
-      "index.html:722",
-      "index.html:1108-1121",
-      "index.html:914",
-      "ios/Causeway/Causeway/Views/ContentView.swift:479-483"
+      "ios/Causeway/Causeway/Views/ContentView.swift:181",
+      "ios/Causeway/Causeway/Views/ContentView.swift:156-159",
+      "ios/Causeway/Causeway/Views/ContentView.swift:51-52",
+      "ios/Causeway/Causeway/Model/Game.swift:174",
+      "ios/Causeway/Causeway/Model/Game.swift:825-828",
+      "ios/Causeway/Causeway/Views/ContentView.swift:104-108"
     ],
     "severity": "major",
-    "region": "index.html:1280-1300, 1563",
-    "introduced_by_fix": false,
-    "current_status": "open",
-    "note": "CONFIRMED by reading the code, not run. Pre-existing and web-side, so a scoped deferral to BACKLOG (like DV-1) is a defensible answer -- but the loop should record it, because the just-landed iOS fix makes the two copies diverge on an integrity rule that tests/ios-parity.test.mjs exists to keep in sync. Fix shape: point demoStop.onclick at restartDeal (matching ios ContentView.swift:483).",
-    "first_seen_round": 1,
-    "status_history": [
-      {
-        "round": 1,
-        "status": "open"
-      }
-    ]
-  },
-  {
-    "id": "correctness/index.html:apply-demo-token-unguarded",
-    "claim": "The web applyDemoToken (index.html:1236-1247) still has every defect just removed from the Swift copy: `case 'C'` does cells[cells.indexOf(null)]=card, so with no free cell it writes cells[-1] and the popped card vanishes from the deck; `case 'F'/'C'` pop() an empty column, yielding undefined and throwing on card.suit. That throw happens inside the setTimeout demoTick, so it escapes silently, the timer chain dies with demoing stuck true, and startDrag early-returns forever -- input is permanently locked until reload. index.html:473 already documents this exact lockup as a known hazard. Web finishDemo (index.html:1280) also has no boardComplete guard, the counterpart of the guard just added at Game.swift:865.",
-    "evidence": [
-      "index.html:1236-1247",
-      "index.html:1280-1284",
-      "index.html:473-475",
-      "index.html:1287-1291"
-    ],
-    "severity": "minor",
-    "region": "index.html:1236-1300",
-    "introduced_by_fix": false,
-    "current_status": "open",
-    "note": "Same reachability caveat as the original iOS finding (needs malformed baked data, and all 922 shipped lines are clean), so this is a parity/defence-in-depth item, not a live bug. Only worth doing together with the index.html:demo-stop finding above.",
-    "first_seen_round": 1,
-    "status_history": [
-      {
-        "round": 1,
-        "status": "open"
-      }
-    ]
-  },
-  {
-    "id": "layout/ContentView.swift:tableau-shrink-detaches-from-upper-row",
-    "claim": "The new card-size shrink applies to the tableau only, and the tableau HStack is content-sized inside a full-width GeometryReader in a VStack(alignment: .leading), so once it triggers the whole tableau becomes narrower and hugs the LEFT edge while the foundations/free cells above stay at the original width: on a 375pt phone with a 15-card column, w drops 41->33 and the tableau is 8*33+7*4=292pt against the upper row's 356pt, leaving a 64pt dead margin down the right side of the board. Worse, w is recomputed every body pass from game.tableau.map(\\.count).max(), so every move that changes the tallest column's height re-scales ALL 52 tableau cards (~2.6pt per card at the threshold) inside the caller's withAnimation -- the whole board pulses and re-flows horizontally on single-card moves, which is precisely the 'no whole-board resize as one column grows' property the replaced comment at ContentView.swift:429-434 used to guarantee.",
-    "evidence": [
-      "ios/Causeway/Causeway/Views/ContentView.swift:410-422",
-      "ios/Causeway/Causeway/Views/ContentView.swift:80",
-      "ios/Causeway/Causeway/Views/ContentView.swift:104-106",
-      "ios/Causeway/Causeway/Views/ContentView.swift:273-293"
-    ],
-    "severity": "minor",
-    "region": "ios/Causeway/Causeway/Views/ContentView.swift:404-426",
+    "region": "ios/Causeway/Causeway/Views/ContentView.swift:130-160, 179-182",
     "introduced_by_fix": true,
     "current_status": "open",
-    "note": "CONFIRMED by reading the layout, not run. Kept at minor because of reachability: I computed the trigger threshold as cardW*(1.6727 + 0.42*(n-1)) > maxH, which needs roughly a 14-20 card column (375x667 with the HUD bar up: maxH ~316 => n>=16; 393x852 with HUD: maxH ~418 => n>=20; 320x568: n>=14). Note the threshold DROPS if the 0.42 constant is corrected upward per the legibility finding, so fix the two together. Two cheap mitigations: centre the tableau (.frame(maxWidth: .infinity) on the HStack) so it stays aligned with the upper row, and quantise w (e.g. step in 4pt buckets or derive it from a monotonically-latched max column count) so a single move cannot re-scale the board. SUSPECTED extra: on a transient maxH == 0 layout pass the guard falls through to max(30, floor(0)) = 30, so all tableau cards would briefly render at the 30pt minimum -- previously such a pass only collapsed the fan, not the card size.",
+    "note": "CONFIRMED at code level (I traced deal()/restartDeal()/showSolution and the two onChange sites); the VISUAL magnitude is device- and column-dependent \u2014 on a 390x844 phone with tallest <= 12 the width bound still dominates and nothing shows. shrinkLatchCount does not have this hole because it is only ever WRITTEN when count != 0; latchedBoardH is written by the liveH observer at any moveCount, which is the asymmetry.",
     "first_seen_round": 1,
     "status_history": [
       {
@@ -91,18 +45,19 @@
     ]
   },
   {
-    "id": "test/ios-parity.test.mjs:f-token-field-pin-loosened",
-    "claim": "The drift-guard re-pin quietly dropped coverage: the old F pin was 'let c = tableau[n(1)].removeLast()', which asserted that F reads its column from field 1. The new pin is 'let c = tableau[col].removeLast()' and nothing pins 'let col = n(1)', so an edit changing F (or C) to read n(2) as the column would keep all five pins green while making the iOS demo replay a baked line differently from index.html and tools/solver -- the precise divergence this file exists to catch.",
+    "id": "layout/ContentView.swift:height-latch-not-scoped-to-container-size",
+    "claim": "latchedBoardH is scoped per-deal but is a function of the container size, and nothing invalidates it when the container size changes. CONFIRMED: it survives a portrait->landscape->portrait round trip untouched (only .onChange(of: game.moveCount) clears it). SUSPECTED failure: the portrait branch is selected by `geo.size.width > geo.size.height` (ContentView.swift:73), so if SwiftUI delivers interpolated root sizes during the rotation animation, every intermediate frame from 390x844 down to ~617x617 still renders the portrait branch and feeds liveH values as low as ~373 into the min-latch. Rotating out and back mid-deal would then leave the board pinned at the near-square height for the rest of the deal \u2014 with tallest=14 that is fit=(373-32)/11.09=30 (the clamp) instead of 41pt cards, a ~27% permanent shrink triggered by a gesture that should be a no-op. Cheap unconditional guard that also removes the doubt: `.onChange(of: geo.size) { latchedBoardH = 0 }` on the outer GeometryReader (or store the latch alongside the geo.size it was measured at). Verify by logging liveH in the onChange at ContentView.swift:156 and rotating in the simulator: if only the final size is ever delivered, close this as wontfix.",
     "evidence": [
-      "tests/ios-parity.test.mjs:82-88",
-      "ios/Causeway/Causeway/Model/Game.swift:908",
-      "ios/Causeway/Causeway/Model/Game.swift:924"
+      "ios/Causeway/Causeway/Views/ContentView.swift:156-159",
+      "ios/Causeway/Causeway/Views/ContentView.swift:73",
+      "ios/Causeway/Causeway/Views/ContentView.swift:181",
+      "ios/Causeway/Causeway/Views/ContentView.swift:477-482"
     ],
     "severity": "minor",
-    "region": "tests/ios-parity.test.mjs:78-88",
+    "region": "ios/Causeway/Causeway/Views/ContentView.swift:130-160",
     "introduced_by_fix": true,
     "current_status": "open",
-    "note": "The rest of the re-pin is legitimate -- the T pin is unchanged and the two-line C pin is as strong as the one it replaced. One-line fix: add 'let col = n(1)' to the snippet list. Verified npm test is 67/67 green as claimed.",
+    "note": "SUSPECTED, not confirmed \u2014 I did not run a rotation. The comment at ContentView.swift:52-55 mentions iPad resize as the accepted trade, but TARGETED_DEVICE_FAMILY = 1 (project.pbxproj:203,231) so there is no iPad/Stage Manager/Split View path; rotation intermediates are the only remaining container-size channel on this target. The same one-line guard fixes the sibling finding height-latch-survives-dealless-movecount, so it is likely one edit for both.",
     "first_seen_round": 1,
     "status_history": [
       {

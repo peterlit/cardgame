@@ -1,96 +1,83 @@
-# Review-loop final report — qa-loop round-2 major fixes (demo-exit integrity + tableau fan compression)
+# Review-loop final report — RL-1..4 residual fixes (uniform whole-board portrait card sizing)
 
-**Result: CONVERGED** (round 2): 0 open blockers, 0 open majors, none newly introduced this
-round. 4 open minors remain (2 partial, 2 new) — mop-up candidates, none ship-blocking.
+**Result: CONVERGED** (round 2): **0 open findings of any severity** — every finding fixed or
+justified-wontfix. 14 tracked total across seed + 2 rounds.
 
-Scope: commit `66d1682` (mid-demo Stop re-deals so a demo-touched board can never be played or
-scored; per-column tableau fan compression against measured board height), then the loop's own
-fix commits `0894907` (round 1) and `101beb5` (round 2).
+Scope: commit `e77f664` (RL-1..4 — whole-board uniform card shrink per the user's decision,
+conditional tableau centring, hardened F/C token pins, iOS demo-exit guard pins), then the
+loop's fix commits `40e9f36` (round 1) and `787fec9` (round 2).
 
 ## Why it stopped
 
-Round 2 closed the round-1 major (the same demo-Stop exploit was live in the web prototype)
-and introduced no new blockers/majors. The convergence condition — no open or newly-introduced
-blockers/majors — fired.
+Round 2 closed all three remaining findings and introduced none. Reviewer's closing line:
+"Nothing for the implementer to act on next round."
 
 ## Trend
 
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Net | Decision |
 |-------|----------|--------|--------|--------|-----|----------|-----|----------|
-| 1 | 0 | 1 | 4 | 2 | 4 | 0 | -2 | continue |
-| 2 | 0 | 0 | 4 | 3 | 2 | 0 | +1 | converged |
+| 1 | 0 | 1 | 2 | 1 | 2 | 0 | -1 | continue |
+| 2 | 0 | 0 | 0 | 3 | 0 | 0 | +3 | converged |
 
-(Seed = round 0: 1 major + 3 minors against `66d1682`. The round-1 "new major" was the web
-parity gap, not a reopen; nothing reopened in either round.)
+(Seed = round 0 against `e77f664`: verified RL-1/2/3 fixed, RL-4 partial, plus 2 new minors.)
 
-## Closed along the way
+## What the loop caught and fixed
 
-- **Seed major** — iOS `finishDemo()` unlocked input without verifying the board was actually
-  complete, and `applyDemoToken` applied tokens blind (a bad `C` token destroyed a card; a
-  desync could trap on `removeLast()`). The "demo boards are never playable" guarantee rested
-  on the bundled solutions JSON being perfect. Now: `finishDemo()` only unlocks on
-  `boardComplete`, otherwise it re-deals; every token is validated and a failed token aborts
-  the demo to a re-deal. (Reviewer independently simulated all 922 baked lines — none actually
-  misbehave today; the fix makes the invariant code-enforced instead of data-dependent.)
-- **Round-1 major** — the exact original exploit (Stop mid-demo, finish by hand, bank a win +
-  best time) was still live in the **web prototype**. Web now mirrors iOS: Stop/Done re-deal,
-  `finishDemo` guards completion, token applier validated, and a cross-copy parity test pins
-  the wiring on both platforms.
-- Minors: demo banner copy ("tap Done"), legibility floor constant corrected 0.42 → 0.53
-  (SF-ascent derivation, verified against CardView), portrait shrunk-tableau centering,
-  transient zero-height layout pass no longer collapses card size.
-- Wontfix (recorded): `showSolution`/`playChallenge` silently discard an in-progress casual
-  game — pre-existing, out of scope; filed as backlog item **DV-1** with a concrete fix shape.
+- **Height-latch pulse (seed minor → fixed round 1).** The one-shot-fit height input
+  (`bg.size.height`) is card-size-independent but not *constant*: the conditional Finish pill
+  can add/drop a toolbar FlowLayout row mid-deal and the demo bar's wrapping headline changes
+  per step — with the column latch holding a shrink alive, that wobble would rescale the whole
+  board up and down. Fixed with `latchedBoardH`: the per-deal minimum board height, monotone
+  like the column latch.
+- **Latch invalidation bug (round-1 MAJOR → fixed round 2).** Both latches reset only in
+  `.onChange(of: moveCount)`, which fires on *transitions* — a deal→deal hop where moveCount
+  never leaves 0 (demo Stop before Start; Daily → Play → immediate New game) left a fresh deal
+  permanently sized for chrome no longer on screen. Fixed at the model level: `dealGeneration`
+  counter bumped in `Game.deal()` (the single chokepoint every deal path routes through);
+  ContentView resets both latches on its change. Reviewer verified the chokepoint claim by
+  grepping every `tableau =`/`moveCount = 0` write site.
+- **Rotation/keyboard latch poisoning (round-1 minor → fixed round 2).**
+  `.onChange(of: geo.size)` on the root reader resets the height latch on any container-size
+  change (rotation intermediates, the deal-alert keyboard shrinking the safe area). Reviewer
+  proved chrome wobble cannot move root `geo.size`, so this can't reintroduce the pulse.
+- **G/T/X token pins (seed minor → fixed rounds 1–2).** The RL-1 fix anchored F/C but left
+  G/T/X mutable: five single-token mutations kept the suite green. Now all five iOS case
+  bodies and all five web case bodies are pinned contiguously; both sides mutation-verified
+  (9 distinct mutations, each fails exactly the right test).
 
-## Open findings (all minor)
+## Wontfix (justified, recorded)
 
-- **partial** `test/ios-parity.test.mjs:f-token-field-pin-loosened` — the re-added pin
-  `let col = n(1)` is an unanchored substring that also matches case `C`, so mutating only
-  case `F` to `n(2)` stays green. Pin the contiguous case body instead (reviewer supplied the
-  exact normalized snippet).
-- **open** `test/ios-parity.test.mjs:ios-demo-exit-guards-unpinned` — the new cross-copy test
-  pins the three web guards but not the iOS `finishDemo` `boardComplete` guard (the word
-  appears only in a comment); drift protection is currently one-directional.
-- **open** `layout/ContentView.swift:tableau-centering-misaligns-unshrunk` — the unconditional
-  `.frame(maxWidth: .infinity)` centres the *non*-shrunk tableau too, offsetting it ~3–3.5pt
-  from the full-width upper row on 375/390pt devices. Fix: center only when shrunk.
-- **partial** `layout/ContentView.swift:tableau-shrink-detaches-from-upper-row` — the shrink
-  latch is sound (monotone, written only in the `moveCount` onChange, reset exactly at fresh
-  deal), but each *new* tallest-column maximum still rescales all 52 cards, the 0.53 floor
-  lowered the first trigger to ~13 cards on a 4.7" phone, and the shrunk state renders two
-  card sizes at once (upper row vs tableau). Reviewer explicitly offered to flip this to
-  wontfix if the trade is argued as deliberate — it is a design call for the human.
+- `layout/ContentView.swift:tableau-shrink-detaches-from-upper-row` — the residual
+  "whole board re-flows on a new tallest-column maximum" is the **user's explicit choice**
+  (uniform card size across foundations/free cells/tableau); bounded to one re-flow per new
+  maximum per deal by the monotone latches.
+- `dataloss/DailyView.swift:show-solution-discards-in-progress-game` — pre-existing, out of
+  scope; tracked as backlog DV-1.
 
 ## Disputed items
 
-None — no finding ended in `disputed`; the one declined finding (DV-1) was accepted by the
-reviewer as a justified wontfix with a backlog entry.
+None.
 
 ## HUMAN SKIM LIST — read these diffs
 
-1. **`0894907` — Game.swift `finishDemo`/`applyDemoToken` rewrite.** The demo-integrity
-   invariant now lives here: unlock-only-on-`boardComplete` plus a validating token applier
-   that aborts to `restartDeal()`. Look here because both agents agreed this is *the* guard —
-   if its logic is subtly wrong (e.g. a path that re-deals when it shouldn't, eating a
-   legitimate demo), nothing else catches it.
-2. **`101beb5` — index.html demo Stop/Done + `applyDemoToken` guards.** A hand-mirrored port
-   of the Swift logic into the web prototype's inline script. Same-family agents porting their
-   own fix is exactly where a shared blind spot would land; the parity test pins text, not
-   behavior.
-3. **`101beb5`/`0894907` — ContentView.swift `tableauArea` shrink path + `shrinkLatchCount`.**
-   New @State driving whole-board card size from a `moveCount` onChange. Look here because
-   layout/@State feedback loops and the two-card-sizes-on-screen trade are visual judgments a
-   reviewer can only partially verify by reading (`swiftc -parse` passed; no simulator
-   screenshot was taken this loop).
-4. **`66d1682` — the original per-column fan compression + portrait GeometryReader swap.** It
-   replaced the portrait Spacer with a greedy GeometryReader; drop zones, zIndex and
-   matchedGeometryEffect were reasoned about, not exercised on screen.
-5. **`101beb5` — tests/ios-parity.test.mjs re-pins.** Twice now a re-pin shipped weaker than
-   claimed (the F-token substring; the unpinned iOS guard). Skim the pinned snippets and ask
-   "would this fail if the code regressed?"
+1. **`787fec9` — Game.swift `dealGeneration` + ContentView latch resets.** A new @Published
+   on the model exists purely for view-layer cache invalidation. Look here because it's the
+   invariant everything else leans on: if any future deal-like path bypasses `deal()`, stale
+   latches return silently.
+2. **`e77f664` — `portraitFitCardW` + the outer/inner GeometryReader restructure.** The
+   whole-board fit formula (3·aspect + 0.53·(n−1) units, 32pt chrome constant) was hand-checked
+   by both agents but never screenshot-verified; the 32pt constant is derived, not measured.
+3. **`40e9f36`/`787fec9` — the two-latch mechanism (`shrinkLatchCount`, `latchedBoardH`).**
+   Three @State caches + three reset triggers (deal generation, moveCount 0, geo.size) now
+   govern portrait card size. It's correct per review, but it's the most stateful this view has
+   ever been — worth a skim for whether chrome stabilisation (reserving the Finish pill slot)
+   would let most of it be deleted later.
+4. **`787fec9` — tests/ios-parity.test.mjs web T/X pins.** Pins are normalized-substring
+   matches against minified-ish inline JS; they were mutation-verified today, but any web
+   refactor will trip them — that's by design, just know the failure mode.
 
-**Verification run:** iOS `xcodebuild` BUILD SUCCEEDED each round; `npm test` 68/68 (one test
-added); all 922 baked solution lines replayed clean through both the iOS-semantics and the new
-guarded web applier; web Undo second-door checked closed (demo never snapshots history).
-**Not run:** any simulator/on-screen check of the new portrait layout — the next qa-loop round
-should re-verify TC-2.3 (tall column) and the demo WF-6 cases on screen.
+**Verification run:** `xcodebuild` BUILD SUCCEEDED every round (reviewer round 2 built from
+clean derived data independently); `npm test` 68/68 every round; 9 pin mutations exercised.
+**Not run:** simulator/on-screen check of shrink behavior — the next qa-loop round should
+re-run TC-2.3 (tall column, now expecting a uniform whole-board shrink at ~15 cards on 4.7")
+and the WF-6 demo cases.
