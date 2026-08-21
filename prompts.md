@@ -451,3 +451,22 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     pass; app builds Debug+Release; 68 Node tests green. Updated the docs that claimed no test target
     existed (ios/README, tests/README, both architecture docs, .qa-loop REPORT + WORKFLOWS) and
     marked UITEST-target resolved / half of M8 closed.
+69. "Come up with more ideas for daily challenges — add variety. Don't make changes yet; write a
+    proposal." Wrote `docs/daily-objectives-proposal.md`. Grounded every claim in measurements over
+    the 366 baked winning lines rather than guesses. Key findings: (a) the catalogue is lopsided —
+    five of the six Golds are foundation-ORDERING variants (76% of Gold days) and the tableau is
+    completely unmeasured; (b) **a new objective must be certified/supports-gated, never universal**
+    — empirically, appending an id to `GOLD` or `SILVER_CERTIFIED` changes 0/366 days, but appending
+    to `SILVER_UNIVERSAL` rewrites **123/366**, because universal ids are concat'd wholesale while
+    certified ones are `.filter(supports)`-gated; (c) consequently new objectives can only debut on
+    newly-appended seeds — and the calendar runs out 2027-08-12 anyway, so the required pool
+    extension is the natural zero-migration moment. Proposed 9 objectives in 4 families, each with
+    measured feasibility: the split point (0/366 split all-suits 7/8; 4/366 build a suit from one
+    end), tempo (26th card lands at median move 59; 15/366 get all Aces up by move 20), peak cell
+    occupancy (3 in ALL 366 lines — orthogonal to cumulative use), and move shape (52/366 never
+    supermove; 15/366 move a run of 5+). Rejected 4 ideas WITH data — `strong-finish` is vacuous
+    (last 13 cards take exactly 13 moves, median and min), the `empty-column` rescue is still nearly
+    free (349/366 qualify even at ≥35 cards remaining), `rainbow` is 0/366 and likely infeasible.
+    Also proposed retiring `suit-sprint` for future seeds (supported by 4/366, picked 3 days/year),
+    a reusable feasibility-probe tool, and an optional "freeze history in a lookup table" refactor
+    that would decouple the frozen arrays from recorded history. No code changed; 68 tests green.

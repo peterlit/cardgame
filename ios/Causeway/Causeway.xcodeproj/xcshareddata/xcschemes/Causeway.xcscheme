@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-               BuildableName = "Causeway"
+               BuildableName = "Causeway.app"
                BlueprintName = "Causeway"
                ReferencedContainer = "container:Causeway.xcodeproj">
             </BuildableReference>
@@ -63,7 +63,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-            BuildableName = "Causeway"
+            BuildableName = "Causeway.app"
             BlueprintName = "Causeway"
             ReferencedContainer = "container:Causeway.xcodeproj">
          </BuildableReference>
@@ -79,7 +79,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-            BuildableName = "Causeway"
+            BuildableName = "Causeway.app"
             BlueprintName = "Causeway"
             ReferencedContainer = "container:Causeway.xcodeproj">
          </BuildableReference>
