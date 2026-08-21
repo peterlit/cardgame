@@ -488,3 +488,26 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     ~63 bytes). Proposal now has 6 families / ~16 objectives, 6 [DECIDE] points, and a rollout that
     front-loads the one-line solver gates (B3/B4) because they answer the most interesting
     feasibility question for the least work. 68 tests green.
+71. "Validate the ideas assuming auto-play and auto-finish are OFF — incompatibility with automation
+    shouldn't force us to discard ideas." This exposed a real flaw in my measurements: every
+    "natural rate" I'd quoted came from the baked solver lines, and `solve.mjs` runs an `autoSafe`
+    macro that force-sends provably-safe cards home — i.e. **auto-play was baked into every number**,
+    and those numbers measured *incidental* occurrence on move-optimal unconstrained play, not
+    achievability. Re-measured properly and **reversed two conclusions in each direction**:
+    (a) RESCUED — `no-down-foundation` wins on 6/8 sampled seeds and `no-up-foundation` on ≥4/8
+    (the rest budget-limited, not infeasible: seed 10004 flipped unknown→WIN par 118 when the budget
+    went 400k→1.2M). Their 0/366 incidental rate was pure artifact; these are now among the
+    strongest ideas. (b) DOWNGRADED — the free-cell configs are reachable in 3 moves (E1, 6/6 seeds)
+    and 4–6 moves (E2, 5/6) when *targeted*, so E1 is recommended dropped and E2's difficulty lives
+    entirely in the unmeasured "win from there". Also established that auto-play needn't constrain
+    the design at all: `autoSafe` is gated by `constraint.allowFoundation` so certification stays
+    sound, and auto-play is nearly inert in the opening (`isSafeAutoplay` needs foundations built),
+    which is why the cell probes hit identical depth with it on and off. Corrected the ~10% support
+    bar to apply to CERTIFIED support only (applying it to incidental rates would have killed
+    B3/B4), withdrew the `rainbow` rejection as based on invalid evidence, and added a solver-cost
+    table: the constraint API is memoryless, so state-derivable gates (A1/A2/B1–B4/C2/F1) are cheap,
+    while C1 and `rainbow` need history in the node key and D/E/F2 need reach-and-win. Cost signal
+    recorded: B4 runs ~24–30s/seed at 1.2M and a 3M budget exhausted an 8GB heap. **Found a UX
+    parity gap**: the design doc made showing automation state a UI obligation "so it isn't a hidden
+    trap"; web's daily card shows `Your call: [Auto-play][Auto-finish]` but iOS `DailyView` has no
+    equivalent — so on the shipping platform the player gets no hint. Still proposal-only; 68 green.
