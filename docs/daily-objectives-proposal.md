@@ -3,8 +3,31 @@
 **Status: proposal only. No code changed.** Decisions needed from you are marked **[DECIDE]**.
 
 Companion to [`daily-challenges.md`](daily-challenges.md) (the original design) and
-[`solver.md`](solver.md) (certification). Every feasibility number below was measured against the
-366 baked winning lines in `data/daily-solutions.json`, not estimated.
+[`solver.md`](solver.md) (certification). Every feasibility number below was measured, not estimated.
+
+## 0. Index of proposed objectives
+
+| ID | Name | One line | Grade | Cost |
+|---|---|---|---|---|
+| **A1** | `split-even` | Split every suit exactly down the middle — A–7 up, 8–K down | Gold | T0 |
+| **A2** | `down-heavy` | Take at least 8 of every suit from the King end | Silver | T0 |
+| **B1** | `suit-all-up` | Build one whole suit from Ace to King | Gold | T0 |
+| **B2** | `suit-all-down` | Build one whole suit from King down to Ace | Gold | T0 |
+| **B3** | `no-down-foundation` | **Win without ever using a down foundation** (every suit A→K) | Gold | T0 |
+| **B4** | `no-up-foundation` | **Win without ever using an up foundation** (every suit K→A) | Gold | T0 |
+| **C1** | `suit-run-N` | Send N cards of one suit home back-to-back | tunable | T0 |
+| **C2** | `suit-opener-N` | Send N cards of one suit home before any other card | tunable | T0 |
+| **D1** | `aces-up-by-N` | All four Aces home within your first N moves | Silver | T0 |
+| **D2** | `half-home-by-N` | Half the deck home by move N | Silver | T0 |
+| **D3** | `down-openers-N` | Parameterise the existing fixed-20 objective | Silver | T0 |
+| **E1** | `cells-straight` | Three consecutive ranks in the free cells at once | — | T1 |
+| **E2** | `cells-three-of-a-kind` | Three of a kind in the free cells at once | Gold | T1 |
+| **F1** | `no-supermoves` | Move one card at a time | Silver | T0 |
+| **F2** | `one-big-move` | Relocate a run of 5+ cards in a single move | Gold | T1 |
+
+**B3 and B4 are the headline pair** — the two the corrected methodology rescued (§4), and the two
+that most exploit the two-ended foundation. **E1 is recommended for dropping** (§5).
+T0 = no new telemetry; T1 = one new field in `Telemetry`.
 
 ---
 
@@ -82,8 +105,12 @@ There is a second, subtler consequence:
 The calendar currently covers **2026-08-12 → 2027-08-12** (366 seeds). Day 366 is
 **2027-08-13**, and `dailyChallenge` returns `null` past the pool, so the app shows "No challenge
 available yet". **The pool has to be extended before Aug 2027 regardless** — and that extension is
-the natural, zero-migration moment to introduce new objectives. **[DECIDE]** whether that timing is
-acceptable, or whether you want the optional unlock in §7.
+the natural, zero-migration moment to introduce new objectives on the forward calendar.
+
+> **Resolved by §8.** Rule 2 constrains *forward* days only. Backfilling **below** the epoch —
+> negative day indices — introduces new objectives immediately with the same zero-migration
+> guarantee, because days ≥ 0 are untouched. That is the plan: playtest in the past, then graduate
+> to the future.
 
 ---
 
@@ -156,11 +183,17 @@ automation is the player's responsibility (`daily-challenges.md` §5), the live 
 objective failed the moment it is broken, and the player restarts with the toggles off. That is a
 teaching moment, not a reason to drop the objective.
 
-> **UX gap found while checking this.** The original design made showing the automation state a
-> **UI obligation** "so it isn't a hidden trap". The web daily card does it —
-> `Your call: [Auto-play: On] [Auto-finish: Ask]` (`index.html:1437`) — but **iOS `DailyView` has no
-> equivalent**. On the shipping platform the player gets no hint that a toggle is about to cost them
-> the objective. Worth fixing before any auto-play-hostile objective ships. **[DECIDE]**
+> **DECIDED (2026-08-21): no per-deal automation hint.** The original design treated telling the
+> player about automation as a UI obligation "so it isn't a hidden trap". That is now overruled by
+> the owner: working out that a given objective needs Auto-play/Auto-finish off **is part of the
+> challenge**. The live HUD already marks the objective failed the instant it breaks, which is
+> feedback enough to learn from — and a restart costs nothing.
+>
+> Consequence: **no work is needed here**, and auto-play hostility is no longer a mark against any
+> objective. (Factual note, not a task: the web daily card shows a neutral
+> `Your call: [Auto-play: On] [Auto-finish: Ask]` state readout at `index.html:1437`; iOS has no
+> equivalent. Since it reports current settings rather than per-deal impact, it is compatible with
+> this decision either way — align or remove it whenever the platforms are next reconciled.)
 
 ### Solver mechanics — what each family costs
 
@@ -366,42 +399,140 @@ properly, re-certify old seeds to enrich them, and tune `moves` params — all w
 single recorded day. It converts "frozen by construction" (fragile, and one careless append from
 disaster) into "frozen by record" (explicit and safe).
 
-**[DECIDE]** whether this is worth doing before or alongside the new objectives. My recommendation:
-**yes, and do it first** — it is a small, testable change, and it removes the single sharpest
-footgun in the codebase.
+**[DECIDE]** whether this is worth doing. My earlier recommendation was "yes, and first" — the
+backfill plan (§8) **downgrades that to optional**, because the sandbox already provides a safe
+place to iterate without touching frozen history. It remains the right long-term fix if you ever
+want to reorder or retire entries in the frozen arrays (e.g. removing `suit-sprint` outright rather
+than just ceasing to certify it), or if Causeway gains a second player (§8.6). Not a blocker for
+anything proposed here.
 
 ---
 
-## 8. Suggested rollout
+## 8. Implementation plan — backfill a playtest window first
 
-Ordered so the cheap, high-information steps come first and no app code is written on a hunch.
+**Owner's plan (2026-08-21):** backfill **2026-08-05 → 2026-08-11** with a representative variety of
+the new challenges, play them for a few days, adjust and re-backfill as needed, and only once
+satisfied extend the *forward* calendar. Single-user context, so churn in the sandbox is acceptable.
 
-1. **Build a feasibility probe** (`tools/solver/probe-objective.mjs`). Replays the 366 baked lines
-   and reports how often a candidate checker passes — every number in this document came from an
-   ad-hoc version of it. It killed four ideas (`strong-finish`, `empty-column`, unqualified
-   cell-filling, `suit-run` at N ≤ 4) in minutes. *Cheapest, highest-leverage step.*
-2. **Decide the shortlist** from §5, plus the `suit-sprint`/C2 question in §6 and the §7 refactor.
-3. **Ship the T0 families first (A–D, §5).** Checkers go in `tests/daily.mjs` (canonical) → mirrored
-   into `index.html` and `Model/Daily.swift` → drift guards extended. No schema change, no app
-   state change; these are the low-risk wins and they already cover the two biggest gaps (the split
-   point and the tableau-adjacent suit runs).
-4. **Solver work, cheapest first.** B3/B4 (`no-down-foundation` / `no-up-foundation`) are one-line
-   gates and answer the most interesting feasibility question, so do them first. Then A1/A2, B1/B2,
-   C1/C2 (all gates), then D (prefix goals, reusing the `down-openers` shape). **Certify a 40-seed
-   sample and drop anything under ~10 %.**
-5. **Extend the pool** with `build-pool.mjs --start 10377` against the enlarged objective set, then
-   rebuild solutions. This refills the calendar past Aug 2027 *and* debuts the new objectives — the
-   one moment where both can happen without a history migration.
-6. **T1 families (E, F) last, as their own change.** They add `cellTriples` (~63 bytes, median 7
-   entries) and `maxRunMoved` to `Telemetry`, which is persisted inside the saved game on both
-   platforms — so it deserves an independent review pass and a resume round-trip test.
+This is a good shape, and better than it may look — the mechanics work strongly in its favour.
+
+### 8.1 Those dates are NEGATIVE day indices
+
+The epoch is 2026-08-12 = day 0, so the window is **days −7 … −1**:
+
+| Date | 08-05 | 08-06 | 08-07 | 08-08 | 08-09 | 08-10 | 08-11 |
+|---|---|---|---|---|---|---|---|
+| day index | −7 | −6 | −5 | −4 | −3 | −2 | −1 |
+
+**This is the key advantage.** Everything in §2 that makes changes dangerous — the frozen arrays, the
+append-only pool, the RNG indexed by day — applies to days **≥ 0**. Backfilling *below* the epoch
+touches none of it:
+
+- `pool.seeds[i]` indices are unchanged, so every existing day keeps its seed.
+- The epoch is unchanged, so every date keeps its day index.
+- The per-day RNG is `f(dayIndex)`, so no existing day's objectives move.
+
+**Zero history rewrite.** (Contrast: moving the epoch back 7 days would preserve date→seed but shift
+every stored `DailyStore` key and re-roll every existing day's objectives. Don't do that.)
+
+It also gives a clean rule to state and keep:
+
+> **Days ≥ 0 are frozen. Days < 0 are the playtest sandbox and may be rewritten at will.**
+
+Streaks need no special handling — `streaks()` walks integer keys and the backwards run-scan simply
+continues into negatives, so a backfilled week extends a streak correctly and for free.
+
+### 8.2 What has to change (small, and all in one direction)
+
+Eight guards currently assume non-negative days. Each needs to admit a bounded negative range:
+
+| File | Site |
+|---|---|
+| `tests/daily.mjs` | `:73` `dayIndex < 0 \|\| dayIndex >= pool.seeds.length` |
+| `index.html` | `:1186` same guard · `:1237` `playChallenge` · `:1393` `openDaily` clamp · `:1449` calendar `avail` |
+| `Model/Daily.swift` | `:203` `guard dayIndex >= 0` |
+| `Model/Game.swift` | `:777` `guard day >= 0` |
+| `Views/DailyView.swift` | `:328` calendar `avail` · `:80` `clampedToday` |
+
+Storage shape: a separate **`preSeeds`** array in the pool file, indexed by `−dayIndex − 1`, keeps
+the sandbox physically distinct from the frozen `seeds` array — so it can never be confused for, or
+accidentally shift, live data. The RNG formula `(0x9e3779b9 ^ (dayIndex+1)) >>> 0` already works
+unchanged for negative indices on both platforms.
+
+### 8.3 Choosing the objectives — Gold is free, Silver is constrained
+
+The two RNG draws are fixed per day, so the objective is steered by **which seed occupies the slot**
+(its `supports` set the pool contents and length). Measured for this window:
+
+- **Gold is fully steerable.** `goldPool = GOLD.filter(supports)` has no fixed prefix, so certifying
+  a seed for exactly the right subset lands any Gold you want on any day.
+- **Silver is not.** `SILVER_UNIVERSAL` (`moves`, `no-undo`) permanently occupies indices 0–1, so a
+  low draw can never reach a certified Silver. Measured over the requested window:
+
+| Date | 08-05 | 08-06 | 08-07 | 08-08 | 08-09 | 08-10 | 08-11 |
+|---|---|---|---|---|---|---|---|
+| Silver draw `r1` | 0.362 | 0.653 | 0.935 | 0.014 | 0.007 | 0.992 | 0.359 |
+| certified Silver reachable? | no | **yes** | **yes** | no | no | **yes** | no |
+
+**Only 3 of the 7 requested days can carry a certified Silver**; the other four will always show
+`moves` or `no-undo`.
+
+**Recommendation: extend the window back to 2026-08-01 (day −11).** That yields **7** certified-
+Silver-capable days out of 11 — enough to show real variety in both tiers:
+
+```
+08-01 yes · 08-02 yes · 08-03 yes · 08-04 yes · 08-05 no  · 08-06 yes
+08-07 yes · 08-08 no  · 08-09 no  · 08-10 yes · 08-11 no
+```
+
+If you would rather keep the 7-day window and still choose both tiers freely, the sandbox can carry
+an explicit `forceSilver` / `forceGold` override on `preSeeds` records. That is normally forbidden —
+it breaks the derive-everything-from-the-RNG discipline — but it is **safe here precisely because
+the sandbox is outside the frozen region**, and it makes playtesting direct: name the objective you
+want to try. **[DECIDE]** extend the window, or add sandbox overrides.
+
+### 8.4 Practical limit: the calendar shows one month
+
+`renderDailyCal` / `DailyView.calendar` render **the current month only**, with no month navigation
+on either platform. So backfilled August days are reachable from the calendar only while the device
+date is in **August 2026** — the playtest window effectively closes on 2026-08-31. Either run the
+playtest this month, or add month navigation (small, and independently useful). **[DECIDE]**
+
+### 8.5 Order of work
+
+1. **Feasibility probe** (`tools/solver/probe-objective.mjs`) — replays baked lines and reports how
+   often a candidate passes. Every number in this document came from an ad-hoc version; it killed
+   four ideas in minutes. Extend it with the "targeted" mode §4 showed is the honest measure.
+2. **Pick the sandbox slate** — a variety across families, weighted to the ideas you most want to
+   feel: B3/B4 (measured, cheap), C1/C2 at their tunable settings, A1 if it certifies.
+3. **Negative-day support** (§8.2) + **`preSeeds`** in the pool file, mirrored web/iOS with drift
+   guards extended. Small and self-contained.
+4. **Certify the sandbox seeds** for the chosen objectives and bake their solution lines.
+5. **Play.** Iterate freely — rewrite `preSeeds` as often as you like; nothing downstream depends
+   on it.
+6. **Graduate.** When satisfied, implement the winning objectives for real and extend the *forward*
+   calendar with `build-pool.mjs --start 10377` under the normal frozen rules (§2). This also
+   refills the calendar past its 2027-08-12 exhaustion.
+7. **T1 families last** (E2, F1/F2) if they make the cut — they touch the persisted `Telemetry`
+   shape on both platforms and deserve their own review pass.
+
+### 8.6 Before this becomes multi-user
+
+The sandbox is safe **because there is one player**. If that changes, either delete the negative-day
+range or freeze it like any other history — otherwise a second player's records would depend on
+data that has been rewritten underneath them.
 
 ## 9. Risks
 
 - **Support rate is unknown until certification — for what is left.** B3/B4 are now measured
   (§4) and clear the bar; A1 (`split-even`) and C1/C2 at their harder settings are the remaining
   unknowns. A low *incidental* rate is not evidence against them (§4); only a constrained solve
-  settles it, at roughly one solver run each.
+  settles it, at roughly one solver run each. **The backfill plan largely defuses this risk** — an
+  objective that certifies on a handful of sandbox seeds is playable immediately, and only needs a
+  broad support rate when it graduates to the forward calendar.
+- **The sandbox is a permanent code path for a temporary need.** Negative-day support (§8.2) will
+  outlive the playtest. Keep it bounded and clearly labelled, and see §8.6 before Causeway gains a
+  second player.
 - **E2 is half-measured.** Reaching three-of-a-kind in the cells is easy (4–6 moves); *winning
   from there* is unmeasured and is where the entire difficulty lives. It could turn out trivial or
   impossible — do not commit to it before the reach-and-win probe.

@@ -511,3 +511,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     parity gap**: the design doc made showing automation state a UI obligation "so it isn't a hidden
     trap"; web's daily card shows `Your call: [Auto-play][Auto-finish]` but iOS `DailyView` has no
     equivalent — so on the shipping platform the player gets no hint. Still proposal-only; 68 green.
+72. Three things: (a) "What is B4?" — the doc used opaque IDs before defining them, so added a §0
+    index table naming all 15 proposed objectives up front (B4 = `no-up-foundation`, win building
+    every suit K→A, never touching an up foundation). (b) DECIDED: it's fine to give players no hint
+    about how auto-play/auto-finish affect a particular deal — figuring that out is part of the
+    challenge. Recorded as overruling the original design's "UI obligation" clause; the live HUD
+    already fails the objective the instant it breaks, and a restart is free. Auto-play hostility is
+    no longer a mark against any objective. (c) New implementation plan: backfill 2026-08-05..08-11
+    as a playtest sandbox, play a few days, iterate, then commit to future dates. Worked out the
+    mechanics: those dates are **negative day indices (−7…−1)** because the epoch is 2026-08-12, and
+    that turns out to be the ideal shape — every freeze constraint in §2 applies to days ≥0 only, so
+    backfilling below the epoch touches no existing seed, index, or RNG draw: **zero history
+    rewrite** (vs. moving the epoch back, which would re-roll every existing day's objectives).
+    Gives a clean rule: days ≥0 frozen, days <0 mutable sandbox. Streaks need no work — the
+    backwards run-scan walks into negatives for free. Catalogued the 8 guard sites that assume
+    non-negative days, and proposed a separate `preSeeds` array so sandbox data can never shift live
+    data. Two measured constraints found: **Gold is fully steerable by seed choice, Silver is not** —
+    `SILVER_UNIVERSAL` permanently occupies indices 0–1, so a low RNG draw can never reach a
+    certified Silver, and only 3 of the 7 requested days (08-06/07/10) can carry one; recommended
+    extending back to 08-01 for 7 of 11 days, or adding sandbox-only forceSilver/forceGold overrides
+    (safe precisely because the sandbox is outside the frozen region). Also flagged that the
+    calendar renders **the current month only** with no month navigation on either platform, so the
+    backfilled August days are reachable only during August 2026. Still proposal-only; 68 green.
