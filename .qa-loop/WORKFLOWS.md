@@ -117,5 +117,5 @@ randomness levers are the deal number and the wall-clock date. Pin them like thi
   a deal (it does not grow back until a new deal/replay). Clipping or an untappable
   bottom card is a bug; a one-time uniform shrink at a new tallest-column maximum is
   the design.
-- The `Causeway` scheme contains a dangling testable reference (`CausewayUITests` — a
-  parked, never-persisted Xcode target). `build-for-testing` succeeds; ignore it.
+- The `CausewayUITests` target now exists in `project.pbxproj` (added 2026-08-21) and the
+  scheme's testable reference resolves. `xcodebuild ... test` runs six XCUITests; all pass.

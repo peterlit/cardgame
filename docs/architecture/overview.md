@@ -89,7 +89,7 @@ flowchart LR
     Dev --> Node
     Dev --> Xcode
     Dev --> Py
-    Node --> Tests["67 tests<br/>tests/*.test.mjs"]
+    Node --> Tests["68 tests<br/>tests/*.test.mjs"]
     Node --> Solver["tools/solver<br/>build-pool / build-solutions"]
     Xcode --> IPA["Causeway.app"]
 ```
@@ -139,9 +139,12 @@ not test helpers), and each product carries its own transcription.
 | daily ↔ web | `tests/daily.test.mjs:236-258` | all six ordering checkers, the frozen per-day RNG seed, silver/gold pool construction and pick order, epoch constant, `mergeTiers`, streak walk |
 | canonical ↔ Swift | `tests/ios-parity.test.mjs` | Swift mulberry32 wrapping arithmetic, deal layout, floor-division calendar, frozen objective arrays, generator seed, all six checkers, `mergeTiers`/streaks, `guard !winRecorded`, `applyDemoToken` — plus a cross-check that the web and iOS token appliers agree |
 
-This is an explicit substitute for the missing iOS test target: `tests/ios-parity.test.mjs:1-9` and
-`tests/README.md:50-56` state that adding an XCTest target to the hand-authored `project.pbxproj`
-was judged too risky, so text pins are the fallback. The gap is tracked as backlog **F6**.
+These pins were introduced as a substitute for a native test target: `tests/ios-parity.test.mjs:1-9`
+and `tests/README.md` state that adding one to the hand-authored `project.pbxproj` was judged too
+risky. A `CausewayUITests` UI Testing Bundle target has since been added (2026-08-21) and runs, but
+it exercises the app through the UI — the drift guards remain the only thing pinning the Swift
+*logic* to the canonical modules, so they are still load-bearing. A model-level unit-test target
+remains open as backlog **F6**.
 
 ---
 
@@ -381,7 +384,9 @@ The per-codebase documents carry the detailed critiques. At system level:
    the objective semantics (`index.html:1421-1452` vs `Model/Daily.swift:312-383`), and the two
    `dailyChallenge` copies have genuinely divergent signatures (canonical takes a pool *object* and
    reads `pool.seeds`; web takes the seeds *array*) — behaviourally equivalent, unpinned.
-2. **Native test coverage is absent.** There is no XCTest target (backlog **F6**), so the entire
+2. **Native test coverage is thin, but no longer absent.** A `CausewayUITests` UI Testing Bundle
+   target now exists and runs end-to-end in the simulator (added 2026-08-21), covering four
+   regression contracts. There is still no *unit*-test target, so the entire
    Swift UI layer, persistence, and the async auto-finish/demo timing paths are covered only by
    text pins and manual QA. The backlog itself notes this produced a blocker and a major that the
    Node suite structurally cannot see (**AF-test**).

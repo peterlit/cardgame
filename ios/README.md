@@ -73,7 +73,10 @@ Causeway/Causeway/
 tools/make_icon.swift      app-icon generator (standalone macOS script, not in the target)
 ```
 
-There is **no XCTest target**. The Swift port is instead pinned from the Node suite by
+There is a **UI Testing Bundle target** (`CausewayUITests`) covering the app end-to-end in the
+simulator — run it with `xcodebuild -scheme Causeway -destination 'platform=iOS Simulator,name=<sim>' test`,
+or ⌘U in Xcode. There is still **no unit-test (XCTest) target** for the model layer; that Swift
+logic is instead pinned from the Node suite by
 `../tests/ios-parity.test.mjs`, which asserts the parity-critical Swift bodies (deal RNG,
 calendar, daily generator, objective checkers, streaks, the once-only win gate, the demo
 token applier) still match the canonical logic. See `../tests/README.md`.

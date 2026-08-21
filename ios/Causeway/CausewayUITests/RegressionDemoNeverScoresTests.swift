@@ -54,7 +54,6 @@ final class RegressionDemoNeverScoresTests: XCTestCase {
     /// bug/WF-6:demo-progress-counts-as-a-real-win — a demo must be input-locked,
     /// Stop/Done must re-deal the same seed fresh, and nothing may ever be banked.
     func testDemoIsLockedAndNeverBanksAWin() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

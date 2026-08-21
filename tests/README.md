@@ -48,9 +48,11 @@ If you edit the logic in `index.html`, mirror it in `engine.mjs` or the tests fa
 
 ## Not covered here
 
-There is still no **XCTest** target (adding one to a hand-authored `.pbxproj` without Xcode
-is risky — see BACKLOG.md "XCTest target"). Until then, `ios-parity.test.mjs` is the fallback:
-it pins the Swift port's canonical bodies so web↔iOS drift trips CI. Full **auto-finish
+A **UI Testing Bundle** target (`ios/Causeway/CausewayUITests/`) now exists and runs — six
+XCUITests, four of them regression guards from the QA loop. Run them with
+`xcodebuild -project ios/Causeway/Causeway.xcodeproj -scheme Causeway -destination 'platform=iOS Simulator,name=<sim>' test`.
+There is still no **unit-test** target exercising the Swift model directly, so `ios-parity.test.mjs`
+remains the fallback that pins the Swift port's canonical bodies so web↔iOS drift trips CI. Full **auto-finish
 deferred-overlay timing** (record-exactly-once, not-before-cascade) is app/UI timing and is only
 partially guarded here (the `winRecorded` once-only gate is pinned); the full timing test remains
 an app-level concern (BACKLOG "AF-test").

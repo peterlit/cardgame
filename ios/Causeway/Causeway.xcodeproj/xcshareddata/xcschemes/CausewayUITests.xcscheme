@@ -6,22 +6,6 @@
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES"
       buildArchitectures = "Automatic">
-      <BuildActionEntries>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-               BuildableName = "Causeway"
-               BlueprintName = "Causeway"
-               ReferencedContainer = "container:Causeway.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-      </BuildActionEntries>
    </BuildAction>
    <TestAction
       buildConfiguration = "Debug"
@@ -54,20 +38,6 @@
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES"
       queueDebuggingEnableBacktraceRecording = "Yes">
-      <PathRunnable
-         runnableDebuggingMode = "0"
-         BundleIdentifier = "com.whimsicaldistractions.Causeway"
-         FilePath = "/Users/plit/Library/Developer/Xcode/DerivedData/Causeway-fbjfryogzyxfdjeniutxntdttrrq/Build/Products/Debug-iphoneos/Causeway.app">
-      </PathRunnable>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-            BuildableName = "Causeway"
-            BlueprintName = "Causeway"
-            ReferencedContainer = "container:Causeway.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -75,15 +45,6 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "CA5E1A2B3C4D5E6F00000006"
-            BuildableName = "Causeway"
-            BlueprintName = "Causeway"
-            ReferencedContainer = "container:Causeway.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

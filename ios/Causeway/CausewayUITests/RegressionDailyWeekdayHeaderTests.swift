@@ -45,7 +45,6 @@ final class RegressionDailyWeekdayHeaderTests: XCTestCase {
     /// contain exactly two "S", one "M", two "T", one "W", one "F", laid out
     /// left-to-right as S M T W T F S on a single row.
     func testCalendarWeekdayHeaderShowsAllSevenLetters() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

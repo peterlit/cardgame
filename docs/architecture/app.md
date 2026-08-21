@@ -14,7 +14,7 @@ a filesystem-synchronized group).
 | Swift version | **5.0** (no strict concurrency) | `:202, 230` |
 | Version / build | 1.0 (1) | `:198/185` |
 | Entitlements | **none** — no file, no `CODE_SIGN_ENTITLEMENTS` | grep |
-| Test target | **none** | only one target exists |
+| Targets | `Causeway` (app) + `CausewayUITests` (UI Testing Bundle) | no unit-test target |
 
 Verified against source throughout; rationale not written in the repo is marked **(inference)**.
 
@@ -493,7 +493,10 @@ by the foundation ranks), and rejection of a completed board.
    `@Published` surface is ~15 properties, so any change invalidates every view observing `game` —
    which is `ContentView`, `WinsView` and `DailyView` in their entirety. `GameClock` was carved out
    for exactly this reason; nothing else has been.
-2. **No native tests at all.** Backlog **F6** records the reason (editing the hand-authored
+2. **Native coverage is UI-level only.** A `CausewayUITests` UI Testing Bundle now exists and
+   runs (6 tests, incl. 4 regression guards for demo-never-scores, portrait tall columns, the
+   calendar weekday header, and disabled-pill legibility). There is still **no unit-test target**
+   exercising the model layer directly. Backlog **F6** records the original reason (editing the hand-authored
    `project.pbxproj` without Xcode was judged risky). Consequently the async timing paths —
    auto-finish, deferred win, demo stepping — have **zero** automated coverage, and the backlog
    (**AF-test**) notes this area has already produced one blocker and one major that the Node suite

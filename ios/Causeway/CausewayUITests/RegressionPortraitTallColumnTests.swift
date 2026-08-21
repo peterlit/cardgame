@@ -49,7 +49,6 @@ final class RegressionPortraitTallColumnTests: XCTestCase {
     /// to 16 cards; the bottom card must remain on-screen and hittable (board
     /// shrinks uniformly instead of clipping).
     func testTallPortraitColumnBottomCardStaysHittable() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait   // contract is portrait-only

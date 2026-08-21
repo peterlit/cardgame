@@ -91,9 +91,12 @@ Four XCTSkip-guarded XCUITests in `ios/Causeway/CausewayUITests/` (commits `e021
 `2b66b93`): demo-never-scores contract, portrait tall-column tap-ability, calendar
 weekday letters, landscape disabled-Undo legibility (pixel-contrast assertion). Round 2's
 identifier work let the first two be retrofitted from raw coordinates to `card.*`/`stat.*`
-queries. **They cannot run yet** — the UI Testing Bundle target never persisted (BACKLOG
-"UITEST-target"); when it lands, add the four files to it in Xcode, run once to verify
-selectors, then delete the skip lines. The round-3-verified a11y fix got no dedicated
+queries. **They now run** (2026-08-21): the UI Testing Bundle target was added to `project.pbxproj`
+directly, the skip lines were removed, and all four pass. One needed recalibration —
+`landscape-disabled-undo` asserted an absolute luminance spread > 0.10, which no rail pill can
+reach because disabled pills are `.opacity(0.4)` and the metric is diluted by the pill's empty
+area; it now asserts contrast *relative* to an enabled pill of the same style (measured: disabled
+0.0725 / enabled 0.3088 = 0.235; a blank capsule would be ~0). The round-3-verified a11y fix got no dedicated
 test: the two retrofitted tests inherently fail if the identifiers vanish, which is the
 same guard.
 

@@ -55,7 +55,6 @@ final class RegressionLandscapeDisabledUndoTests: XCTestCase {
     /// bug/Main:landscape-disabled-undo-blank — the disabled rail Undo pill
     /// must render a legible (greyed) glyph + label, not a blank capsule.
     func testLandscapeDisabledUndoPillIsNotBlank() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -79,28 +78,40 @@ final class RegressionLandscapeDisabledUndoTests: XCTestCase {
         XCTAssertTrue(undo.label.contains("Undo"))
 
         // --- THE core regression: the pill's face must have visible contrast -----
-        // Central 60% crop excludes the capsule stroke, rounded corners and any
-        // background bleed, isolating label-vs-capsule contrast.
-        let shot = undo.screenshot().image
-        guard let spread = luminanceSpread(of: shot, centralFraction: 0.6) else {
-            XCTFail("could not read pixels of the Undo pill screenshot")
-            return
-        }
-        XCTAssertGreaterThan(spread, 0.10,
-                             "disabled landscape Undo pill is near-uniform " +
-                             "(luminance spread \(spread)) — the blank white capsule is back")
+        // Measured RELATIVE to an enabled pill of the SAME style in the SAME orientation,
+        // not against an absolute number. Rationale (measured 2026-08-21, iPhone 17 Pro):
+        //
+        //     landscape rail   disabled Undo 0.0725   enabled Replay 0.3088   ratio 0.235
+        //     portrait toolbar disabled Undo 0.1293   enabled Replay 0.3718   ratio 0.348
+        //
+        // The disabled pill is deliberately .opacity(0.4), and P95-P5 spread is diluted by
+        // the pill's empty area — rail pills are full-width (118pt) so they read lower than
+        // portrait's hug-width pills for identical rendering. An absolute floor therefore
+        // cannot hold across both geometries (0.10 sits between the two known-GOOD values).
+        // The bug being guarded is the label washing out to the capsule colour, which drives
+        // the ratio toward 0 regardless of geometry or opacity.
+        let disabledSpread = try XCTUnwrap(luminanceSpread(of: undo.screenshot().image,
+                                                           centralFraction: 1.0),
+                                           "could not read pixels of the disabled Undo pill")
 
-        // --- collateral guard: the ENABLED pill still renders and acts -----------
-        // (The round-1 fix candidate risked washing out the enabled state; round 2
-        // verified enabled pills unchanged. Cheap to re-assert.)
-        let newGame = app.buttons["toolbar.newgame"]
-        XCTAssertTrue(newGame.exists)
-        XCTAssertTrue(newGame.isEnabled)
-        guard let ngSpread = luminanceSpread(of: newGame.screenshot().image, centralFraction: 0.6) else {
-            XCTFail("could not read pixels of the New game pill screenshot")
-            return
-        }
-        XCTAssertGreaterThan(ngSpread, 0.10, "enabled rail pill lost its label contrast")
+        let reference = app.buttons["toolbar.replay"]      // enabled, same non-primary style
+        XCTAssertTrue(reference.waitForExistence(timeout: 5), "no toolbar.replay pill to compare against")
+        XCTAssertTrue(reference.isEnabled)
+        let enabledSpread = try XCTUnwrap(luminanceSpread(of: reference.screenshot().image,
+                                                          centralFraction: 1.0),
+                                          "could not read pixels of the reference pill")
+
+        // Guard the guard: if even the enabled pill has no contrast, the measurement is
+        // broken (or every pill regressed) and the ratio below would be meaningless.
+        XCTAssertGreaterThan(enabledSpread, 0.15,
+                             "enabled rail pill lost its label contrast (\(enabledSpread)) — " +
+                             "measurement broken or all rail pills regressed")
+
+        let ratio = disabledSpread / enabledSpread
+        XCTAssertGreaterThan(ratio, 0.12,
+                             "disabled landscape Undo pill is near-uniform relative to an enabled " +
+                             "pill (disabled \(disabledSpread) / enabled \(enabledSpread) = \(ratio)) " +
+                             "— the blank white capsule is back")
     }
 
     // MARK: - helpers

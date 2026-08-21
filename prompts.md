@@ -429,3 +429,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     override). Perf clean at baselines. Plugin feedback delivered (implemented_rounds fixed the
     thrashing false positive; merge_coverage persona-collapse bug found; shared-/tmp worker
     collision; regression writer blind to archived fixes).
+68. "XCUI tests won't build/run — as an exception, edit `project.pbxproj` to make it work."
+    Root cause: Xcode never re-serialized the project when the UI test target was added in the GUI,
+    so BOTH schemes pointed at blueprint id `C761C3703031FA7B00429DAC` that no target defined
+    (BACKLOG "UITEST-target"). Wrote the target into the pbxproj directly, reusing that same id so
+    no scheme edits were needed: synchronized root group for `CausewayUITests/`, native target with
+    `productType = com.apple.product-type.bundle.ui-testing`, Sources/Frameworks/Resources phases,
+    `PBXTargetDependency` + `PBXContainerItemProxy` on the app, Debug+Release configs with
+    `TEST_TARGET_NAME = Causeway`, and `TargetAttributes.TestTargetID`. First `test` run then failed
+    with `UITargetAppPath should be provided` — the *app* target had no `productReference` (the M8
+    hand-authored quirk, which the backlog item had predicted); added a `PBXFileReference` for
+    `Causeway.app` and wired it up. Diff is purely additive (134 insertions, 0 deletions).
+    Then unparked the four QA-loop regression tests (removed the `XCTSkipIf(true, …)` lines). Three
+    passed immediately; `landscape-disabled-undo` failed, so I measured real pixels via a temporary
+    diagnostic before touching anything: disabled Undo 0.0725 vs enabled same-style Replay 0.3088 in
+    landscape, and 0.1293 vs 0.3718 in portrait (known-good). The app fix was intact — the test's
+    absolute `> 0.10` threshold was simply unreachable, because disabled pills are `.opacity(0.4)`
+    and the P95–P5 metric is diluted by a full-width rail pill's empty area. Rewrote the assertion as
+    contrast *relative* to an enabled pill of the same style in the same orientation (ratio 0.235
+    measured; a blank capsule ⇒ ~0), with a guard-the-guard check on the reference. All 6 XCUITests
+    pass; app builds Debug+Release; 68 Node tests green. Updated the docs that claimed no test target
+    existed (ios/README, tests/README, both architecture docs, .qa-loop REPORT + WORKFLOWS) and
+    marked UITEST-target resolved / half of M8 closed.

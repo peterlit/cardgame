@@ -303,27 +303,30 @@ findings fixed:
   is error-prone and could break the build. Add an XCTest target in Xcode that asserts the
   Swift engine reproduces the same golden deal orders (`tests/engine.test.mjs` GOLDEN) and
   the same `isSafeAutoplay` cases, so both platforms are pinned to one contract. Ties to M8.
-- **UITEST-target — UI Testing Bundle add did not persist (PARKED 2026-08-15; user decision).**
-  Adding a `CausewayUITests` UI Testing Bundle in Xcode wrote the scheme testable (blueprint
-  `C761C35A30315F0500429DAC`), the two stock template files under `ios/Causeway/CausewayUITests/`,
-  and UI state — but `project.pbxproj` was never re-serialized (unchanged since Aug 14; zero
-  `CausewayUITests` references; `xcodebuild -list` shows only the app target), even after builds.
-  Strong evidence for the M8 hand-authored-pbxproj concern. Current state is harmless:
-  `build-for-testing` succeeds despite the dangling scheme testable, and the committed template
-  files/scheme entry are inert. `emit_regression_tests` is **true** in `.qa-loop/ledger.json`
-  (the qa loop's regression-test-writer emits `XCTSkip`-guarded tests and tolerates a missing
-  target). To resume: in Xcode check the project's TARGETS list for `CausewayUITests` → if
-  present, ⌘U (Product → Test) to force a project-file flush; if absent, re-add the target —
-  expect Xcode to collide with the existing `CausewayUITests/` files and the stale scheme
-  testable entry (delete/merge those first), and if the pbxproj still won't write, diagnose its
-  nonstandard bits (missing `productReference`) before retrying. Ties to F6/M8.
+- **UITEST-target — RESOLVED 2026-08-21.** The `CausewayUITests` UI Testing Bundle target now
+  exists in `project.pbxproj` and runs. Xcode had never re-serialized the project when the target
+  was added in the GUI, leaving both schemes pointing at a blueprint id that no target defined.
+  Fixed by writing the target into the pbxproj directly (user-authorised exception to the
+  "don't hand-edit the pbxproj" rule), reusing the id the schemes already referenced
+  (`C761C3703031FA7B00429DAC`) so no scheme edits were needed: a
+  `PBXFileSystemSynchronizedRootGroup` for `CausewayUITests/`, native target with
+  `productType = com.apple.product-type.bundle.ui-testing`, Sources/Frameworks/Resources phases,
+  a `PBXTargetDependency` on the app, Debug+Release configs with `TEST_TARGET_NAME = Causeway`,
+  and `TargetAttributes.TestTargetID`. **The blocker this item predicted was the real one:** the
+  first `test` run failed with `UITargetAppPath should be provided` because the *app* target had
+  no `productReference` — so a `PBXFileReference` for `Causeway.app` was added and referenced by
+  the app target (this also closes half of M8). All six XCUITests pass; the four QA-loop
+  regression guards were unparked (skip lines removed). One needed recalibration — see
+  `.qa-loop/REPORT.md`. **Still open:** a model-level *unit*-test target (F6).
 - **M7 — Accessibility (iOS).** No VoiceOver labels/actions; Dynamic Type ignored
   (all fixed `.system(size:)`, tap gestures not buttons).
 
 ## Open — medium
-- **M8 — Verify buildability from the committed project.** App builds/runs for the owner,
-  but `project.pbxproj` was hand-authored (no `productReference`); confirm a clean clone
-  opens & archives in Xcode 16.
+- **M8 — Verify buildability from the committed project.** App builds/runs for the owner.
+  The missing `productReference` noted here was added 2026-08-21 (it blocked UI testing — see
+  UITEST-target), so the project is now closer to what Xcode itself writes; `xcodebuild` builds
+  Debug + Release and runs tests from the command line. Still to confirm: a clean clone opens
+  and **archives** in the Xcode GUI.
 - **DV-1 — Daily "Play"/"Show me how to win" silently discard an in-progress game.**
   `playChallenge()`/`showSolution()` call `deal()` + `persist()`, overwriting the saved casual
   game (any moves/elapsed) with no confirmation or undo. Add a confirm when a different game is
