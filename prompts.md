@@ -470,3 +470,21 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Also proposed retiring `suit-sprint` for future seeds (supported by 4/366, picked 3 days/year),
     a reusable feasibility-probe tool, and an optional "freeze history in a lookup table" refactor
     that would decouple the frozen arrays from recorded history. No code changed; 68 tests green.
+70. Four more daily-objective ideas, added to the proposal (still no code): (a) fill the free cells
+    with a specific set of card values at some point; (b) build a foundation completely in reverse
+    (K→A) or completely straight up (A→K); (c) send an unbroken streak of N cards of one suit home;
+    (d) send N cards of one suit home before any other card. Measured all four against the 366 baked
+    lines. Findings that changed the shape of the proposal: **(b) is asymmetric** — a suit built
+    A→K happens 4/1464 naturally, K→A **0/1464** (you must withhold that suit's Ace for twelve
+    sends), and the maximal form is legal and striking: winning with `up[s]=13, down[s]=14` still
+    satisfies `down == up+1`, so "never use a down foundation" (and its mirror) are valid, trivially
+    gateable objectives. **(c) has the cleanest difficulty dial found** — unbroken same-suit run
+    N≥5 54%, N≥6 29%, N≥8 6%, N≥13 0% → N=6 Silver, N=8 Gold. **(d) supersedes `suit-sprint`**:
+    suit-sprint *is* (d) at N=13, which is exactly why it has 4/366 support and appears 3 days a
+    year; at N=4 the same idea gets ~11% natural support, reviving a dead family. **(a) only works
+    if the set is specific** — all three cells full happens in 366/366 lines (vacuous) and a matching
+    pair in 264/366 (too easy), but three consecutive ranks is 74/366 (20%, Silver) and three of a
+    kind 8/366 (2%, Gold); telemetry is cheaper than feared (median 7 distinct rank-triples per game,
+    ~63 bytes). Proposal now has 6 families / ~16 objectives, 6 [DECIDE] points, and a rollout that
+    front-loads the one-line solver gates (B3/B4) because they answer the most interesting
+    feasibility question for the least work. 68 tests green.
