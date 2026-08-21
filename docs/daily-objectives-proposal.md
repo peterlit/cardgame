@@ -1,33 +1,39 @@
 # Proposal — more variety in Daily Challenge objectives
 
-**Status: proposal only. No code changed.** Decisions needed from you are marked **[DECIDE]**.
+**Status: partially shipped (2026-08-21).** Six objectives — A1, A2, B3, B4, F1, F2 — are
+implemented on all three copies of the logic and are live in the pre-epoch playtest sandbox
+(§8). The rest remain proposals. Decisions still needed from you are marked **[DECIDE]**.
 
 Companion to [`daily-challenges.md`](daily-challenges.md) (the original design) and
 [`solver.md`](solver.md) (certification). Every feasibility number below was measured, not estimated.
 
 ## 0. Index of proposed objectives
 
-| ID | Name | One line | Grade | Cost |
-|---|---|---|---|---|
-| **A1** | `split-even` | Split every suit exactly down the middle — A–7 up, 8–K down | Gold | T0 |
-| **A2** | `down-heavy` | Take at least 8 of every suit from the King end | Silver | T0 |
-| **B1** | `suit-all-up` | Build one whole suit from Ace to King | Gold | T0 |
-| **B2** | `suit-all-down` | Build one whole suit from King down to Ace | Gold | T0 |
-| **B3** | `no-down-foundation` | **Win without ever using a down foundation** (every suit A→K) | Gold | T0 |
-| **B4** | `no-up-foundation` | **Win without ever using an up foundation** (every suit K→A) | Gold | T0 |
-| **C1** | `suit-run-N` | Send N cards of one suit home back-to-back | tunable | T0 |
-| **C2** | `suit-opener-N` | Send N cards of one suit home before any other card | tunable | T0 |
-| **D1** | `aces-up-by-N` | All four Aces home within your first N moves | Silver | T0 |
-| **D2** | `half-home-by-N` | Half the deck home by move N | Silver | T0 |
-| **D3** | `down-openers-N` | Parameterise the existing fixed-20 objective | Silver | T0 |
-| **E1** | `cells-straight` | Three consecutive ranks in the free cells at once | — | T1 |
-| **E2** | `cells-three-of-a-kind` | Three of a kind in the free cells at once | Gold | T1 |
-| **F1** | `no-supermoves` | Move one card at a time | Silver | T0 |
-| **F2** | `one-big-move` | Relocate a run of 5+ cards in a single move | Gold | T1 |
+| ID | Name | One line | Grade | Cost | Status |
+|---|---|---|---|---|---|
+| **A1** | `split-even` | Split every suit exactly down the middle — A–7 up, 8–K down | Gold | T0 | **shipped** |
+| **A2** | `down-heavy` | Take at least 8 of every suit from the King end | Silver | T0 | **shipped** |
+| **B1** | `suit-all-up` | Build one whole suit from Ace to King | Gold | T0 | proposed |
+| **B2** | `suit-all-down` | Build one whole suit from King down to Ace | Gold | T0 | proposed |
+| **B3** | `no-down-foundation` | **Win without ever using a down foundation** (every suit A→K) | Gold | T0 | **shipped** |
+| **B4** | `no-up-foundation` | **Win without ever using an up foundation** (every suit K→A) | Gold | T0 | **shipped** |
+| **C1** | `suit-run-N` | Send N cards of one suit home back-to-back | tunable | T0 | proposed |
+| **C2** | `suit-opener-N` | Send N cards of one suit home before any other card | tunable | T0 | proposed |
+| **D1** | `aces-up-by-N` | All four Aces home within your first N moves | Silver | T0 | proposed |
+| **D2** | `half-home-by-N` | Half the deck home by move N | Silver | T0 | proposed |
+| **D3** | `down-openers-N` | Parameterise the existing fixed-20 objective | Silver | T0 | proposed |
+| **E1** | `cells-straight` | Three consecutive ranks in the free cells at once | — | T1 | proposed |
+| **E2** | `cells-three-of-a-kind` | Three of a kind in the free cells at once | Gold | T1 | proposed |
+| **F1** | `no-supermoves` | Move one card at a time | Silver | T1 | **shipped** |
+| **F2** | `one-big-move` | Relocate a run of 5+ cards in a single move | Gold | T1 | **shipped** |
 
 **B3 and B4 are the headline pair** — the two the corrected methodology rescued (§4), and the two
 that most exploit the two-ended foundation. **E1 is recommended for dropping** (§5).
 T0 = no new telemetry; T1 = one new field in `Telemetry`.
+
+The six shipped objectives cost exactly one new telemetry field, `maxRunMoved` (the largest run
+the player has ever relocated in one move), which serves both F1 and F2 — so F1 is T1, not the T0
+this table originally claimed. A1/A2/B3/B4 are pure foundation gates and needed nothing new.
 
 ---
 
@@ -222,7 +228,7 @@ Nine families below; every feasibility figure is measured against the 366 baked 
 since a constrained solve will usually do better. Anything at ~100 % is vacuous; anything at 0 %
 needs certification to prove it is reachable at all.
 
-### Family A — The split point *(T0)*
+### Family A — The split point *(T0)* — **A1 and A2 shipped 2026-08-21**
 
 Nothing today targets where a suit's two halves meet. Measured split points across 1 464 suits
 (ranks taken from the up end):
@@ -242,7 +248,7 @@ below 8). **Natural rate 0/366** — a real constraint, not a freebie.
 Check: every suit's up-count ≤ 5. Solver: gating. Per-suit natural rate 411/1464 (28 %); all four
 at once is rarer. Pushes play toward the down foundations, which players neglect.
 
-### Family B — Build a suit from one end *(your idea; T0)*
+### Family B — Build a suit from one end *(your idea; T0)* — **B3 and B4 shipped 2026-08-21**
 
 Sharper than my earlier "one-end suit" because up and down are **very** different in difficulty:
 
@@ -352,7 +358,7 @@ not an event log.
 *Solver:* this is a **positive/existential** goal like `down-openers-20`, not a gate — the search
 must *reach* a state, so the node key gains an "achieved" flag. New shape, but precedent exists.
 
-### Family F — Move shape *(T1; makes the tableau matter)*
+### Family F — Move shape *(T1; makes the tableau matter)* — **F1 and F2 shipped 2026-08-21**
 
 **F1 · `no-supermoves` — "Move one card at a time."** Silver. Natural rate 52/366 (14 %).
 
@@ -410,38 +416,72 @@ anything proposed here.
 
 ## 8. Implementation plan — backfill a playtest window first
 
-> ## ✅ SHIPPED 2026-08-21 — the sandbox is live
+> ## ✅ SHIPPED 2026-08-21 — six new objectives, and the sandbox rebuilt around them
 >
-> Seven dates backfilled with certified deals drawn from seeds **> 10,000,000**, on both platforms:
+> **A1, A2, B3, B4, F1 and F2 are implemented** on all three copies of the logic (`tests/daily.mjs`,
+> the inlined copy in `index.html`, `Model/Daily.swift`) plus the offline solver, and the drift
+> guards pin all six. Seven dates are backfilled with certified deals from seeds **> 10,000,000**:
 >
-> | Date | Day | Deal | Silver | Gold |
-> |---|---|---|---|---|
-> | 2026-08-05 | −7 | 333,604,570 | `no-undo` | `suits-top-down` |
-> | 2026-08-06 | −6 | 872,540,785 | `cells-le-1` | `jacks-down-first` |
-> | 2026-08-07 | −5 | 53,307,501 | `down-openers-20` | `no-cells` |
-> | 2026-08-08 | −4 | 835,196,898 | `moves` | `kings-first` |
-> | 2026-08-09 | −3 | 339,664,220 | `moves` | `aces-first` |
-> | 2026-08-10 | −2 | 561,325,499 | `cells-le-2` | `kings-first` |
-> | 2026-08-11 | −1 | 872,465,152 | `no-undo` | `no-cells` |
+> | Date | Day | Deal | Silver | Gold | Showcases |
+> |---|---|---|---|---|---|
+> | 2026-08-05 | −7 | 191,924,978 | `moves` | `split-even` | **A1** |
+> | 2026-08-06 | −6 | 699,587,523 | `down-heavy` | `no-down-foundation` | **A2 + B3** |
+> | 2026-08-07 | −5 | 942,660,922 | `no-supermoves` | `no-up-foundation` | **F1 + B4** |
+> | 2026-08-08 | −4 | 186,441,603 | `moves` | `one-big-move` | **F2** |
+> | 2026-08-09 | −3 | 339,664,220 | `moves` | `aces-first` | contrast |
+> | 2026-08-10 | −2 | 561,325,499 | `cells-le-2` | `kings-first` | contrast |
+> | 2026-08-11 | −1 | 872,465,152 | `no-undo` | `no-cells` | contrast |
 >
-> **Variety achieved: 5/5 distinct Silvers** (every objective in the catalogue, including all three
-> certified ones) **and 5/6 distinct Golds.** The only Gold missing is `suit-sprint` — none of the 22
-> certified candidates supported it, consistent with its ~1 % support rate, and it is the objective
-> §6 recommends retiring anyway.
+> **All six new objectives appear, four of the seven days lead with one, and the last three keep
+> familiar objectives so the new ones have something to read against.**
 >
-> Certification: 22 random seeds sampled from 10,000,001–999,999,999, **22/22 certified** (100 %
-> eligibility, ~10–20 s each). Every backfilled day has a verified bronze **and** gold line; the
-> three certified-Silver days also carry a silver line. All lines are replayed and re-checked against
-> the runtime objective checkers by `tests/solutions.test.mjs`.
+> ### What the solver needed
+>
+> A1, A2, B3 and B4 are pure `allowFoundation` gates — the solver simply never generates a move that
+> would violate them, so a certification is **sound by construction**. The other two needed new
+> machinery:
+>
+> - **F1** added `constraint.maxRun`, which caps run length inside `legalMoves` (1 for
+>   `no-supermoves`, `Infinity` otherwise). Also a gate, so also sound by construction.
+> - **F2** is *existential*, not a gate — it demands something happen at least once. That needs a
+>   second latch alongside the one `down-openers-20` already used, so the search node key grows a
+>   `big` flag and the win test becomes `(!usesOpen || opened) && (!usesBig || big)`.
+>
+> Soundness was verified by replaying each gated line and checking the property directly rather than
+> trusting the constraint: `split-even` → up = [7,7,7,7]; `no-down-foundation` → down = [0,0,0,0];
+> `no-up-foundation` → up = [0,0,0,0]; `no-supermoves` → maxRun = 1; `down-heavy` → every up ≤ 5.
+>
+> ### What the app needed
+>
+> One new telemetry field, `maxRunMoved`, serving both F1 and F2. It is threaded through the
+> snapshot/undo rollback, both multi-card move paths, the persisted saved game (decode-tolerant,
+> defaults to 0), and the HUD's `Attempt` reconstruction on both platforms.
+>
+> `one-big-move` is also the first **securable** objective — positive and irreversible — so the live
+> HUD can show a green ✓ the moment it happens, where every previous objective could only ever go
+> from neutral to violated.
+>
+> ### Steering which objective a day gets
+>
+> The per-day RNG draw is fixed, so the only lever is pool *length*. A seed certified for exactly one
+> Gold gives `goldPool` length 1 — index 0 regardless of the draw — which pins that Gold
+> deterministically. Silver needed the same trick with a known draw: day −6 wanted `L = 4, r = 0.653
+> → index 2`, day −5 wanted `L = 3, r = 0.935 → index 2`. A targeted hunt over seeds > 10,000,000
+> found all four required combinations in **6 candidates**.
 >
 > **History intact — verified, not assumed:** all 366 existing days produce byte-identical challenges
 > before and after, `pool.seeds` is unchanged, and all 366 original solution entries are untouched.
+> This holds because appending to `GOLD` and `SILVER_CERTIFIED` changes nothing (§8.3), and the
+> sandbox lives entirely at negative indices (§8.1).
 >
-> Two things had to be fixed to make it work, both described below: the iOS **seed clamp**
-> (§8.2) and a pre-existing **calendar bug** (§8.7). The objectives themselves are all from the
-> *existing* catalogue — the new ones proposed in §5 are still unimplemented and remain the obvious
-> next step.
-
+> Two guard failures were fixed rather than silenced: the iOS frozen-pool pins needed updating for
+> the appends, and **both** `replay()` reconstructions (in `tests/solutions.test.mjs` and
+> `tools/solver/build-solutions.mjs`) failed to emit `maxRunMoved` — which would have made an F1 or
+> F2 line impossible to validate. 71 node tests green; verified on web and on device.
+>
+> Earlier the same day, the sandbox shipped once with *existing* objectives only (5/5 Silvers, 5/6
+> Golds from the old catalogue); that version was replaced by this one. Two fixes from that pass
+> still stand: the iOS **seed clamp** (§8.2) and a pre-existing **calendar bug** (§8.7).
 
 
 **Owner's plan (2026-08-21):** backfill **2026-08-05 → 2026-08-11** with a representative variety of

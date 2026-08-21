@@ -77,13 +77,31 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
-### Daily sandbox + calendar fix (2026-08-21)
+### Daily objectives + sandbox + calendar fix (2026-08-21)
+- **Six new objective types — DONE.** `split-even` (A1: every suit splits A-7 up / 8-K down),
+  `down-heavy` (A2: >= 8 of every suit from the King end), `no-down-foundation` (B3: win using only
+  up foundations), `no-up-foundation` (B4: win building every suit K->A), `no-supermoves` (F1: one
+  card at a time), `one-big-move` (F2: relocate a run of 5+ at least once). All three copies of the
+  logic + the solver + the drift guards. A1/A2/B3/B4 are pure `allowFoundation` gates (sound by
+  construction); F1 added `constraint.maxRun` to `legalMoves`; F2 is existential, so the search node
+  key grew a second latch (`big`) alongside `wantDownOpen`. Appending to `GOLD`/`SILVER_CERTIFIED`
+  changes 0 of 366 frozen days — re-verified. See docs/daily-objectives-proposal.md section 8.
+- **`maxRunMoved` telemetry — DONE.** New field serving F1 and F2: largest run ever relocated in one
+  move. Threaded through snapshot/undo rollback, both multi-card move paths, the persisted saved
+  game (decode-tolerant, defaults 0), and the HUD's `Attempt` reconstruction, on both platforms.
+  `one-big-move` is the first *securable* objective — positive and irreversible — so the live HUD
+  can show a green check mid-game rather than only ever going neutral -> violated.
 - **Pre-epoch playtest sandbox — DONE.** Negative day indices now resolve to a `preSeeds` array in
   `data/daily-pool.json` (`preSeeds[i]` = day `-(i+1)`), so dates before the 2026-08-12 epoch are
   playable. Days >= 0 are frozen; the sandbox is deliberately mutable. Seven dates (2026-08-05..11)
-  backfilled with certified deals from seeds > 10,000,000 — 5/5 distinct Silvers, 5/6 Golds.
-  Verified all 366 existing days are byte-identical before/after. Both platforms + canonical, with
-  2 new tests. See docs/daily-objectives-proposal.md section 8.
+  backfilled with certified deals from seeds > 10,000,000, rebuilt to showcase the six new
+  objectives: Aug 5 = A1, Aug 6 = A2 + B3, Aug 7 = F1 + B4, Aug 8 = F2, Aug 9-11 keep familiar
+  objectives for contrast. Objective assignment is steered by pool *length* (a seed certified for
+  exactly one Gold pins that Gold, since the per-day RNG draw is fixed). Verified all 366 existing
+  days are byte-identical before/after. Both platforms + canonical.
+- **`replay()` dropped `maxRunMoved` — FIXED.** Both solution replayers (`tests/solutions.test.mjs`
+  and `tools/solver/build-solutions.mjs`) reconstructed telemetry without it, which would have made
+  any F1 or F2 line impossible to validate. Caught by a guard failure, fixed rather than silenced.
 - **iOS seed clamp — FIXED.** `Game.deal(seed:)` clamped to `maxSeed = 1_000_000`, so any pool seed
   above that dealt a DIFFERENT board on iOS than on web. Split into `maxSeed` (what the player may
   type into Deal #) and `maxValidSeed` (UInt32 max, what the RNG accepts, matching web's `>>> 0`).

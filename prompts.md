@@ -577,3 +577,13 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     frozen-pool pins needed updating for the appends, and BOTH `replay()` reconstructions
     (solutions.test.mjs and build-solutions.mjs) failed to emit `maxRunMoved`, so an F1/F2 line could
     never validate. 71 node tests green; verified on web and on device.
+
+    **Verification.** All four new-objective sandbox days render correctly on device (Aug 5 A1,
+    Aug 6 A2+B3, Aug 7 F1+B4, Aug 8 F2), the two-line labels wrap without truncating, and the
+    "show me how to win" row correctly offers Silver only on the three certified-Silver days —
+    matching §8.3's prediction of exactly which days can carry one. All 10 XCUITests pass. Live-HUD
+    behaviour spot-checked on web: `one-big-move` secures at maxRunMoved>=5 and is never violated at
+    any value; `no-supermoves` violates at 2 but not 1; `no-up-foundation` violates on the first up
+    send but not on a down send. Also fixed drift the change introduced in `docs/architecture/`:
+    the Telemetry ER diagrams on all three pages were missing `maxRunMoved`, the web page pinned the
+    old `telem` initialiser, and the objective catalogue still said "11 implemented ids" (now 17).

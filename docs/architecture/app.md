@@ -429,6 +429,7 @@ erDiagram
         int cellUses
         int undos
         array foundationOrder
+        int maxRunMoved
     }
     WINS {
         int seed PK

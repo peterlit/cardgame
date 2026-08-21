@@ -212,6 +212,7 @@ erDiagram
         int cellUses
         int undos
         array foundationOrder
+        int maxRunMoved
     }
     SAVED_GAME {
         int seed
@@ -245,7 +246,7 @@ that seed is certified to support (`tests/daily.mjs:72-83`). The pool is **appen
 can never be rewritten — appending seeds cannot shift a past day, which is asserted directly at
 `tests/daily.test.mjs:48-52`.
 
-**Objective catalogue** — 11 implemented ids (`tests/daily.mjs:41-53`):
+**Objective catalogue** — 17 implemented ids (`tests/daily.mjs`):
 
 | Grade | id | Requires (in addition to winning) |
 |---|---|---|
@@ -259,6 +260,16 @@ can never be rewritten — appending seeds cannot shift a past day, which is ass
 | Gold | `jacks-down-first` | no Ace goes up before all four Jacks are down |
 | Gold | `suits-top-down` | per suit, its King lands before its Ace |
 | Gold | `suit-sprint` | finish one whole suit before a second suit starts |
+| Silver (certified) | `down-heavy` | at least 8 of every suit came from the King end |
+| Silver (certified) | `no-supermoves` | `maxRunMoved <= 1` — never relocated more than one card |
+| Gold | `split-even` | every suit splits exactly A-7 up / 8-K down |
+| Gold | `no-down-foundation` | no card ever went to a down foundation |
+| Gold | `no-up-foundation` | no card ever went to an up foundation |
+| Gold | `one-big-move` | `maxRunMoved >= 5` — relocated a run of 5+ in one move |
+
+The last six were added 2026-08-21 (see `docs/daily-objectives-proposal.md`). Five of them are
+*gates* the solver can enforce during search, so certification is sound by construction;
+`one-big-move` is existential and needs a latch in the search node key.
 
 **Trusted-telemetry contract.** Checkers do not re-simulate the game; they read a telemetry record
 the app must emit honestly (`tests/daily.mjs:26-33`). The stated justification: the game is local,

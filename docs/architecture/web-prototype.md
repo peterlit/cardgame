@@ -74,7 +74,7 @@ places.
 
 ```js
 let state, history, seed, moveCount, startTime, timerId, selection;
-let telem = { cellUses:0, undos:0, foundationOrder:[] }, challengeDay = null;
+let telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }, challengeDay = null;
 ```
 
 `state` is `{tableau: Card[8][], cells: (Card|null)[3], up: int[4], down: int[4]}` (`:485-490`).
@@ -323,7 +323,7 @@ erDiagram
         int elapsedSecs
         bool started
         int challengeDay "nullable"
-        object telem "cellUses, undos, foundationOrder"
+        object telem "cellUses, undos, foundationOrder, maxRunMoved"
     }
     WINS {
         int seed PK
