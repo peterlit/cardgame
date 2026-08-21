@@ -199,9 +199,19 @@ struct Challenge: Equatable {
 /// Day D always maps to pool[D] (append-only ⇒ frozen history); a per-day RNG picks the
 /// Silver/Gold objective from what that seed is certified to support. Returns nil if D is out of
 /// the pool's current range. FROZEN rng-seed formula — never alter without a history migration.
-func dailyChallenge(_ dayIndex: Int, _ pool: [PoolSeed]) -> Challenge? {
-    guard dayIndex >= 0, dayIndex < pool.count else { return nil }
-    let rec = pool[dayIndex]
+func dailyChallenge(_ dayIndex: Int, _ pool: [PoolSeed], pre: [PoolSeed] = DailyData.preSeeds) -> Challenge? {
+    // Day >= 0 indexes the frozen, append-only calendar. Day < 0 indexes the pre-epoch PLAYTEST
+    // SANDBOX, which is explicitly mutable — rewriting it can never disturb a day >= 0, because
+    // those indices, seeds and RNG draws are untouched. See docs/daily-objectives-proposal.md §8.
+    let rec: PoolSeed
+    if dayIndex >= 0 {
+        guard dayIndex < pool.count else { return nil }
+        rec = pool[dayIndex]
+    } else {
+        let i = -dayIndex - 1
+        guard i < pre.count else { return nil }
+        rec = pre[i]
+    }
     var rng = Mulberry32(UInt32(truncatingIfNeeded: 0x9e37_79b9 ^ (dayIndex + 1)))
     let silverPool = SILVER_UNIVERSAL + SILVER_CERTIFIED.filter { rec.supports.contains($0) }
     let goldPool = GOLD.filter { rec.supports.contains($0) }
@@ -389,7 +399,7 @@ struct PoolSeed: Decodable, Equatable {
     let par: Int
     let supports: [String]
 }
-private struct PoolFile: Decodable { let seeds: [PoolSeed] }
+private struct PoolFile: Decodable { let seeds: [PoolSeed]; let preSeeds: [PoolSeed]? }
 
 /// The baked winning lines for one seed, one per tier. `silver` is present only when the day's
 /// Silver is a certified (constraining) objective; a universal Silver falls back to `bronze`.
@@ -401,13 +411,19 @@ struct TierSolutions: Decodable, Equatable {
 private struct SolutionsFile: Decodable { let solutions: [String: TierSolutions] }
 
 enum DailyData {
-    /// The certified seed pool, or [] if the resource is missing/unreadable (Daily then disabled).
-    static let pool: [PoolSeed] = {
+    /// The bundled pool file, decoded once (nil if missing/unreadable — Daily is then disabled).
+    private static let file: PoolFile? = {
         guard let url = Bundle.main.url(forResource: "daily-pool", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let file = try? JSONDecoder().decode(PoolFile.self, from: data) else { return [] }
-        return file.seeds
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(PoolFile.self, from: data)
     }()
+
+    /// The certified seed pool for days >= 0 (the frozen calendar).
+    static let pool: [PoolSeed] = file?.seeds ?? []
+
+    /// Pre-epoch PLAYTEST SANDBOX, indexed by `-dayIndex - 1`. Explicitly mutable; empty in a
+    /// normal build. See docs/daily-objectives-proposal.md §8.
+    static let preSeeds: [PoolSeed] = file?.preSeeds ?? []
 
     /// Baked "Show me how to win" lines per seed (bronze/silver/gold). Empty if the resource is
     /// missing — the feature just doesn't offer itself for those seeds.

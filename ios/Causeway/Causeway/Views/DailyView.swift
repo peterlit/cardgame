@@ -307,16 +307,23 @@ struct DailyView: View {
                 }.font(.system(size: 11)).foregroundStyle(.secondary)
             }
             LazyVGrid(columns: calCols, spacing: 4) {
-                // Positional id, NOT \.self: "T" (Thu) and "S" (Sat) duplicate Tue/Sun's letters,
-                // and identity-collapsed duplicates rendered as two blank header columns.
-                ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { _, d in
+                // All three ForEach blocks below are siblings inside ONE LazyVGrid, so their ids share
+                // an identity space and MUST be disjoint. Two bugs have come from getting this wrong:
+                //   1. \.self on the weekday letters — "T"/"S" duplicate Tue/Sun, collapsing two
+                //      header columns to blank.
+                //   2. the fix for (1) used \.offset (0...6), which then collided with the day cells'
+                //      ids (1...31) and silently blanked days 1-6 of EVERY month.
+                // Prefixed string ids keep the three spaces provably distinct.
+                ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { i, d in
                     Text(d).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
+                        .id("hdr-\(i)")
                 }
                 // Data-driven ForEach (not the constant-range ForEach(0..<Int)) so a month rollover
-                // that changes `first` re-diffs cleanly; negative ids never collide with day cells.
-                ForEach(Array(0..<first).map { -($0 + 1) }, id: \.self) { _ in Color.clear.frame(height: 40) }
-                ForEach(1...dim, id: \.self) { d in
+                // that changes `first` re-diffs cleanly.
+                ForEach(Array(0..<first).map { "pad-\($0)" }, id: \.self) { _ in Color.clear.frame(height: 40) }
+                ForEach(Array(1...dim).map { "day-\($0)" }, id: \.self) { key in
+                    let d = Int(key.dropFirst(4)) ?? 1
                     calCell(idx: dayIndexFor(y, m, d), day: d, ti: ti)
                 }
             }
@@ -325,7 +332,7 @@ struct DailyView: View {
 
     private func calCell(idx: Int, day: Int, ti: Int) -> some View {
         let rec = days[idx]
-        let avail = idx >= 0 && idx < pool.count && idx <= ti
+        let avail = idx <= ti && dailyChallenge(idx, pool) != nil   // sandbox days (idx < 0) are playable too
         let dots = ["bronze", "silver", "gold"].filter { rec?[$0] == true }
         return ZStack {
             RoundedRectangle(cornerRadius: 8)

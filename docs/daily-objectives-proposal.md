@@ -410,6 +410,40 @@ anything proposed here.
 
 ## 8. Implementation plan — backfill a playtest window first
 
+> ## ✅ SHIPPED 2026-08-21 — the sandbox is live
+>
+> Seven dates backfilled with certified deals drawn from seeds **> 10,000,000**, on both platforms:
+>
+> | Date | Day | Deal | Silver | Gold |
+> |---|---|---|---|---|
+> | 2026-08-05 | −7 | 333,604,570 | `no-undo` | `suits-top-down` |
+> | 2026-08-06 | −6 | 872,540,785 | `cells-le-1` | `jacks-down-first` |
+> | 2026-08-07 | −5 | 53,307,501 | `down-openers-20` | `no-cells` |
+> | 2026-08-08 | −4 | 835,196,898 | `moves` | `kings-first` |
+> | 2026-08-09 | −3 | 339,664,220 | `moves` | `aces-first` |
+> | 2026-08-10 | −2 | 561,325,499 | `cells-le-2` | `kings-first` |
+> | 2026-08-11 | −1 | 872,465,152 | `no-undo` | `no-cells` |
+>
+> **Variety achieved: 5/5 distinct Silvers** (every objective in the catalogue, including all three
+> certified ones) **and 5/6 distinct Golds.** The only Gold missing is `suit-sprint` — none of the 22
+> certified candidates supported it, consistent with its ~1 % support rate, and it is the objective
+> §6 recommends retiring anyway.
+>
+> Certification: 22 random seeds sampled from 10,000,001–999,999,999, **22/22 certified** (100 %
+> eligibility, ~10–20 s each). Every backfilled day has a verified bronze **and** gold line; the
+> three certified-Silver days also carry a silver line. All lines are replayed and re-checked against
+> the runtime objective checkers by `tests/solutions.test.mjs`.
+>
+> **History intact — verified, not assumed:** all 366 existing days produce byte-identical challenges
+> before and after, `pool.seeds` is unchanged, and all 366 original solution entries are untouched.
+>
+> Two things had to be fixed to make it work, both described below: the iOS **seed clamp**
+> (§8.2) and a pre-existing **calendar bug** (§8.7). The objectives themselves are all from the
+> *existing* catalogue — the new ones proposed in §5 are still unimplemented and remain the obvious
+> next step.
+
+
+
 **Owner's plan (2026-08-21):** backfill **2026-08-05 → 2026-08-11** with a representative variety of
 the new challenges, play them for a few days, adjust and re-backfill as needed, and only once
 satisfied extend the *forward* calendar. Single-user context, so churn in the sandbox is acceptable.
@@ -453,6 +487,12 @@ Eight guards currently assume non-negative days. Each needs to admit a bounded n
 | `Model/Daily.swift` | `:203` `guard dayIndex >= 0` |
 | `Model/Game.swift` | `:777` `guard day >= 0` |
 | `Views/DailyView.swift` | `:328` calendar `avail` · `:80` `clampedToday` |
+
+**Also required (found during implementation): the iOS seed clamp.** `Game.deal(seed:)` clamped
+every deal to `maxSeed = 1_000_000`, so a sandbox seed above 10 M would have dealt a *different
+board on iOS than on web* — silently breaking parity and the challenge. Fixed by separating the two
+concepts: `maxSeed` still bounds what the player may **type** into Deal #, while a new
+`maxValidSeed` (UInt32 max) bounds what the RNG accepts, matching web's `theSeed >>> 0`.
 
 Storage shape: a separate **`preSeeds`** array in the pool file, indexed by `−dayIndex − 1`, keeps
 the sandbox physically distinct from the frozen `seeds` array — so it can never be confused for, or
@@ -516,7 +556,23 @@ playtest this month, or add month navigation (small, and independently useful). 
 7. **T1 families last** (E2, F1/F2) if they make the cut — they touch the persisted `Telemetry`
    shape on both platforms and deserve their own review pass.
 
-### 8.6 Before this becomes multi-user
+### 8.6 Bug found while verifying: iOS hid days 1–6 of every month
+
+Verifying the sandbox on device surfaced a **pre-existing** bug, unrelated to this work but fatal
+to it: the iOS calendar rendered **days 1–6 of every month as blank cells**. Confirmed pre-existing
+by rebuilding the unmodified view — days 7–11 drew greyed, 1–6 drew nothing.
+
+Cause: the month grid is one `LazyVGrid` containing **three sibling `ForEach` blocks that share an
+identity space**. The weekday header used `id: \.offset` → ids **0…6**; the day cells used
+`id: \.self` → ids **1…31**. Ids 1–6 collided, and SwiftUI collapsed the duplicates.
+
+It is a bug produced by fixing another bug: the header originally used `id: \.self` on the letters,
+where the duplicate "T"/"S" collapsed two header columns — and the QA-loop fix for *that* switched
+to positional ids, which then collided with the day cells. Fixed properly by giving all three blocks
+prefixed string ids (`hdr-`, `pad-`, `day-`) so the spaces are provably disjoint, with a comment
+recording both failure modes. The existing `RegressionDailyWeekdayHeaderTests` still passes.
+
+### 8.7 Before this becomes multi-user
 
 The sandbox is safe **because there is one player**. If that changes, either delete the negative-day
 range or freeze it like any other history — otherwise a second player's records would depend on

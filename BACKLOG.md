@@ -77,6 +77,22 @@ are done or added.
 - **M6 — Single-tap latency (iOS)** — **resolved** by the change above: the `.onTapGesture(count: 2)`
   double-tap is gone, so a single tap fires immediately with no disambiguation delay.
 
+### Daily sandbox + calendar fix (2026-08-21)
+- **Pre-epoch playtest sandbox — DONE.** Negative day indices now resolve to a `preSeeds` array in
+  `data/daily-pool.json` (`preSeeds[i]` = day `-(i+1)`), so dates before the 2026-08-12 epoch are
+  playable. Days >= 0 are frozen; the sandbox is deliberately mutable. Seven dates (2026-08-05..11)
+  backfilled with certified deals from seeds > 10,000,000 — 5/5 distinct Silvers, 5/6 Golds.
+  Verified all 366 existing days are byte-identical before/after. Both platforms + canonical, with
+  2 new tests. See docs/daily-objectives-proposal.md section 8.
+- **iOS seed clamp — FIXED.** `Game.deal(seed:)` clamped to `maxSeed = 1_000_000`, so any pool seed
+  above that dealt a DIFFERENT board on iOS than on web. Split into `maxSeed` (what the player may
+  type into Deal #) and `maxValidSeed` (UInt32 max, what the RNG accepts, matching web's `>>> 0`).
+- **iOS calendar hid days 1-6 of EVERY month — FIXED (pre-existing).** The month grid is one
+  LazyVGrid with three sibling ForEach blocks sharing an identity space; the weekday header used
+  `id: \.offset` (0...6) and the day cells `id: \.self` (1...31), so ids 1-6 collided and SwiftUI
+  collapsed them. Itself a regression from the earlier fix for duplicate "T"/"S" header letters.
+  Now uses prefixed string ids (`hdr-`/`pad-`/`day-`) so the three spaces are provably disjoint.
+
 ### QA loop — round 1 findings (2026-08-14)
 Simulator-driven UX/QA loop (`.qa-loop/REPORT.md`) converged round 1: no blockers/majors.
 All four findings (2 auto + 2 accepted proposals) **fixed** in `5b237b4`:

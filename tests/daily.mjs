@@ -70,8 +70,11 @@ function makeObjective(id, rec) {
 // day), and a per-day RNG picks the Silver/Gold objective from what that seed is certified to
 // support. Returns null if D is out of the pool's current range (challenge not available yet).
 export function dailyChallenge(dayIndex, pool) {
-  if (dayIndex < 0 || dayIndex >= pool.seeds.length) return null;
-  const rec = pool.seeds[dayIndex];
+  // Day >= 0 indexes the frozen, append-only calendar. Day < 0 indexes `preSeeds` — the pre-epoch
+  // PLAYTEST SANDBOX (docs/daily-objectives-proposal.md §8), which is explicitly mutable: rewriting
+  // it can never disturb a day >= 0, because those indices, seeds and RNG draws are untouched.
+  const rec = dayIndex >= 0 ? pool.seeds[dayIndex] : (pool.preSeeds || [])[-dayIndex - 1];
+  if (!rec) return null;
   // FROZEN rng seed formula — changing it retroactively reshuffles every past day's Silver/Gold
   // pick. Golden-mastered in tests/daily.test.mjs. Never alter without a history migration.
   const rng = mulberry32((0x9e3779b9 ^ (dayIndex + 1)) >>> 0);

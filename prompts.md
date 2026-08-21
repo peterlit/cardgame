@@ -533,3 +533,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (safe precisely because the sandbox is outside the frozen region). Also flagged that the
     calendar renders **the current month only** with no month navigation on either platform, so the
     backfilled August days are reachable only during August 2026. Still proposal-only; 68 green.
+73. "Run the solver on randomly-selected deals above 10,000,000 until you have seven certified deals
+    with bronze/silver/gold showcasing variety. Backfill seven dates before 8/12/2026. Go."
+    **Shipped.** Sampled 22 random seeds in 10,000,001–999,999,999 and certified **22/22** (~10–20s
+    each). Searched assignments of seed→day-slot to maximise variety, since the RNG draw is fixed per
+    day and the seed's `supports` steer the pick: landed **5/5 distinct Silvers** (all three certified
+    ones included) and **5/6 Golds** — only `suit-sprint` missing, as no candidate supports it (~1%
+    rate; the objective §6 recommends retiring). Backfilled 2026-08-05..08-11 = day indices −7..−1 via
+    a new `preSeeds` array (`preSeeds[i]` = day −(i+1)) in the pool file, wired through canonical
+    `tests/daily.mjs`, web, and Swift, plus the calendar/playChallenge guards on both platforms.
+    Baked + validated bronze and gold lines for all 7 (and silver for the 3 certified-Silver days).
+    **Verified history intact**: all 366 existing days byte-identical before/after, `pool.seeds`
+    unchanged, all 366 original solution entries untouched. Two blockers found and fixed en route:
+    (a) `Game.deal(seed:)` clamped every deal to `maxSeed = 1_000_000`, so a >10M seed would have
+    dealt a DIFFERENT board on iOS than web — split into `maxSeed` (max the player may type) vs
+    `maxValidSeed` (UInt32, what the RNG accepts, matching web's `>>>0`); (b) **pre-existing: the iOS
+    calendar hid days 1–6 of every month.** Proved pre-existing by rebuilding the unmodified view.
+    Cause: the month grid is one LazyVGrid with three sibling ForEach blocks sharing an identity
+    space — the weekday header used `id: \.offset` (0…6) and the day cells `id: \.self` (1…31), so
+    ids 1–6 collided and SwiftUI collapsed them. Itself a regression from the earlier fix for the
+    duplicate "T"/"S" header letters. Fixed with prefixed string ids (`hdr-`/`pad-`/`day-`).
+    Verified on web and on-device (Aug 5 → Deal #333,604,570, correct objectives, calendar shows
+    1–31 with 5–11 playable). 70 node tests + 10 XCUI tests green.

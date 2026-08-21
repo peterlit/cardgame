@@ -42,7 +42,13 @@ private struct Snapshot {
 final class Game: ObservableObject {
     static let cellCount = 3
     static let colCount = 8
+    /// Highest deal number the player may type in (Deal # / Wins entry).
     static let maxSeed = 1_000_000
+    /// Highest seed the deal RNG accepts. mulberry32 is seeded from a UInt32, and the web build
+    /// only does `theSeed >>> 0`, so any value in this range deals identically on both platforms.
+    /// Challenge pools may legitimately exceed `maxSeed` (the playtest sandbox uses > 10,000,000);
+    /// clamping those down here would silently deal a different board than web.
+    static let maxValidSeed = 4_294_967_295
 
     @Published var tableau: [[Card]] = Array(repeating: [], count: colCount)
     @Published var cells: [Card?] = Array(repeating: nil, count: cellCount)
@@ -163,7 +169,7 @@ final class Game: ObservableObject {
         // and lingering demoing/demoDoneMessage would keep the demo bar up and lock input.
         // showSolution re-arms demoing = true AFTER deal() returns, so this doesn't self-cancel it.
         stopDemo()
-        self.seed = max(1, min(Game.maxSeed, seed))
+        self.seed = max(1, min(Game.maxValidSeed, seed))
         var rng = Mulberry32(UInt32(truncatingIfNeeded: self.seed))
         var deck: [Card] = []
         for s in 0..<4 { for r in 1...13 { deck.append(Card(suit: Suit(rawValue: s)!, rank: r)) } }
@@ -774,8 +780,9 @@ final class Game: ObservableObject {
     /// Begin playing `day` as a challenge: deal its seed (which resets telemetry and clears
     /// challengeDay), then mark this attempt as that challenge. No-op if unavailable / in the future.
     func playChallenge(_ day: Int) {
-        guard day >= 0, day < pool.count, day <= todayIndex() else { return }
-        deal(seed: pool[day].seed)   // resets telem + clears challengeDay + dailyResult
+        // Resolve through dailyChallenge so pre-epoch sandbox days (day < 0) work too.
+        guard day <= todayIndex(), let ch = dailyChallenge(day, pool) else { return }
+        deal(seed: ch.seed)          // resets telem + clears challengeDay + dailyResult
         challengeDay = day
         persist()
     }

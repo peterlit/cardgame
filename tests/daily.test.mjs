@@ -230,6 +230,32 @@ test('streaks count a day completed yesterday (today not yet played)', () => {
   assert.equal(streaks(rec, 9).play.current, 1);   // yesterday done, today pending -> streak alive
 });
 
+/* ---------- pre-epoch playtest sandbox (negative day indices) ---------- */
+test('negative day indices resolve to preSeeds, and never disturb days >= 0', () => {
+  const seedsOnly = { seeds: [
+    { seed: 10001, par: 100, supports: ['no-cells', 'cells-le-1'] },
+    { seed: 10002, par: 100, supports: ['kings-first'] },
+  ] };
+  const withPre = { ...seedsOnly, preSeeds: [
+    { seed: 555001, par: 90, supports: ['aces-first', 'cells-le-2'] },
+    { seed: 555002, par: 90, supports: ['suits-top-down'] },
+  ] };
+  // days >= 0 are byte-identical whether or not a sandbox exists — the whole safety claim
+  for (let d = 0; d < seedsOnly.seeds.length; d++) {
+    assert.deepEqual(dailyChallenge(d, withPre), dailyChallenge(d, seedsOnly));
+  }
+  // preSeeds[i] backs day -(i+1)
+  assert.equal(dailyChallenge(-1, withPre).seed, 555001);
+  assert.equal(dailyChallenge(-2, withPre).seed, 555002);
+  // out of sandbox range, and no sandbox at all, both yield null
+  assert.equal(dailyChallenge(-3, withPre), null);
+  assert.equal(dailyChallenge(-1, seedsOnly), null);
+  // a sandbox day is a real challenge: objectives drawn from that seed's supports
+  const c = dailyChallenge(-1, withPre);
+  assert.ok(['aces-first', 'cells-le-2'].includes(c.gold.id) || c.gold.id === 'aces-first');
+  assert.ok(c.silver.id && c.gold.id);
+});
+
 /* ---------- DRIFT GUARD: the web app inlines this logic; assert it hasn't diverged ---------- */
 // The daily logic is inlined into index.html (file:// can't import modules). Pin distinctive bodies
 // so an edit to one copy without the other trips CI — mirrors the engine/rules drift guards.

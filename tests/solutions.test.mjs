@@ -88,3 +88,27 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
   ).length;
   assert.equal(silverChecked, expectedSilver, `expected ${expectedSilver} certified-silver lines`);
 });
+
+test('sandbox (pre-epoch) baked lines win and satisfy their objective', () => {
+  const pre = pool.preSeeds || [];
+  assert.ok(pre.length > 0, 'expected a playtest sandbox in data/daily-pool.json');
+  let checked = 0;
+  pre.forEach((rec, i) => {
+    const day = -(i + 1);
+    const ch = dailyChallenge(day, pool);
+    assert.ok(ch, `sandbox day ${day} has no challenge`);
+    const e = sol.solutions[String(rec.seed)];
+    assert.ok(e && e.bronze, `sandbox seed ${rec.seed} missing bronze line`);
+    assert.ok(replay(rec.seed, e.bronze).won, `sandbox seed ${rec.seed} bronze does not win`);
+    assert.ok(e.gold, `sandbox seed ${rec.seed} missing gold line`);
+    const g = replay(rec.seed, e.gold);
+    assert.ok(g.won, `sandbox seed ${rec.seed} gold does not win`);
+    assert.ok(evaluate(ch.gold, g), `sandbox seed ${rec.seed} gold fails ${ch.gold.id}`);
+    if (e.silver) {
+      const t = replay(rec.seed, e.silver);
+      assert.ok(t.won && evaluate(ch.silver, t), `sandbox seed ${rec.seed} silver fails ${ch.silver.id}`);
+    }
+    checked++;
+  });
+  assert.equal(checked, pre.length);
+});

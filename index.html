@@ -1182,9 +1182,12 @@ const OBJECTIVES={
 const SILVER_UNIVERSAL=['moves','no-undo'], SILVER_CERTIFIED=['cells-le-1','cells-le-2','down-openers-20'];
 const GOLD=['no-cells','aces-first','kings-first','jacks-down-first','suits-top-down','suit-sprint'];
 function makeObjective(id,rec){const o=OBJECTIVES[id];const param=o.param?o.param(rec):{};return{id,grade:o.grade,param,label:o.label(param)};}
+// Day >=0 = frozen calendar (pool array). Day <0 = pre-epoch PLAYTEST SANDBOX (dailyPre),
+// explicitly mutable — rewriting it can never disturb a day >=0. See docs/daily-objectives-proposal.md §8.
+function dailyRec(idx){ return idx>=0 ? (dailyPool&&dailyPool[idx]) : dailyPre[-idx-1]; }
 function dailyChallenge(dayIndex,pool){
-  if(dayIndex<0||dayIndex>=pool.length)return null;
-  const rec=pool[dayIndex];
+  const rec = dayIndex>=0 ? (pool&&pool[dayIndex]) : dailyPre[-dayIndex-1];
+  if(!rec) return null;
   const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);
   const silverPool=SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id=>rec.supports.includes(id)));
   const goldPool=GOLD.filter(id=>rec.supports.includes(id));
@@ -1221,12 +1224,12 @@ function streaks(records,todayIndex){
 }
 
 /* ---- pool + per-day store ---- */
-let dailyPool=null;
+let dailyPool=null, dailyPre=[];
 let dailyStore=loadDaily();
 function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days) return g; }catch(e){} return {version:1, days:{}}; }
 function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
 // The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
-fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.seeds; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
+fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.seeds; dailyPre=p.preSeeds||[]; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
 // Baked winning lines for "Show me how to win" (seed -> compact token string). Optional: absent =
 // the feature just doesn't offer itself for that seed.
 let dailySolutions=null;
@@ -1234,7 +1237,7 @@ fetch("data/daily-solutions.json").then(r=>r.json()).then(s=>{ dailySolutions=s.
 
 /* ---- play a challenge, and score it on win ---- */
 function playChallenge(day){
-  if(!dailyPool||!dailyPool[day]||day>todayIndex()) return;
+  if(!dailyPool||!dailyRec(day)||day>todayIndex()) return;
   stopDemo();
   deal(dailyPool[day].seed);   // resets telem + clears challengeDay
   challengeDay=day; saveGame();
@@ -1446,7 +1449,7 @@ function renderDailyCal(){
   for(let i=0;i<first;i++) html+='<div class="dcell empty"></div>';
   for(let d=1;d<=dim;d++){
     const idx=dayIndexFor(y,m,d); const rec=dailyStore.days[idx];
-    const avail=idx>=0 && idx<dailyPool.length && idx<=ti;
+    const avail=!!dailyRec(idx) && idx<=ti;   // sandbox days (idx<0) are playable too
     const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
     // Flawless days show a ⭐ in the marker slot (in place of the tier dots — flawless implies all
     // three), so it never overlaps the date number.
