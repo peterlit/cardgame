@@ -57,16 +57,18 @@ function parseToken(tok) {
 function replay(seed, tokens) {
   let s = dealState(seed);
   const foundationOrder = [];
-  let cellUses = 0, moves = 0;
+  let cellUses = 0, moves = 0, maxRunMoved = 0;
   for (const tok of tokens.split(' ')) {
     const f = tok.split(',');
     moves++;
     if (f[0] === 'F') { const col = s.tableau[+f[1]]; const c = col[col.length - 1]; foundationOrder.push({ suit: c.suit, rank: c.rank, end: +f[2] ? 'down' : 'up', moveIdx: moves }); }
     else if (f[0] === 'G') { const c = s.cells[+f[1]]; foundationOrder.push({ suit: c.suit, rank: c.rank, end: +f[2] ? 'down' : 'up', moveIdx: moves }); }
     else if (f[0] === 'C') { cellUses++; }
+    // largest tableau run relocated — the telemetry the no-supermoves / one-big-move checkers read
+    else if (f[0] === 'T') { maxRunMoved = Math.max(maxRunMoved, s.tableau[+f[1]].length - (+f[2])); }
     s = applyMove(s, parseToken(tok));
   }
-  return { won: isWon(s), moves, elapsed: 0, cellUses, undos: 0, foundationOrder };
+  return { won: isWon(s), moves, elapsed: 0, cellUses, undos: 0, foundationOrder, maxRunMoved };
 }
 
 // Solve seed under `objId` and return the winning line as tokens, or null if unsolved in budget.

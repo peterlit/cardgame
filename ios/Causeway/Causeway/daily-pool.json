@@ -6,10 +6,10 @@
     {"seed":872465152,"winnable":true,"par":70,"supports":["no-cells","aces-first","kings-first","jacks-down-first","suits-top-down","cells-le-1","cells-le-2","down-openers-20"],"constraintPar":{"no-cells":84,"aces-first":82,"kings-first":81,"jacks-down-first":81,"suits-top-down":80,"cells-le-1":77,"cells-le-2":70,"down-openers-20":76}},
     {"seed":561325499,"winnable":true,"par":91,"supports":["no-cells","aces-first","kings-first","jacks-down-first","suits-top-down","cells-le-1","cells-le-2"],"constraintPar":{"no-cells":102,"aces-first":105,"kings-first":113,"jacks-down-first":113,"suits-top-down":110,"cells-le-1":92,"cells-le-2":91}},
     {"seed":339664220,"winnable":true,"par":84,"supports":["no-cells","aces-first","kings-first","jacks-down-first","suits-top-down","cells-le-1","cells-le-2","down-openers-20"],"constraintPar":{"no-cells":87,"aces-first":84,"kings-first":101,"jacks-down-first":104,"suits-top-down":98,"cells-le-1":89,"cells-le-2":87,"down-openers-20":88}},
-    {"seed":835196898,"winnable":true,"par":83,"supports":["no-cells","kings-first","suits-top-down","cells-le-1","cells-le-2"],"constraintPar":{"no-cells":96,"kings-first":98,"suits-top-down":104,"cells-le-1":99,"cells-le-2":83}},
-    {"seed":53307501,"winnable":true,"par":86,"supports":["no-cells","aces-first","kings-first","suits-top-down","cells-le-1","cells-le-2","down-openers-20"],"constraintPar":{"no-cells":104,"aces-first":98,"kings-first":92,"suits-top-down":92,"cells-le-1":86,"cells-le-2":93,"down-openers-20":92}},
-    {"seed":872540785,"winnable":true,"par":83,"supports":["no-cells","aces-first","kings-first","jacks-down-first","suits-top-down","cells-le-1","cells-le-2"],"constraintPar":{"no-cells":99,"aces-first":83,"kings-first":90,"jacks-down-first":102,"suits-top-down":96,"cells-le-1":91,"cells-le-2":93}},
-    {"seed":333604570,"winnable":true,"par":78,"supports":["no-cells","aces-first","kings-first","suits-top-down","cells-le-1","cells-le-2"],"constraintPar":{"no-cells":78,"aces-first":93,"kings-first":91,"suits-top-down":87,"cells-le-1":79,"cells-le-2":80}}
+    {"seed":186441603,"winnable":true,"par":80,"supports":["one-big-move"],"constraintPar":{"one-big-move":86}},
+    {"seed":942660922,"winnable":true,"par":91,"supports":["no-up-foundation","no-supermoves"],"constraintPar":{"no-up-foundation":94,"no-supermoves":92}},
+    {"seed":699587523,"winnable":true,"par":88,"supports":["no-down-foundation","down-heavy","no-supermoves"],"constraintPar":{"no-down-foundation":93,"down-heavy":88,"no-supermoves":94}},
+    {"seed":191924978,"winnable":true,"par":106,"supports":["split-even"],"constraintPar":{"split-even":106}}
   ],
   "seeds": [
     {"seed":10001,"winnable":true,"par":83,"supports":["no-cells","aces-first","kings-first","jacks-down-first","suits-top-down","cells-le-1","cells-le-2"],"constraintPar":{"no-cells":86,"aces-first":107,"kings-first":91,"jacks-down-first":103,"suits-top-down":97,"cells-le-1":88,"cells-le-2":99}},

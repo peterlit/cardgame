@@ -439,7 +439,8 @@ struct DailyHUD: View {
     private func liveState(_ obj: Objective, _ t: Attempt) -> ObjState {
         if t.won { return evaluate(obj, Attempt(won: true, moves: t.moves, elapsed: t.elapsed,
                                                 cellUses: t.cellUses, undos: t.undos,
-                                                foundationOrder: t.foundationOrder)) ? .ok : .no }
+                                                foundationOrder: t.foundationOrder,
+                                                maxRunMoved: t.maxRunMoved)) ? .ok : .no }
         if objViolated(obj, t) { return .no }
         // On track: green ✓ as soon as the tier is locked in (guaranteed just by clearing the deal).
         return objSecured(obj, t, up: game.up, down: game.down) ? .ok : .live

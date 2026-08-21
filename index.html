@@ -437,8 +437,8 @@ let autoFinishMode = (()=>{ const m=lsGet("causeway.autofinishmode"); return (m=
 let finishing=false, autoFinishDeferred=false, finishPromptOpen=false;
 // Daily-challenge per-attempt telemetry (reset on deal/restore). `challengeDay` = the day index
 // being played as a challenge (null = casual play). See the "daily challenges" section below.
-let telem = { cellUses:0, undos:0, foundationOrder:[] }, challengeDay = null;
-function resetTelem(){ telem = { cellUses:0, undos:0, foundationOrder:[] }; }
+let telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }, challengeDay = null;
+function resetTelem(){ telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }; }
 // Record any cards newly sent home this move, by diffing the foundations against the pre-move
 // snapshot (each move homes at most one card). Non-invasive — leaves the drift-guarded send
 // functions untouched. Call right after moveCount++ at each commit point. Builds the ordered
@@ -555,7 +555,8 @@ function restoreGame(){
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
   challengeDay = (typeof g.challengeDay==="number") ? g.challengeDay : null;
-  telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[] };
+  telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 };
+  if(typeof telem.maxRunMoved!=="number") telem.maxRunMoved=0;
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
   winRecorded=false; pendingWin=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
   const es = g.elapsedSecs||0;
@@ -697,7 +698,8 @@ function snapshot(){
     down: state.down.slice(),
     moveCount,
     foundationOrder: telem.foundationOrder.length,   // pre-move telemetry cursor (append-only)
-    cellUses: telem.cellUses                          // pre-move cell-use counter
+    cellUses: telem.cellUses,                         // pre-move cell-use counter
+    maxRunMoved: telem.maxRunMoved                    // pre-move largest run relocated
   });
   if(history.length>500) history.shift();
 }
@@ -715,6 +717,7 @@ function undo(){
   // tolerate snapshots taken before these fields were recorded.
   telem.foundationOrder.length = h.foundationOrder ?? telem.foundationOrder.length;
   telem.cellUses = h.cellUses ?? telem.cellUses;
+  telem.maxRunMoved = h.maxRunMoved ?? telem.maxRunMoved;
   selection=null; render(false);
   saveGame();
 }
@@ -748,6 +751,7 @@ function tryDestTableau(col){
   if(selection.kind==="cell"){ state.cells[selection.idx]=null; }
   else { state.tableau[selection.col].length = selection.idx; }
   state.tableau[col].push(...cards);
+  telem.maxRunMoved = Math.max(telem.maxRunMoved, cards.length);   // supermove size (F1/F2)
   commitMove(); return true;
 }
 function tryDestCell(idx){
@@ -802,7 +806,8 @@ function smartMove(src){
   for(let col=0; col<NCOLS; col++){
     if(src.kind==="tableau" && src.col===col) continue;
     if(state.tableau[col].length>0 && canStackTableau(run,col) && n<=maxMovable(false)){
-      snapshot(); removeRun(src); state.tableau[col].push(...run); commitMove(); return true;
+      snapshot(); removeRun(src); state.tableau[col].push(...run);
+      telem.maxRunMoved=Math.max(telem.maxRunMoved,n); commitMove(); return true;
     }
   }
   // 3) an empty column (skip if the run is already the whole source column)
@@ -810,7 +815,8 @@ function smartMove(src){
   if(!wholeCol){
     for(let col=0; col<NCOLS; col++){
       if(state.tableau[col].length===0 && n<=maxMovable(true)){
-        snapshot(); removeRun(src); state.tableau[col].push(...run); commitMove(); return true;
+        snapshot(); removeRun(src); state.tableau[col].push(...run);
+        telem.maxRunMoved=Math.max(telem.maxRunMoved,n); commitMove(); return true;
       }
     }
   }
@@ -1165,6 +1171,13 @@ const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e
 const jacksDownFirst=t=>{let j=0;for(const e of t.foundationOrder){if(e.rank===11&&e.end==="down")j++;else if(e.rank===1&&e.end==="up"&&j<4)return false;}return t.won;};
 const suitsTopDown=t=>{const kd=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")kd[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!kd[e.suit])return false;}return t.won;};
 const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};
+const upDown=t=>{const u=[0,0,0,0],d=[0,0,0,0];for(const e of t.foundationOrder){if(e.end==="up")u[e.suit]++;else d[e.suit]++;}return{u,d};};
+const splitEven=t=>t.won&&upDown(t).u.every(x=>x===7);
+const downHeavy=t=>t.won&&upDown(t).u.every(x=>x<=5);
+const noDownFoundation=t=>t.won&&upDown(t).d.every(x=>x===0);
+const noUpFoundation=t=>t.won&&upDown(t).u.every(x=>x===0);
+const noSupermoves=t=>t.won&&(t.maxRunMoved??0)<=1;
+const oneBigMove=t=>t.won&&(t.maxRunMoved??0)>=5;
 const downOpeners20=t=>{let k=0,opened=null;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down"){k++;if(k===4){opened=e.moveIdx;break;}}}return t.won&&opened!=null&&opened<=20;};
 const OBJECTIVES={
   'moves':{grade:'silver',param:rec=>({N:Math.round(rec.par*1.2)}),label:p=>`Win in ${p.N} moves or fewer`,check:(t,p)=>t.won&&t.moves<=p.N},
@@ -1178,9 +1191,15 @@ const OBJECTIVES={
   'jacks-down-first':{grade:'gold',label:()=>'Get every Jack onto the down-foundation before any Ace',check:jacksDownFirst},
   'suits-top-down':{grade:'gold',label:()=>'For every suit, send its King home before its Ace',check:suitsTopDown},
   'suit-sprint':{grade:'gold',label:()=>'Finish one whole suit before any other suit is started',check:suitSprint},
+  'down-heavy':{grade:'silver',label:()=>'Take at least 8 of every suit from the King end',check:downHeavy},
+  'no-supermoves':{grade:'silver',label:()=>'Move one card at a time — never move a run',check:noSupermoves},
+  'split-even':{grade:'gold',label:()=>'Split every suit exactly down the middle — A-7 up, 8-K down',check:splitEven},
+  'no-down-foundation':{grade:'gold',label:()=>'Win without ever using a down foundation',check:noDownFoundation},
+  'no-up-foundation':{grade:'gold',label:()=>'Win without ever using an up foundation — every suit K down to A',check:noUpFoundation},
+  'one-big-move':{grade:'gold',label:()=>'Move a run of 5 or more cards in a single move',check:oneBigMove},
 };
-const SILVER_UNIVERSAL=['moves','no-undo'], SILVER_CERTIFIED=['cells-le-1','cells-le-2','down-openers-20'];
-const GOLD=['no-cells','aces-first','kings-first','jacks-down-first','suits-top-down','suit-sprint'];
+const SILVER_UNIVERSAL=['moves','no-undo'], SILVER_CERTIFIED=['cells-le-1','cells-le-2','down-openers-20','down-heavy','no-supermoves'];
+const GOLD=['no-cells','aces-first','kings-first','jacks-down-first','suits-top-down','suit-sprint','split-even','no-down-foundation','no-up-foundation','one-big-move'];
 function makeObjective(id,rec){const o=OBJECTIVES[id];const param=o.param?o.param(rec):{};return{id,grade:o.grade,param,label:o.label(param)};}
 // Day >=0 = frozen calendar (pool array). Day <0 = pre-epoch PLAYTEST SANDBOX (dailyPre),
 // explicitly mutable — rewriting it can never disturb a day >=0. See docs/daily-objectives-proposal.md §8.
@@ -1381,7 +1400,7 @@ function showSolution(seed, tier, label){
 function recordChallengeResult(secs){
   if(challengeDay==null || !dailyPool) return null;
   const ch=dailyChallenge(challengeDay,dailyPool);
-  const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder});
+  const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved});
   dailyStore.days[challengeDay]=mergeTiers(dailyStore.days[challengeDay],res);
   saveDaily();
   const day=challengeDay; challengeDay=null;
@@ -1475,6 +1494,12 @@ function objViolated(obj, t){
     case 'suits-top-down': { const kd=[0,0,0,0]; for(const e of fo){ if(e.rank===13&&e.end==="down") kd[e.suit]=1; else if(e.rank===1&&e.end==="up"&&!kd[e.suit]) return true; } return false; }
     case 'suit-sprint': { const home=[0,0,0,0],st=[false,false,false,false]; for(const e of fo){ const S=e.suit; if(!st[S]){ for(let T=0;T<4;T++) if(T!==S&&st[T]&&home[T]<13) return true; st[S]=true; } home[S]++; } return false; }
     case 'down-openers-20': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down"){ k++; if(k===4) return e.moveIdx>20; } } return t.moves>20; }
+    case 'split-even': { const {u,d}=upDown(t); return u.some(x=>x>7)||d.some(x=>x>6); }
+    case 'down-heavy': return upDown(t).u.some(x=>x>5);
+    case 'no-down-foundation': return upDown(t).d.some(x=>x>0);
+    case 'no-up-foundation': return upDown(t).u.some(x=>x>0);
+    case 'no-supermoves': return (t.maxRunMoved??0)>1;
+    case 'one-big-move': return false;   // positive goal — always still reachable
     default: return false;
   }
 }
@@ -1490,7 +1515,8 @@ function objSecured(obj, up, down, t){
     case 'jacks-down-first': return down.every(d=>d<=11);   // all four Jacks down
     case 'down-openers-20':  return down.every(d=>d<=13);   // all four down-foundations opened (within 20, else violated)
     case 'suit-sprint':      return [0,1,2,3].filter(s=>down[s]===up[s]+1).length>=3;  // ≥3 suits home (only one left; no interleave possible)
-    default: return false;   // move/undo/cell budgets — not securable until win
+    case 'one-big-move':     return (t.maxRunMoved??0)>=5;   // positive + irreversible: locked in the moment it happens
+    default: return false;   // budgets and end-restrictions — not securable until win
   }
 }
 // Compact live objectives HUD shown over the board during a challenge attempt.
@@ -1499,7 +1525,7 @@ function renderDailyHud(){
   if(challengeDay==null || !dailyPool){ hud.classList.remove("show"); return; }
   const c=dailyChallenge(challengeDay,dailyPool);
   const won=isWon();
-  const t={won,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder};
+  const t={won,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved};
   // 'ok' (green ✓) once won OR already secured (on track); 'no' if impossible; else 'live' (·).
   const live=obj=>{
     if(won) return evaluate(obj,{...t,won:true})?'ok':'no';

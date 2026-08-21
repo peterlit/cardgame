@@ -34,6 +34,7 @@ private struct Snapshot {
     var moveCount: Int
     var foLen: Int      // pre-move length of telem.foundationOrder (append-only cursor)
     var cellUses: Int   // pre-move free-cell-use counter
+    var maxRunMoved: Int // pre-move largest tableau run relocated
 }
 
 /// The Causeway engine + observable state for SwiftUI. Rules ported from the web prototype:
@@ -387,7 +388,8 @@ final class Game: ObservableObject {
 
     private func snapshot() {
         history.append(Snapshot(tableau: tableau, cells: cells, up: up, down: down, moveCount: moveCount,
-                                foLen: telem.foundationOrder.count, cellUses: telem.cellUses))
+                                foLen: telem.foundationOrder.count, cellUses: telem.cellUses,
+                                maxRunMoved: telem.maxRunMoved))
         if history.count > 500 { history.removeFirst() }
     }
 
@@ -440,6 +442,7 @@ final class Game: ObservableObject {
         // counter. (undos itself intentionally stays incremented.)
         if telem.foundationOrder.count > h.foLen { telem.foundationOrder.removeLast(telem.foundationOrder.count - h.foLen) }
         telem.cellUses = h.cellUses
+        telem.maxRunMoved = h.maxRunMoved
         selection = nil
         won = false
         // A win stops the clock; undoing back into play must resume it (else elapsed
@@ -503,6 +506,7 @@ final class Game: ObservableObject {
         case .tableau(let scol, let sidx): tableau[scol].removeSubrange(sidx...)
         }
         tableau[col].append(contentsOf: cards)
+        telem.maxRunMoved = max(telem.maxRunMoved, cards.count)   // supermove size (F1/F2)
         commit()
         return true
     }
@@ -562,7 +566,8 @@ final class Game: ObservableObject {
         for col in 0..<Game.colCount {
             if case .tableau(let sc, _) = spot, sc == col { continue }
             if !tableau[col].isEmpty, canStackTableau(run, onto: col), n <= maxMovable(targetEmpty: false) {
-                snapshot(); removeRun(spot); tableau[col].append(contentsOf: run); commit(); return
+                snapshot(); removeRun(spot); tableau[col].append(contentsOf: run)
+                telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return
             }
         }
         // 3) an empty column (skip if the run is already the whole source column)
@@ -570,7 +575,8 @@ final class Game: ObservableObject {
         if !wholeCol {
             for col in 0..<Game.colCount where tableau[col].isEmpty {
                 if n <= maxMovable(targetEmpty: true) {
-                    snapshot(); removeRun(spot); tableau[col].append(contentsOf: run); commit(); return
+                    snapshot(); removeRun(spot); tableau[col].append(contentsOf: run)
+                    telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return
                 }
             }
         }
@@ -793,7 +799,8 @@ final class Game: ObservableObject {
         guard let day = challengeDay, let ch = dailyChallenge(day, pool) else { return nil }
         let attempt = Attempt(won: true, moves: moveCount, elapsed: secs,
                               cellUses: telem.cellUses, undos: telem.undos,
-                              foundationOrder: telem.foundationOrder)
+                              foundationOrder: telem.foundationOrder,
+                              maxRunMoved: telem.maxRunMoved)
         let res = evaluateChallenge(ch, attempt)
         dailyStore.record(day: day, result: res)
         challengeDay = nil
@@ -809,7 +816,8 @@ final class Game: ObservableObject {
     /// A snapshot of the current attempt's telemetry for the HUD (`won` reflects the live board).
     func liveAttempt() -> Attempt {
         Attempt(won: checkWin(), moves: moveCount, elapsed: 0,
-                cellUses: telem.cellUses, undos: telem.undos, foundationOrder: telem.foundationOrder)
+                cellUses: telem.cellUses, undos: telem.undos, foundationOrder: telem.foundationOrder,
+                maxRunMoved: telem.maxRunMoved)
     }
 
     // MARK: - "Show me how to win" (assisted demo; never scored)

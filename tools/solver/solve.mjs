@@ -20,12 +20,14 @@ const suitDone = (s, T) => s.down[T] === s.up[T] + 1;
 const blockAceUpUntil = cond => (s, c, end) => !(end === 'up' && c.rank === 1) || cond(s);
 
 const DOWN_OPENERS_N = 20;
-export const GOLD_GRADE = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint'];
-export const SILVER_GRADE = ['cells-le-1', 'cells-le-2', 'down-openers-20'];
+const BIG_MOVE_N = 5;   // 'one-big-move': relocate a run of >= 5 cards at least once
+export const GOLD_GRADE = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint', 'split-even', 'no-down-foundation', 'no-up-foundation', 'one-big-move'];
+export const SILVER_GRADE = ['cells-le-1', 'cells-le-2', 'down-openers-20', 'down-heavy', 'no-supermoves'];
 export const CERTIFIED = [...GOLD_GRADE, ...SILVER_GRADE];
 
 export function objective(id) {
-  const base = { allowFoundation: () => true, cellBudget: Infinity, wantDownOpen: false };
+  const base = { allowFoundation: () => true, cellBudget: Infinity, wantDownOpen: false,
+                 maxRun: Infinity, wantBigMove: false };
   switch (id) {
     case 'unconstrained':    return { ...base };
     case 'no-cells':         return { ...base, cellBudget: 0 };
@@ -45,6 +47,18 @@ export function objective(id) {
       },
     };
     case 'down-openers-20':  return { ...base, wantDownOpen: true, downOpenN: DOWN_OPENERS_N };
+    // --- split point: where a suit's two halves meet -------------------------------------
+    // A1: every suit splits exactly A-7 up / 8-K down. Gate both ends; the win condition
+    // (down === up + 1) then forces up=7, down=8 on all four suits.
+    case 'split-even':       return { ...base, allowFoundation: (s, c, end) => end === 'up' ? c.rank <= 7 : c.rank >= 8 };
+    // A2: at least 8 of every suit comes from the King end => the up pile may never pass 5.
+    case 'down-heavy':       return { ...base, allowFoundation: (s, c, end) => end !== 'up' || c.rank <= 5 };
+    // --- one-end games (B3/B4). Legal because down === up + 1 still holds at 14/13 and 1/0.
+    case 'no-down-foundation': return { ...base, allowFoundation: (s, c, end) => end !== 'down' };
+    case 'no-up-foundation':   return { ...base, allowFoundation: (s, c, end) => end !== 'up' };
+    // --- move shape ----------------------------------------------------------------------
+    case 'no-supermoves':    return { ...base, maxRun: 1 };
+    case 'one-big-move':     return { ...base, wantBigMove: true, bigMoveN: BIG_MOVE_N };
     default: throw new Error('unknown objective ' + id);
   }
 }
@@ -119,14 +133,16 @@ export function solve(state0, constraint, { budget = 300000, withPath = false } 
   const best = new Map();                 // key -> best g seen (lazy-deletion transposition)
   const usesCells = constraint.cellBudget < Infinity;
   const usesOpen = constraint.wantDownOpen;
-  const key = (s, cellUses, opened) =>
-    stateKey(s) + '#' + (usesCells ? 'c' + cellUses : '') + (usesOpen ? 'o' + (opened ? 1 : 0) : '');
+  const usesBig = constraint.wantBigMove;
+  const key = (s, cellUses, opened, big) =>
+    stateKey(s) + '#' + (usesCells ? 'c' + cellUses : '') + (usesOpen ? 'o' + (opened ? 1 : 0) : '')
+                      + (usesBig ? 'b' + (big ? 1 : 0) : '');
 
-  const push = (s, g, cellUses, opened, parent, seg) => {
-    const k = key(s, cellUses, opened);
+  const push = (s, g, cellUses, opened, big, parent, seg) => {
+    const k = key(s, cellUses, opened, big);
     if (best.has(k) && best.get(k) <= g) return;
     best.set(k, g);
-    heap.push({ f: g + 2 * heuristic(s), g, s, cellUses, opened, k, parent: withPath ? parent : null, seg: withPath ? seg : null });
+    heap.push({ f: g + 2 * heuristic(s), g, s, cellUses, opened, big, k, parent: withPath ? parent : null, seg: withPath ? seg : null });
   };
   const reconstruct = node => {
     const segs = [];
@@ -136,7 +152,7 @@ export function solve(state0, constraint, { budget = 300000, withPath = false } 
 
   const a0 = autoSafe(state0, constraint);
   push(a0.state, a0.moves, 0, usesOpen ? (kingsDown(a0.state) && a0.moves <= constraint.downOpenN) : false,
-       null, withPath ? a0.applied.slice() : null);
+       false, null, withPath ? a0.applied.slice() : null);
 
   let nodes = 0;
   while (heap.size()) {
@@ -145,7 +161,9 @@ export function solve(state0, constraint, { budget = 300000, withPath = false } 
     if (best.get(node.k) < node.g) continue;            // superseded by a cheaper path
     const { s, g } = node;
     if (isWon(s)) {
-      if (!usesOpen || node.opened) return withPath ? { solved: true, par: g, moves: reconstruct(node) } : { solved: true, par: g };
+      // Existential goals must have been achieved somewhere along the path, not merely be winnable.
+      const goalsMet = (!usesOpen || node.opened) && (!usesBig || node.big);
+      if (goalsMet) return withPath ? { solved: true, par: g, moves: reconstruct(node) } : { solved: true, par: g };
       continue;
     }
     for (const m of legalMoves(s, node.cellUses, constraint)) {
@@ -158,7 +176,10 @@ export function solve(state0, constraint, { budget = 300000, withPath = false } 
         if (!opened && kingsDown(ns) && ng <= constraint.downOpenN) opened = true;
         if (!opened && ng > constraint.downOpenN) continue;   // deadline blown, can't satisfy
       }
-      push(ns, ng, ncell, opened, node, withPath ? [m, ...a.applied] : null);
+      // 'one-big-move': latch once any tableau run of >= bigMoveN cards is relocated.
+      let big = node.big;
+      if (usesBig && !big && m.k === 'T' && (s.tableau[m.src].length - m.idx) >= constraint.bigMoveN) big = true;
+      push(ns, ng, ncell, opened, big, node, withPath ? [m, ...a.applied] : null);
     }
   }
   return { solved: false };

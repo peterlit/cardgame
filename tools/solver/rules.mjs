@@ -131,6 +131,8 @@ export function legalMoves(s, cellUses, constraint) {
         if (idx === 0 && dstEmpty) continue;   // pointless whole-column relocation
         if (!canStackTableau(tableau[dst], run)) continue;
         if (run.length > maxMovable(freeCells, emptyCols, dstEmpty)) continue;
+        // `maxRun` gates supermoves (no-supermoves caps it at 1). Infinity when unconstrained.
+        if (run.length > (constraint.maxRun ?? Infinity)) continue;
         moves.push({ k: 'T', src, idx, dst });
       }
     }

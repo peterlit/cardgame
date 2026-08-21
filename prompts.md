@@ -555,3 +555,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     duplicate "T"/"S" header letters. Fixed with prefixed string ids (`hdr-`/`pad-`/`day-`).
     Verified on web and on-device (Aug 5 → Deal #333,604,570, correct objectives, calendar shows
     1–31 with 5–11 playable). 70 node tests + 10 XCUI tests green.
+74. "Still not enough variety — I want examples of A1 (split the stacks exactly halfway), A2, B3, B4,
+    F1, F2." Implemented **six new objective types** end to end (canonical + web + Swift + solver +
+    drift guards) and rebuilt the sandbox around them:
+    A1 `split-even` (every suit A-7 up / 8-K down), A2 `down-heavy` (>=8 of every suit from the King
+    end), B3 `no-down-foundation` (win using only up foundations), B4 `no-up-foundation` (win building
+    every suit K->A), F1 `no-supermoves` (one card at a time), F2 `one-big-move` (relocate a run of 5+).
+    Two new solver mechanisms were needed: `constraint.maxRun` gating supermove generation in
+    `legalMoves` (F1), and a second existential latch alongside `wantDownOpen` for F2 (the node key
+    grows a `big` flag). A1/A2/B3/B4 are pure `allowFoundation` gates. Verified soundness by replaying
+    each gated line: split-even -> up=[7,7,7,7], no-down-foundation -> down=[0,0,0,0],
+    no-up-foundation -> up=[0,0,0,0], no-supermoves -> maxRun=1. F1/F2 needed new telemetry
+    (`maxRunMoved`) threaded through both platforms — Telemetry struct, snapshot/undo rollback, both
+    multi-card move paths, and the HUD's Attempt reconstruction. Steered the objective assignment by
+    exploiting the fixed per-day RNG draw: giving a seed exactly ONE certified gold forces
+    goldPool=[that], len 1, pick index 0 — so each named objective lands deterministically. Hunted
+    seeds >10M for the specific combos and got all four day-slots in **6 seeds**. Final sandbox:
+    Aug 5 = A1, Aug 6 = A2 + B3, Aug 7 = F1 + B4, Aug 8 = F2, Aug 9-11 keep existing objectives for
+    contrast. Verified all 366 frozen days are byte-identical (the array appends and sandbox edits
+    changed 0). Two guard failures caught real gaps and were fixed rather than silenced: the iOS
+    frozen-pool pins needed updating for the appends, and BOTH `replay()` reconstructions
+    (solutions.test.mjs and build-solutions.mjs) failed to emit `maxRunMoved`, so an F1/F2 line could
+    never validate. 71 node tests green; verified on web and on device.

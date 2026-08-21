@@ -55,6 +55,8 @@ struct FoundationEvent: Codable, Equatable {
 struct Telemetry: Codable, Equatable {
     var cellUses = 0
     var undos = 0
+    /// Largest tableau run relocated in a single move (F1/F2). 0 = no multi-card move yet.
+    var maxRunMoved = 0
     var foundationOrder: [FoundationEvent] = []
 
     // Decode defensively so a future schema bump can't fail to restore an in-progress attempt.
@@ -63,6 +65,7 @@ struct Telemetry: Codable, Equatable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         cellUses = try c.decodeIfPresent(Int.self, forKey: .cellUses) ?? 0
         undos = try c.decodeIfPresent(Int.self, forKey: .undos) ?? 0
+        maxRunMoved = try c.decodeIfPresent(Int.self, forKey: .maxRunMoved) ?? 0
         foundationOrder = try c.decodeIfPresent([FoundationEvent].self, forKey: .foundationOrder) ?? []
     }
 }
@@ -75,6 +78,7 @@ struct Attempt {
     var cellUses: Int
     var undos: Int
     var foundationOrder: [FoundationEvent]
+    var maxRunMoved: Int = 0
 }
 
 // MARK: - Objective catalogue (checkers evaluate an Attempt)
@@ -121,6 +125,19 @@ private func suitSprint(_ t: Attempt) -> Bool {
     }
     return t.won
 }
+/// Per-suit counts of ranks arriving from each end. u[suit] IS that suit's split point.
+private func upDown(_ t: Attempt) -> (u: [Int], d: [Int]) {
+    var u = [0, 0, 0, 0], d = [0, 0, 0, 0]
+    for e in t.foundationOrder { if e.end == "up" { u[e.suit] += 1 } else { d[e.suit] += 1 } }
+    return (u, d)
+}
+private func splitEven(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 7 } }
+private func downHeavy(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 <= 5 } }
+private func noDownFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).d.allSatisfy { $0 == 0 } }
+private func noUpFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 0 } }
+private func noSupermoves(_ t: Attempt) -> Bool { t.won && t.maxRunMoved <= 1 }
+private func oneBigMove(_ t: Attempt) -> Bool { t.won && t.maxRunMoved >= 5 }
+
 private func downOpeners20(_ t: Attempt) -> Bool {
     var k = 0, opened: Int? = nil
     for e in t.foundationOrder where e.rank == 13 && e.end == "down" {
@@ -144,6 +161,12 @@ func objectiveCheck(_ id: String, _ t: Attempt, param: Int) -> Bool {
     case "jacks-down-first": return jacksDownFirst(t)
     case "suits-top-down":   return suitsTopDown(t)
     case "suit-sprint":      return suitSprint(t)
+    case "down-heavy":       return downHeavy(t)
+    case "no-supermoves":    return noSupermoves(t)
+    case "split-even":       return splitEven(t)
+    case "no-down-foundation": return noDownFoundation(t)
+    case "no-up-foundation": return noUpFoundation(t)
+    case "one-big-move":     return oneBigMove(t)
     default:                 return false
     }
 }
@@ -159,8 +182,8 @@ struct Objective: Equatable {
 
 // FROZEN — APPEND-ONLY, NEVER REORDER (the per-day RNG indexes these). See daily.mjs.
 private let SILVER_UNIVERSAL = ["moves", "no-undo"]
-private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20"]
-private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint"]
+private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20", "down-heavy", "no-supermoves"]
+private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint", "split-even", "no-down-foundation", "no-up-foundation", "one-big-move"]
 
 private func gradeFor(_ id: String) -> Grade { GOLD.contains(id) ? .gold : .silver }
 
@@ -177,6 +200,12 @@ private func labelFor(_ id: String, _ param: Int) -> String {
     case "jacks-down-first": return "Get every Jack onto the down-foundation before any Ace"
     case "suits-top-down":   return "For every suit, send its King home before its Ace"
     case "suit-sprint":      return "Finish one whole suit before any other suit is started"
+    case "down-heavy":       return "Take at least 8 of every suit from the King end"
+    case "no-supermoves":    return "Move one card at a time — never move a run"
+    case "split-even":       return "Split every suit exactly down the middle — A-7 up, 8-K down"
+    case "no-down-foundation": return "Win without ever using a down foundation"
+    case "no-up-foundation": return "Win without ever using an up foundation — every suit K down to A"
+    case "one-big-move":     return "Move a run of 5 or more cards in a single move"
     default:                 return id
     }
 }
@@ -370,6 +399,12 @@ func objViolated(_ obj: Objective, _ t: Attempt) -> Bool {
             if k == 4 { return e.moveIdx > 20 }
         }
         return t.moves > 20
+    case "split-even":       let x = upDown(t); return x.u.contains { $0 > 7 } || x.d.contains { $0 > 6 }
+    case "down-heavy":       return upDown(t).u.contains { $0 > 5 }
+    case "no-down-foundation": return upDown(t).d.contains { $0 > 0 }
+    case "no-up-foundation": return upDown(t).u.contains { $0 > 0 }
+    case "no-supermoves":    return t.maxRunMoved > 1
+    case "one-big-move":     return false   // positive goal — always still reachable
     default:
         return false
     }
@@ -388,7 +423,8 @@ func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool 
     case "jacks-down-first": return down.allSatisfy { $0 <= 11 }    // all four Jacks down
     case "down-openers-20":  return down.allSatisfy { $0 <= 13 }    // all four down-foundations opened
     case "suit-sprint":      return (0..<4).filter { down[$0] == up[$0] + 1 }.count >= 3  // ≥3 suits home (only one left; no interleave possible)
-    default:                 return false   // move/undo/cell budgets — not securable until win
+    case "one-big-move":     return t.maxRunMoved >= 5   // positive + irreversible: locked in the moment it happens
+    default:                 return false   // budgets and end-restrictions — not securable until win
     }
 }
 

@@ -46,8 +46,8 @@ pin('Model/Daily.swift', 'daysFromCivil (floor-division)', [
 ]);
 pin('Model/Daily.swift', 'frozen objective pools', [
   'private let SILVER_UNIVERSAL = ["moves", "no-undo"]',
-  'private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20"]',
-  'private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint"]',
+  'private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20", "down-heavy", "no-supermoves"]',
+  'private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint", "split-even", "no-down-foundation", "no-up-foundation", "one-big-move"]',
 ]);
 pin('Model/Daily.swift', 'dailyChallenge RNG seed + pick order', [
   'Mulberry32(UInt32(truncatingIfNeeded: 0x9e37_79b9 ^ (dayIndex + 1)))',
@@ -63,6 +63,14 @@ pin('Model/Daily.swift', 'objective checkers', [
   'else if e.rank == 1 && e.end == "up" && j < 4 { return false }',                                       // jacksDownFirst
   'else if e.rank == 1 && e.end == "up" && !kd[e.suit] { return false }',                                 // suitsTopDown
   'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',                          // suitSprint
+]);
+pin('Model/Daily.swift', 'new objective checkers (split point / one-end / move shape)', [
+  'private func splitEven(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 7 } }',
+  'private func downHeavy(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 <= 5 } }',
+  'private func noDownFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).d.allSatisfy { $0 == 0 } }',
+  'private func noUpFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 0 } }',
+  'private func noSupermoves(_ t: Attempt) -> Bool { t.won && t.maxRunMoved <= 1 }',
+  'private func oneBigMove(_ t: Attempt) -> Bool { t.won && t.maxRunMoved >= 5 }',
 ]);
 pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless)', [
   'bronze: p.bronze || attempt.bronze,',

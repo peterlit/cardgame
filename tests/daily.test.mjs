@@ -279,6 +279,13 @@ test('daily logic is inlined verbatim in index.html (no drift)', () => {
     'flawless:!!p.flawless||!!attempt.flawless',
     'while(i!=null&&has(i,tier)){cur++;i--;}',
     "return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};",
+    // new objective families (A1/A2/B3/B4/F1/F2) — pin the distinctive bodies
+    'const splitEven=t=>t.won&&upDown(t).u.every(x=>x===7);',
+    'const downHeavy=t=>t.won&&upDown(t).u.every(x=>x<=5);',
+    'const noDownFoundation=t=>t.won&&upDown(t).d.every(x=>x===0);',
+    'const noUpFoundation=t=>t.won&&upDown(t).u.every(x=>x===0);',
+    'const noSupermoves=t=>t.won&&(t.maxRunMoved??0)<=1;',
+    'const oneBigMove=t=>t.won&&(t.maxRunMoved??0)>=5;',
   ];
   for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
 });

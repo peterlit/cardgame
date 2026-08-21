@@ -36,6 +36,17 @@ const kingsFirst = t => { let k = 0; for (const e of t.foundationOrder) { if (e.
 const jacksDownFirst = t => { let j = 0; for (const e of t.foundationOrder) { if (e.rank === 11 && e.end === 'down') j++; else if (e.rank === 1 && e.end === 'up' && j < 4) return false; } return t.won; };
 const suitsTopDown = t => { const kd = [false, false, false, false]; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') kd[e.suit] = true; else if (e.rank === 1 && e.end === 'up' && !kd[e.suit]) return false; } return t.won; };
 const suitSprint = t => { const home = [0, 0, 0, 0], started = [false, false, false, false]; for (const e of t.foundationOrder) { const S = e.suit; if (!started[S]) { for (let T = 0; T < 4; T++) if (T !== S && started[T] && home[T] < 13) return false; started[S] = true; } home[S]++; } return t.won; };
+// Per-suit counts of how many ranks arrived from each end. The suit's SPLIT POINT is u[suit]:
+// with 13 cards per suit, u + d === 13 on a win, so u alone determines where the halves met.
+const upDown = t => { const u = [0, 0, 0, 0], d = [0, 0, 0, 0]; for (const e of t.foundationOrder) { if (e.end === 'up') u[e.suit]++; else d[e.suit]++; } return { u, d }; };
+const splitEven = t => t.won && upDown(t).u.every(x => x === 7);                 // A1: every suit A-7 up / 8-K down
+const downHeavy = t => t.won && upDown(t).u.every(x => x <= 5);                  // A2: >= 8 of every suit from the King end
+const noDownFoundation = t => t.won && upDown(t).d.every(x => x === 0);          // B3: only up foundations used
+const noUpFoundation = t => t.won && upDown(t).u.every(x => x === 0);            // B4: only down foundations used
+// maxRunMoved defaults to 0 when absent (an older saved attempt): 0 means no multi-card move
+// happened, which is exactly right for both checks below.
+const noSupermoves = t => t.won && (t.maxRunMoved ?? 0) <= 1;                    // F1
+const oneBigMove = t => t.won && (t.maxRunMoved ?? 0) >= 5;                      // F2
 const downOpeners20 = t => { let k = 0, opened = null; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') { k++; if (k === 4) { opened = e.moveIdx; break; } } } return t.won && opened != null && opened <= 20; };
 
 export const OBJECTIVES = {
@@ -50,6 +61,12 @@ export const OBJECTIVES = {
   'jacks-down-first':{ grade: 'gold',   certified: true, label: () => 'Get every Jack onto the down-foundation before any Ace',                                         check: jacksDownFirst },
   'suits-top-down':  { grade: 'gold',   certified: true, label: () => 'For every suit, send its King home before its Ace',                                              check: suitsTopDown },
   'suit-sprint':     { grade: 'gold',   certified: true, label: () => 'Finish one whole suit before any other suit is started',                                         check: suitSprint },
+  'down-heavy':      { grade: 'silver', certified: true, label: () => 'Take at least 8 of every suit from the King end',                                                 check: downHeavy },
+  'no-supermoves':   { grade: 'silver', certified: true, label: () => 'Move one card at a time — never move a run',                                                      check: noSupermoves },
+  'split-even':      { grade: 'gold',   certified: true, label: () => 'Split every suit exactly down the middle — A-7 up, 8-K down',                                     check: splitEven },
+  'no-down-foundation': { grade: 'gold', certified: true, label: () => 'Win without ever using a down foundation',                                                       check: noDownFoundation },
+  'no-up-foundation':{ grade: 'gold',   certified: true, label: () => 'Win without ever using an up foundation — every suit K down to A',                                check: noUpFoundation },
+  'one-big-move':    { grade: 'gold',   certified: true, label: () => 'Move a run of 5 or more cards in a single move',                                                  check: oneBigMove },
 };
 
 // FROZEN — APPEND-ONLY, NEVER REORDER. dailyChallenge() indexes these three arrays with a per-day
@@ -57,8 +74,8 @@ export const OBJECTIVES = {
 // day picked (frozen history). New objectives may only be *appended*. The golden-master test in
 // tests/daily.test.mjs pins several days and fails if this invariant is broken.
 const SILVER_UNIVERSAL = ['moves', 'no-undo'];
-const SILVER_CERTIFIED = ['cells-le-1', 'cells-le-2', 'down-openers-20'];
-const GOLD = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint'];
+const SILVER_CERTIFIED = ['cells-le-1', 'cells-le-2', 'down-openers-20', 'down-heavy', 'no-supermoves'];
+const GOLD = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint', 'split-even', 'no-down-foundation', 'no-up-foundation', 'one-big-move'];
 
 function makeObjective(id, rec) {
   const o = OBJECTIVES[id];
