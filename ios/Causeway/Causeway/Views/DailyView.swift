@@ -17,10 +17,46 @@ struct DailyView: View {
     @State private var exportDoc = StatsBackupDocument(data: Data())
     @State private var backupNote: String?
 
-    /// A demo request made while a daily attempt is in progress, parked behind the
-    /// "end your attempt?" confirmation (nil = no confirmation showing).
-    private struct PendingDemo { var seed: Int; var tier: String; var label: String }
-    @State private var pendingDemo: PendingDemo?
+    /// A board-replacing request parked behind the "you have a game in progress" confirmation
+    /// (nil = no confirmation showing).
+    ///
+    /// Every route out of this sheet that re-deals the board goes through here. Before round 1 only
+    /// the demo pills confirmed, and only for a daily attempt — so the DAY CARD'S OWN `Play` threw
+    /// away a live attempt silently (ux/WF-5, ux/WF-13) and a demo pill threw away a live CASUAL
+    /// game silently (ux/WF-6). Three reports, one shape: the app guarded the rare path and not the
+    /// common ones.
+    private enum PendingAction {
+        case demo(seed: Int, tier: String, label: String)
+        case play(day: Int)
+    }
+    @State private var pending: PendingAction?
+
+    /// Is there a real, unfinished game that a re-deal would destroy? (See `Game.hasLiveGame` — it
+    /// lives on the model because only the model can see `boardComplete`.)
+    private var hasLiveGame: Bool { game.hasLiveGame }
+
+    /// Copy for the confirmation. A daily attempt is replayable, a casual game is not — so the
+    /// daily-specific promise ("you can replay the challenge afterwards") must NOT be reused for a
+    /// casual game, whose loss really is final.
+    private var confirmTitle: String {
+        game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
+    }
+    private var confirmMessage: String {
+        let cause: String
+        switch pending {
+        case .demo:  cause = "Watching a demo re-deals the board"
+        case .play:  cause = "Starting this challenge re-deals the board"
+        case .none:  cause = "This re-deals the board"
+        }
+        let cost = "your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded"
+        return game.challengeDay != nil
+            ? "\(cause), so \(cost). You can replay the challenge afterwards."
+            : "\(cause), so \(cost). This game is not a challenge, so there is no way back to it."
+    }
+    private var confirmVerb: String {
+        if case .demo = pending { return "Show demo" }
+        return "Start over"
+    }
 
     private var days: [Int: TierResult] { game.dailyStore.days }
     private var pool: [PoolSeed] { game.pool }
@@ -58,22 +94,29 @@ struct DailyView: View {
         } onCancellation: {
             backupNote = "Import cancelled."
         }
-        // Watching a demo re-deals the board (Game.showSolution → deal), which would silently
-        // discard an in-progress daily attempt — confirm first. Mirrors the web's confirm().
-        .alert("End your daily attempt?", isPresented: Binding(
-            get: { pendingDemo != nil },
-            set: { if !$0 { pendingDemo = nil } })
+        // Both a demo (Game.showSolution → deal) and the day card's Play (Game.playChallenge →
+        // deal) replace the board, which would silently discard whatever is in progress — confirm
+        // first for BOTH, and for a casual game as well as a daily attempt. Mirrors the web's
+        // confirm(). The confirmed action still re-deals: "Play" must remain a restart, else the
+        // alert's own "you can replay the challenge afterwards" would be false. playChallenge()
+        // routes through deal(), which resets telemetry, so a restart can never keep the previous
+        // attempt's banked moves/time.
+        .alert(confirmTitle, isPresented: Binding(
+            get: { pending != nil },
+            set: { if !$0 { pending = nil } })
         ) {
-            Button("Show demo", role: .destructive) {
-                if let p = pendingDemo {
-                    game.showSolution(p.seed, tier: p.tier, label: p.label)
-                    pendingDemo = nil
-                    dismiss()
+            Button(confirmVerb, role: .destructive) {
+                switch pending {
+                case .demo(let seed, let tier, let label): game.showSolution(seed, tier: tier, label: label)
+                case .play(let day):                       game.playChallenge(day)
+                case .none:                                return
                 }
+                pending = nil
+                dismiss()
             }
-            Button("Keep playing", role: .cancel) { pendingDemo = nil }
+            Button("Keep playing", role: .cancel) { pending = nil }
         } message: {
-            Text("Watching a demo re-deals the board, so your current attempt (moves and time) will be discarded. You can replay the challenge afterwards.")
+            Text(confirmMessage)
         }
     }
 
@@ -81,24 +124,41 @@ struct DailyView: View {
 
     // MARK: streaks
 
+    /// Four streak cards. Each shows THREE numbers, so each number carries its own caption: the
+    /// tier name moves ABOVE the headline (where it names the card, not a number) and the headline
+    /// gets an explicit "day streak" caption underneath — previously the big number was the only
+    /// unlabelled figure on the sheet and the word "streak" appeared nowhere near it
+    /// (ux/WF-5:streak-card-headline-unlabelled).
     private var streaksRow: some View {
         let s = streaks(days, todayIndex())
         let items: [(String, String, StreakRun)] =
             [("🔥", "Play", s.play), ("🥈", "Silver", s.silver), ("🥇", "Gold", s.gold), ("🌟", "Flawless", s.flawless)]
-        return HStack(spacing: 8) {
-            ForEach(items, id: \.1) { ic, label, run in
-                VStack(spacing: 2) {
-                    Text(ic).font(.system(size: 18))
-                    Text("\(run.current)").font(.system(size: 24, weight: .bold, design: .serif))
-                        .foregroundStyle(Theme.gold)
-                    Text(label).font(.system(size: 11, weight: .semibold))
-                    Text("\(run.total) total").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                    Text("best \(run.best)").font(.system(size: 10)).foregroundStyle(.secondary.opacity(0.7))
+        return VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                ForEach(items, id: \.1) { ic, label, run in
+                    VStack(spacing: 1) {
+                        HStack(spacing: 3) {
+                            Text(ic).font(.system(size: 13))
+                            Text(label).font(.system(size: 11, weight: .semibold))
+                        }
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        Text("\(run.current)").font(.system(size: 24, weight: .bold, design: .serif))
+                            .foregroundStyle(Theme.gold)
+                        Text("day streak").font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                        Text("\(run.total) total").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                        Text("best \(run.best)").font(.system(size: 10)).foregroundStyle(.secondary.opacity(0.7))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.gray.opacity(0.12)))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(label): current streak \(run.current) days, \(run.total) days total, best \(run.best) days")
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.gray.opacity(0.12)))
             }
+            Text("A streak counts consecutive days holding that medal. Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal.")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -151,7 +211,13 @@ struct DailyView: View {
 
     private func tierRow(_ name: String, _ tier: String, _ text: String, _ rec: TierResult?, future: Bool) -> some View {
         let done = rec?[tier] == true
-        let color: Color = done ? .green : (future ? .secondary : Theme.red)
+        // Red means "you attempted this day and missed the tier". A day with NO record has never
+        // been cleared, so it gets the same neutral marker a future day gets — a fresh install used
+        // to open on three red circles, reading as "you already failed today"
+        // (ux/WF-5:unattempted-objective-shows-red). `rec != nil` is exactly "a won attempt was
+        // recorded": dailyStore.record() only runs at a win, and every win banks Bronze.
+        let attempted = rec != nil
+        let color: Color = done ? .green : (future || !attempted ? .secondary : Theme.red)
         return HStack(spacing: 10) {
             Text(medal[tier] ?? "").font(.system(size: 18))
             VStack(alignment: .leading, spacing: 1) {
@@ -173,8 +239,12 @@ struct DailyView: View {
         } else {
             let replay = rec?.bronze == true
             Button {
-                game.playChallenge(day)
-                dismiss()
+                if hasLiveGame {
+                    pending = .play(day: day)
+                } else {
+                    game.playChallenge(day)
+                    dismiss()
+                }
             } label: {
                 Text(replay ? "Replay to improve ↻" : "Play")
                     .font(.system(size: 15, weight: .bold))
@@ -188,14 +258,14 @@ struct DailyView: View {
     }
 
     /// A per-tier "show a winning line" button — hands off to the demo (assisted, unscored).
-    /// The demo re-deals the board, so with a daily attempt in progress (moves made, not yet
-    /// won) it must CONFIRM before silently throwing that attempt away. Deliberately no
+    /// The demo re-deals the board, so with ANY game in progress (daily attempt or casual, moves
+    /// made, not yet won) it must CONFIRM before silently throwing it away. Deliberately no
     /// restore-the-attempt-after-the-demo: resuming a demo-touched flow is exactly the
     /// "finish the app's own line" scoring hole the demo teardown exists to close.
     private func showPill(_ seed: Int, _ tier: String, _ title: String, _ label: String) -> some View {
         Button {
-            if game.challengeDay != nil && game.moveCount > 0 && !game.won {
-                pendingDemo = PendingDemo(seed: seed, tier: tier, label: label)
+            if hasLiveGame {
+                pending = .demo(seed: seed, tier: tier, label: label)
             } else {
                 game.showSolution(seed, tier: tier, label: label)
                 dismiss()
@@ -268,24 +338,43 @@ struct DailyView: View {
             return
         }
         // Sanitize before merging so a hand-edited or corrupt file can't inject phantom days/deals or
-        // poison a best score: keep only in-range keys, and drop non-positive moves/times. (Our own
-        // exports always pass these, so a normal backup is unaffected.)
+        // poison a best score: keep only keys THIS APP CAN LEGITIMATELY PRODUCE, and drop
+        // non-positive moves/times.
+        //
+        // The bounds must be the app's real output range, not a convenient subset — an earlier
+        // 0...dayMax / 1...Game.maxSeed pair silently ate the app's OWN untouched export
+        // (bug/WF-11): pre-epoch sandbox days carry dayIndex < 0, and their deals use seeds far
+        // above Game.maxSeed (which is only the RANDOM-deal / type-in ceiling, never a limit on
+        // what can be won). So:
+        //   days  → -preSeeds.count ... today+2 : every index dailyChallenge() can resolve
+        //                                          (sandbox below 0, calendar above), plus a
+        //                                          small grace for clock skew.
+        //   wins  → 1 ... Game.maxValidSeed     : every seed Game.deal() can actually deal.
+        // Anything outside those is a hand-edited/corrupt key and is still dropped.
         let dayMax = max(0, todayIndex() + 2)   // days run epoch→today; small grace for clock skew
+        let dayMin = -DailyData.preSeeds.count  // pre-epoch playtest sandbox (day -1 = preSeeds[0])
         let validDaily = backup.dailyInts
-            .filter { (0...dayMax).contains($0.key) }
+            .filter { (dayMin...dayMax).contains($0.key) }
             .mapValues { r in
                 TierResult(bronze: r.bronze, silver: r.silver, gold: r.gold, flawless: r.flawless,
                            moves: (r.moves ?? 0) > 0 ? r.moves : nil,
                            elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil)
             }
         let validWins = backup.winsInts.filter {
-            (1...Game.maxSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0
+            (1...Game.maxValidSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0
         }
         let addedDays = game.dailyStore.merge(validDaily)
         let addedDeals = game.winStore.merge(validWins)
-        let skipped = (backup.daily.count - validDaily.count) + (backup.wins.count - validWins.count)
+        // Report the two kinds separately: "Skipped 2 invalid entries" told the player nothing
+        // about WHAT was dropped, which is the whole question when a restore loses progress.
+        let skippedDays = backup.daily.count - validDaily.count
+        let skippedDeals = backup.wins.count - validWins.count
         var note = "Imported — merged \(pl(validDaily.count, "day")) (\(addedDays) new) and \(pl(validWins.count, "deal")) (\(addedDeals) new)."
-        if skipped > 0 { note += " Skipped \(skipped) invalid entr\(skipped == 1 ? "y" : "ies")." }
+        if skippedDays + skippedDeals > 0 {
+            let parts = [skippedDays > 0 ? pl(skippedDays, "day") : nil,
+                         skippedDeals > 0 ? pl(skippedDeals, "deal") : nil].compactMap { $0 }
+            note += " Skipped \(parts.joined(separator: " and ")) this app can't have produced."
+        }
         backupNote = note
     }
 
@@ -374,15 +463,6 @@ struct DailyView: View {
         let nm = m == 12 ? 1 : m + 1, ny = m == 12 ? y + 1 : y
         return daysFromCivil(ny, nm, 1) - daysFromCivil(y, m, 1)
     }
-    private func dateFrom(dayIndex idx: Int) -> Date? {
-        var c = DateComponents(); c.year = 2026; c.month = 8; c.day = 12
-        let cal = Calendar(identifier: .gregorian)
-        return cal.date(from: c).flatMap { cal.date(byAdding: .day, value: idx, to: $0) }
-    }
-    private func dayLabel(_ idx: Int) -> String {
-        guard let d = dateFrom(dayIndex: idx) else { return "" }
-        let f = DateFormatter(); f.dateFormat = "MMM d"; return f.string(from: d)
-    }
     private func monthLabel(_ y: Int, _ m: Int) -> String {
         var c = DateComponents(); c.year = y; c.month = m; c.day = 1
         guard let d = Calendar.current.date(from: c) else { return "" }
@@ -430,6 +510,17 @@ struct DailyHUD: View {
     }
 
     @ViewBuilder private func chips(_ c: Challenge, _ t: Attempt, oneLine: Bool) -> some View {
+        // Name the day when it isn't today's: a catch-up day played from the calendar put its
+        // objectives on the board with nothing anywhere saying WHICH day they belong to, so the
+        // Daily sheet's "Today" card (a different deal, with its own medals) read as the state of
+        // the challenge in progress (ux/WF-5:board-hud-omits-challenge-day).
+        if c.dayIndex != todayIndex() {
+            Text(dayLabel(c.dayIndex))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.gold)
+                .lineLimit(1).fixedSize()
+                .accessibilityIdentifier("hud.day")
+        }
         objChip("🥉", "Clear the deal", state: t.won ? .ok : .live, oneLine: oneLine)
         objChip("🥈", c.silver.label, state: liveState(c.silver, t), oneLine: oneLine)
         objChip("🥇", c.gold.label, state: liveState(c.gold, t), oneLine: oneLine)

@@ -232,6 +232,11 @@ final class Game: ObservableObject {
         var started: Bool
         var challengeDay: Int?      // preserve a challenge attempt (+ its telemetry) across relaunch
         var telem: Telemetry?
+        /// "Not yet" on the auto-finish prompt is a per-GAME decision, so it has to survive a kill:
+        /// without it a cold relaunch re-offers "Ready to finish" on the identical board. Optional
+        /// so saves written before this field existed still decode (synthesized Codable uses
+        /// decodeIfPresent for optionals) — a missing key restores the pre-fix default, false.
+        var autoFinishDeferred: Bool?
     }
 
     /// Snapshot the live (unfinished) game to UserDefaults. Cheap: board only, no undo
@@ -245,7 +250,8 @@ final class Game: ObservableObject {
         guard !won, !boardComplete, !demoing else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
                           moveCount: moveCount, elapsed: clock.elapsed, started: started,
-                          challengeDay: challengeDay, telem: telem)
+                          challengeDay: challengeDay, telem: telem,
+                          autoFinishDeferred: autoFinishDeferred)
         if let data = try? JSONEncoder().encode(s) {
             UserDefaults.standard.set(data, forKey: gameKey)
         }
@@ -289,7 +295,11 @@ final class Game: ObservableObject {
         winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)
         // Reset finish state too (parity with web restoreGame): restore() is init-only so these
         // are already default, but keep it explicit and robust against future re-entrant restores.
-        finishing = false; promptAutoFinish = false; autoFinishDeferred = false
+        // autoFinishDeferred is the exception: "Not yet" is a decision about THIS game, so it is
+        // carried over from the save (missing on pre-fix saves ⇒ false, the old behaviour) and must
+        // be set BEFORE the maybeAutoFinish() below, which reads it.
+        finishing = false; promptAutoFinish = false
+        autoFinishDeferred = s.autoFinishDeferred ?? false
         stopTimer()
         if started { startTimer() }
         // A kill mid-autoplay-chain can save a board with more safe cards still to send.
@@ -378,6 +388,17 @@ final class Game: ObservableObject {
         tableau.allSatisfy { $0.isEmpty } && cells.allSatisfy { $0 == nil }
     }
     private var boardComplete: Bool { Game.boardComplete(tableau: tableau, cells: cells) }
+
+    /// Is there a real, unfinished game on the board that a re-deal would DESTROY? Drives the Daily
+    /// sheet's "discard the game in progress?" confirmations (daily attempt or casual alike).
+    /// - `moveCount > 0` keeps the guard off a fresh board, so the ordinary "open the sheet, tap
+    ///   Play / open a demo" path never grows a pointless prompt.
+    /// - `won` / `boardComplete` keep it off a SOLVED board — the win is already banked, and after
+    ///   the overlay's Close (`dismissWin()` clears `won`) the finished table is still sitting there
+    ///   with a non-zero move count.
+    /// - `demoing` keeps it off an auto-played demo line: those moves are the app's, not the
+    ///   player's, and Stop/Done re-deals it anyway.
+    var hasLiveGame: Bool { moveCount > 0 && !won && !demoing && !boardComplete }
 
     /// Dismiss the win overlay through the model. The finished game was already cleared from
     /// storage by onWin(); we just drop the banner and leave the solved board on screen.
@@ -754,6 +775,7 @@ final class Game: ObservableObject {
     func deferAutoFinish() {
         autoFinishDeferred = true
         promptAutoFinish = false
+        persist()       // the deferral is part of this game's state — a kill before the next move must keep it
         runAutoplay()   // resume the safe-autoplay we paused for the prompt
     }
 

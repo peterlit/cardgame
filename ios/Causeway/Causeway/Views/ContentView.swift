@@ -11,6 +11,12 @@ private struct DropZoneFrame: Equatable {
     var target: DropTarget
     var rect: CGRect
 }
+/// Measured height of the landscape rail's pill stack, so the rail can tell when it is taller
+/// than its viewport and show a "there is more below" cue (ux/WF-12:rail-hides-howtoplay).
+private struct RailContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
 private struct DropZonesKey: PreferenceKey {
     static var defaultValue: [DropZoneFrame] = []
     static func reduce(value: inout [DropZoneFrame], nextValue: () -> [DropZoneFrame]) {
@@ -78,7 +84,24 @@ struct ContentView: View {
     // on this un-liftable card?".
     @State private var shakeSpot: Spot?
     @State private var shakeTrigger: CGFloat = 0
+    /// Height of the landscape rail's pill stack — see landscapeRail.
+    @State private var railContentH: CGFloat = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
+
+    /// The typed deal number, or nil when the field is empty / not a number / outside the range
+    /// the engine can actually deal. Gates the alert's `Play`.
+    ///
+    /// Previously this was a bare `if let n = Int(dealText) { game.deal(seed: n) }` against a field
+    /// advertising "1–1,000,000": `Game.deal` silently clamped 5,000,000,000 to 4,294,967,295 and
+    /// dealt a DIFFERENT board from the one typed, with no message (bug/WF-7). The bound is
+    /// `maxValidSeed`, NOT `maxSeed`: `maxSeed` is only the random-deal ceiling, and the
+    /// daily/sandbox pools legitimately deal seeds far above it — clamping the entry there would
+    /// make a won sandbox deal (e.g. #872,465,152, which the Wins list shows) untypeable.
+    private var enteredSeed: Int? {
+        guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)),
+              n >= 1, n <= Game.maxValidSeed else { return nil }
+        return n
+    }
 
     private let outerPad: CGFloat = 6
     private let gap: CGFloat = 4
@@ -235,12 +258,13 @@ struct ContentView: View {
         // hint, leaving destructive "Play" as the only visible exit. A "Random" action here was
         // redundant anyway — the always-visible "New game" pill is the same call.
         .alert("Play a deal", isPresented: $showDeal) {
-            TextField("1–1,000,000", text: $dealText).keyboardType(.numberPad)
+            TextField(DealFormat.seedRangeHint, text: $dealText).keyboardType(.numberPad)
             Button("Cancel", role: .cancel) {}
             Button("Play") {
-                if let n = Int(dealText) { withAnimation { game.deal(seed: n) } }
+                if let n = enteredSeed { withAnimation { game.deal(seed: n) } }
             }
-        } message: { Text("Enter a deal number to play that exact deal.") }
+            .disabled(enteredSeed == nil)
+        } message: { Text("Enter a deal number (\(DealFormat.seedRangeHint)) to play that exact deal.") }
         .alert("Ready to finish", isPresented: $game.promptAutoFinish) {
             Button("Finish") { withAnimation { game.runAutoFinish() } }
             Button("Not yet", role: .cancel) { game.deferAutoFinish() }
@@ -252,40 +276,67 @@ struct ContentView: View {
     /// Scrolls inside `boardH` so the bottom controls stay reachable on short phones / while the HUD
     /// bar is showing (the rail holds no cards, so scrolling can't fight a card drag).
     private func landscapeRail(boardH: CGFloat) -> some View {
-        ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
-            VStack(spacing: 6) {
-                // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
-                // hierarchies exists at a time, so UI tests address either orientation uniformly.
-                railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
-                    .accessibilityIdentifier("toolbar.newgame")
-                railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
-                    .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
-                    .accessibilityIdentifier("toolbar.undo")
-                railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
-                    .accessibilityIdentifier("toolbar.replay")
-                railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-                    .accessibilityIdentifier("toolbar.autoplay")
-                railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
-                    .accessibilityIdentifier("toolbar.autofinish")
-                if game.canOfferFinish {
-                    railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
-                        .accessibilityIdentifier("toolbar.finish")
+        // Does the pill stack overflow the viewport? With the daily HUD (or the demo bar) on screen
+        // the viewport drops to ~248 pt against a ~285 pt stack, and the clipped edge landed exactly
+        // on a pill boundary: the LAST pill ("How to play") was drawn 0% — no partial pill, no fade,
+        // and iOS hides the scroll indicator at rest, so the rules looked simply absent
+        // (ux/WF-12:rail-hides-howtoplay). When it overflows, give up 18 pt of the viewport to a
+        // persistent chevron cue that sits BELOW the scrolling area, so it can never cover a pill.
+        // No feedback loop: the stack's height depends only on the fixed rail width and the pill
+        // set, never on the viewport height, so shrinking the viewport cannot change `overflows`.
+        let overflows = railContentH > boardH
+        let cueH: CGFloat = 18
+        return VStack(spacing: 0) {
+            ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
+                VStack(spacing: 6) {
+                    // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
+                    // hierarchies exists at a time, so UI tests address either orientation uniformly.
+                    railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+                        .accessibilityIdentifier("toolbar.newgame")
+                    railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
+                        .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                        .accessibilityIdentifier("toolbar.undo")
+                    railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+                        .accessibilityIdentifier("toolbar.replay")
+                    railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+                        .accessibilityIdentifier("toolbar.autoplay")
+                    railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+                        .accessibilityIdentifier("toolbar.autofinish")
+                    if game.canOfferFinish {
+                        railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                            .accessibilityIdentifier("toolbar.finish")
+                    }
+                    railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
+                        dealText = "\(game.seed)"; showDeal = true
+                    }
+                    .accessibilityIdentifier("toolbar.deal")
+                    if !game.pool.isEmpty {
+                        railPill("Daily") { showDaily = true }
+                            .accessibilityIdentifier("toolbar.daily")
+                    }
+                    railPill("Wins") { showWins = true }
+                        .accessibilityIdentifier("toolbar.wins")
+                    railPill("How to play") { showRules = true }
+                        .accessibilityIdentifier("toolbar.howtoplay")
                 }
-                railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                    dealText = "\(game.seed)"; showDeal = true
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: RailContentHeightKey.self, value: g.size.height)
+                })
+            }
+            .frame(width: landscapeRailW, height: max(60, boardH - (overflows ? cueH : 0)))
+            .onPreferenceChange(RailContentHeightKey.self) { railContentH = $0 }
+            if overflows {
+                HStack(spacing: 3) {
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                    Text("more").font(.system(size: 10, weight: .semibold))
                 }
-                .accessibilityIdentifier("toolbar.deal")
-                if !game.pool.isEmpty {
-                    railPill("Daily") { showDaily = true }
-                        .accessibilityIdentifier("toolbar.daily")
-                }
-                railPill("Wins") { showWins = true }
-                    .accessibilityIdentifier("toolbar.wins")
-                railPill("How to play") { showRules = true }
-                    .accessibilityIdentifier("toolbar.howtoplay")
+                .foregroundStyle(Color(hex: 0xF4EFE2).opacity(0.9))
+                .frame(height: cueH)
+                .allowsHitTesting(false)          // purely a cue; the ScrollView above owns the gesture
+                .accessibilityHidden(true)        // VoiceOver already reports the rail as scrollable
             }
         }
-        .frame(width: landscapeRailW, height: boardH)
+        .frame(width: landscapeRailW, height: boardH, alignment: .top)
     }
     /// A rail button — like `pill` but filled to the rail width, left-aligned, compact.
     private func railPill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
@@ -311,7 +362,7 @@ struct ContentView: View {
     private func foundationsAndCells(cardW: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                groupLabel("FOUNDATIONS")
+                groupLabel("FOUNDATIONS · A↑ / K↓")   // see the portrait upperArea note
                 foundationRow(dir: .up, cardW: cardW)
                 foundationRow(dir: .down, cardW: cardW)
             }
@@ -407,7 +458,10 @@ struct ContentView: View {
         HStack(alignment: .top) {
             // Foundations on the LEFT, free cells on the RIGHT (matches MobilityWare FreeCell muscle memory).
             VStack(alignment: .leading, spacing: 4) {
-                groupLabel("FOUNDATIONS")
+                // The two rows are the app's central twist and were the one thing the board never
+                // named (ux/WF-1:foundation-rows-unlabelled): top row builds up from A, bottom row
+                // down from K, echoed by the A/K corner hint on each empty slot.
+                groupLabel("FOUNDATIONS · A↑ / K↓")
                 VStack(spacing: gap) {
                     foundationRow(dir: .up, cardW: cardW)
                     foundationRow(dir: .down, cardW: cardW)
@@ -427,6 +481,7 @@ struct ContentView: View {
     }
     private func groupLabel(_ t: String) -> some View {
         Text(t).font(.system(size: 10, weight: .semibold)).tracking(1).opacity(0.6)
+            .lineLimit(1).minimumScaleFactor(0.6)   // never wrap/truncate on a narrow board
     }
 
     // MARK: tap / drag
@@ -484,12 +539,22 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.18)) {
                     if travelled < tapSlop {
                         game.smartMove(spot)                                   // tap
-                    } else if canDrag, let z = dropZones.first(where: { $0.rect.contains(v.location) }) {
-                        game.drop(spot, to: z.target)                          // drop onto target under finger
+                    } else if canDrag, let t = dropTarget(at: v.location) {
+                        game.drop(spot, to: t)                                 // drop onto target under finger
                     }
                     drag = nil                                                 // else: snaps back
                 }
             }
+    }
+
+    /// Which drop target a release at `p` resolves to. Tableau columns deliberately overhang each
+    /// other by the inter-column gutter (see `column`), so more than one zone can contain the
+    /// point; the nearest zone CENTRE wins, on the horizontal axis only — a column's zone runs all
+    /// the way down to the tableau bottom, so its midY is meaningless for "which column is this".
+    private func dropTarget(at p: CGPoint) -> DropTarget? {
+        let hits = dropZones.filter { $0.rect.contains(p) }
+        if hits.count <= 1 { return hits.first?.target }
+        return hits.min(by: { abs($0.rect.midX - p.x) < abs($1.rect.midX - p.x) })?.target
     }
 
     /// A transparent probe that reports this view's frame in board coordinates as a drop zone.
@@ -530,7 +595,7 @@ struct ContentView: View {
                 CardView(card: card, width: cardW)
                     .matchedGeometryEffect(id: card.id, in: ns)
             } else {
-                SlotView(width: cardW, glyphSuit: suit)
+                SlotView(width: cardW, glyphSuit: suit, startRank: dir == .up ? "A" : "K")
             }
         }
         .background(dropZone(.foundation(suit, dir)))   // drop target only; foundation cards aren't dragged
@@ -601,8 +666,15 @@ struct ContentView: View {
         // strip below a column belongs to no other target, so a run released a few points below
         // the column's last card should land ON that column, not silently snap back. (The web
         // mirror gives every column the tallest column's hit height for the same reason.)
+        //
+        // It also overhangs `gap` HORIZONTALLY on each side, so the columns' hit areas TILE instead
+        // of leaving the ~5 pt inter-column gutter belonging to nobody: a release there used to be
+        // refused by both neighbours even though the dragged card visibly overlapped one of them by
+        // ~45% (ux/WF-2:drop-gutter-dead-zone). The overhang makes adjacent zones overlap on
+        // purpose; cardGesture resolves an overlap to the nearest column centre, which is exactly
+        // "the column the card was mostly over".
         .background(alignment: .top) {
-            dropZone(.column(col)).frame(height: max(height, maxH), alignment: .top)
+            dropZone(.column(col)).frame(width: cardW + gap * 2, height: max(height, maxH), alignment: .top)
         }
     }
 
@@ -662,7 +734,12 @@ struct ContentView: View {
         default:       head = "Winning line"
         }
         let suffix = !game.demoPaused ? "…" : (game.demoStarted ? " (paused)" : "")   // initial = no suffix
-        return "\(head) — \(game.demoProgress)\(suffix)"
+        // "·", not an em dash: three objective labels ("Split every suit exactly down the middle —
+        // A-7 up, 8-K down", no-supermoves, no-up-foundation) embed an em dash of their own, so an
+        // em dash separator punctuated the move counter exactly like the second half of the
+        // objective and it read as more objective text
+        // (ux/WF-13:demo-headline-emdash-collides-with-label).
+        return "\(head) · \(game.demoProgress)\(suffix)"
     }
     private func demoPill(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {

@@ -269,6 +269,43 @@ findings fixed:
   top-right corner overlay into the day-cell marker slot (replaces the tier dots — flawless implies all
   three). Both platforms.
 
+### QA loop 3, round 1 — implementer pass (2026-08-22)
+15 of the 18 open auto-routed findings fixed; 2 argued down. All in the iOS app unless noted.
+- **BLOCKER `bug/WF-11` — import ate the app's own export.** `DailyView.importStats` sanitized
+  daily keys to `0...today+2` and win seeds to `1...Game.maxSeed` (1,000,000), but a sandbox day
+  is `dayIndex < 0` and its deals use seeds above 100,000,000 — so an untouched export→import
+  round trip lost a real win and a whole day's four tiers while promising "Importing merges — it
+  never erases progress". Bounds widened to what the app can PRODUCE (`-preSeeds.count...today+2`,
+  `1...Game.maxValidSeed`); the moves>0/secs>0 poison guards stay; the skipped line now names what
+  was dropped instead of calling the user's own file "invalid entries".
+- **`bug/WF-7` + `bug/WinsView` — deal entry advertised 1–1,000,000 and enforced nothing** (typing
+  5,000,000,000 silently loaded a *different* deal, #4,294,967,295). Enforced at the two entry
+  points, NOT in `Game.deal` (whose 4,294,967,295 ceiling exists so daily/sandbox seeds deal the
+  same board as web). New `DealFormat.seedRangeHint` is the single honest range string.
+- **`ux/WF-5` + `ux/WF-6` + `ux/WF-13` — three reports of one shape.** The Daily sheet confirmed
+  before discarding a live game on the *demo* path only, and only for a *daily* attempt. One
+  `PendingAction` now gates the day card's `Play` too, and covers casual games, with copy that
+  doesn't promise a casual game is replayable. Guard stays off at `moveCount == 0` and on a solved
+  board (`Game.hasLiveGame`). Confirmed `Play` still restarts — telemetry is reset by `deal()`, so
+  a restart can never keep the old attempt's banked moves/time.
+- **`bug/WinsView:row-text-contrast`** — List rows were Buttons, so the gold accent tinted the whole
+  label and the stats rendered at 1.42:1 on white. `.buttonStyle(.plain)` + a "Tap a deal to play it
+  again." footer keeps the affordance in words.
+- **`ux/WF-12`** — the landscape rail clipped "How to play" 100% away with no cue whenever the HUD
+  bar shrank its viewport; it now measures its own stack and shows a persistent "▾ more" below the
+  scroll area when it overflows.
+- **`ux/WF-2`** — column drop frames now overhang the inter-column gutter and a release resolves to
+  the nearest column centre, so the ~5 pt gutter no longer belongs to nobody.
+- **`bug/WF-4`** — `autoFinishDeferred` is persisted with the saved game (optional field, old saves
+  still decode), so "Not yet" survives a kill.
+- Smaller: A/K hint on empty foundation slots + `FOUNDATIONS · A↑ / K↓` (WF-1); an "Automation"
+  section in How to play (WF-10); streak headline labelled "day streak" + a Flawless definition
+  (WF-5); never-attempted objectives no longer show red (WF-5); the board HUD names a catch-up day
+  (WF-5); demo headline separator `—` → `·` (WF-13); ungrouped deal numbers in the Wins drill-in.
+- **Argued down:** `bug/WF-13:one-big-move-check-lost-on-undo` — undo MUST keep rolling
+  `telem.maxRunMoved` back; only the "positive + irreversible" comment (both platforms) was wrong.
+  See the CHANGES rationale in the round-1 record.
+
 ## Open — high value
 - **DAILY — Daily Challenges feature (design approved; Phase 0 landed).** MobilityWare-style dated
   challenges: a "Deal of the Day" with 🥉 Bronze (win, required) + one 🥈 Silver + one 🥇 Gold

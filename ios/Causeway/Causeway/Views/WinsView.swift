@@ -45,19 +45,31 @@ struct WinsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Play a deal").font(.headline)
             HStack(spacing: 8) {
-                TextField("Number 1–\(Game.maxSeed)", text: $dealText)
+                TextField("Number \(DealFormat.seedRangeHint)", text: $dealText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                 Button("Play", action: playEntered)
                     .buttonStyle(.borderedProminent)
-                    .disabled((Int(dealText.trimmingCharacters(in: .whitespaces)) ?? 0) < 1)
+                    .disabled(enteredSeed == nil)
             }
         }
     }
 
+    /// The typed deal number, or nil when it is empty / not a number / outside what the engine can
+    /// deal. The field used to advertise "Number 1–1,000,000" and lean on a stale comment claiming
+    /// `Game.deal` clamped there; it clamps to `maxValidSeed` (4,294,967,295), so 2,000,000 loaded
+    /// fine and the promise was enforced nowhere (bug/WinsView:deal-entry-range-not-enforced).
+    /// The bound stays `maxValidSeed`: this list itself shows wins on daily/sandbox seeds above
+    /// 1,000,000 (e.g. #561325499), and clamping the field would make them untypeable.
+    private var enteredSeed: Int? {
+        guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)),
+              n >= 1, n <= Game.maxValidSeed else { return nil }
+        return n
+    }
+
     private func playEntered() {
-        guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)), n >= 1 else { return }
-        game.deal(seed: n)   // Game.deal clamps to 1...maxSeed
+        guard let n = enteredSeed else { return }
+        game.deal(seed: n)
         dismiss()
     }
 
@@ -74,20 +86,41 @@ struct WinsView: View {
 
     private func rangeDetail(_ r: ClosedRange<Int>) -> some View {
         let rows = store.records(in: r)
-        return List(rows, id: \.seed) { row in
-            Button {
-                game.deal(seed: row.seed)
-                dismiss()
-            } label: {
-                HStack {
-                    Text("Deal #\(row.seed)").fontWeight(.semibold)
-                    if row.seed == game.seed {
-                        Image(systemName: "play.circle.fill").foregroundStyle(Theme.gold)
+        return List {
+            Section {
+                ForEach(rows, id: \.seed) { row in
+                    Button {
+                        game.deal(seed: row.seed)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            // Ungrouped, like the range chip / navigation title above it and the
+                            // board's Deal # pill. `Text("Deal #\(row.seed)")` interpolates into a
+                            // LocalizedStringKey, which GROUPS the digits — so one screen showed the
+                            // same deal as "561325499" and "Deal #561,325,499"
+                            // (ux/WinsView:seed-format-inconsistent).
+                            Text("Deal #" + DealFormat.seed(row.seed)).fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                            if row.seed == game.seed {
+                                Image(systemName: "play.circle.fill").foregroundStyle(Theme.gold)
+                            }
+                            Spacer()
+                            Text("\(row.rec.moves) moves · \(DealFormat.time(row.rec.secs)) · \(row.rec.date.formatted(.dateTime.month(.abbreviated).day()))")
+                                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        .contentShape(Rectangle())
                     }
-                    Spacer()
-                    Text("\(row.rec.moves) moves · \(DealFormat.time(row.rec.secs)) · \(row.rec.date.formatted(.dateTime.month(.abbreviated).day()))")
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    // A Button in a List takes the accent tint over its WHOLE label, which dragged
+                    // the .secondary stats to 1.42:1 against white and the title to 2.09:1 — the
+                    // only content this screen exists to show was unreadable
+                    // (bug/WinsView:row-text-contrast). `.plain` restores the system label colours
+                    // (primary ≈ 16:1, secondary ≈ 4.6:1); the row stays tappable via contentShape,
+                    // the gold "currently playing" marker keeps its explicit tint, and the footer
+                    // below states the affordance the tint used to imply.
+                    .buttonStyle(.plain)
                 }
+            } footer: {
+                Text("Tap a deal to play it again.")
             }
         }
         .navigationTitle(DealFormat.rangeLabel(r))

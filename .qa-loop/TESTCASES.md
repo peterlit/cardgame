@@ -459,18 +459,25 @@ sentence is now stale.)*
 
 **TC-7.3 [power] (Power) — Blank input (edge).**
 1. Open the Deal alert. Delete all digits (empty field). Tap `Play`.
-- **Expected:** no crash; `Int("")` is nil so nothing loads / alert dismisses with
-  the current deal intact. (Note: the alert `Play` is always tappable — confirm it
-  degrades gracefully, unlike the Wins field which disables Play.)
+- **Expected:** no crash; the deal is left intact. Since round 1 the alert's `Play`
+  is DISABLED on an empty/out-of-range field (matching the Wins field), so there is
+  nothing to tap.
 
 **TC-7.4 [power] (Power) — Out-of-range input (edge).**
-1. Open the Deal alert. Type `9999999` (> 1,000,000). Tap `Play`.
-- **Expected:** no crash; deal(seed:) clamps to 1…1,000,000 (max 1,000,000). Verify
-  the loaded Deal # is the clamped value, not the typed one.
-2. Repeat with `0` → clamps up to 1.
-- **Edge:** confirm whether the displayed pill matches the clamped seed (a mismatch
-  between typed and loaded value with no feedback is a candidate finding). Verified on
-  build 5447237: `9999999` → Deal #1000000, `0` → Deal #1, blank → deal unchanged.
+- **REWRITTEN after bug/WF-7 (round 1).** The old expectation ("`9999999` → Deal
+  #1000000, verified on build 5447237") is stale: `Game.maxSeed` (1,000,000) is only
+  the RANDOM-deal ceiling, while `Game.deal` legitimately accepts up to
+  `maxValidSeed` = 4,294,967,295 because the daily/sandbox pools use seeds above
+  10,000,000. The alert now ADVERTISES and ENFORCES the real range instead of
+  silently clamping to a different deal.
+1. Open the Deal alert. Type `9999999`. Tap `Play`.
+- **Expected:** `Play` is enabled and Deal #9999999 loads — it is inside the
+  advertised range (1–4,294,967,295).
+2. Type `5000000000` (or any value above 4,294,967,295, or a run of 20 digits).
+- **Expected:** `Play` is DISABLED (greyed) while the field is out of range — the
+  app never loads a deal different from the one typed. Cancel leaves the deal intact.
+3. Type `0` → `Play` is disabled (below the range). Blank → `Play` disabled.
+- **Edge:** the pill must always show exactly the number that was typed.
 
 **TC-7.5 [power] (Power) — Cancel leaves state untouched.**
 1. Open the Deal alert (prefilled with current seed). Tap `Cancel`.
@@ -588,10 +595,20 @@ autoplay before move 31. Verified 28/28 drags land, Moves = 28.*
   changed, no crash.
 
 **TC-11.4 [power] (Power) — Import a hand-edited / out-of-range backup (edge).**
-1. Import a backup whose entries include out-of-range day keys, seeds
-   >1,000,000/<1, or non-positive moves/times.
-- **Expected:** invalid entries are sanitized/skipped; note appends "Skipped N
-  invalid entr(y/ies)." Best scores are not poisoned by zero/negative values.
+1. Import a backup whose entries include out-of-range day keys, out-of-range
+   seeds, or non-positive moves/times.
+- **REWRITTEN after bug/WF-11 (round 1):** the sanitizer's bounds are now the range
+  the app can actually PRODUCE, not a narrower convenience range. Valid (must be
+  merged, not skipped): day keys `-7 … today+2` (day −1 … −7 are the pre-epoch
+  playtest sandbox; `preSeeds.count` = 7) and win seeds `1 … 4,294,967,295`.
+  Phantom probe values must therefore now be day `-8` / `9999` and seed `0` /
+  `4294967296` — the old probes (day `-3`, seed `1000001`) are legitimate entries
+  and are expected to merge.
+- **Expected:** genuinely impossible entries are skipped; the note names what was
+  dropped ("Skipped 1 day and 1 deal this app can't have produced."). Best scores
+  are not poisoned by zero/negative values.
+- **Regression to keep:** export→import of the app's OWN untouched backup must skip
+  ZERO entries, including a sandbox-day record and a win on a seed > 1,000,000.
 
 **TC-11.5 [power] (Power) — Cancel the importer.**
 1. Tap `Import`, then cancel the Files sheet.

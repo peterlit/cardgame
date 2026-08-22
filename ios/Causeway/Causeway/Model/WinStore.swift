@@ -94,6 +94,16 @@ final class WinStore: ObservableObject {
 }
 
 enum DealFormat {
+    /// Human range for the two deal-number entry fields. It quotes `maxValidSeed` (what the engine
+    /// can actually deal), NOT `maxSeed` (the random-deal ceiling) — the old "1–1,000,000" hint was
+    /// unenforced AND wrong, since daily/sandbox deals run far above it (bug/WF-7).
+    static let seedRangeHint = "1–\(Game.maxValidSeed.formatted(.number.grouping(.automatic)))"
+
+    /// A deal number as the app IDENTIFIES it — ungrouped, matching the board pill and the Wins
+    /// range chips. (`Text("Deal #\(seed)")` interpolates through LocalizedStringKey and groups the
+    /// digits, so the same deal read as "561325499" in the title and "561,325,499" in the row.)
+    static func seed(_ s: Int) -> String { String(s) }
+
     static func rangeLabel(_ r: ClosedRange<Int>) -> String {
         r.lowerBound == r.upperBound ? "\(r.lowerBound)" : "\(r.lowerBound)–\(r.upperBound)"
     }

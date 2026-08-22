@@ -605,3 +605,24 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (base64 length in the transcript overstates image token cost by 30-70x), which had briefly made
     four QA evidence PNGs look like 470K tokens instead of ~6K. Written up in
     `docs/loop-token-usage.md`.
+
+76. QA loop 3, round 1 — implementer pass over the 18 open auto-routed findings from the 57-case
+    persona sweep (1 blocker, 5 major, 12 minor). Fixed 15, argued 2 down, and rewrote the two
+    stale test cases the fixes invalidate (TC-7.3/7.4, TC-11.4). The blocker was the app eating its
+    own backup: `importStats` sanitized daily keys to `0...today+2` and win seeds to
+    `1...Game.maxSeed`, but pre-epoch sandbox days are NEGATIVE indices and their deals use seeds
+    above 100,000,000 — so an untouched export→import lost a real win plus a whole day's four tiers
+    behind the message "Skipped 2 invalid entries", under a UI promising it never erases progress.
+    The fix widens the bounds to what the app can actually produce rather than deleting the
+    sanitizer (which is what makes the hand-edited-backup case pass). Three separate UX reports
+    turned out to be one shape — the Daily sheet confirmed before discarding a live game on the
+    demo path only, and only for a daily attempt — so they were fixed together behind one
+    `PendingAction`, with copy that does not promise a casual game is replayable and a guard that
+    stays off at move 0 and on a solved board. **The one I pushed back on**: WF-13 wanted
+    `telem.maxRunMoved` to stop rolling back on undo so the Gold "one big move" check would be
+    irreversible as its own comment claimed. Declined with numbers: the same field feeds
+    `no-supermoves` with the opposite polarity, so a one-way counter would make an *undone* 2-card
+    move permanently fail Silver; the win-time checker reads the rolled-back field on both
+    platforms, so the reverting chip is the truthful prediction of the grade; and every other
+    `objSecured` case un-secures on undo too. The comment was the bug, and it was wrong in
+    `index.html` as well.

@@ -100,6 +100,12 @@ struct CardView: View {
 struct SlotView: View {
     let width: CGFloat
     var glyphSuit: Suit? = nil
+    /// Which END this (empty) foundation builds from — "A" for the up pile, "K" for the down pile.
+    /// The board's two foundation rows were otherwise identical empty suit slots under one
+    /// FOUNDATIONS heading, so nothing on screen said which row takes an Ace and which takes a
+    /// King; an Ace dragged to the wrong row just snapped back (ux/WF-1:foundation-rows-unlabelled).
+    /// Only ever set on EMPTY slots — an occupied foundation shows its real card, unchanged.
+    var startRank: String? = nil
 
     private var height: CGFloat { width * Theme.cardAspect }
 
@@ -109,6 +115,7 @@ struct SlotView: View {
             .overlay(RoundedRectangle(cornerRadius: width * 0.11, style: .continuous)
                 .strokeBorder(Theme.ink.opacity(0.28), lineWidth: 2))
             .overlay(glyphView)
+            .overlay(alignment: .topLeading) { startGlyph }
             .frame(width: width, height: height)
     }
 
@@ -118,6 +125,19 @@ struct SlotView: View {
             Image(systemName: suit.sfSymbol)
                 .font(.system(size: width * 0.4))
                 .foregroundStyle(Theme.suitColor(suit).opacity(0.4))
+        }
+    }
+
+    // "A"/"K" hint in the rank corner — same position a real card puts its rank, so the empty slot
+    // reads as "the card that starts here".
+    @ViewBuilder private var startGlyph: some View {
+        if let r = startRank {
+            Text(r)
+                .font(.system(size: width * 0.3, weight: .bold, design: .serif))
+                .foregroundStyle(Theme.ink.opacity(0.45))
+                .padding(.leading, width * 0.1)
+                .padding(.top, width * 0.06)
+                .accessibilityHidden(true)
         }
     }
 }

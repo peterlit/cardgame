@@ -34,6 +34,17 @@ func daysFromCivil(_ y0: Int, _ m: Int, _ d: Int) -> Int {
 let EPOCH_DAYS = daysFromCivil(2026, 8, 12)   // launch epoch = day 0
 func dayIndexFor(_ y: Int, _ m: Int, _ d: Int) -> Int { daysFromCivil(y, m, d) - EPOCH_DAYS }
 
+/// "Aug 12" for a day index (day 0 = the 2026-08-12 launch epoch; negatives are the pre-epoch
+/// playtest sandbox). Shared by the Daily sheet's day card and the board HUD's catch-up-day badge
+/// so the board can name WHICH day is in progress (ux/WF-5:board-hud-omits-challenge-day).
+func dayLabel(_ idx: Int) -> String {
+    var c = DateComponents(); c.year = 2026; c.month = 8; c.day = 12
+    let cal = Calendar(identifier: .gregorian)
+    guard let base = cal.date(from: c), let d = cal.date(byAdding: .day, value: idx, to: base) else { return "" }
+    let f = DateFormatter(); f.dateFormat = "MMM d"
+    return f.string(from: d)
+}
+
 /// Today's day index in the player's local calendar (matches web's `new Date()` local reading).
 func todayIndex() -> Int {
     let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
@@ -423,7 +434,13 @@ func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool 
     case "jacks-down-first": return down.allSatisfy { $0 <= 11 }    // all four Jacks down
     case "down-openers-20":  return down.allSatisfy { $0 <= 13 }    // all four down-foundations opened
     case "suit-sprint":      return (0..<4).filter { down[$0] == up[$0] + 1 }.count >= 3  // ≥3 suits home (only one left; no interleave possible)
-    case "one-big-move":     return t.maxRunMoved >= 5   // positive + irreversible: locked in the moment it happens
+    // Secured relative to the CURRENT line: the big move is banked for any completion from here.
+    // Undo rewinds it (Game.undo restores telem.maxRunMoved from the move snapshot) exactly as it
+    // rewinds every other case above — objSecured mirrors the board, and the authoritative checker
+    // (oneBigMove) reads the same rolled-back field at win, so the chip always predicts the grade.
+    // maxRunMoved must stay two-way: no-supermoves reads the same field, and a one-way counter
+    // would make an undone 2-card move permanently fail it.
+    case "one-big-move":     return t.maxRunMoved >= 5
     default:                 return false   // budgets and end-restrictions — not securable until win
     }
 }
