@@ -481,3 +481,15 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
 - [ ] **Set `DebugFlags.memoryHUD = false`** (`Model/MemoryMonitor.swift`) — the on-screen
       memory HUD is a diagnostic for I6-verify and must not ship. (Not `#if DEBUG`-gated on
       purpose, so it can be watched in a Release/untethered run.)
+
+### Token-cost analysis of the review/QA loops (2026-08-22)
+- **Measured, written up in `docs/loop-token-usage.md`.** Review loop: 17 runs, 22 rounds, 26
+  findings for 8.40M effective subagent tokens (323K per finding). QA loop: 3 rounds, 18 findings
+  for 39.87M (2.21M per finding) — ~7x more per finding, with `qa-loop:ux-tester` alone accounting
+  for 77% of all loop spend. Recommendations are in the doc; the two with the best
+  effort-to-saving ratio are (a) run a loop in a FRESH session — measured 3.3x on identical
+  plumbing — and (b) give QA testers a pre-built accessibility-identifier index instead of having
+  28 agents each re-read the app source. Not repo code changes; they are plugin/skill changes and
+  working-habit changes.
+- **One earlier recommendation was retracted by the data:** passing the raw diff to the reviewer by
+  path rather than in-context saves nothing. Diffs averaged 271 tokens across 48 calls.

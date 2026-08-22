@@ -587,3 +587,21 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     send but not on a down send. Also fixed drift the change introduced in `docs/architecture/`:
     the Telemetry ER diagrams on all three pages were missing `maxRunMoved`, the web page pinned the
     old `telem` initialiser, and the objective catalogue still said "11 implemented ids" (now 17).
+75. "Reflect on token usage so far including the review loop; suggest reductions — plus a dedicated
+    summary for the review-loop agent." Then: "Create a .md with the analysis specific to the review
+    loop (and qa loop) and recommendations." Measured it from the raw session transcripts rather
+    than estimating: dedupe usage by `requestId`, weight `input×1 + cache_read×0.1 + cache_write×2 +
+    output×5`, and match all 98 subagent transcripts back to their `subagent_type` by normalising the
+    dispatching `Agent` prompt (98/98 matched). Findings: 243M effective tokens across the project;
+    this session alone is 187M, of which 63% is re-reading context at a mean of 497K over 2,387
+    requests. Loop-specific: the review loop cost 8.40M of subagent tokens for 26 findings (323K
+    each) while the QA loop cost 39.87M for 18 (2.21M each) — `qa-loop:ux-tester` alone is 77% of all
+    loop spend, at 97 requests and a 173K median context per agent versus the review agents' 36-41K.
+    **A mid-analysis measurement retracted my own earlier recommendation**: I had proposed keeping the
+    raw diff out of the orchestrator's context, but diffs averaged 271 tokens across 48 calls, so the
+    change would save nothing — dropped it and said so in the doc. The real review-loop lever is
+    ambient context: the identical plumbing request cost 16.6K in a focused session and 55.3K in this
+    one, a measured 3.3x for no code change. Also corrected an image-sizing error mid-analysis
+    (base64 length in the transcript overstates image token cost by 30-70x), which had briefly made
+    four QA evidence PNGs look like 470K tokens instead of ~6K. Written up in
+    `docs/loop-token-usage.md`.
