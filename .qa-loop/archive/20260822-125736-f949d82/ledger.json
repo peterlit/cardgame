@@ -1,0 +1,1042 @@
+{
+  "round": 3,
+  "build_sha": "2b66b93",
+  "max_rounds": 3,
+  "parallel_testers": 3,
+  "emit_regression_tests": true,
+  "implemented_rounds": [
+    1
+  ],
+  "findings": [
+    {
+      "id": "ux/WF-2:drop-below-column-refused",
+      "claim": "A legal drag was silently refused when the card was released in the empty tableau space just below the target column instead of on top of its cards, teaching the player that a legal move is illegal.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-2",
+      "test_case": "TC-2.3",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/qa-worker-1/wf2-dropzone-before.png",
+          "evidence/round-1/qa-worker-1/wf2-dropzone-released-20pt-below-refused.png",
+          "evidence/round-1/qa-worker-1/wf2-dropzone-released-on-cards-accepted.png",
+          "evidence/round-1/qa-worker-1/wf2-dropzone-moves-ladder.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-02b-01-release700.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-02b-02-release800.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-02b-03-release860.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-11a-drop-20pt-below-accepted.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-11b-drop-120pt-below-accepted.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-12-drop-offboard-refused.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap the Deal # pill (192,175); tap the field (200,268); tap Select All (213,316); type 1,0,0,0,4 on the number pad; tap Play (200,336) -> deal #10,004, Moves 0",
+          "press-drag the 10\u2665 at the bottom of column 6 (321,612) and release at (28,700) - 20 pt below column 0's last card, whose bottom edge is y=680: card snaps back, Moves stays 0",
+          "repeat releasing at (28,690) (10 pt below): snaps back, Moves stays 0",
+          "repeat releasing at (28,600), over the column's cards: accepted, Moves = 1",
+          "fresh install, launch, tap the Deal # pill (toolbar.deal), backspace out the prefilled seed, type 1,0,0,0,4, tap Play -> deal #10,004, Moves 0",
+          "column 0's last card (J-clubs) has frame y 605.33..680.33 pt; column 6's bottom card (10-hearts) is centred (322,613)",
+          "press-drag 10-hearts (322,613) and release at (28,700) = 19.7 pt below column 0's last card -> ACCEPTED on this build: Moves 1, card.H10 frame moves to x=6,y=635.33 (was x=300,y=575.33)",
+          "Undo, repeat releasing at (28,800) = 119.7 pt below, deep in the empty strip -> ACCEPTED: Moves 1, card.H10 at x=6,y=635.33",
+          "Undo, repeat releasing at (28,860) -> refused (Moves 0, card.H10 back at x=300): y=860 is past the tableau area, whose deepest card edge measures 836.33 pt on an 874 pt screen",
+          "ROUND 3 RE-RUN on 2b66b93: fresh install -> Deal # alert -> 10004 -> Play (Moves 0)",
+          "drag 322,613 (card.H10, column 6 bottom) -> release 28,700 = 19.7 pt below column 0's last card: ACCEPTED, Moves 1, card.H10 at x=6,y=635.33",
+          "Undo; drag 322,613 -> release 28,800 = 119.7 pt below: ACCEPTED, Moves 1, card.H10 at x=6,y=635.33",
+          "Undo; drag 322,613 -> release 28,860 (past the tableau area): correctly REFUSED, Moves 0, card.H10 back at x=300,y=575.33"
+        ],
+        "measurements": {
+          "accepted_release_offsets_below_last_card_pt": [
+            20,
+            120
+          ],
+          "refused_release_offset_pt": 180,
+          "tableau_deepest_card_bottom_edge_pt": 836.33,
+          "moves_after_each_accepted_drop": 1,
+          "prior_build_moves_at_same_release_points": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Verified on 5447237 by re-running the round-1 repro plus a deeper release. Each column's drop frame now spans the full tableau height. Two things I checked for collateral damage and did not find: releasing a run in the strip below its OWN column is still a no-op with no move counted (Game.tryMoveToTableau's sc == col guard), and an illegal drop (4-hearts released on column 1's 10-clubs) still snaps back with Moves unchanged. The only remaining refusal is a release BELOW the tableau area itself (y>=~840 pt, i.e. the home-indicator strip), which is correct. TESTCASES TC-2.3 has been rewritten to the inverted contract and now carries this repro as its regression check. ROUND 3: regression check re-run on 2b66b93, all three legs behave as in round 2 (20 pt and 120 pt below accepted, off-board refused). Still fixed."
+    },
+    {
+      "id": "ux/WF-2:unmovable-card-no-feedback",
+      "claim": "Touching or dragging a card that cannot move produced literally zero on-screen response, so a novice could not tell 'this card is not movable' from 'the app did not register my touch'.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-2",
+      "test_case": "TC-2.4",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/qa-worker-1/wf2-unmovable-before-drag.png",
+          "evidence/round-1/qa-worker-1/wf2-unmovable-during-drag-t3.05s.png",
+          "evidence/round-1/qa-worker-1/wf2-unmovable-after-drag.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-tc24-shake-vs-rest.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-tc24-drag-nolift-then-shake.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-tc24-drag-release-shake.png",
+          ".qa-loop/evidence/round-2/qa-worker-1/r2b-tc24-rest-frame.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-13-tc24-rest-vs-shake.png"
+        ],
+        "repro": [
+          "fresh install, launch, tap New game (51,135) (observed on deal #904390, Moves 0 so nothing else on screen animates)",
+          "press-drag the buried card at column 0 index 2 (28,500) towards (200,500) with a 3.0 s press duration",
+          "capture host screenshots (xcrun simctl io ... screenshot) continuously through the gesture and diff them against the pre-gesture frame",
+          "same gesture on the column's BOTTOM card (28,642) does visibly move the card - so the rig does deliver the gesture",
+          "fresh install, launch, play deal #10,004 via the Deal # alert (Moves 0)",
+          "TAP PATH: tap the buried A-hearts at column 0 index 2 (28,500) eight times with ~1 s gaps while filming the host at ~4 fps; imgdiff every frame against a rest frame over that card's rect (raw px 18,1456,135,90)",
+          "-> 3 of the 8 taps land a displaced frame (MAD 43.9 / 40.3 % pixels changed at t=1786862948.965, tap issued 1786862948.753); the rest of the film is MAD 0.000. Moves stays 0, card returns to its exact frame (6,485.33).",
+          "DRAG PATH (the round-1 repro verbatim): press-drag the same buried card 3.0 s from (28,500) towards (200,500) while filming",
+          "-> every frame from the press (1786864704.28) through the translation is MAD 0.000 (the card correctly never lifts), then the release frame at 1786864707.911 is MAD 43.9 / 40.3 % changed = the shake. Moves 0, Undo still disabled, card back at (6,485.33) with no stuck/elevated-zIndex artifact.",
+          "NEGATIVE CONTROL (no over-cueing): with 4-hearts parked in free cell 3 and no legal target for it anywhere, 8 taps on it over 93 filmed frames gave MAD 0.000 in that cell's rect -> a movable card's fruitless tap stays silent, as designed.",
+          "ROUND 3 RE-RUN on 2b66b93, deal #10,004, Moves 0: tap the buried A-hearts (column 0 index 2, 28,500) 8x with ~1 s gaps while filming the host at ~4 fps (194 frames)",
+          "imgdiff every frame against the rest frame over that card's rect (raw px 18,1456,135,225): 7 displaced frames (MAD 13.1-18.9, 12.9-16.8 % pixels changed), all others MAD 0.000",
+          "then press-drag the same buried card 28,500 -> 200,500 with a 2.5 s hold: all 13 frames inside the 3.3 s drag window are MAD 0.000 (the card never lifts), and the release frame shows the wiggle",
+          "final state: Moves 0, toolbar.undo isEnabled=false, card.H1 back at its exact frame (6,485.33)"
+        ],
+        "measurements": {
+          "shake_frames_caught_tap_path": "3/8 taps at ~4 fps sampling of a 0.3 s cue",
+          "max_mean_abs_pixel_diff_during_cue": 43.906,
+          "pct_pixels_changed_during_cue": 40.263,
+          "frames_at_zero_diff_during_3s_press_drag": 14,
+          "negative_control_frames_at_zero_diff": 93,
+          "moves_counted": 0,
+          "round3_displaced_frames": "7/194 filmed frames",
+          "round3_frames_at_zero_diff_during_drag": 13
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Fixed on both the tap and the drag path, and the card still never lifts. Residual, NOT filed as a finding because it is the implementer's stated design decision and I have no evidence it confuses anyone: the identical silence still exists for a card that CAN be lifted but has no legal target (all three cells full, no stackable bottom) - same 'did my touch register?' ambiguity, different card class. If a human wants symmetry there it is a one-line change to the same guard; I would not pay the noise cost. Also note the cue is positional (shakeSpot is a Spot, not a card id), which is fine today because nothing re-lays-out during the 0.3 s animation. ROUND 3: re-filmed on 2b66b93 - cue still fires on both the tap and the drag-release path, card still never lifts, no stuck-zIndex artifact. Still fixed."
+    },
+    {
+      "id": "ux/WF-3:new-game-discards-progress-no-confirm",
+      "claim": "One tap on the primary gold 'New game' pill destroys an in-progress game with no confirmation and no way back: after 3 moves on deal #10,004 (clock 1:08) a single tap redealt to random deal #904390 with Moves 0, Undo immediately dimmed (history cleared), and the abandoned deal number no longer shown anywhere - the position is unrecoverable. 'New game' sits directly left of 'Undo', the other most-tapped pill.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-3",
+      "test_case": "TC-3.1",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/qa-worker-1/wf3-newgame-destroys-inprogress.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-09a-3moves-before-newgame.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-09b-newgame-discards-progress.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "Deal # pill -> play deal #10,004",
+          "make 3 moves (any); header reads Moves 3, Time 1:08",
+          "tap New game (51,135)",
+          "observe Deal #904390, Moves 0, Time 0:00, Undo dimmed",
+          "tap Undo (142,135): nothing happens - the 3-move position and its deal number are gone",
+          "ROUND 3 RE-RUN on 2b66b93 (fresh install): launch -> deal #690486, make 3 moves (tap card.D13, card.S11, card.D10); header reads Moves 3, Time 0:09, toolbar.undo isEnabled=true",
+          "tap toolbar.newgame once: no confirmation alert of any kind appears",
+          "state immediately after: toolbar.deal reads 'Deal #443568', stat.moves 0, stat.time 0:00, toolbar.undo isEnabled=false - the 3-move position on #690486 and its deal number are gone with no way back"
+        ],
+        "measurements": {
+          "taps_to_destroy": 1,
+          "taps_to_recover": null,
+          "new_game_pill_x_range_pt": [
+            7,
+            97
+          ],
+          "undo_pill_x_range_pt": [
+            103,
+            180
+          ],
+          "gap_between_pills_pt": 6
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "behavior-change",
+      "note": "TRAP: the obvious fix (confirmation alert when moves > 0) breaks WORKFLOWS.md's WF-3 effort bar 'each is one tap'. A non-conflicting alternative is making the redeal undoable (Undo restores the previous deal + history) or surfacing the abandoned deal number. Human should pick. ROUND 3: unchanged on 2b66b93 - reproduced exactly (3 moves on #690486 -> one tap -> #443568, Undo dimmed). Still proposal-routed, awaiting a human decision; no implementer attempt was made."
+    },
+    {
+      "id": "ux/WF-5:daily-hud-truncates-objectives",
+      "claim": "In portrait, the live daily objectives HUD squeezed all three chips onto one 402pt line, so Silver and Gold were cut off ('\ud83e\udd48 \u00b7 Win in 103 moves or\u2026'); a player chasing Gold could not read what Gold requires while playing.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.2",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/tc5.2-hud-truncated-portrait.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/tc5.2-hud-full-landscape.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/tc6.6-gold-demo-headline.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc5.2-hud-portrait-wrapped-FIXED.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc5.2-hud-landscape-oneline.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc5.2-hud-portrait.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc5.2-hud-landscape.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily",
+          "tap Play (Today card, deal #10,005)",
+          "read the dark objectives capsule under the toolbar",
+          "tap Daily (toolbar.daily)",
+          "tap Play (daily.play) on the Today card (deal #10,005, dayIndex 4)",
+          "read the dark objectives box under the toolbar, portrait then landscape",
+          "ROUND 3: fresh install, launch",
+          "tap Play (daily.play)",
+          "read the objectives box under the toolbar in portrait, then rotate left and read it again"
+        ],
+        "measurements": {
+          "portrait_silver_shown": "Win in 103 moves or fewer",
+          "portrait_gold_shown": "For every suit, send its King home before its Ace",
+          "ellipses_in_hud": 0,
+          "landscape_layout": "still one line, all three full",
+          "portrait_tableau_origin_pt": "498 (was 479 with the one-line HUD)",
+          "round3_ellipses_in_hud": 0,
+          "round3_portrait_tableau_origin_pt": 499.33,
+          "round3_no_hud_tableau_origin_pt": 425.33
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Round-3 re-confirmation on 2b66b93 (fresh install, dayIndex 4 / deal #10,005): portrait HUD still stacks the three chips with fully wrapped labels ('Win in 103 moves or fewer', 'For every suit, send its King home before its Ace'), landscape still one untruncated line. Zero ellipses in either orientation; portrait tableau origin measured at y=499.33 via card.* frames (425.33 with no HUD)."
+    },
+    {
+      "id": "ux/WF-6:demo-discards-daily-attempt-without-warning",
+      "claim": "Tapping a 'Show me how to win' pill while a daily attempt was in progress silently threw that attempt away \u2014 no confirmation, no way back.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.7",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/cc2-daily-attempt-discarded-and-hud-lost.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.3-demo-confirm-alert-FIXED.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.3-keep-playing-attempt-intact.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.3-show-demo-proceeds.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.7-casual-game-no-confirm-gap.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.7-confirm-alert.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.7-keep-playing-attempt-intact.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.7-show-demo-proceeds.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily, tap Play (deal #10,005)",
+          "tap the bottom card of column 0 (K\u2660 smart-moves home) and the bottom card of column 7 -> Moves 2, Time 0:51, HUD visible, Undo enabled",
+          "tap Daily",
+          "tap the \ud83e\udd49 Clear pill under 'Show me how to win:'",
+          "observe the board: Moves 0, Undo disabled, demo bar replaces the HUD",
+          "launch, tap Daily, tap Play (deal #10,005)",
+          "tap the bottom card of column 0 (K\u2660) and of column 7 (K\u2665) -> Moves 2, clock running, HUD up, Undo enabled",
+          "tap Daily, tap the \ud83e\udd49 Clear pill -> alert 'End your daily attempt?' with Keep playing / Show demo",
+          "tap Keep playing, tap Done -> board still Moves 2, Time 1:45 and counting, Undo enabled, both kings still on the foundations, HUD still up",
+          "re-open Daily, tap Clear, tap Show demo -> sheet dismisses, demo bar opens at 0 / 86, board re-dealt (attempt gone, by design)",
+          "ROUND 3: Daily -> Play, tap card.S13 and card.H13 (Moves 2)",
+          "tap Daily -> \ud83e\udd49 Clear -> alert appears",
+          "tap Keep playing, tap Done -> Moves 2, Time 2:01 running, Undo enabled, kings still home, HUD up",
+          "re-open Daily -> \ud83e\udd49 Clear -> Show demo -> demo bar 0 / 86 on a re-dealt board"
+        ],
+        "measurements": {
+          "confirmations_shown": 1,
+          "moves_preserved_on_cancel": 2,
+          "clock_preserved_on_cancel": "1:45 and running",
+          "round3_confirmations_shown": 1,
+          "round3_moves_preserved_on_cancel": 2
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Round-3 re-confirmation on 2b66b93: with a daily attempt at Moves 2 / Time 0:09, a demo pill still raises 'End your daily attempt?' (Keep playing / Show demo, destructive). Keep playing preserved everything (Moves 2, clock at 2:01 and running, Undo enabled, both kings still on the down foundations at y=412, HUD still up); Show demo proceeded to 'Winning line \u2014 0 / 86' on a re-dealt board. The sibling gap noted in round 2 is unchanged and still unfiled: the gate is `challengeDay != nil && moveCount > 0`, so a CASUAL game in progress is re-dealt by a demo pill with no warning (same class as the open ux/WF-3:new-game-discards-progress-no-confirm)."
+    },
+    {
+      "id": "ux/WF-6:challenge-mode-silently-dropped-after-demo",
+      "claim": "Exiting a demo (Stop or Done) leaves the player on a fresh deal of the daily seed with challenge mode silently switched off \u2014 the objectives HUD is gone and Game.showSolution()/deal() has cleared challengeDay, so anything played from that board is casual play that banks no daily tier. Nothing on screen says so: same Deal #10,005, same board, no HUD, no message.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.3",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/cc2-daily-attempt-discarded-and-hud-lost.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/tc6.3-stop-fresh-board.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.3-after-stop-fresh-board.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.3-coldlaunch-stop-fresh-board.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily, tap Play (deal #10,005) \u2014 HUD with the three medal chips is up",
+          "tap Daily, tap \ud83e\udd49 Clear, tap Next a few times",
+          "tap Stop",
+          "board is a fresh deal of #10,005 with NO objectives HUD; the only way back into scoring is Daily -> Play",
+          "ROUND 3: fresh install, launch, Daily -> Play (deal #10,005, HUD up)",
+          "Daily -> \ud83e\udd49 Clear -> Next x3 -> Start -> Pause (24 / 86)",
+          "board is the fresh dealt #10,005 (all 52 cards back in the dealt columns) with NO objectives HUD and no notice"
+        ],
+        "measurements": {
+          "hud_before": "present",
+          "hud_after_stop": "absent",
+          "onscreen_notice": "none",
+          "round3_tableau_origin_with_hud_pt": 499.33,
+          "round3_tableau_origin_after_stop_pt": 425.33,
+          "round3_onscreen_notice": "none"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "STILL REPRODUCES on 2b66b93 (round-3 confirming pass). Measured with card.* frames: during the daily attempt the tableau origin is y=499.33 (objectives HUD up); after the demo's Stop it is y=425.33 (HUD gone) while toolbar.deal still reads 'Deal #10,005' and nothing on screen says the challenge was left. Same after the post-line Done. TRAP unchanged: do not re-arm challengeDay silently \u2014 tell the user, or offer an explicit 'Restart the daily' affordance."
+    },
+    {
+      "id": "ux/WF-6:demo-moves-counter-in-player-header",
+      "claim": "While a demo ran, and on its completion banner, the player's own header showed the demo's move count against a stopped clock ('Moves 86 / Time 0:00'), reading as if the user had played a perfect zero-second game.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.4",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/tc6.4-cc3-banner-moves86-time0.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.2-running-header-emdash.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.4-banner-header-emdash-FIXED.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc6.4-nothing-banked-wins-and-streaks.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.2-demo-states.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.2-demo-bar-strip.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.1-demo-ready-header-emdash.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily, tap \ud83e\udd49 Clear",
+          "tap Start and let the line run to 86 / 86 (~22 s)",
+          "read the header: Moves 86, Time 0:00, Won 0",
+          "launch, tap Daily, tap the \ud83e\udd49 Clear pill",
+          "read the header while the bar is ready (0/86), while Start auto-runs (15/86), while paused (15/86 paused) and on the completion banner (86/86)",
+          "tap Done and read the header again",
+          "ROUND 3: cold launch, Daily -> \ud83e\udd49 Clear",
+          "read stat.moves/stat.time at 0/86, after 3x Next, while Start auto-runs, while paused, and on the banner"
+        ],
+        "measurements": {
+          "header_moves_while_demoing": "\u2014",
+          "header_time_while_demoing": "\u2014",
+          "header_won_while_demoing": "0 (real value kept)",
+          "header_after_done": "Moves 0 / Time 0:00",
+          "round3_header_moves_while_demoing": "\u2014",
+          "round3_header_time_while_demoing": "\u2014",
+          "round3_header_after_done": "Moves 0 / Time 0:00"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Round-3 re-confirmation on 2b66b93 via the stat.moves / stat.time accessibility VALUES (not pixels) in all four demo states: ready 0/86, stepped 3/86, auto-running 15/86, paused 24/86 and the completion banner all report Moves '\u2014' and Time '\u2014' with Won keeping its real value 0. After Done the header returns to Moves 0 / Time 0:00."
+    },
+    {
+      "id": "ux/WF-5:no-seed-or-date-override-for-daily",
+      "claim": "The daily challenge is derived from the wall-clock date with no debug override, and the only way to bank a daily tier is to solve the deal by hand (86 moves for #10,005) now that demo progress is deliberately unbankable. TC-5.3 (post-bronze 'Replay to improve' state) and every day-boundary/streak behaviour are therefore untestable by playing; I had to seed a bronze record through the app's own Import to check the display at all.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.3",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/tc5.3-replay-to-improve-label.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/tc5.3-streaks-after-bronze.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/r3-tc6.4-nothing-banked.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "attempt TC-5.3: there is no launch argument, debug picker or seed/date override to reach a 'bronze already earned' state",
+          "workaround used: drop a crafted causeway-stats JSON into On My iPhone and Daily -> Import -> On My iPhone -> QA-Seed-Bronze.json",
+          "app reports 'Imported \u2014 merged 1 day (1 new) and 1 deal (1 new)'; Today card then shows a checked Bronze circle and a grey 'Replay to improve \u21bb' button, Play streak 1 / 1 total / best 1",
+          "ROUND 3: fresh install; no launch argument or debug affordance found for date/seed",
+          "after the full Clear demo line + Done, Wins reads 'No wins yet \u2014 go solve one!' and all four streak cards are 0",
+          "host check: plutil -p <container>/Library/Preferences/com.whimsicaldistractions.Causeway.plist lists only causeway.game"
+        ],
+        "measurements": {
+          "manual_moves_to_win_daily": 86,
+          "blocked_test_cases": 1,
+          "round3_blocked_test_cases": 1,
+          "round3_persisted_keys": "causeway.game only"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "STILL OPEN on 2b66b93: no launch argument, debug picker or date/seed override exists, so TC-5.3 (post-bronze 'Replay to improve' state) is BLOCKED for a third round. The only in-app routes to a banked bronze are an 86-move manual solve of #10,005 or seeding via the app's own Import. Verified this round that a full demo run banks nothing: after running the whole 86-move Clear line plus a Gold line, the app's UserDefaults contains only `causeway.game` \u2014 no `causeway.wins`, no `causeway.daily` key at all."
+    },
+    {
+      "id": "bug/DailyView:calendar-weekday-header-dupes",
+      "claim": "The Daily screen's month calendar rendered only 5 of the 7 weekday letters (Thu 'T' and Sat 'S' collapsed by ForEach(..., id: \\.self)), leaving two blank header columns.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "DailyView",
+      "test_case": "TC-11.1",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-3/bug-calendar-weekday-header.png",
+          ".qa-loop/evidence/round-1/qa-worker-3/wf11-daily-screen-full.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-11-daily-mid.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-40-rot.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-11-daily-calendar-weekday-header.png"
+        ],
+        "repro": [
+          "cold launch",
+          "tap Daily",
+          "scroll the Daily sheet down to the month calendar",
+          "read the weekday header row above the day grid: 'S M T W _ F _'",
+          "cold launch on a fresh install",
+          "tap the 'Daily' toolbar pill",
+          "scroll the Daily sheet down to the August 2026 calendar",
+          "read the weekday header row above the day grid"
+        ],
+        "measurements": {
+          "weekday_letters_rendered": 7,
+          "expected": 7
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Round 3 re-verify on 2b66b93 (fresh install, dayIndex 4 / deal #10,005): the August 2026 weekday header reads S M T W T F S - all seven letters, no blank columns. Still fixed."
+    },
+    {
+      "id": "ux/WF-8:autofinish-cycle-through-on-ends-game",
+      "claim": "The Auto-finish pill cycled Ask -> On -> Off, so on a finishable board the only route from the default 'Ask' to 'Off' passed through 'On', and that single tap instantly cascaded the whole board and recorded the win.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-8",
+      "test_case": "TC-8.4",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/qa-worker-2/wf8-8_4-ask-prompt.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/wf8-casc.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/wf8-8_4-on-cascade-1.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/wf8-8_4-win.png",
+          ".qa-loop/evidence/round-1/qa-worker-2/tc81-83-strip.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc8.1-8.3-cycle-ask-off-on.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc8.4-ask-prompt.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc8.4-ask-to-off-one-tap-no-cascade-FIXED.png",
+          ".qa-loop/evidence/round-2/qa-worker-2/tc8.4-on-cascade-win.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/tc8.3-autofinish-cycle.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/tc8.4-ask-prompt-28moves.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/tc8.4-ask-to-off-one-tap-no-cascade.png",
+          ".qa-loop/evidence/round-3/qa-worker-2/tc8.4-off-to-on-cascade-win.png"
+        ],
+        "repro": [
+          "fresh launch (defaults Auto-play: On, Auto-finish: Ask)",
+          "tap 'Deal #' pill, enter 10169, tap Play",
+          "play the 28 moves listed in TESTCASES TC-8.4 fixture (bronze line prefix for deal #10169) until the board is finishable",
+          "the 'Ready to finish' prompt appears (Ask working as labelled); tap 'Not yet' \u2014 the gold Finish pill stays and the board is still playable",
+          "now try to switch Auto-finish to 'Off' so you can finish the deal by hand: tap the 'Auto-finish: Ask' pill ONCE",
+          "the pill reads 'Auto-finish: On' and the app instantly cascades all 42 remaining cards home, shows the win overlay and records the win \u2014 'Off' was never reachable",
+          "launch (defaults Auto-play: On, Auto-finish: Ask)",
+          "tap the Deal # pill, enter 10169, tap Play",
+          "replay the first 28 tokens of #10169's bronze line as real drags (node gen2.mjs 10169 bronze 28) -> Moves 28, board finishable",
+          "the 'Ready to finish' prompt appears by itself; tap 'Not yet' -> gold Finish pill stays, board playable",
+          "tap the 'Auto-finish: Ask' pill ONCE -> label reads 'Auto-finish: Off', Moves still 28, Won still 0, no cascade, Finish pill still offered",
+          "tap it again -> 'Auto-finish: On' cascades to the win overlay (70 moves) as intended",
+          "fresh install, cold launch (defaults Auto-play: On, Auto-finish: Ask)",
+          "tap the 'Deal #' pill, clear the field, type 10169, tap Play",
+          "replay the first 28 tokens of #10169's bronze line as real drags (node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28) -> Moves 28, board finishable",
+          "tap it again -> 'Auto-finish: On' cascades to the win overlay (70 moves, 'Deal #10,169 - 70 moves - 4:30') as intended"
+        ],
+        "measurements": {
+          "cycle_order_round3": "Ask -> Off -> On -> Ask",
+          "taps_from_ask_to_off": 1,
+          "cards_played_by_that_tap": 0,
+          "moves_before": 28,
+          "moves_after_ask_to_off_tap": 28,
+          "moves_after_off_to_on_tap": 70,
+          "persisted_across_relaunch": "Auto-finish: On survived terminate+launch; plist causeway.autofinishmode = on"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "fix_risk": "behavior-change",
+      "note": "Re-verified on 2b66b93 (app binary 5447237) with a full 28-drag fixture replay: cycle is Ask -> Off -> On -> Ask, Ask->Off is one tap and plays zero cards, and the deliberate Off->On shortcut still cascades. Residual (unchanged, still NOT filed separately): returning Off -> Ask still transits On, so one extra tap on a finishable board ends the game."
+    },
+    {
+      "id": "bug/Main:landscape-disabled-undo-blank",
+      "claim": "In landscape the DISABLED Undo rail pill rendered as a featureless blank white capsule (no glyph, no label) between 'New game' and 'Replay'.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.1",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/qa-worker-3/wf12-undo-blank-landscape-rail.png",
+          "evidence/round-1/qa-worker-3/wf12-undo-legible-portrait-toolbar.png",
+          "evidence/round-1/qa-worker-3/wf12-undo-enabled-landscape-rail.png",
+          "evidence/round-1/qa-worker-3/wf12-landscape-fresh-deal10005.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-31-undo-crop.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-30-land-fresh-rot.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-33-land-after-drag-rot.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-41-rot.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-01-land-fresh-rail.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-02-disabled-undo-legible.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-06-daily-hud-land.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-11-demo-bar-land.png"
+        ],
+        "repro": [
+          "launch the app fresh (or any state with an empty undo stack - the stack is empty after every relaunch)",
+          "rotate the device to landscape (XCUIDevice.shared.orientation = .landscapeLeft)",
+          "look at the second pill of the left control rail, between 'New game' and 'Replay' (pt 127,102 with no HUD; pt 127,141 with the daily HUD)",
+          "install fresh, play deal #10005, terminate and relaunch (relaunch leaves Moves>0 but an EMPTY undo stack, so Undo is disabled)",
+          "rotate to landscape (XCUIDevice.shared.orientation = .landscapeLeft)",
+          "read the second pill of the left rail at pt (127,102) - no HUD - or (127,141) with the daily HUD",
+          "fresh install, launch the app (undo stack empty)",
+          "read the second pill of the left rail at pt (127,102) - no HUD",
+          "also checked with the daily HUD up (pill at pt 127,142) and with the demo bar up (pill at pt 127,157)"
+        ],
+        "measurements": {
+          "landscape_disabled_undo_glyph_visible": true,
+          "landscape_disabled_undo_label_visible": true,
+          "states_checked": 4,
+          "enabled_undo_still_dark_and_functional": true
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Re-verified on a fresh install of 2b66b93 (app binary 5447237) in four separate landscape states (fresh launch, after a rotation round-trip, with the daily HUD, with the demo bar): the disabled pill reads as a greyed arrow.uturn.backward glyph + 'Undo' label, matching the portrait toolbar. Enabled Undo still renders dark and still acted (rolled Moves 70 -> 69). Stays fixed."
+    },
+    {
+      "id": "ux/WF-12:deal-alert-actions-hidden-in-landscape",
+      "claim": "In landscape the 'Play a deal' alert showed only 'Play'; 'Random' and 'Cancel' sat below the visible alert behind the auto-raised number pad with no scroll hint, so the only visible exit was the destructive Play.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.2",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          "evidence/round-1/qa-worker-3/wf12-deal-alert-landscape-only-play-visible.png",
+          "evidence/round-1/qa-worker-3/wf12-deal-alert-portrait-all-three-actions.png",
+          "evidence/round-1/qa-worker-3/wf12-deal-alert-landscape-tap-outside-no-dismiss.png",
+          "evidence/round-1/qa-worker-3/wf12-deal-alert-landscape-scrolled-reveals-cancel.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-35-land-dealalert-rot.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-36-crop.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-03-dealalert-land-two-actions.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-04-deal10005-land.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-10-enddaily-alert-land.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-16-finish-prompt-land.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-15-alert-survives-rotation.png"
+        ],
+        "repro": [
+          "launch the app fresh",
+          "rotate the device to landscape (XCUIDevice.shared.orientation = .landscapeLeft)",
+          "tap the 'Deal #...' pill in the left rail (pt 127,232 with no HUD; pt 127,271 with the daily HUD)",
+          "observe the alert: title, message, prefilled field, number pad up, and 'Play' as the only visible button",
+          "tap anywhere outside the alert (e.g. pt 780,40 and pt 60,380) - the alert does not dismiss and the pad stays up",
+          "drag upward inside the alert body (pt 437,200 -> 437,60) - the action list scrolls and 'Cancel' appears in the same slot where 'Play' was",
+          "launch, play deal #10005, make a couple of moves",
+          "rotate to landscape",
+          "tap the 'Deal #10005' rail pill at pt (127,232)",
+          "observe the alert; then tap 'Cancel' at pt (362,179)",
+          "fresh install, launch, rotate to landscape",
+          "tap the 'Deal #...' pill in the left rail (pt 127,232, no HUD)",
+          "observe the alert: Cancel and Play side by side, entirely above the number pad, no scrolling needed",
+          "type 10005 and tap Play - the board re-deals to #10,005",
+          "repeat for the other two landscape alerts: Daily -> 'Show me how to win: Clear' ('End your daily attempt?') and the 'Ready to finish' prompt"
+        ],
+        "measurements": {
+          "actions_visible_without_scrolling_landscape": 2,
+          "actions_total": 2,
+          "other_landscape_alerts_checked": 2,
+          "alert_survives_rotation_landscape_to_portrait": true
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Re-verified on a fresh install. The two other alerts that can appear in landscape ('End your daily attempt?' and 'Ready to finish') also lay their two actions out side by side, fully visible. Rotating landscape->portrait with the deal alert open keeps the alert, the typed value and the keypad intact. Stays fixed."
+    },
+    {
+      "id": "ux/WF-11:export-picker-no-progress-indicator",
+      "claim": "Tapping Export/Import froze the UI for 1.6-1.8 s with no spinner or any acknowledgement before the Files sheet appeared, so the user had no evidence their tap registered.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-11",
+      "test_case": "TC-11.1",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/perf/export-cold-t+0.50s-press-highlight.png",
+          ".qa-loop/evidence/round-1/perf/export-cold-t+0.88s-highlight-gone-no-spinner.png",
+          ".qa-loop/evidence/round-1/perf/export-cold-t+1.84s-still-frozen.png",
+          ".qa-loop/evidence/round-1/perf/export-cold-t+3.60s-files-sheet-settled.png",
+          ".qa-loop/evidence/round-1/perf/import-cold-t+0.96s-highlight-gone-no-spinner.png",
+          ".qa-loop/evidence/round-1/perf/import-cold-t+1.87s-still-frozen.png",
+          ".qa-loop/evidence/round-1/perf/import-cold-t+3.59s-picker-settled.png",
+          ".qa-loop/evidence/round-1/perf/perf-measurements.txt",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-18-note-strip.png",
+          ".qa-loop/evidence/round-2/qa-worker-3/r2-47-export-note-strip.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-11-opening-files-ack-export.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-11-opening-files-ack-import.png"
+        ],
+        "repro": [
+          "xcrun simctl terminate + launch (cold start; the stall recurs on every cold launch, not once per install)",
+          "tap the 'Daily' toolbar pill",
+          "scroll the Daily sheet to the BACKUP section at the bottom",
+          "tap 'Export' (or, on another cold launch, 'Import')",
+          "observe: the pill's press highlight shows for ~0.4 s, then the screen is byte-for-byte frozen for ~1.0-1.2 s with no spinner, then the Files sheet starts to slide up (first pixel change 1.61 s after touch for Export, 1.80 s for Import); fully settled ~3.2 s after touch",
+          "cold launch, tap 'Daily', scroll the sheet to the BACKUP section",
+          "tap 'Import' (and separately 'Export') while filming the host at ~4 fps",
+          "read the note line under the two buttons in the frames immediately after the touch"
+        ],
+        "measurements": {
+          "acknowledgement_text": "Opening Files\u2026",
+          "first_frame_showing_it_after_touch_ms_import": 530,
+          "first_frame_showing_it_after_touch_ms_export": 500,
+          "note": "frame-sampled at ~0.25 s intervals on a CONTENDED shared host - treat the ms as ordering evidence, not a measurement"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Round 3 re-verify on 2b66b93 by host filmstrip on BOTH paths: the note line flips to 'Opening Files...' at +0.46 s after the Export touch and +0.47 s after the Import touch (frames at +0.25 s still show the previous note), and stays until the Files sheet slides up. Still fixed. Functional lane: frame timings are ordering evidence on a contended host, not measurements."
+    },
+    {
+      "id": "bug/Main:no-accessibility-identifiers-anywhere",
+      "claim": "The app source contains zero accessibilityIdentifier (and zero explicit accessibilityLabel) modifiers \u2014 grep across ios/Causeway/Causeway/**/*.swift returns nothing. Every UI-test query must fall back to visible-label text (which breaks on copy changes and localization) and every card interaction must use raw device-point coordinates (cards in CardView expose no stable handle at all), because there is no way to address a specific tableau column, free cell, foundation slot, header stat value, or demo-bar control programmatically. This also degrades VoiceOver: cards, slots and the Moves/Time/Won stat values have no meaningful accessibility semantics.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "TC-2.6",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-01-cold-launch.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/r3-22-daily-ids-present.png"
+        ],
+        "repro": [
+          "grep -rn 'accessibilityIdentifier\\|accessibilityLabel' ios/Causeway/Causeway --include='*.swift'",
+          "observe: no matches",
+          "grep -rn 'accessibilityIdentifier' ios/Causeway/Causeway --include='*.swift' -> present since 5447237",
+          "drive the installed build with a throwaway XCUITest bundle and dump every element with a non-empty identifier (`ids`) on a cold-launched board",
+          "observe on the board: toolbar.newgame|undo|replay|autoplay|autofinish|deal|daily|wins|howtoplay, stat.moves|time|won, and card.<SUIT><RANK> on all 52 cards (e.g. card.H13 label 'king of hearts' frame {{6,425.33},{45,75}})",
+          "tap toolbar.daily and dump again: daily.play, daily.demo.bronze, daily.demo.gold, daily.export, daily.import",
+          "drive 40+ interactions this round entirely through tapid/dragid (identifier predicates) - 0 QA-MISS, every tap and drag landed, so adding the identifiers did not change the gesture pipeline"
+        ],
+        "measurements": {
+          "accessibility_identifier_count_observed": "52 card.* + 9 toolbar.* + 3 stat.* + 5 daily.*",
+          "identifier_driven_interactions_this_round": 40,
+          "missed_lookups": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 3,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Verified on 2b66b93 (binary identical to 5447237). The whole WF-1/2/3 pass was driven through the new identifiers instead of coordinates: card.* frames are a complete board oracle (column contents, fan pitch, card size, free-cell/foundation occupancy) and stat.*/toolbar.* give Moves/Time and every pill's isEnabled. No gesture regression - 40+ tapid/dragid interactions, zero misses. Known remaining gaps (win overlay buttons, alert buttons, empty slots, calendar cells) stay tracked under bug/Main:accessibility-identifier-gaps-remaining."
+    },
+    {
+      "id": "bug/Main:accessibility-identifier-gaps-remaining",
+      "claim": "The 5447237 identifier pass (card.*, stat.*, demo.*, toolbar.*, daily.*) covers most of the UI, but four element groups regression tests need are still unaddressable except by fragile label text or raw device-point coordinates: the win overlay (title and its 'Play deal #<n>' / 'Random' / 'Close' pills), the empty SlotView slots (free cells and foundations - there is no way to target 'drop on free cell 2' or 'foundation up-hearts' without coordinates), the Daily month-calendar weekday header letters (bare Texts whose labels are ambiguous by design - two 'S', two 'T'), and the Daily calendar day cells (no per-day handle). Missing identifiers hurt both UI testability and VoiceOver navigation.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "Main",
+      "test_case": "TC-2.6",
+      "build_sha": "5447237",
+      "evidence": {
+        "screenshots": [],
+        "repro": [
+          "grep accessibilityIdentifier ios/Causeway/Causeway/Views/*.swift on 5447237",
+          "ContentView.swift winOverlay (~line 692): Text(\"You solved it! \ud83c\udf89\") and the pill(\"Play deal #...\")/pill(\"Random\")/pill(\"Close\") buttons carry no identifier - RegressionDemoNeverScoresTests must match the emoji title label verbatim",
+          "CardView.swift SlotView (~line 100): empty free-cell/foundation slots render with no identifier and no label - RegressionPortraitTallColumnTests keeps a raw (274,296) iPhone-17-Pro-only coordinate to drop 4-hearts on free cell 1, and no test can address a foundation drop at all",
+          "DailyView.swift calendar (~line 312): the seven weekday header Texts have no identifiers, so RegressionDailyWeekdayHeaderTests counts exact single-letter labels - correct today, but any future single-letter staticText on the Daily sheet breaks it",
+          "DailyView.swift calCell (~line 326): day cells are tap targets (dayView selection) with no identifier, so past-day inspection flows are untestable without coordinates"
+        ],
+        "measurements": {
+          "identifier_groups_shipped": [
+            "card.<S><rank>",
+            "stat.*",
+            "demo.*",
+            "toolbar.*",
+            "daily.play",
+            "daily.export",
+            "daily.import",
+            "daily.demo.<tier>"
+          ],
+          "groups_still_uncovered": [
+            "win overlay title + its 3 pills",
+            "SlotView free-cell/foundation slots",
+            "daily calendar weekday header letters",
+            "daily calendar day cells"
+          ],
+          "suggested_identifiers": [
+            "win.overlay",
+            "win.next",
+            "win.random",
+            "win.close",
+            "cell.<i>",
+            "foundation.<up|down>.<suit>",
+            "daily.cal.weekday.<0-6>",
+            "daily.cal.day.<n>"
+          ]
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Follow-up residue of bug/Main:no-accessibility-identifiers-anywhere (still open in the ledger): the 5447237 pass fixed the bulk of it; this narrows the remainder to the four groups the round-2 regression tests actually hit. Filed by the regression-test writer while retrofitting RegressionDemoNeverScoresTests/RegressionPortraitTallColumnTests to the new identifiers and writing the two new round-2 tripwires."
+    },
+    {
+      "id": "bug/WinsView:deal-number-grouping-inconsistent",
+      "claim": "The same deal number is printed two different ways one line apart: the Wins range chip / range-detail title read '10005-10007' while that screen's own rows read 'Deal #10,005', and after loading it the board toolbar pill reads 'Deal #10006' while the Daily card reads 'Deal #10,005' for the same deal. SwiftUI Text(\"Deal #\\(seed)\") auto-groups the Int (LocalizedStringKey), the String-interpolated pill labels and DealFormat.rangeLabel do not, so a player cross-referencing a deal number sees two spellings of it.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WinsView",
+      "test_case": "TC-9.2",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-09-range-detail-and-number-format.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-09-wins-populated-ranges.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-09-toolbar-deal-no-separator.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3-11-daily-calendar-weekday-header.png"
+        ],
+        "repro": [
+          "fresh install, cold launch (zero state)",
+          "seed wins via the app's own Import route: tap Daily, scroll to BACKUP, tap Import, pick a Causeway backup containing wins for 10005/10006/10007",
+          "tap Done, tap the 'Wins' toolbar pill",
+          "read the range chip: '10005-10007' (no thousands separator)",
+          "tap that chip: the navigation title is '10005-10007' but every row under it reads 'Deal #10,005' / 'Deal #10,006' / 'Deal #10,007' (with separators) - same screen, two formats",
+          "tap the 'Deal #10,006' row: the sheet dismisses and the toolbar pill reads 'Deal #10006 (check)' - no separator",
+          "tap Daily: the Today card reads 'Deal #10,005' - with separator"
+        ],
+        "measurements": {
+          "formats_for_same_value": 2,
+          "screens_affected": 3
+        }
+      },
+      "first_seen_round": 3,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Cosmetic only - no state or scoring impact. Cheapest correct fix is to pick one rendering (the Deal # pill/Wins chip String interpolation vs SwiftUI's auto-grouped Text) and use it everywhere; note that grouping widens the toolbar pill, which reflows the FlowLayout pill rows."
+    },
+    {
+      "id": "bug/WF-4:clock-never-stops-on-repeat-win",
+      "claim": "Undoing out of an already-won deal and re-completing it shows the win overlay again but never stops the game clock: recordWin() bails on the winRecorded guard before stopTimer(), so the header Time keeps counting up forever on a finished, all-52-home board while the overlay's own time stays frozen at a lower value (observed 12:35 on the overlay vs 13:02 and climbing in the header).",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "TC-4.3",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-3/qa-worker-1/wf4-12-off-real-move.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/wf4-13-overlay-clock.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/wf4-17-overlay-clock2.png",
+          ".qa-loop/evidence/round-3/qa-worker-1/wf4-31-win4-overlay.png"
+        ],
+        "repro": [
+          "fresh install, cold launch",
+          "tap Deal # -> type 10169 -> Play",
+          "play the 28-move bronze line for deal #10169 (drag list: node /private/tmp/qaw2r1wf8/gen2.mjs 10169 bronze 28) so the board becomes auto-finishable",
+          "complete the deal (Ready-to-finish -> Finish, or the gold Finish pill)",
+          "on the win overlay tap Close",
+          "tap Undo one or more times (cards come back off the foundations; the win is cleared and the clock resumes, which is intended per Game.swift:439)",
+          "tap the returned card(s) to send them home again -> the board completes and the win overlay reappears",
+          "watch the header Time: it keeps incrementing indefinitely while the overlay is displayed, and disagrees with the time printed on the overlay"
+        ],
+        "measurements": {
+          "rewin_header_time_t0": "8:42",
+          "rewin_header_time_t_plus_15s": "9:01",
+          "rewin_second_instance_overlay_time": "12:35",
+          "rewin_second_instance_header_time": "13:02 (12:45 -> 13:03 over 15 s)",
+          "control_first_win_header_time_held": "5:44 unchanged over 8 s"
+        }
+      },
+      "first_seen_round": 3,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the correct fix is to stop the clock (and clear autoplaying) on every completed board, i.e. move stopTimer() out of the winRecorded-guarded section of recordWin() (Game.swift:762-765). Do NOT fix it by resetting winRecorded on undo/re-win - that is what currently protects the banked best time, and clearing it would let an undo-and-redo pass overwrite WinStore/daily records with a padded elapsed. Verified this round that the banked record stayed the honest best (causeway.wins 10169 = {secs:262, moves:70} after wins of 6:48, 5:44 and 4:22)."
+    },
+    {
+      "id": "bug/WinOverlay:rewin-time-understated",
+      "claim": "After a win is undone and the deal is finished again, the win overlay reports an elapsed time that is short by the whole auto-finish cascade (overlay '11:26' vs the header Time frozen at '11:34'; second observation 9:06 vs 9:11) - two contradictory times for the same finish on one screen. A genuine first win shows the same value in both places (7:26 / 7:26), so only the re-win path disagrees.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "TC-12.3",
+      "build_sha": "2b66b93",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-19-rewin-header-times.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-20-rewin-overlay-time.png",
+          ".qa-loop/evidence/round-3/qa-worker-3/r3w12-17-win-overlay-land.png"
+        ],
+        "repro": [
+          "reach a finishable board (deal #10169, the 28-drag bronze fixture in HARNESS_NOTES) and win it - overlay and header Time agree (both 7:26)",
+          "tap Close on the win overlay",
+          "tap Undo once (this clears 'won'; the clock resumes and Moves goes 70 -> 69)",
+          "wait ~10 s, note the header Time (11:24)",
+          "tap the gold 'Finish' pill (Auto-finish: Off/On) or re-trigger the finish prompt",
+          "when the cascade ends, compare the header Time (frozen at 11:34) with the overlay line 'Deal #10,169 - 70 moves - 11:26'"
+        ],
+        "measurements": {
+          "overlay_time_s": 686,
+          "header_time_s": 694,
+          "delta_s": 8,
+          "cascade_duration_s": 8,
+          "independent_reproductions": 2,
+          "first_win_delta_s": 0
+        }
+      },
+      "first_seen_round": 3,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 3,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: fix_risk metric-integrity. Found in landscape while probing WF-12 TC-12.3; the orientation is not the variable (the re-win is) and I did not re-check it in portrait, so treat the region as WF-4/win overlay. No stats are corrupted today because winRecorded is not reset by undo, so a re-win writes no record - the safe fix is to make the OVERLAY read the same frozen elapsed the header shows, NOT to change what elapsed value gets recorded or to stop the clock earlier (that would shorten recorded best-times by the cascade length)."
+    }
+  ]
+}

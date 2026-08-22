@@ -1,769 +1,453 @@
 {
   "rounds": {
     "1": {
-      "TC-1.1": {
-        "status": "passed",
-        "reason": "Cold launch on fresh install (random deal #632687): subtitle 'build each suit from both ends' + FOUNDATIONS/FREE CELLS labels visible; How to play (1 tap) shows Goal/The catch/Tableau/Free cells/Controls AND About on ONE screen with no scrolling; Done dismisses; tapping the bottom K\u2666 of column 6 sent it to the diamonds down-foundation, Moves 1, clock started 0:01, Undo enabled. Well inside the ~1 min bar (3 taps total).",
-        "persona": "novice"
-      },
-      "TC-1.2": {
-        "status": "passed",
-        "reason": "Tapped 8\u2663 (bottom of column 5) which has no foundation step and no alternating-colour neighbour: smart-move parked it in free cell 1, Moves 2 - visible and self-explanatory, not a silent no-op. Related observation on cards that cannot move at all filed as ux/WF-2:unmovable-card-no-feedback.",
-        "persona": "novice"
-      },
-      "TC-2.1": {
-        "status": "passed",
-        "reason": "Exactly 1 tap per home-able card, no mis-target across the 5 smart-moves exercised (K\u2666->down foundation, 8\u2663->free cell, 8\u2665+7\u2663 run->column 1); matches the 1-tap effort bar.",
-        "persona": "power"
-      },
-      "TC-2.2": {
-        "status": "passed",
-        "reason": "Whole run relocated in 1 tap and counted as 1 move; buried non-head cards did not lift (see TC-2.4).",
-        "persona": "power"
-      },
-      "TC-2.3": {
-        "status": "passed",
-        "reason": "All 13 scripted placement drags of the TC-2.6 build landed exactly on their intended targets, 1 drag each. Caveat filed separately: a release 10-20 pt BELOW the target column's last card is refused even though the move is legal (ux/WF-2:drop-below-column-refused).",
-        "persona": "power"
-      },
-      "TC-2.4": {
-        "status": "passed",
-        "reason": "Buried card never lifted (host filmstrip at ~4 fps, 14 frames, mean-abs-diff 0.000 vs pre-gesture); board pixel state unchanged.",
-        "persona": "power"
-      },
       "TC-2.5": {
-        "status": "passed",
-        "reason": "Same evidence; every tap/drag in ~40 scripted interactions produced a visible change in the next screenshot. Perf candidates for the serial lane listed in the summary.",
-        "persona": "power"
-      },
-      "TC-2.6": {
-        "status": "passed",
-        "reason": "Fixture note: the case's own verified 13-drag build script is pinned to deal #10,004, so I ran it on #10,004 rather than today's daily #10,005 (dayIndex 4) - the shrink contract is deal-independent (it depends on screen height and chrome, not the deal), and using the pinned script kept every drag coordinate replayable. All 13 drags landed first time; 16 cards reached in 13 drags + 1 free-cell round-trip.",
-        "persona": "power"
-      },
-      "TC-3.1": {
-        "status": "passed",
-        "reason": "1 tap, matches the effort bar. Separate proposal filed: the same 1 tap destroys an in-progress game with no confirmation and no undo (ux/WF-3:new-game-discards-progress-no-confirm).",
-        "persona": "power"
-      },
-      "TC-3.2": {
-        "status": "passed",
-        "reason": "1 tap; also verified Replay is the reset that restores full card size after a tall-column board shrink (42.33/41.00 pt).",
-        "persona": "power"
-      },
-      "TC-3.3": {
-        "status": "passed",
-        "reason": "1 tap per undo, no confirmation.",
-        "persona": "power"
-      },
-      "TC-3.4": {
-        "status": "passed",
-        "reason": "Disabled state unambiguous next to the enabled Replay pill in the same row.",
-        "persona": "power"
-      },
-      "TC-3.5": {
-        "status": "passed",
-        "reason": "5 moves then 5 undos stepped 5->4->3->2->1->0 one per tap; after the 5th the tableau was pixel-identical to the initial deal (imgdiff MAD 0.000 over two tableau bands) and the 6th tap was inert. No corruption, no over-undo.",
-        "persona": "power"
-      },
-      "TC-5.1": {
-        "status": "passed",
-        "reason": "One tap from the board to Daily; streak vs total vs best readable at a glance.",
-        "persona": "power"
-      },
-      "TC-5.2": {
-        "status": "failed",
-        "reason": "Same truncation; a power user chasing Gold cannot read the gold rule without reopening Daily (2 extra taps).",
-        "persona": "power"
-      },
-      "TC-5.3": {
-        "status": "blocked",
-        "reason": "Same blocker; see the novice entry.",
-        "persona": "power"
-      },
-      "TC-5.4": {
-        "status": "passed",
-        "reason": "Calendar drill-in is 1 tap per day and reversible; no dead ends.",
-        "persona": "power"
-      },
-      "TC-6.1": {
-        "status": "passed",
-        "reason": "Daily \u2192 \ud83e\udd49 Clear dismisses to the board with 'Winning line \u2014 0 / 86' (matches the derived bronze line length), pills Next/Start/Stop, Moves 0, Time 0:00, Undo disabled, Deal #10005; does not auto-run.",
-        "persona": "novice"
-      },
-      "TC-6.2": {
-        "status": "passed",
-        "reason": "3x Next \u2192 3/86; Start auto-advanced to 15/86 in ~3.2 s, hid Next, showed Pause+Stop and a trailing '\u2026'; Pause showed '17 / 86 (paused)' with Next/Resume/Stop.",
-        "persona": "novice"
-      },
-      "TC-6.3": {
-        "status": "passed",
-        "reason": "Stop at 17/86 removed the demo bar and re-dealt #10,005 to the exact initial layout: Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay. (Two side-effects of the same flow are filed separately: attempt discarded without warning, challenge mode dropped.)",
-        "persona": "novice"
-      },
-      "TC-6.4": {
-        "status": "passed",
-        "reason": "Line ran to 86/86 \u2192 banner \"That's a winning line \u2014 tap Done to try it yourself.\" with a single Done pill; Done re-dealt fresh (Moves 0, full columns, byte-identical to the post-Stop board). Nothing banked: Won 0, Wins 'No wins yet', all four streak cards 0 and all Today circles empty. Header cosmetic issue filed as ux/WF-6:demo-moves-counter-in-player-header.",
-        "persona": "novice"
-      },
-      "TC-6.5": {
-        "status": "passed",
-        "reason": "4.0 s drag on column 0's bottom card during a paused demo: 22 consecutive host screenshots spanning the whole drag are byte-identical (md5 435086e1\u2026) in the column-0 region \u2014 the card never lifted. A subsequent tap on an exposed Ace also did nothing; board+demo-bar crop md5 identical before drag / after drag / after tap.",
-        "persona": "novice"
-      },
-      "TC-6.6": {
-        "status": "passed",
-        "reason": "\ud83e\udd47 Gold pill opens '\ud83e\udd47 Gold: For every suit, send its King home before its Ace \u2014 0 / 86' (full label, 3 lines) with Next/Start/Stop; Next \u2192 1/86; Stop re-dealt to a board byte-identical to the fresh deal. No Silver pill for this seed, as derived.",
-        "persona": "novice"
-      },
-      "TC-7.1": {
-        "status": "passed",
-        "reason": "Deal pill \u2192 5 backspaces + '10003' \u2192 Play loaded Deal #10003, Moves 0. Chrome taps = 2 (pill, Play) plus digit entry; the number pad is already up when the alert opens.",
-        "persona": "power"
-      },
-      "TC-7.2": {
-        "status": "passed",
-        "reason": "Random loaded Deal #801919 immediately.",
-        "persona": "power"
-      },
-      "TC-7.3": {
-        "status": "passed",
-        "reason": "Emptied the field and tapped Play: alert dismissed, no crash, deal unchanged (#801919). Silent no-op, exactly as the case expects.",
-        "persona": "power"
-      },
-      "TC-7.4": {
-        "status": "passed",
-        "reason": "9999999 \u2192 loaded Deal #1000000; 0 \u2192 loaded Deal #1. Clamping is silent but the pill shows the real (clamped) seed, so the user is not misled \u2014 not filed as a finding.",
-        "persona": "power"
-      },
-      "TC-7.5": {
-        "status": "passed",
-        "reason": "Cancel dismissed the alert with Deal #1 and Moves 0 unchanged.",
-        "persona": "power"
-      },
-      "TC-9.1": {
-        "status": "passed",
-        "reason": "Same; 1 tap to open from the toolbar, 1 tap back.",
-        "persona": "power"
-      },
-      "TC-9.2": {
-        "status": "passed",
-        "reason": "Same board/state; row tap loaded Deal #10006 and dismissed the sheet in 1 tap.",
-        "persona": "power"
-      },
-      "TC-9.3": {
-        "status": "passed",
-        "reason": "9999999 clamps to Deal #1000000 as documented; empty/0 keep Play disabled.",
-        "persona": "power"
-      },
-      "TC-10.1": {
-        "status": "passed",
-        "reason": "How to play is a visible toolbar pill; sheet shows Goal (both-ended foundations meeting in the middle), The catch, Tableau, Free cells, Controls (tap = smart move, run moves together, drag = specific).",
-        "persona": "novice"
-      },
-      "TC-10.2": {
-        "status": "passed",
-        "reason": "About / 'Causeway - v1.0 (1)' / '(c) 2026 Whimsical Distractions. All rights reserved.' / tagline all visible without scrolling on iPhone 17 Pro.",
-        "persona": "novice"
-      },
-      "TC-10.3": {
-        "status": "passed",
-        "reason": "Done dismisses straight back to the board.",
-        "persona": "novice"
-      },
-      "TC-11.1": {
-        "status": "passed",
-        "reason": "Exporter opens on On My iPhone with suggested name Causeway-Stats-2026-08-16.json; after Save the note reads 'Stats exported.' and the host file is valid StatsBackup JSON. Interactive dismiss gives 'Export cancelled.'",
-        "persona": "power"
-      },
-      "TC-11.2": {
-        "status": "passed",
-        "reason": "Importing a backup reported 'Imported - merged 2 days (2 new) and 5 deals (5 new).'; re-importing the app's own re-export reported 'merged 2 days (0 new) and 6 deals (0 new).' - merge is additive and idempotent, Won counter only grew (0 -> 5 -> 6).",
-        "persona": "power"
-      },
-      "TC-11.3": {
-        "status": "passed",
-        "reason": "Non-Causeway .json rejected with 'That file isn't a Causeway stats backup.'; stats unchanged, no crash.",
-        "persona": "power"
-      },
-      "TC-11.4": {
-        "status": "passed",
-        "reason": "Hand-edited backup (day keys 99 and -1, seeds 0 and 1000001, moves=0, secs=0, moves=0/elapsed=-5 on an existing day) gave 'Imported - merged 1 day (0 new) and 1 deal (1 new). Skipped 6 invalid entries.'; the subsequent export proves day 3 kept moves 100 / elapsed 300 (not poisoned) and only seed 702 was admitted.",
-        "persona": "power"
-      },
-      "TC-11.5": {
-        "status": "passed",
-        "reason": "Cancelling the Files importer (X) sets the note to 'Import cancelled.' with no state change.",
-        "persona": "power"
-      },
-      "TC-4.1": {
-        "status": "passed",
-        "reason": "Daily #10,005 driven to the finishable state by 76 real moves (baked bronze line replayed as taps/drags); 'Ready to finish / Every remaining card can go home. Send them all now?' auto-appeared at move 76 with Not yet/Finish; Finish cascaded 10 cards and showed 'You solved it! Deal #10,005 - 86 moves - 4:16' plus 'Daily challenge: bronze+silver earned' and the three routing buttons.",
-        "persona": "power"
-      },
-      "TC-4.2": {
-        "status": "passed",
-        "reason": "Not yet dismissed the prompt, gold Finish pill appeared in the toolbar, and a further legal move (Moves 77 -> 78) did not re-prompt.",
-        "persona": "power"
-      },
-      "TC-4.3": {
-        "status": "passed",
-        "reason": "(a) Close returned to the solved board (Won 0->1, 'Deal #10005 checkmark' pill) and a terminate+launch after the win started a fresh deal (#102228, Moves 0) with the win retained rather than resurrecting the solved board; (b) 'Play deal #10006' loaded #10006 at Moves 0; (c) 'Random' loaded #612770 at Moves 0. Wins sheet shows the best record (86 moves / 2:03).",
-        "persona": "power"
-      },
-      "TC-4.4": {
-        "status": "passed",
-        "reason": "With Auto-finish: Off on a freshly re-solved #10,005 no prompt appeared at move 76; the gold Finish pill completed the deal to the win overlay.",
-        "persona": "power"
-      },
-      "P-A": {
-        "status": "passed",
-        "reason": "Daily, Wins and How to play each dismissed via Done AND via swipe-down (drag 200,100 -> 200,830); the Deal alert dismissed via Cancel with the seed unchanged; the finish prompt dismissed via Not yet. No sheet trapped the user.",
-        "persona": "power"
-      },
-      "P-B": {
-        "status": "passed",
-        "reason": "The overlay appeared only at the 5 genuine board completions (foundations complete) and never during ~40 other interactions (sheet open/close, deal entry, undo x20, mode toggles, 152 board moves); it also did not reappear on relaunch after Close.",
-        "persona": "power"
-      },
-      "TC-8.1": {
-        "status": "passed",
-        "reason": "Auto-play pill flipped On->Off->On->Off, label updated immediately on every tap; Off survived terminate+launch (UserDefaults). Evidence wf8-... tc81-83-strip.png / persistrip.png",
-        "persona": "power"
-      },
-      "TC-8.2": {
-        "status": "passed",
-        "reason": "Deal #10164, 7 scripted moves with Auto-play: Off -> Moves exactly 7, no automatic sends (safe KD, plus exposed AS/AD, all left in place). Flipping Auto-play to On homed exactly the one provably-safe card (KD) and nothing else, Moves 7->8 \u2014 matches the independent rules.mjs isSafeAutoplay prediction. Second datapoint: on the fully finishable deal #10169 board the safe set is empty and Auto-play: On correctly homed 0 cards (documented strict rule, not filed).",
-        "persona": "power"
-      },
-      "TC-8.3": {
-        "status": "passed",
-        "reason": "Auto-finish cycled Ask->On->Off->Ask->On in that exact order, one tap each, label immediate; 'On' survived terminate+launch. See ux/WF-8:autofinish-cycle-through-on-ends-game for the side effect of the pass-through state.",
-        "persona": "power"
-      },
-      "TC-8.4": {
-        "status": "passed",
-        "reason": "All three modes exercised on real finishable boards of deal #10169 (28-move bronze prefix, driven twice). Off: Finish pill appeared at the finishing move, no prompt. Ask: 'Ready to finish' prompt appeared BOTH naturally (2nd pass, default mode, at move 28) and on mode change; 'Not yet' left the board playable with the Finish pill and did not nag again. On: cascaded 42 cards with no prompt and reached the win overlay (70 moves).",
-        "persona": "power"
+        "novice": {
+          "status": "passed",
+          "reason": "Smart-move tap: touch-down frame t+0.000, move animation starts t+0.069 s, ends t+0.310 s (video packet timeline, deal #191,924,978, A-spades col0). Well inside the ~0.18 s expectation; no >1 s stall."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same measurement; also re-measured the other tap paths a power user hits \u2014 New game 1.548 s to settle, auto-finish cascade 0.217 s/card to the win overlay, first Export after cold launch 3.04 s with a 1.07 s pixel-frozen window (an 'Opening Files...' caption does appear within 0.2 s)."
+        }
       },
       "P-C": {
-        "status": "passed",
-        "reason": "Deal #10164 at 8 moves: home-button background + resume kept everything incl. the undo stack; background then terminate+launch restored seed, board, Moves 8, elapsed (1:38 -> 1:43 -> 1:45, no reset/inflation) and both settings \u2014 only the undo stack is dropped after a kill (Undo greys out), which matches Game.restore() setting history=[]. Mid-demo probe: Daily -> 'Show me how to win: Clear' -> 5x Next -> home -> relaunch restored the FRESH re-deal of #10,005 (Moves 0, no demo bar, input unlocked), i.e. the half-played demo position is never persisted, as intended. Note the demo entry also discarded the in-progress casual game with no warning \u2014 same theme as the existing ux/WF-6:demo-discards-daily-attempt-without-warning, not re-filed.",
-        "persona": "power"
-      },
-      "TC-12.1": {
-        "status": "failed",
-        "reason": "Reflow itself is correct and verified by live rotation (117pt left rail with all 9 controls, foundations up+down row with free cells beneath, tableau right, header kept, portrait toolbar hidden), but the rail renders the DISABLED Undo as a blank featureless capsule - bug/Main:landscape-disabled-undo-blank.",
-        "persona": "novice"
-      },
-      "TC-12.2": {
-        "status": "failed",
-        "reason": "Rail half passes: with the daily HUD up 'How to play' falls below the fold and 'Wins' is clipped mid-pill, but the rail scrolls (indicator visible while dragging), reveals How to play at pt y=331 well above the home-indicator zone, and all sheets (Daily/Wins/How to play) open and dismiss in landscape. Failed on the other landscape control surface: the 'Play a deal' alert exposes only 1 of its 3 actions - ux/WF-12:deal-alert-actions-hidden-in-landscape.",
-        "persona": "power"
-      },
-      "TC-12.3": {
-        "status": "passed",
-        "reason": "Drag-to-place (8S col1 -> free cell 1) and tap-to-smart-move (KS col0 -> down foundation) both land in landscape, with and without the daily HUD; cardW measured 42.33pt (39.00pt inner white face), far above the 30pt floor, and board state survives a landscape->portrait->landscape round trip. Deal #10,005, pinned via Deal #.",
-        "persona": "power"
+        "power": {
+          "status": "failed",
+          "reason": "Board/seed/settings restore correctly across background+foreground, but the elapsed clock does not count background time \u2014 filed as ux/WF-4:clock-pauses-in-background."
+        }
       },
       "P-D": {
-        "status": "passed",
-        "reason": "Idle CPU 0.0% (fresh board, 70 s), 0.9% (clock running, 65 s), 0.0% (win overlay, 45 s) \u2014 all far below the ~20% drain threshold; demo auto-run 17.0% is active animation, not idle. RSS flat at 369.8->371.1 MB (max 371.9) across 12 New game+Undo-spam cycles and 10 New game+Replay cycles \u2014 no monotone climb, no leak. Zero network bytes for the whole session.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "Idle CPU 0.0% over 75 s with the clock stopped (display emitted ZERO video frames in 20 s) and 0.9% with the clock running; 12x New game and 2 separate 10x Daily-sheet loops both plateau with no monotone RSS growth; network bytes 0 throughout."
+        }
       },
       "P-E": {
-        "status": "failed",
-        "reason": "One transition breaches the >1 s no-response-without-indicator rule: the first Export/Import tap of an app process freezes 1.61 s / 1.80 s with byte-identical frames and no spinner (finding ux/WF-11:export-picker-no-progress-indicator, re-measured). All other measured paths pass: cold launch->painted board 0.90 s, New game redeal 1.43 s (continuously animating), deal alert+keypad 1.04 s, Daily Play handoff 1.16 s, Wins sheet with 300 records 0.88 s, auto-finish cascade 8.2 s for 42 cards (0.19 s/card) with the finishing drop->'Ready to finish' gap <=0.22 s and last-card->win-overlay 0.21 s.",
-        "persona": "power"
-      }
-    },
-    "2": {
-      "TC-2.1": {
-        "status": "passed",
-        "reason": "Exactly 1 tap per card across 5 consecutive smart-moves on #10,005 (2 to foundations, 3 parked into free cells 1/2/3), Moves 5, no mis-target. Matches the 1-tap effort bar; accessibility ids changed nothing about the gesture pipeline.",
-        "persona": "power"
-      },
-      "TC-2.2": {
-        "status": "passed",
-        "reason": "Whole 2-card run moved in 1 tap and counted as 1 move; buried non-head cards still do not lift (TC-2.4).",
-        "persona": "power"
-      },
-      "TC-2.3": {
-        "status": "passed",
-        "reason": "All 13 pinned TC-2.6 placement drags plus 6 ad-hoc drags landed on their intended targets, 1 drag each. The case's below-the-column expectation is now INVERTED by design and verified: release 20 pt and 120 pt below column 0's last card both land ON column 0 (ux/WF-2:drop-below-column-refused = fixed). TESTCASES TC-2.3 updated to the new contract.",
-        "persona": "power"
-      },
-      "TC-2.4": {
-        "status": "passed",
-        "reason": "Same on the tap path (3 of 8 filmed taps caught the cue; Moves stayed 0). Negative control confirms no over-cueing: 8 taps on a movable-but-targetless free-cell card gave 93 consecutive frames at MAD 0.000.",
-        "persona": "power"
-      },
-      "TC-2.5": {
-        "status": "passed",
-        "reason": "Same evidence. Perf candidates for the serial lane are listed in the summary.",
-        "persona": "power"
-      },
-      "TC-2.6": {
-        "status": "passed",
-        "reason": "Fixture note unchanged from round 1: the case's verified drag script is pinned to deal #10,004, so I ran it there rather than today's daily #10,005 - the shrink contract depends on screen height and chrome, not the deal. All 13 drags landed first time.",
-        "persona": "power"
-      },
-      "TC-3.1": {
-        "status": "passed",
-        "reason": "SMOKE, power persona only. One tap on New game reshuffled: Deal #10005 -> #863895, 52 cards dealt, Moves 0, Time 0:00, Undo disabled. (Also observed indirectly at 07d: Deal #1 -> #790237.) The round-1 proposal ux/WF-3:new-game-discards-progress-no-confirm still describes this build's behaviour - one tap after a move discards the game with no confirmation - but it is proposal-routed and outside my dispatch's update list, so I left its ledger entry to the owning lane.",
-        "persona": "power"
-      },
-      "TC-3.2": {
-        "status": "passed",
-        "reason": "SMOKE. One tap on Replay after 13 moves on #10,004 reloaded the SAME deal: Moves 0, Time 0:00, Undo disabled, and all 52 card frames were byte-identical to the frames captured at the fresh deal. Replay is also what clears the tall-column shrink latch (43 -> 45 pt).",
-        "persona": "power"
-      },
-      "TC-3.3": {
-        "status": "passed",
-        "reason": "SMOKE. One tap per undo, no confirmation; the Moves readout stepped 5->4->3->2->1->0 exactly one per tap (stacked header strip r2b-tc35-undo-ladder.png).",
-        "persona": "power"
-      },
-      "TC-3.4": {
-        "status": "passed",
-        "reason": "SMOKE. At Moves 0 toolbar.undo reports isEnabled=false and renders visibly dimmed next to the enabled Replay pill (r2b-tc34-undo-disabled.png); a further tap did nothing (state identical across two ids dumps).",
-        "persona": "power"
-      },
-      "TC-3.5": {
-        "status": "passed",
-        "reason": "SMOKE. 5 moves then 5 undos on #10,005: one move reversed per tap, and after the 5th the 52 card frames matched the fresh deal exactly. The 6th tap was inert (Undo disabled). No corruption, no over-undo. Note the clock keeps running through undos (Time 1:33 at Moves 0) - that is the recorded continuous-timing decision, not filed.",
-        "persona": "power"
-      },
-      "TC-7.1": {
-        "status": "passed",
-        "reason": "Deal pill -> 6 backspaces -> 1,0,0,0,3 -> Play loaded Deal #10003, Moves 0. Chrome taps = 2 (pill, Play) plus digit entry, as round 1 accepted; the number pad is already up and the field prefilled+focused.",
-        "persona": "power"
-      },
-      "TC-7.2": {
-        "status": "passed",
-        "reason": "RE-SPECIFIED against the new two-action contract (the old 'tap Random in the alert' expectation is stale). The alert now shows exactly Cancel (127,391) and Play (275,391) side by side - a driver tapb Random reports QA-MISS after its 5 s wait, and the screenshot shows no third action. The random-deal capability is still one always-visible tap away: New game took Deal #1 -> #790237. TESTCASES TC-7.2 rewritten to this contract.",
-        "persona": "power"
-      },
-      "TC-7.3": {
-        "status": "passed",
-        "reason": "Emptied the field (5 backspaces) and tapped Play: alert dismissed, no crash, deal unchanged at #10003, Moves 0. Silent no-op, as the case expects.",
-        "persona": "power"
-      },
-      "TC-7.4": {
-        "status": "passed",
-        "reason": "9999999 -> loaded Deal #1000000; 0 -> loaded Deal #1. Clamping is silent but the pill shows the real clamped seed, so the user is not misled - unchanged from round 1, not filed.",
-        "persona": "power"
-      },
-      "TC-7.5": {
-        "status": "passed",
-        "reason": "Cancel (now the LEFT action) dismissed the alert with Deal #815096 and Moves 0 unchanged.",
-        "persona": "power"
-      },
-      "TC-5.1": {
-        "status": "passed",
-        "reason": "One tap from board to Daily (toolbar.daily); streak vs total vs best readable at a glance.",
-        "persona": "power"
-      },
-      "TC-5.2": {
-        "status": "passed",
-        "reason": "Gold rule readable while playing without reopening Daily (0 extra taps, was 2).",
-        "persona": "power"
-      },
-      "TC-5.3": {
-        "status": "blocked",
-        "reason": "Same blocker as the novice entry; not re-attempted this round (targeted pass).",
-        "persona": "power"
-      },
-      "TC-5.4": {
-        "status": "passed",
-        "reason": "One tap per day, fully reversible, no dead ends.",
-        "persona": "power"
-      },
-      "TC-6.1": {
-        "status": "passed",
-        "reason": "Daily -> \ud83e\udd49 Clear opens 'Winning line \u2014 0 / 86' (matches the derived bronze length) with Next/Start/Stop, Undo disabled, Deal #10005; does not auto-run. Header now reads Moves \u2014 / Time \u2014 / Won 0.",
-        "persona": "novice"
-      },
-      "TC-6.2": {
-        "status": "passed",
-        "reason": "3x Next -> 3/86 (one step each); Start auto-advanced ~0.25 s/move, hid Next, showed Pause+Stop and a trailing '\u2026'; Pause restored Next/Resume/Stop with '\u2026 \u2014 15 / 86 (paused)'. Verified on both the Clear and Gold lines.",
-        "persona": "novice"
-      },
-      "TC-6.3": {
-        "status": "passed",
-        "reason": "Stop at 15/86 removed the demo bar and re-dealt #10,005 to the exact initial layout (card.* frames identical to the dealt board): Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay.",
-        "persona": "novice"
-      },
-      "TC-6.4": {
-        "status": "passed",
-        "reason": "Line ran to 86/86 -> banner \"That's a winning line \u2014 tap Done to try it yourself.\" with a single Done pill and Moves \u2014/Time \u2014 in the header; Done re-dealt fresh (Moves 0, full 7-card columns). Nothing banked: Won 0, Wins 'No wins yet \u2014 go solve one!', all four streak cards 0.",
-        "persona": "novice"
-      },
-      "TC-6.5": {
-        "status": "passed",
-        "reason": "During a 3.3 s drag on column 0's bottom card with the demo paused at 15/86, 20 consecutive host screenshots are byte-identical (one md5) \u2014 the card never lifted; a subsequent tap on the exposed A\u2660 did nothing; all card.* frames identical before/after and the counter unchanged.",
-        "persona": "novice"
-      },
-      "TC-6.6": {
-        "status": "passed",
-        "reason": "\ud83e\udd47 Gold pill opens '\ud83e\udd47 Gold: For every suit, send its King home before its Ace \u2014 0 / 86' (full label, no truncation) with Next/Start/Stop; total matches the derived gold line length; Stop re-dealt to the fresh board. No Silver pill for this seed, as derived.",
-        "persona": "novice"
-      },
-      "TC-6.7": {
-        "status": "passed",
-        "reason": "Cancel path costs one extra tap and loses nothing. Gap noted on the finding: the gate is daily-only \u2014 a casual game in progress is still re-dealt by a demo pill with no warning (reproduced).",
-        "persona": "power"
-      },
-      "TC-8.1": {
-        "status": "passed",
-        "reason": "Auto-play pill flipped On->Off->On->Off with the label updating immediately on every tap; Off survived terminate+launch.",
-        "persona": "power"
-      },
-      "TC-8.2": {
-        "status": "passed",
-        "reason": "Deal #10164, 7 scripted moves with Auto-play: Off -> Moves exactly 7, nothing sent automatically. Flipping Auto-play to On homed exactly one card, the provably-safe K\u2666 (Moves 7->8, col6 left as [2\u2663]) and nothing else \u2014 matches the offline rules.mjs isSafeAutoplay prediction ('safe now: c6:KD').",
-        "persona": "power"
-      },
-      "TC-8.3": {
-        "status": "passed",
-        "reason": "NEW ORDER VERIFIED: Ask -> Off -> On -> Ask, one tap each, label immediate (9-state filmstrip); 'On' survived terminate+launch. TESTCASES expectation updated from the old Ask->On->Off.",
-        "persona": "power"
-      },
-      "TC-8.4": {
-        "status": "passed",
-        "reason": "Deal #10169 driven to finishable with the 28-drag bronze prefix (28/28 landed). Ask: 'Ready to finish' prompt appeared by itself; Not yet left the board playable with the Finish pill. One tap on Auto-finish -> 'Off' with zero cards played (Moves still 28, Won 0) \u2014 the round-1 trap is gone. Second tap -> 'On' cascaded to the win overlay ('You solved it! \u00b7 Deal #10,169 \u00b7 70 moves'), the intended shortcut preserved.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "No >1 s stall without an indicator. Cold launch to painted board 0.81 s; New game 1.548 s; daily demo 0.2500 s/move (design 0.24); finish cascade 4.98 s for 23 cards. The one >1 s frozen window (first Export, 1.07 s) is preceded within 0.2 s by the app's 'Opening Files...' caption, so it is not an unindicated stall."
+        }
       },
       "TC-1.1": {
-        "status": "passed",
-        "reason": "How to play states both-ended foundations + tap/drag controls; tapping bottom K\u2660 on deal #10005 sent it to the down-spades foundation, Moves 1, clock started, Undo enabled and legible.",
-        "persona": "novice"
+        "novice": {
+          "status": "passed",
+          "reason": "Header subtitle 'build each suit from both ends' present; How to play covers Goal/The catch/Tableau/Free cells/Controls (tap AND drag) legibly; tapping the exposed AD sent it to the diamond up-foundation, Moves 0->1, Undo enabled, clock started at the move (verified: 40s idle after Replay kept Time 0:00). 3 taps, well inside the 1-min bar. One minor discoverability gap filed: ux/WF-1:foundation-rows-unlabelled."
+        }
       },
       "TC-1.2": {
-        "status": "passed",
-        "reason": "Tapping 9\u2660 (no foundation step, no alternating-colour neighbour) parked it in free cell 1 as the documented last resort; Moves 2.",
-        "persona": "novice"
-      },
-      "TC-11.1": {
-        "status": "passed",
-        "reason": "Exporter offered Causeway-Stats-2026-08-16.json; Save (via Replace, a same-day file existed) wrote a valid backup on the host and the note read 'Stats exported.'; swipe-dismiss gave 'Export cancelled.'",
-        "persona": "power"
-      },
-      "TC-11.2": {
-        "status": "passed",
-        "reason": "Importing qa-backup-A.json reported 'Imported \u2014 merged 2 days (2 new) and 5 deals (5 new).'; calendar and streak cards grew, nothing erased.",
-        "persona": "power"
-      },
-      "TC-11.3": {
-        "status": "passed",
-        "reason": "qa-notabackup.json rejected with 'That file isn't a Causeway stats backup.'; persisted stats unchanged, no crash.",
-        "persona": "power"
-      },
-      "TC-11.4": {
-        "status": "passed",
-        "reason": "qa-bad-entries.json gave 'Imported \u2014 merged 1 day (0 new) and 1 deal (1 new). Skipped 6 invalid entries.'; UserDefaults shows day 3 kept moves 100/elapsed 300 (not poisoned by 0/-5) and the zero-moves/zero-secs/out-of-range wins were dropped.",
-        "persona": "power"
-      },
-      "TC-11.5": {
-        "status": "passed",
-        "reason": "Closing the importer with its X produced 'Import cancelled.' and no state change.",
-        "persona": "power"
-      },
-      "TC-12.1": {
-        "status": "passed",
-        "reason": "Live rotation to landscape (appFrame 874x402): rail + foundations/free cells + 8-column tableau as designed; the previously blank disabled Undo pill now renders greyed glyph+label.",
-        "persona": "power"
-      },
-      "TC-12.2": {
-        "status": "passed",
-        "reason": "Deal alert now shows Cancel+Play together above the keypad, Cancel non-destructive; with the daily HUD up the rail clips 'How to play' below the fold but one drag scrolls it fully into reach, as designed.",
-        "persona": "power"
-      },
-      "TC-12.3": {
-        "status": "passed",
-        "reason": "Cards comfortably large (no 30pt floor); tap smart-move (K\u2665\u2192down foundation) and drag (8\u2660\u2192free cell 2) both landed in landscape, with and without the daily HUD.",
-        "persona": "power"
-      }
-    },
-    "3": {
-      "TC-1.1": {
-        "status": "passed",
-        "reason": "Cold launch on a fresh install (random deal #690486): the header subtitle 'build each suit from both ends' plus the FOUNDATIONS/FREE CELLS labels are on screen, and the 'How to play' pill opens a single-screen sheet whose Goal section states the two-ended foundations explicitly and whose Controls section states tap-to-smart-move and drag-to-place. Done dismissed it; one tap on the exposed king of diamonds (column 4 bottom) sent it to the DIAMONDS DOWN foundation (card.D13 -> x=104,y=338 = down row, correct suit column), Moves 0->1, Time started (0:04), toolbar.undo went isEnabled false->true. Well inside the ~1 min bar; no outside knowledge needed.",
-        "persona": "novice"
-      },
-      "TC-1.2": {
-        "status": "passed",
-        "reason": "On the same board, tapped the jack of spades at column 5's bottom - a card with no foundation step and no alternating-colour neighbour available. Smart-move parked it in free cell 1 (card.S11 -> 253,258.67) rather than doing nothing, Moves 2. The card visibly relocates into a labelled FREE CELLS slot, so the novice sees something deliberate happen (last-resort park, as designed).",
-        "persona": "novice"
-      },
-      "TC-2.1": {
-        "status": "passed",
-        "reason": "Exactly 1 tap per smart-move across 9 taps this pass (foundation, tableau and free-cell targets), Moves incremented by exactly 1 each. Matches the 1-tap effort bar.",
-        "persona": "power"
-      },
-      "TC-2.2": {
-        "status": "passed",
-        "reason": "Whole 2-card run moved in 1 tap, counted as 1 move, and a single Undo later reversed it atomically (the 5-undo ladder in TC-3.5 restored all 52 card frames to the dealt layout).",
-        "persona": "power"
-      },
-      "TC-2.3": {
-        "status": "passed",
-        "reason": "All 13 pinned TC-2.6 placement drags plus 5 ad-hoc drags landed on their intended targets, 1 drag each, zero mis-drops. ux/WF-2:drop-below-column-refused re-verified fixed on 2b66b93.",
-        "persona": "power"
-      },
-      "TC-2.4": {
-        "status": "passed",
-        "reason": "Tap path also cued: 8 taps on the same buried card while filming at ~4 fps caught 7 displaced frames out of 194 (MAD 13.1-18.9, 12.9-16.8 % pixels changed), the rest MAD 0.000. Moves stayed 0 and toolbar.undo stayed disabled throughout. ux/WF-2:unmovable-card-no-feedback re-verified fixed.",
-        "persona": "power"
-      },
-      "TC-2.5": {
-        "status": "passed",
-        "reason": "Same evidence; nothing in the WF-1/2/3 slice felt slow. Perf candidates listed in the summary.",
-        "persona": "power"
-      },
-      "TC-2.6": {
-        "status": "passed",
-        "reason": "(d) monotone: on the shrunken board the 16-card column's bottom card was still hit-testable - tapping it (36,800) parked it in a free cell, Moves 13->14 - and the board stayed at 43 pt; Undo restored 16 cards, still 43 pt. A subsequent New game restored 45x75 for all 52 cards, so the latch is per-deal as designed. Fixture note: the case's verified drag script is pinned to deal #10,004, so I ran it there rather than today's daily #10,005 (dayIndex 4) - the shrink contract depends on screen height and chrome, not on the deal.",
-        "persona": "power"
-      },
-      "TC-3.1": {
-        "status": "passed",
-        "reason": "1 tap, matches the effort bar. Also verified from a shrunken 16-card board: New game restored the full 45x75 card size and a fresh random seed.",
-        "persona": "power"
-      },
-      "TC-3.2": {
-        "status": "passed",
-        "reason": "1 tap, same-deal restart confirmed by a 52-card frame-for-frame comparison; Replay is also what clears the tall-column shrink latch.",
-        "persona": "power"
-      },
-      "TC-3.3": {
-        "status": "passed",
-        "reason": "1 tap per undo, no confirmation, counter steps down by exactly 1 each time.",
-        "persona": "power"
-      },
-      "TC-3.4": {
-        "status": "passed",
-        "reason": "Same: inert disabled pill, no crash, no state change.",
-        "persona": "power"
-      },
-      "TC-3.5": {
-        "status": "passed",
-        "reason": "5 moves on deal #690486 then 5 Undo taps: one move reversed per tap, Moves 5 -> 0, and after the 5th all 52 card frames matched the fresh deal exactly (diff empty). Undo then went isEnabled=false, so no over-undo. The group move (2-card run) was reversed atomically by one tap. Note the clock keeps running through undos (Time 9:12 at Moves 0) - that is the recorded continuous-timing decision, not filed.",
-        "persona": "power"
-      },
-      "TC-5.1": {
-        "status": "passed",
-        "reason": "One tap from the board to Daily (toolbar.daily); streak / N total / best N are distinguishable at a glance; Done dismisses.",
-        "persona": "power"
-      },
-      "TC-5.2": {
-        "status": "passed",
-        "reason": "Gold rule readable while playing in both orientations without reopening Daily (0 extra taps).",
-        "persona": "power"
-      },
-      "TC-5.3": {
-        "status": "blocked",
-        "reason": "Same blocker as the novice entry; per dispatch, recorded blocked rather than re-attempted.",
-        "persona": "power"
-      },
-      "TC-5.4": {
-        "status": "passed",
-        "reason": "One tap per day, fully reversible, no dead ends; future days inert rather than error-producing.",
-        "persona": "power"
-      },
-      "TC-6.1": {
-        "status": "passed",
-        "reason": "Cold launch -> Daily -> \ud83e\udd49 Clear opens 'Winning line \u2014 0 / 86' (matches the derived bronze line length for #10,005) with Next/Start/Stop, Undo disabled, Deal #10005; it does not auto-run (pill reads Start, counter stays 0). Header reads Moves \u2014 / Time \u2014 / Won 0.",
-        "persona": "novice"
-      },
-      "TC-6.2": {
-        "status": "passed",
-        "reason": "3x Next advanced 0->1->2->3 exactly one per tap; Start auto-advanced (~24 moves in ~6 s), hid Next and showed Pause+Stop with a trailing '\u2026'; Pause restored Next/Resume/Stop and the headline read 'Winning line \u2014 24 / 86 (paused)' wrapped to 2 lines. Moves/Time stayed em-dashes throughout.",
-        "persona": "novice"
-      },
-      "TC-6.3": {
-        "status": "passed",
-        "reason": "Stop at 24/86 removed the demo bar and re-dealt #10,005 to the EXACT initial layout (all 52 card.* frames identical to the freshly dealt board, cells and foundations empty), Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay. Re-confirmed a second time from a cold launch. (The HUD/challenge-mode loss after the exit is the separately open ux/WF-6:challenge-mode-silently-dropped-after-demo, not a TC-6.3 fail condition.)",
-        "persona": "novice"
-      },
-      "TC-6.4": {
-        "status": "passed",
-        "reason": "Start ran the line to the banner \"That's a winning line \u2014 tap Done to try it yourself.\" with a single Done pill and Moves \u2014 / Time \u2014 / Won 0; Done re-dealt #10,005 to the identical dealt board (Moves 0). Nothing banked: Wins reads 'No wins yet \u2014 go solve one!', all four streak cards 0, and the app's UserDefaults holds only causeway.game (no causeway.wins, no causeway.daily).",
-        "persona": "novice"
-      },
-      "TC-6.5": {
-        "status": "passed",
-        "reason": "With the demo paused at 24/86, a 3.3 s drag on column 0's bottom card (8\u2665 at 28,670) produced 16 consecutive host screenshots with ONE md5 \u2014 the card never lifted; two follow-up taps on the same exposed card did nothing. All 47 card.* frames identical before/after both the drag and the taps; counter still 24/86, Moves/Time still em-dashes.",
-        "persona": "novice"
-      },
-      "TC-6.6": {
-        "status": "passed",
-        "reason": "\ud83e\udd47 Gold pill opens '\ud83e\udd47 Gold: For every suit, send its King home before its Ace \u2014 0 / 86' (full derived label, no truncation) with Next/Start/Stop; total matches the derived gold line length; after one Next, Stop re-dealt to the exact dealt board (52/52 frames). No Silver pill for this seed, as derived.",
-        "persona": "novice"
-      },
-      "TC-6.7": {
-        "status": "passed",
-        "reason": "Cancel path costs one extra tap and loses nothing. Documented gap unchanged (not re-filed): the gate is daily-only, so a casual game in progress is still re-dealt by a demo pill with no warning \u2014 same class as the open ux/WF-3:new-game-discards-progress-no-confirm.",
-        "persona": "power"
-      },
-      "TC-7.1": {
-        "status": "passed",
-        "reason": "toolbar.deal opens the alert with the field pre-filled (10005), focused, number pad already up; clear + type 10003 + Play loaded Deal #10003 with Moves 0 / Undo disabled. Two chrome taps (open, Play) plus typing \u2014 within the <=3 tap bar.",
-        "persona": "power"
-      },
-      "TC-7.2": {
-        "status": "passed",
-        "reason": "The alert has exactly two side-by-side actions, Cancel (left) and Play (right); a driver `tapb Random` reported QA-MISS after its 5 s wait \u2014 the Random action is genuinely gone. The random-deal capability remains one always-visible tap away: New game changed Deal #10003 -> #398596 with Moves 0.",
-        "persona": "power"
-      },
-      "TC-7.3": {
-        "status": "passed",
-        "reason": "Emptying the field leaves the placeholder '1\u20131,000,000' and a tappable Play; tapping Play dismissed the alert with no crash and left Deal #398596 / Moves 0 untouched.",
-        "persona": "power"
-      },
-      "TC-7.4": {
-        "status": "passed",
-        "reason": "9999999 -> Deal #1000000 and 0 -> Deal #1, no crash; the toolbar pill matches the clamped value that actually loaded (no separate 'clamped' notice, as accepted in earlier rounds).",
-        "persona": "power"
-      },
-      "TC-7.5": {
-        "status": "passed",
-        "reason": "With a game in progress (Deal #10003, Moves 1), opening the alert and tapping Cancel dismissed it leaving the same deal and the same Moves 1. (The clock kept running behind the alert \u2014 the deliberate continuous-timing design, not filed.)",
-        "persona": "power"
-      },
-      "TC-9.1": {
-        "status": "passed",
-        "reason": "Empty Wins: 'Deals won', placeholder 'Number 1-1,000,000', Play greyed and inert while empty, 'No wins yet - go solve one!', Done dismisses.",
-        "persona": "novice"
-      },
-      "TC-9.2": {
-        "status": "passed",
-        "reason": "After Import-seeding 5 wins: '5 deals solved * 3 ranges', chips 500 / 10005-10007 / 606803; drill-in lists 'Deal #10,005 | 95 moves * 7:08 * Aug 16'; row tap loads the deal and dismisses; back chevron returns to the chip grid; current seed's chip gold-outlined. Number-format inconsistency filed separately (bug/WinsView:deal-number-grouping-inconsistent).",
-        "persona": "power"
-      },
-      "TC-9.3": {
-        "status": "passed",
-        "reason": "Typed 99 + Play loaded deal #99 and dismissed; Play stays disabled for empty, '0' and a 21-digit overflow (no crash, no dead end); 2000000 clamped to deal #1000000.",
-        "persona": "power"
+        "novice": {
+          "status": "passed",
+          "reason": "On deal #10011 the bottom card 4C (no foundation step, no alternating-colour neighbour) tapped straight into free cell 1 (Moves 1) - last-resort parking works and How to play's Controls text documents it. Also probed the harsher case: with all 3 cells full, tapping the truly stuck 3S did nothing (Moves stayed 5); the card plays a ~100ms lift/scale animation so the tap is visibly registered, but there is no explanation of why the move was impossible. Not filed - the lift confirms the hit and the game is full-information, so a message is a matter of taste rather than a defect."
+        }
       },
       "TC-10.1": {
-        "status": "passed",
-        "reason": "How to play is one toolbar tap; Goal/The catch/Tableau/Free cells/Controls all fit one screen with both-ends foundations and tap-vs-drag explained.",
-        "persona": "novice"
+        "novice": {
+          "status": "passed",
+          "reason": "All five sections present and accurate: Goal names 52 cards and the dual up/down foundations meeting in the middle; Tableau states alternating colours, either direction, no reversing; Free cells = three parking spots; Controls covers tap=smart-move, run-moves-together, drag=specific. One tap from cold launch."
+        }
       },
       "TC-10.2": {
-        "status": "passed",
-        "reason": "About block on the same screen: 'Causeway * v1.0 (1)', '(c) 2026 Whimsical Distractions. All rights reserved.', tagline - no scrolling needed.",
-        "persona": "novice"
+        "novice": {
+          "status": "passed",
+          "reason": "About block reads 'Causeway - v1.0 (1)', copyright 2026 Whimsical Distractions, tagline 'An original two-ended-foundation solitaire.' Visible without scrolling on iPhone 17 Pro; a confirming swipe showed no content below it."
+        }
       },
       "TC-10.3": {
-        "status": "passed",
-        "reason": "Done returns to the board.",
-        "persona": "novice"
+        "novice": {
+          "status": "passed",
+          "reason": "Done (348,100) dismisses in one tap straight back to the board with deal #723811, moves 0 and clock 0:00 unchanged."
+        }
       },
       "TC-11.1": {
-        "status": "passed",
-        "reason": "Export opened the Files exporter suggesting Causeway-Stats-2026-08-16.json (date-correct); file written on disk with matching exportedAt; note read 'Stats exported.'. Swipe-dismissing a second export gave 'Export cancelled.'. Same-day 'Replace Existing Items?' seen and treated as the accepted sim-hygiene artifact.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "Exporter sheet showed suggested name Causeway-Stats-2026-08-22.json; Save -> 'Stats exported.'; swipe-dismiss -> 'Export cancelled.' (testcase doc says 'Export cancelled or failed.' - the shipped wording is the clearer one, not filed)."
+        }
       },
       "TC-11.2": {
-        "status": "passed",
-        "reason": "Imported a 5-win/2-day backup: 'Imported - merged 2 days (2 new) and 5 deals (5 new).'; streak cards went to Play 2/2/best 2, Silver 0/1/best 1; today's Bronze ticked; nothing erased.",
-        "persona": "power"
+        "power": {
+          "status": "failed",
+          "reason": "Merge itself never erased in-range entries, but importing the app's OWN untouched export dropped the sandbox-day record (dayIndex -1) and the win on deal #872,465,152 - permanent loss on restore. bug/WF-11:import-drops-out-of-range-stats."
+        }
       },
       "TC-11.3": {
-        "status": "passed",
-        "reason": "qa-notabackup.json rejected with \"That file isn't a Causeway stats backup.\"; persisted causeway.wins/causeway.daily byte-identical before and after.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "notes-list.json rejected with 'That file isn't a Causeway stats backup.'; stores unchanged, no crash."
+        }
       },
       "TC-11.4": {
-        "status": "passed",
-        "reason": "qa-bad-entries.json: 'Imported - merged 1 day (0 new) and 1 deal (1 new). Skipped 6 invalid entries.'; only seed 702 added; day 3's existing moves=100/elapsed=300 not poisoned by the file's 0/-5.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "Hand-edited backup (day -3/9999/abc/12/5-with-zero-moves, seeds 0/1000001/2000-with-zero-moves/3000/xyz) -> 'merged 2 days (2 new) and 1 deal (1 new). Skipped 7 invalid entries.'; stores show no zero-value or out-of-range entries."
+        }
       },
       "TC-11.5": {
-        "status": "passed",
-        "reason": "Importer X-dismiss produced 'Import cancelled.' with no stats change.",
-        "persona": "power"
-      },
-      "TC-4.1": {
-        "status": "passed",
-        "reason": "Auto-finish: Ask on deal #10169 after the 28-move bronze line -> 'Ready to finish / Every remaining card can go home. Send them all now?' with Not yet / Finish; Finish cascaded to 70 moves and the overlay read 'You solved it! \ud83c\udf89 / Deal #10,169 \u00b7 70 moves \u00b7 6:48' with Play deal #10170 / Random / Close. (No daily-tier medal line exercised - casual deal.)",
-        "persona": "power"
-      },
-      "TC-4.2": {
-        "status": "passed",
-        "reason": "Not yet dismissed the prompt, the gold toolbar.finish pill appeared, and a further real move (card.S3 home, +auto-play) did NOT re-nag; Finish pill still completed the deal.",
-        "persona": "power"
-      },
-      "TC-4.3": {
-        "status": "passed",
-        "reason": "Close returned to the solved board (Won 0->1, Deal pill gained ' \u2713', wins store {10169:{secs,moves:70}}, Wins sheet '1 deal solved \u00b7 1 range'); relaunch after the win started a fresh random deal #416134 with Won preserved; Play deal #10170 loaded seed 10170 at 0 moves/0:00; Random loaded #806872 at 0 moves/0:00. Defect found on this case: the clock never stops on a repeat win (bug/WF-4:clock-never-stops-on-repeat-win).",
-        "persona": "power"
-      },
-      "TC-4.4": {
-        "status": "passed",
-        "reason": "With Auto-finish: Off set BEFORE the board became finishable, move 28 produced no prompt and only the gold Finish pill; tapping it completed the deal to the win overlay. Auto-finish: On (cycled Off->On) auto-cascaded at move 28 with no prompt.",
-        "persona": "power"
-      },
-      "P-A": {
-        "status": "passed",
-        "reason": "Daily / Wins / How to play each dismissed via Done AND via a title-bar swipe-down (drag 200 100 -> 200 820); the Deal alert dismissed via Cancel leaving the deal and move count untouched; the Ready-to-finish prompt dismissed via Not yet. No sheet trapped the user.",
-        "persona": "power"
-      },
-      "P-B": {
-        "status": "passed",
-        "reason": "Overlay never appeared during the 28-move build-up, on a merely-finishable board, after Close, after Undo, after New game, after Replay, after Random, or after relaunch; it appeared only when all 52 cards were home. Close / Play deal #next / Random all exited it.",
-        "persona": "power"
-      },
-      "TC-8.1": {
-        "status": "passed",
-        "reason": "Auto-play pill flips On->Off->On->Off one tap each, label immediate; Off survived terminate+launch (plist causeway.autoplay=false).",
-        "persona": "power"
-      },
-      "TC-8.2": {
-        "status": "passed",
-        "reason": "Deal #10164 gold line: with Auto-play On, move 7 exposed the only safe card (KD) and it went home by itself (Moves 7->8, one card only); Replay with Auto-play Off, same 7 moves -> Moves 7, KD still on the board.",
-        "persona": "power"
-      },
-      "TC-8.3": {
-        "status": "passed",
-        "reason": "Cycle is Ask -> Off -> On -> Ask, one tap each, label updates immediately; On survived terminate+launch.",
-        "persona": "power"
-      },
-      "TC-8.4": {
-        "status": "passed",
-        "reason": "28-drag #10169 fixture: Ask prompt appeared at Moves 28; Not yet kept the board + gold Finish pill; one tap Ask->Off changed nothing (Moves 28, Won 0); next tap Off->On cascaded to the win overlay at 70 moves, Deal pill gained the check mark.",
-        "persona": "power"
-      },
-      "P-C": {
-        "status": "passed",
-        "reason": "Deal #10004 + 5 moves -> home -> terminate -> launch: board region byte-identical (md5 match), seed/Moves/Won/settings restored, elapsed resumed at the backgrounded value (0:52 -> 0:58 six seconds after relaunch, i.e. the clock does not accrue while backgrounded). Mid-demo (Winning line 10/86 on #10005) home+terminate+launch restored the FRESH re-deal: Moves 0, Time 0:00, no demo bar, board identical to demo step 0, persisted causeway.game seed=10005 moves=0 elapsed=0 started=false. Only state not restored across a cold kill is the undo stack (Undo dims at Moves 5) - survives home->resume, judged expected, not filed.",
-        "persona": "power"
+        "power": {
+          "status": "passed",
+          "reason": "Import > X in the Files sheet -> 'Import cancelled.'; no change to stores."
+        }
       },
       "TC-12.1": {
-        "status": "passed",
-        "reason": "Both personas run. Novice: cold launch on a fresh install, rotate left (appFrame 874x402) - board reflows to left rail (9 pills, all visible with no HUD) + foundations up/down + free cells + 8-column tableau, header and Moves/Time/Won stay, portrait toolbar hidden, disabled Undo now reads as a greyed glyph+label (round-2 fix holds); landscapeRight renders identically. Power: pinned deal #10,005 and a landscape->portrait->landscape round-trip preserved Moves 3, the clock and the exact board.",
-        "persona": "novice"
+        "novice": {
+          "status": "passed",
+          "reason": "Live rotation (XCUITest actuator) \u2014 landscape reflows to a 118pt left rail (ScrollView), a foundations column at x=196 with up/down rows and FREE CELLS beneath, tableau from x=398, header retained, portrait toolbar gone. Rotating mid-game preserved the board, Moves 69 and the clock; the Daily sheet survived rotation; landscapeRight is the mirror image with no clipping."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same as novice pass, plus: win overlay, Wins sheet, How-to-play sheet (scrolls to About) and the deal-number alert + keypad all render inside bounds in landscape."
+        }
       },
       "TC-12.2": {
-        "status": "passed",
-        "reason": "Both personas run. Novice: with no HUD all 9 rail pills are reachable without scrolling; with the daily HUD the Wins pill is half-clipped (visible scroll affordance) and one rail drag brings 'How to play' fully into view above the home indicator; Daily/Wins/How-to-play sheets open and dismiss via Done in landscape. Power: deal alert shows Cancel+Play side by side above the keypad (round-2 fix holds), 'End your daily attempt?', 'Ready to finish' and the 3-button win overlay are all fully visible in landscape, and the gold Finish pill inserts as a 10th rail pill that still fits and works (cascade -> win).",
-        "persona": "power"
+        "novice": {
+          "status": "failed",
+          "reason": "ux/WF-12:rail-hides-howtoplay \u2014 with the daily HUD (or the demo bar) the rail viewport is 248pt for 285pt of pills, so 'How to play' is 100% below the fold with no partial pill, fade or resting indicator; the rail's cut lands exactly on a pill boundary."
+        },
+        "power": {
+          "status": "failed",
+          "reason": "Same clipping; a power user recovers with one swipe inside the rail (verified), so it costs 1 extra gesture rather than access \u2014 but 'never clip' in the case's expectation is not met (Wins is also clipped 4.6pt)."
+        }
       },
       "TC-12.3": {
-        "status": "passed",
-        "reason": "Both personas run. Novice: cards far above the 30 pt floor (~39 pt white face, same as portrait - the known open size proposal), tap smart-move (KS -> down-spades foundation) and drag-to-free-cell both landed. Power: all three landscape drop-zone types hit-tested correctly - card -> column released ~50 pt BELOW the column's last card (8S onto 7D), card -> free cell, card -> a specific foundation (KH -> down hearts); board never scrolls. Multi-card run drags not exercised (no legal 2-card run on the pinned boards). Incidental observation here became finding bug/WinOverlay:rewin-time-understated.",
-        "persona": "power"
+        "novice": {
+          "status": "passed",
+          "reason": "Drag works in landscape (swipe J-spades onto Q-hearts moved it, Moves 0->1) and tap-to-move works (4 of spades tapped home, Moves 69->70, landscapeRight). cardW 45.0 fresh / 43.0 with HUD / 36.0 with an injected 13-card column \u2014 uniform across the whole board, never at the 30pt floor, nothing clipped."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "13-card-column stress (injected save) shrank foundations, free cells and tableau to one shared 36.0x60.3 size with pitch 20 and bottom edge 358 < 381 \u2014 no second card size, no scrolling board. Minor deviation from the case's 'a fresh deal nearly fills height' clause filed as ux/WF-12:landscape-cards-smaller-than-portrait (proposal)."
+        }
       },
-      "P-D": {
-        "status": "passed",
-        "reason": "Idle 60 s on a running-clock board 1.2% CPU (0.73 cpu-s), idle 90 s on a stopped-clock board 0.0%, post-demo idle 20 s 0.0%; demo auto-run 15.3% (bronze, 12 s) / 20.7% (gold, 18 s) with the driver detached - no sustained >20% idle. Leak loop 12x[New game+move+Undo] + 10x[New game+Replay]: RSS 378.4 min / 379.5 max / 378.5 last over 300 s, no monotone trend. Zero network bytes in all 372 sampler samples.",
-        "persona": "power"
+      "TC-13.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 8 card: 'Aug 8' + Deal #186,441,603, Silver 'Win in 96 moves or fewer', Gold 'Move a run of 5 or more cards in a single move', two pills (Clear + Gold), no truncation, no leftover Today text."
+        }
       },
-      "P-E": {
-        "status": "passed",
-        "reason": "Cold launch <=0.94 s; Daily cold-first-open 0.97-1.13 s vs 0.55 s warm (candidate dismissed - press highlight within one frame, continuous animation, no frozen span); deal alert 0.83 s; New game redeal 1.50-1.72 s; Replay redeal 1.43-1.48 s; daily Play handoff 1.19 s; 42-card cascade 8.50 s = 0.202 s/card; 16-card board shrink 1.05 s with uniform 0.20 s film cadence and only +0.14 cpu-s over a non-resizing drop (candidate dismissed); cold Export/Import picker ~2.87 s / ~2.73 s touch->settled vs round-1 2.72 s / 2.87 s - accepted stall did not grow.",
-        "persona": "power"
+      "TC-13.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 7 (#942,660,922, no-supermoves / no-up-foundation, 3 pills) then Aug 6 (#699,587,523, down-heavy wraps 2 lines / no-down-foundation, 3 pills); full swap, no stale text."
+        }
+      },
+      "TC-13.3": {
+        "power": {
+          "status": "passed",
+          "reason": "2 taps (day 8 + Play): Deal #186441603, stacked HUD reads the same three Aug 8 strings, Moves 0, Time 0:00."
+        }
+      },
+      "TC-13.4": {
+        "power": {
+          "status": "failed",
+          "reason": "Gold check fires immediately on the 6-card run move (good) but a single Undo un-earns it: chip reverts to '.' \u2014 bug/WF-13:one-big-move-check-lost-on-undo."
+        }
+      },
+      "TC-13.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Against the CORRECTED (evaluative, not gating) bar: the 2-card supermove and the Ace-to-up-foundation were both allowed, and both flipped their chip to a red x immediately and legibly. CC-4 dismissed as a gating claim. The 'tier withheld at win time' half was NOT verified (winning the deal was out of budget). Filed a separate finding for the silent attempt discard seen on this path."
+        }
+      },
+      "TC-13.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 5 card matched the expected text exactly (Deal #191,924,978 / Silver 'Win in 127 moves or fewer' / Gold 'Split every suit exactly down the middle \u2014 A-7 up, 8-K down'), fully wrapped and untruncated on the card, in the board's stacked live HUD after Play, and in the Gold demo bar; both demo pills (Clear, Gold) present, matching the two lines daily-solutions.json holds for this seed. The label's 'up'/'down' vocabulary is defined in How to play ('an up pile (A, 2, 3 \u2026) and a down pile (K, Q, J \u2026) \u2026 you choose where each suit splits'), so a novice can decode it without outside knowledge. Two side findings filed: fixed 10 pt labels that ignore the system text size (ux/WF-13:objective-labels-ignore-text-size) and the demo-bar em-dash collision (ux/WF-13:demo-headline-emdash-collides-with-label)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Not confusable with the ordinary gold family: 'Split every suit exactly down the middle \u2014 A-7 up, 8-K down' names the exact per-suit split, where suits-top-down (Today's card, seen for comparison in the same pass) reads 'For every suit, send its King home before its Ace' and aces-first/kings-first name an ordering, not a split. The label's 7/6 asymmetry is disambiguated in the label itself and matches the checker (Daily.swift:134, up counts all == 7). CC-1's HUD-truncation hypothesis does NOT reproduce on this build: DailyHUD uses ViewThatFits and fell back to the stacked, fully-wrapped variant (lineLimit nil) for this day."
+        }
+      },
+      "TC-2.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Cold launch (random deal #962391): one tap on the exposed AC sent it to the clubs UP foundation, Moves 0->1, no confirmation, no mis-target."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Deal #10,004: one tap on the exposed KC sent it to the clubs DOWN foundation (two-ended direction correct), Moves 3->4."
+        }
+      },
+      "TC-2.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10,004: tapping the head (JC) of the 3-card run JC-10H-9S relocated all three onto QD in col4 as one move (Moves 6->7)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same run-head tap; also verified by drag: dragging the run head JC moved JC+10H together to col4. Buried non-head cards never lift (see TC-2.4)."
+        }
+      },
+      "TC-2.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "Drop-below-column regression passes at both +20 pt (y=700) and +120 pt (y=800); free-cell and up-foundation drops land where released; release at y=860 (past the tableau area) correctly snaps back with no move."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Pickup is instant: a 0.1 s drag moved QH onto KS, so no press-and-hold. Wrong-end foundation drop (AD onto the diamonds DOWN pile) refused; occupied free cell refused without rerouting; self-column drop counts no move. One defect found on the horizontal axis: ux/WF-2:drop-gutter-dead-zone (minor)."
+        }
+      },
+      "TC-2.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "Buried AH (col0 idx2, deal #10,004) never lifts on tap or drag, Moves unchanged, no stuck elevated card; the ~0.3 s acknowledgement wiggle was caught on film (frame f35 of a 3 fps host loop: MAD 21.2, 25.2% pixels changed over that card's rect vs 0.000 elsewhere)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Over-cueing non-goal verified: tapping the liftable-but-targetless 4H sitting in a free cell produced MAD 0.000 across all 30 filmed frames (stays silent). The 'cue suppressed during a demo line' sub-check was NOT exercised - it needs the WF-6 demo bar and belongs to that lane."
+        }
+      },
+      "TC-2.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "All four legs on deal #10,004: never clipped (16-card col0 bottom edge 836 pt, above the 840 pt safe-area bottom); fan compresses first (col0 pitch 30->28 at 13 cards, ->24 at 15, neighbours stay 30, card width 44-45 pt throughout)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Uniform board shrink fires on the 16th card (card width 44-45 -> 42.3 pt, pitch 49 -> 47.3, tableau re-centres: left edge 6.0 -> 14.7 pt; foundations and free cells shrink with it, never two sizes). Monotone: tapping the tall column's bottom card at (36,800) moved it (board stayed small) and Undo restored 16 cards still small; only Replay restored full size."
+        }
+      },
+      "TC-3.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "One tap on New game; Deal # changed 113138 -> 910172, Moves 0, Time 0:00, board reshuffled (77k px board diff)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "One tap, new random seed each time (113138 -> 910172 -> 110714); clock and move counter reset."
+        }
+      },
+      "TC-3.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "One tap on Replay after 3 moves; same Deal #910172, Moves 0, Time 0:00, board pixel-identical to the deal's initial layout (only a sub-point card-border AA shift)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same as novice; Undo correctly disabled after Replay (history cleared)."
+        }
+      },
+      "TC-3.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "One move -> Moves 1 and Undo pill visibly enabled; one tap on Undo -> Moves 0, board pixel-identical to pre-move state, Undo greys back out."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same; Undo is a single tap in toolbar row 1. Note: the elapsed clock is NOT rewound by Undo (0:19 at Moves 0) - judged correct, not filed."
+        }
+      },
+      "TC-3.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "At Moves 0 the Undo pill is rendered at ~40% opacity, clearly distinct from the enabled pills; tapping it left the screen pixel-identical apart from the status-bar clock."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Disabled Undo is inert; no error, no state change."
+        }
+      },
+      "TC-3.5": {
+        "power": {
+          "status": "passed",
+          "reason": "5 moves (incl. a K-to-down-foundation move), then 5 Undo taps: each intermediate board was pixel-identical to the matching forward state (diffs 0-64 subpixel, 0 significant), final state pixel-identical to the initial deal (diff 0), Undo then disabled; a 6th tap changed nothing (no over-undo)."
+        }
+      },
+      "TC-4.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Ask mode: board became finishable on a real move -> 'Ready to finish' alert; Finish cascaded to the win overlay 'Deal #10,011 - 93 moves - 2:58' with Play deal #10012 / Random / Close."
+        }
+      },
+      "TC-4.2": {
+        "power": {
+          "status": "passed",
+          "reason": "'Not yet' dismissed the prompt, gold Finish pill appeared and stuck across a further move with no re-nag; Finish pill completed the deal. (Deferral does not survive an app kill - filed as a separate minor finding.)"
+        }
+      },
+      "TC-4.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Close -> solved board (relaunch gives a fresh deal, win kept); Play deal #10012 -> deal 10012; Random -> deal #806927; Won 0->1 on the first genuine win and Deal #10011 gained a check mark. Repeat wins of the same deal do not bump Won - by design, WinStore counts distinct deals."
+        }
+      },
+      "TC-4.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Auto-finish Off: board became finishable with no prompt and the Finish pill appeared; Finish completed it, and manual play of the last 3 cards also produced the win overlay."
+        }
+      },
+      "TC-5.1": {
+        "novice": {
+          "status": "failed",
+          "reason": "Structure/labels/objective text all match the derived day (deal #10,011, silver 'Win without using undo', gold 'For every suit, send its King home before its Ace', pills Clear+Gold), but the effort bar fails: the streak cards' headline number is unlabelled (ux/WF-5:streak-card-headline-unlabelled) and every unattempted objective shows a red circle (ux/WF-5:unattempted-objective-shows-red)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Deal number, par-tier labels and demo pills all match derive_daily.py; Done dismisses; BACKUP section present."
+        }
+      },
+      "TC-5.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "One tap; sheet dismissed; Deal #10011, Moves 0, Time 0:00; portrait DailyHUD is the 3-line stacked box with fully wrapped labels and no ellipsis."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Board-to-playing-the-daily is 2 taps (Daily, Play); HUD chips all show the '.' pending state."
+        }
+      },
+      "TC-5.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "After a bronze+silver win: Play button becomes grey 'Replay to improve <-', Play/Silver streaks go 1 / 1 total / best 1, Bronze+Silver show green checks, Gold correctly withheld (the bronze line sends A before K for suits 0 and 3), and the calendar cell for the 22nd gains bronze+silver dots."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "'Replay to improve' re-deals #10011 with Moves 0 and today's HUD; DailyStore.mergeTiers OR-accumulates so a worse replay cannot downgrade an earned tier."
+        }
+      },
+      "TC-5.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 12 retitles the card and swaps in deal #10,001 / 'Win in 100 moves or fewer' / 'Send all four Aces home before any other card' (matches derive_daily.py 0); 12 gets the filled tint, 22 keeps the gold outline; tapping the 23rd changes nothing; tapping 22 restores 'Today'."
+        },
+        "power": {
+          "status": "failed",
+          "reason": "Catch-up Play works and is scored (Aug 12 board carries Aug 12's HUD), but no day identifier exists on the board and re-opening Daily snaps back to Today's card with its earned checks - ux/WF-5:board-hud-omits-challenge-day. The 'Unlocks <Mon D>' branch was not observable because future cells are inert."
+        }
+      },
+      "TC-6.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Clear pill discoverable on the Daily card; bar opens 'Winning line \u2014 0 / 98' (98 = derived bronze line length for #10,011), pills Next/Start/Stop, does not auto-run, Undo disabled, Moves/Time both '\u2014', Won 0, Deal #10011."
+        }
+      },
+      "TC-6.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Next advanced 0\u21921\u21923 one move each; Start auto-ran (23/98 mid-run), headline gained '\u2026', Next hidden, Pause+Stop only; Pause froze at 67/98 across 4 s, headline wrapped to 'N / 98 (paused)' with Next/Resume/Stop; Resume continued to 90/98."
+        }
+      },
+      "TC-6.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "Stop from 3/98 removed the bar and restored the fresh dealt layout of #10011: all 8 columns full, cells/foundations empty, Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay."
+        }
+      },
+      "TC-6.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "Line ran to 98/98; banner 'That's a winning line \u2014 tap Done to try it yourself.' with a single Done pill; Moves/Time stayed '\u2014' on the banner (round-0 hypothesis CC-3 'Moves 97 / Time 0:00' does NOT reproduce on f949d82 \u2014 dismissed). Done re-dealt fresh: Moves 0, Won 0, Wins 'No wins yet', all 4 streak cards 0/0 total/best 0, all tier circles empty. Filed ux/WF-6:done-hands-back-casual-board for the non-challenge board handed back."
+        }
+      },
+      "TC-6.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "At 3/98: a 4 s drag of col0's bottom card to an empty free cell left all 110 filmstrip frames (~26 s) byte-identical \u2014 no lift, no ghost, no move; a plain tap on the same card likewise changed nothing; counter still 3/98, Moves '\u2014'. Positive control (same gesture after Stop) showed the card lifting at frame 36 and landing, proving the gesture is delivered."
+        }
+      },
+      "TC-6.7": {
+        "novice": {
+          "status": "passed",
+          "reason": "Confirm gate fires with the exact expected copy and buttons; 'Keep playing' left the attempt byte-identical (Moves 1, clock running, Undo enabled, HUD up); 'Show demo' opened 'Winning line - 0 / 98' on a re-dealt #10011. Two findings filed for the UNGUARDED sibling paths (casual game destroyed by a demo pill; Daily Play restarts an attempt in progress)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same gate fires from the Gold pill; pixel diff after 'Keep playing' showed changes only in the status-bar clock band (y 27-103), board untouched at Moves 2; 'Show demo' then opened the GOLD line (0/105), i.e. the alert remembers which pill was tapped."
+        }
+      },
+      "TC-6.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "Gold on #10011: 'Gold: For every suit, send its King home before its Ace - 0 / 105' (= gold line length). Silver needed a day with a distinct silver line (none in the pool head): Aug 10 sandbox #561,325,499 showed 3 pills and 'Silver: Win using free cells at most twice - 0 / 91' (= silver line length). Next advanced 0->1; Stop re-dealt - the post-Stop frame was pixel-identical to a known fresh board except the status-bar clock. Aug 17 Silver line run to the end banners 'That's a Silver line' and Done re-deals with nothing banked (Won 0, all four streak cards 0, Aug 17 tier circles empty). Future days are inert so no demo pills are reachable for them."
+        }
+      },
+      "TC-7.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #10003 loaded (board matches engine deal(10003)), Moves 0; tap cost 13 vs WORKFLOWS' 3 filed separately as ux/WF-7:deal-entry-tap-cost"
+        }
+      },
+      "TC-7.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Exactly two actions, Cancel (129,389) left and Play (274,389) right, pad up and field prefilled+focused; no Random anywhere in the alert; New game pill still one-tap random (#10003 -> #445149)"
+        }
+      },
+      "TC-7.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Blank field + Play: alert dismissed, Deal #445149 unchanged, board pixel-identical, app still running"
+        }
+      },
+      "TC-7.4": {
+        "power": {
+          "status": "failed",
+          "reason": "9999999 is NOT clamped to 1,000,000 \u2014 it loads and displays Deal #9999999; 5000000000 silently loads Deal #4294967295. Only 0 -> 1 behaves as documented. See bug/WF-7:deal-entry-range-not-enforced"
+        }
+      },
+      "TC-7.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Cancel after editing the field to '99' left Deal #10003, Moves 1, Undo enabled and the board pixel-identical (diff confined to status bar + Time label)"
+        }
+      },
+      "TC-8.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Fresh install launches Auto-play: On; pill flips On->Off->On immediately; Off survives terminate+launch."
+        }
+      },
+      "TC-8.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Crafted 52-card save (save82) with a provably-safe 3S top and a foundation-legal-but-unsafe 6H top. Auto-play Off: Moves stayed 20, nothing moved. Toggling On: 3S alone flew home (Moves 21, spade up 2->3), 6H stayed \u2014 safe-only, no burying."
+        }
+      },
+      "TC-8.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Ask -> Off -> On -> Ask, one tap each, label updates immediately; On persists across terminate+launch. Ask->Off is exactly one tap and never transits On."
+        }
+      },
+      "TC-8.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Fixture substituted: the TC's gen2.mjs/deal #10169 recipe is gone from /private/tmp, so used the save-injection recipe (deal #10011 restored at move 69, then one real drag to move 70). All four assertions held: Ask prompted by itself, Not yet left Moves 70 + Finish pill, one tap gave Off with zero board change, next tap gave On and cascaded to the win overlay (Moves 93, Won 1, Deal pill checked). Filed ux/WF-8:autofinish-off-to-ask-forces-destructive-on for the Off->Ask navigation trap this same behaviour creates."
+        }
+      },
+      "TC-9.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Cold launch \u2192 Wins: 'Deals won' sheet, 'Play a deal' field with Play disabled while empty (tapping it does nothing), 'No wins yet \u2014 go solve one!', Done dismisses."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same, and Play stays disabled for '0' and for a 20-digit entry."
+        }
+      },
+      "TC-9.2": {
+        "novice": {
+          "status": "failed",
+          "reason": "Counts/chips/gold outline/drill-in/back nav all correct, but the drill-in row text renders pale gold on white (1.42:1) \u2014 not legible, the doc's stated expectation. bug/WinsView:row-text-contrast."
+        },
+        "power": {
+          "status": "failed",
+          "reason": "97 wins / 35 ranges render and scroll fine, but tapping a row silently destroys the in-progress game (ux/WF-9:row-tap-discards-game) and chip vs row seed formatting disagree."
+        }
+      },
+      "TC-9.3": {
+        "novice": {
+          "status": "failed",
+          "reason": "Typing 777 \u2192 Play loads deal #777 and dismisses, but the advertised 1\u20131,000,000 range is not enforced (2000000 loads). bug/WinsView:deal-entry-range-not-enforced."
+        },
+        "power": {
+          "status": "failed",
+          "reason": "Same clamp failure; 20-digit input silently disables Play with no explanation (not filed, extreme edge)."
+        }
       }
     }
   }

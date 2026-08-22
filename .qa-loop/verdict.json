@@ -1,0 +1,24 @@
+{
+  "round": 1,
+  "pass_type": "full",
+  "blockers_open": 1,
+  "majors_open": 6,
+  "minors_open": 11,
+  "proposals_open": 11,
+  "closed": 0,
+  "new": 18,
+  "reopened": 0,
+  "promoted": 0,
+  "demoted": 0,
+  "net": -18,
+  "tokens": 222590,
+  "cumulative_tokens": 222590,
+  "decision": "continue",
+  "reason": "progress continuing",
+  "coverage": {
+    "ran": 57,
+    "total": 57,
+    "missing": [],
+    "blocked": []
+  }
+}
