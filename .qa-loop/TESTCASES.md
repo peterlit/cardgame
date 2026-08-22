@@ -693,8 +693,8 @@ day's objectives, not Today's.**
   not Today's `no-undo`/`suits-top-down` pair. Moves 0, Time 0:00.
 - **Effort bar:** <= 2 taps total from the Daily sheet root (calendar tap + Play).
 
-**TC-13.4 [power] (Power) — `one-big-move` secures its green check the instant a
-5+ card run is relocated, and the check survives Undo.**
+**TC-13.4 [power] (Power) — `one-big-move` shows its green check the instant a
+5+ card run is relocated, and the check tracks Undo.**
 1. Daily → calendar → `8` → `Play` (deal #186,441,603, gold = one-big-move).
 2. Build a tableau run of 5+ cards (any legal sequence of taps/drags that produces
    an alternating-colour, rank-consecutive run of 5 or more cards at a column's tail)
@@ -703,10 +703,19 @@ day's objectives, not Today's.**
 3. Immediately re-open the HUD/read the Gold chip. Then tap `Undo`.
 - **Expected:** the instant the 5+ card run lands, the Gold chip flips to green `✓`
   (`objSecured`: `maxRunMoved >= 5`) — no need to finish or win the deal first. After
-  `Undo` (step 3), the chip **stays green** (`maxRunMoved` is telemetry that is never
-  rolled back — the objective is "positive and irreversible" per WORKFLOWS.md WF-13).
+  `Undo` (step 3), the chip correctly reverts to `·`: `Game.undo()` restores
+  `telem.maxRunMoved` from the snapshot, and the authoritative grade at win time reads
+  that same field, so a reverted chip is the HUD telling the truth about what the
+  final line will contain. **Corrected round 1 (2026-08-22):** an earlier version of
+  this case asserted the check "survives Undo" on the strength of a
+  "positive and irreversible" code comment. The comment was wrong and has been fixed
+  on both platforms; `maxRunMoved` is shared with the opposite-polarity
+  `no-supermoves` objective, so a one-way counter would permanently fail Silver on an
+  undone 2-card slip, and would also award Gold for a move absent from the winning
+  line. Every other `objSecured` case un-secures on undo for the same reason.
 - **Fail condition:** the check appears only after winning, needs a second move to
-  show, or reverts to `·`/`✗` after Undo — any of these is a HUD/telemetry bug.
+  show, or the chip and the tier actually awarded at win time disagree — any of these
+  is a HUD/telemetry bug. A green check that reverts on Undo is NOT a bug.
 - **Note:** an empty-column move also counts toward `maxRunMoved` (`Game.swift:579`);
   either move path is acceptable evidence.
 

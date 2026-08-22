@@ -87,8 +87,12 @@ Each has a stable ID and a reasonable-effort expectation.
   `split-even`, `down-heavy`, `no-down-foundation`, `no-up-foundation`, `no-supermoves`,
   `one-big-move`. Expectation: a selected past/sandbox day shows its own objectives and par,
   its labels are legible and unambiguous to a novice, Play hands off to a board whose HUD
-  tracks that day's objectives, and `one-big-move` shows its green secured check the moment
-  a 5+ card run is relocated (it is positive and irreversible).
+  tracks that day's objectives, and `one-big-move` shows its green check the moment a 5+
+  card run is relocated. **Corrected round 1:** that check is NOT irreversible — Undo
+  restores `telem.maxRunMoved`, which is deliberate (the field is shared with the
+  opposite-polarity `no-supermoves` objective, and the tier awarded at win time reads
+  the same rolled-back field), so a check that reverts on Undo is the HUD telling the
+  truth.
   **Corrected 2026-08-22 (round-0 exploration):** the constraint objectives are EVALUATIVE,
   not gating — like the older `no-cells` / `no-undo`, a disallowed move is allowed and the
   HUD chip flips to a red ✗ (a hard refusal would make Bronze unreachable on some deals).
