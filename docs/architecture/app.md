@@ -550,9 +550,9 @@ by the foundation ranks), and rejection of a completed board.
 | `Theme.background` | `Theme.swift:27-30` | no references; superseded by `SummerBackground` |
 | `Suit.glyph` | `Cards.swift:8` | no references; pips are drawn from `sfSymbol` |
 | `MemoryMonitor.stop()` | `MemoryMonitor.swift:50` | no callers — `MemoryHUD` starts the monitor in `.onAppear` with no `.onDisappear` |
-| `causeway.*.unreadable` keys | `WinStore.swift:79`, `DailyStore.swift:43` | written, never read |
+| `causeway.*.unreadable` / `causeway.daily.v1` keys | `WinStore.swift`, `DailyStore.swift` | written, never read — deliberate: they stash a store the app could not use rather than destroying it |
 | `MemoryHUD` + `MemoryMonitor` + `MemoryFootprint` | 3 files, ~78 lines | unreachable while `DebugFlags.memoryHUD == false`; intentionally retained per `MemoryMonitor.swift:4-8` |
-| Unused baked pool fields | `daily-pool.json` | `PoolSeed` decodes only `seed`, `par`, `supports` — `winnable`, `constraintPar`, `minSeed` are never read |
+| Unused baked pool fields | `daily-pool.json` | `PoolDay` decodes only `seed`, `par`, `silver`, `gold` — `version`, `epoch`, `minSeed`, `maxSeed` are never read |
 
 One more artefact of drift rather than dead code: **`LaunchScreen.storyboard` is the wrong colour.**
 Its background is `#687D78` (`:15`), which sits between the first two stops of the *unused*

@@ -90,7 +90,7 @@ flowchart LR
     Dev --> Xcode
     Dev --> Py
     Node --> Tests["68 tests<br/>tests/*.test.mjs"]
-    Node --> Solver["tools/solver<br/>build-pool / build-solutions"]
+    Node --> Solver["tools/solver<br/>build-month / build-solutions"]
     Xcode --> IPA["Causeway.app"]
 ```
 
@@ -239,37 +239,36 @@ This is the largest subsystem and the main reason the shared-logic problem matte
 A fourth derived tier, 🌟 **Flawless**, means all three earned in a *single* attempt
 (`tests/daily.mjs:97-105`).
 
-**Determinism.** `dailyChallenge(dayIndex, pool)` is a pure function. Day index = days since the
-frozen epoch **2026-08-12** (`tests/daily.mjs:19`). Day *D* always maps to `pool.seeds[D]`, and a
-per-day RNG seeded `mulberry32((0x9e3779b9 ^ (dayIndex+1)) >>> 0)` draws Silver then Gold from what
-that seed is certified to support (`tests/daily.mjs:72-83`). The pool is **append-only** so history
-can never be rewritten — appending seeds cannot shift a past day, which is asserted directly at
-`tests/daily.test.mjs:48-52`.
+**Determinism.** `dailyChallenge(dayIndex, pool)` is a pure **table lookup**. Day index = days since
+the epoch **2026-08-01** (`tests/daily.mjs`). Day *D* reads `pool.days[D]`, which names that day's
+seed, its par, and both objectives with their parameters. There is **no runtime RNG**: the offline
+generator (`tools/solver/build-month.mjs`) chose all of it, maximising variety across the month.
+Only **August 2026** is seeded — days outside it resolve to `null`.
 
-**Objective catalogue** — 17 implemented ids (`tests/daily.mjs`):
+**Objective catalogue** — 13 parameterised families (`tests/daily.mjs`). A family's *grade* is a
+function of its parameter, so the same id can be a Silver or a Gold:
 
-| Grade | id | Requires (in addition to winning) |
+| Family | Parameter | Requires (in addition to winning) |
 |---|---|---|
-| Silver (universal) | `moves` | `moves <= round(par * 1.2)` |
-| Silver (universal) | `no-undo` | `undos == 0` |
-| Silver (certified) | `cells-le-1` / `cells-le-2` | `cellUses <= 1` / `<= 2` |
-| Silver (certified) | `down-openers-20` | 4th King reaches a down foundation by move 20 |
-| Gold | `no-cells` | `cellUses == 0` |
-| Gold | `aces-first` | first four foundation sends are all Aces |
-| Gold | `kings-first` | no Ace goes up before all four Kings are down |
-| Gold | `jacks-down-first` | no Ace goes up before all four Jacks are down |
-| Gold | `suits-top-down` | per suit, its King lands before its Ace |
-| Gold | `suit-sprint` | finish one whole suit before a second suit starts |
-| Silver (certified) | `down-heavy` | at least 8 of every suit came from the King end |
-| Silver (certified) | `no-supermoves` | `maxRunMoved <= 1` — never relocated more than one card |
-| Gold | `split-even` | every suit splits exactly A-7 up / 8-K down |
-| Gold | `no-down-foundation` | no card ever went to a down foundation |
-| Gold | `no-up-foundation` | no card ever went to an up foundation |
-| Gold | `one-big-move` | `maxRunMoved >= 5` — relocated a run of 5+ in one move |
+| `moves` (universal) | `N` | `moves <= N` (N = par x 1.05-1.4) |
+| `no-undo` (universal) | — | `undos == 0` |
+| `cells-le` | `N` 0-3 | `cellUses <= N` (N=0 is Gold) |
+| `max-run` | `N` 1-3 | `maxRunMoved <= N` |
+| `big-move` | `N` 5-7 | `maxRunMoved >= N` |
+| `split-at` | `R` 3-10 | every suit splits exactly A-R up / R+1-K down |
+| `end-bias` | `end`, `min` 7-13 | at least `min` of every suit came from that end (13 = one-end game) |
+| `ends-first` | `up` 0-3, `down` 10-14 | nothing else goes home until every suit holds A..up and K..down |
+| `before-ace` | `rank` 10-13 | no Ace goes up before all four of that rank are down |
+| `suit-top-first` | `rank` 11-13 | per suit, that suit's `rank` lands from the King end before its Ace |
+| `suit-sprint` | — | finish one whole suit before a second suit starts |
+| `rank-rush` | `rank`, `N` | all four of that rank are home (either end) by move N |
+| `suit-balance` | `N` 2-5 | no suit ever runs more than N cards ahead of another |
 
-The last six were added 2026-08-21 (see `docs/daily-objectives-proposal.md`). Five of them are
-*gates* the solver can enforce during search, so certification is sound by construction;
-`one-big-move` is existential and needs a latch in the search node key.
+Most are *gates* the solver can enforce during search, so certification is sound by construction;
+`big-move` and `rank-rush` are existential/deadline goals and need a latch in the search node key.
+Every previously shipped objective is now a parameter of one of these families — `no-cells` is
+`cells-le{0}`, `aces-first` is `ends-first{up:1}`, `split-even` is `split-at{7}`, and so on. See
+`docs/daily-challenges.md` §4 for the full mapping.
 
 **Trusted-telemetry contract.** Checkers do not re-simulate the game; they read a telemetry record
 the app must emit honestly (`tests/daily.mjs:26-33`). The stated justification: the game is local,
@@ -287,12 +286,12 @@ flowchart LR
     subgraph Offline["Offline, never shipped"]
         Rules["rules.mjs<br/>pure rule model"]
         Solve["solve.mjs<br/>weighted A* + transposition"]
-        BP["build-pool.mjs"]
+        BP["build-month.mjs"]
         BS["build-solutions.mjs"]
     end
 
-    Pool[("data/daily-pool.json<br/>366 seeds")]
-    Sol[("data/daily-solutions.json<br/>366 lines x tiers")]
+    Pool[("data/daily-pool.json<br/>31 days")]
+    Sol[("data/daily-solutions.json<br/>31 seeds x tiers")]
 
     Rules --> Solve
     Solve --> BP
@@ -306,13 +305,16 @@ flowchart LR
     Sol --> IOS
 ```
 
-- **`build-pool.mjs`** scans seeds above 10 000 (IDs 1–10 000 are reserved for personal range-play,
-  `docs/daily-challenges.md:40-42`) and appends those that are winnable *and* support at least one
-  Gold objective. Output: 366 records of `{seed, winnable, par, supports[], constraintPar{}}`.
+- **`build-month.mjs`** draws candidate seeds from 500 001–1 000 000, certifies each against all 63
+  `(family, parameter)` variants in parallel worker processes (resumable through a JSONL cache under
+  `.cache/`), then chooses the month's 31 days greedily for maximum variety. Output: 31 records of
+  `{seed, par, silver:{id,param}, gold:{id,param}}`, plus the cached certifications
+  `{seed, winnable, par, supports:[{id,param,par}]}`.
 - **`build-solutions.mjs`** bakes replayable winning lines per seed — bronze always, gold always, and
   silver only when that day's Silver is a *constraining* objective. Each line is double-validated:
   re-simulated from the raw deal to prove it wins, then re-checked against the **runtime** objective
-  checker from `tests/daily.mjs`. Result: 366 bronze + 366 gold + 190 silver.
+  checker from `tests/daily.mjs`. Result: 31 bronze + 31 gold + 23 silver (the 8 missing silvers
+  are days whose Silver is universal, and so already satisfied by the bronze line).
 - **Soundness by construction.** For every gating objective, the move generator never emits a
   violating move (`tools/solver/solve.mjs:27-50`), so any win found already obeys the constraint —
   there are no false-positive certifications. A search that exhausts its budget returns `'unknown'`,
@@ -401,12 +403,12 @@ The per-codebase documents carry the detailed critiques. At system level:
    Swift UI layer, persistence, and the async auto-finish/demo timing paths are covered only by
    text pins and manual QA. The backlog itself notes this produced a blocker and a major that the
    Node suite structurally cannot see (**AF-test**).
-3. **Shipped data no longer matches its documented invariant.** `certify()` defines
-   `par = min(unconstrained, all constraintPar)` (`tools/solver/solve.mjs:186-188`), but **274 of 366**
-   shipped pool records have `par > min(constraintPar)` — they predate that change and the
-   append-only policy preserves them. Re-running `certify(10002)` today yields `par 77` where the
-   file says `78`. Consequence: the `moves` Silver objective is up to ~14 % looser than intended on
-   those days. Player-friendly, not a correctness break, but the data and the spec disagree.
+3. **~~Shipped data no longer matches its documented invariant.~~ RESOLVED by the 2026-08 recut.**
+   274 of the old 366 pool records stored an unconstrained `par` predating the
+   `par = min(unconstrained, all constraintPar)` rule, and the append-only policy preserved them, so
+   the `moves` Silver was up to ~14 % looser than intended on those days. The whole pool was
+   regenerated from scratch, so every record now satisfies the invariant. The general hazard
+   remains: append-only data outlives the code that produced it.
 4. **Documentation drift — surveyed and repaired (2026-08-15).** A prior pass found four documents
    describing a system that no longer existed: `docs/daily-challenges.md` said the feature was "not
    yet implemented" and listed three objectives that were never built; `docs/solver.md` said the
@@ -417,16 +419,20 @@ The per-codebase documents carry the detailed critiques. At system level:
    behaviour diverged from the plan. **The underlying risk remains structural**: none of these
    documents is verified by anything, so nothing stops them drifting again. Only the *code* copies
    are guarded.
-5. **Objective supply is very thin in one place.** `suit-sprint` is supported by only **4** of 366
-   seeds and is actually selected on **3** days. **(inference)** It survives as a catalogue entry
-   more than as a real player-facing objective.
+5. **Objective supply is very uneven, and now it is priced in.** `cells-le`, `max-run`, `split-at`
+   and `suit-balance` certify at nearly every parameter, while `ends-first` certifies on ~2 of its
+   13 parameters and mid-rank `rank-rush` deadlines are unreachable by construction. The month
+   generator scores rare certifications higher for exactly this reason. Measured during the recut:
+   raising the candidate pool from 93 to 118 seeds changed the chosen month not at all (13 families,
+   52 distinct challenges either way) — **variety is bounded by the parameter matrix, not by how
+   many seeds are scanned**, so widening it means adding parameter values to `VARIANTS`.
 
 **Vestigial code, system-wide** (each grep-verified, no callers anywhere):
 `rules.mjs` — `BLACK_SUITS`, `RED_SUITS`, `canDown`, `runDir`, `tailDir`;
-`solve.mjs` — `kingsDown`, `GOLD_GRADE`, `SILVER_GRADE` (and `build-pool.mjs:51` re-declares the Gold
-list locally instead of importing it);
+`solve.mjs` — (cleared by the 2026-08 recut: `kingsDown`, `GOLD_GRADE` and `SILVER_GRADE` are gone,
+and the `build-pool.mjs` that re-declared the Gold list locally was deleted);
 `engine.mjs` — `RED`, `BLACK_SUITS`, `RED_SUITS`, `freshDeck`, `canFoundationUp`, `canFoundationDown`,
 `rankOnFound`;
-`daily.mjs` — `daysFromCivil`, `EPOCH_DAYS`, and the `universal`/`certified` flags on `OBJECTIVES`
-(both `build-solutions.mjs:28` and `solutions.test.mjs:87` hard-code the certified-silver list
-instead of reading them).
+`daily.mjs` — `daysFromCivil`, `EPOCH_DAYS` (the `universal` flag is no longer vestigial: since the
+recut, `build-solutions.mjs` and `solutions.test.mjs` both read it instead of hard-coding a
+certified-silver list).
