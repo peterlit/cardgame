@@ -44,33 +44,43 @@ pin('Model/Daily.swift', 'daysFromCivil (floor-division)', [
   'let era = floorDiv(y >= 0 ? y : y - 399, 400)',
   'return era * 146097 + doe - 719468',
 ]);
-pin('Model/Daily.swift', 'frozen objective pools', [
-  'private let SILVER_UNIVERSAL = ["moves", "no-undo"]',
-  'private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20", "down-heavy", "no-supermoves"]',
-  'private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint", "split-even", "no-down-foundation", "no-up-foundation", "one-big-move"]',
-]);
-pin('Model/Daily.swift', 'dailyChallenge RNG seed + pick order', [
-  'Mulberry32(UInt32(truncatingIfNeeded: 0x9e37_79b9 ^ (dayIndex + 1)))',
-  'let silverPool = SILVER_UNIVERSAL + SILVER_CERTIFIED.filter { rec.supports.contains($0) }',
-  'Int((Double(par) * 1.2).rounded())',          // moves objective N = round(par*1.2)
+pin('Model/Daily.swift', 'the day -> challenge lookup (no runtime RNG; the pool names both tiers)', [
+  'guard dayIndex >= 0, dayIndex < pool.count else { return nil }',
+  'silver: makeObjective(rec.silver), gold: makeObjective(rec.gold))',
+  'let EPOCH_DAYS = daysFromCivil(2026, 8, 1)',
 ]);
 
-// ---- objective checkers, mergeTiers, streaks (incl. Flawless) ----
-pin('Model/Daily.swift', 'objective checkers', [
-  'for e in t.foundationOrder { if a >= 4 { break }; if e.rank == 1 { a += 1 } else { return false } }', // acesFirst
-  'for e in t.foundationOrder where e.rank == 13 && e.end == "down" {',                                   // downOpeners20
-  'else if e.rank == 1 && e.end == "up" && k < 4 { return false }',                                       // kingsFirst
-  'else if e.rank == 1 && e.end == "up" && j < 4 { return false }',                                       // jacksDownFirst
-  'else if e.rank == 1 && e.end == "up" && !kd[e.suit] { return false }',                                 // suitsTopDown
-  'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',                          // suitSprint
+// ---- objective checkers, grades, labels (every family is parameterised) ----
+pin('Model/Daily.swift', 'parameterised objective checkers', [
+  'case "cells-le":       return t.won && t.cellUses <= (p.N ?? 0)',
+  'case "max-run":        return t.won && t.maxRunMoved <= (p.N ?? 1)',
+  'case "big-move":       return t.won && t.maxRunMoved >= (p.N ?? 5)',
+  'case "split-at":       return t.won && upDown(t).u.allSatisfy { $0 == (p.R ?? 7) }',
+  'return (p.end == "up" ? x.u : x.d).allSatisfy { $0 >= (p.min ?? 0) }',
+  'case "suit-balance":   return t.won && maxSpread(t) <= (p.N ?? 13)',
 ]);
-pin('Model/Daily.swift', 'new objective checkers (split point / one-end / move shape)', [
-  'private func splitEven(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 7 } }',
-  'private func downHeavy(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 <= 5 } }',
-  'private func noDownFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).d.allSatisfy { $0 == 0 } }',
-  'private func noUpFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 0 } }',
-  'private func noSupermoves(_ t: Attempt) -> Bool { t.won && t.maxRunMoved <= 1 }',
-  'private func oneBigMove(_ t: Attempt) -> Bool { t.won && t.maxRunMoved >= 5 }',
+pin('Model/Daily.swift', 'ordering checkers (strict prefix, loose prefix, per-suit)', [
+  // endsFirstOK: the STRICT prefix — nothing else home until every suit holds A..up and K..down
+  `for e in t.foundationOrder {
+        if met() { break }
+        let required = e.end == "up" ? e.rank <= upN : e.rank >= downN
+        if !required { return false }`,
+  // beforeAceOK: the LOOSE prefix — that rank down before ANY Ace goes up
+  `if e.rank == r && e.end == "down" { n += 1 }
+        else if e.rank == 1 && e.end == "up" && n < 4 { return false }`,
+  // suitTopFirstOK: the PER-SUIT version
+  `if e.rank == r && e.end == "down" { down[e.suit] = true }
+        else if e.rank == 1 && e.end == "up" && !down[e.suit] { return false }`,
+  'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',   // suitSprintOK
+  'for e in t.foundationOrder where e.rank == rank && !seen[e.suit] {',           // rushCompleted
+]);
+pin('Model/Daily.swift', 'grades and labels derive from the parameter', [
+  'case "cells-le":     return (p.N ?? 0) == 0 ? .gold : .silver',
+  'case "end-bias":     return (p.min ?? 0) >= 10 ? .gold : .silver',
+  'case "suit-balance": return (p.N ?? 13) <= 3 ? .gold : .silver',
+  'return "Split every suit exactly at the \\(rankName(r)) — A-\\(rankShort(r)) up, \\(rankShort(r + 1))-K down"',
+  'return "Send \\(parts.joined(separator: ", plus ")) home before any other card"',
+  'case "rank-rush":      return "Get all four \\(rankPlural(p.rank ?? 1)) home within your first \\(p.N ?? 0) moves"',
 ]);
 pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless)', [
   'bronze: p.bronze || attempt.bronze,',

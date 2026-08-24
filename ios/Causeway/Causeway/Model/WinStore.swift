@@ -81,7 +81,10 @@ final class WinStore: ObservableObject {
         }
         // uniquingKeysWith (not uniqueKeysWithValues) so distinct JSON keys that map to
         // the same Int (e.g. "1" and "01") merge instead of trapping — a launch crash-loop.
-        wins = Dictionary(decoded.compactMap { k, v in Int(k).map { ($0, v) } },
+        // Drop seeds outside the app's deal range. Nothing the app can deal today lies outside it;
+        // a key above `maxSeed` is either hand-edited or a leftover from the pre-recut daily pools,
+        // which used seeds far above 1,000,000 and are no longer reachable.
+        wins = Dictionary(decoded.compactMap { k, v in Int(k).flatMap { (1...Game.maxSeed).contains($0) ? ($0, v) : nil } },
                           uniquingKeysWith: { a, b in a.secs <= b.secs ? a : b })
     }
 
@@ -94,10 +97,9 @@ final class WinStore: ObservableObject {
 }
 
 enum DealFormat {
-    /// Human range for the two deal-number entry fields. It quotes `maxValidSeed` (what the engine
-    /// can actually deal), NOT `maxSeed` (the random-deal ceiling) — the old "1–1,000,000" hint was
-    /// unenforced AND wrong, since daily/sandbox deals run far above it (bug/WF-7).
-    static let seedRangeHint = "1–\(Game.maxValidSeed.formatted(.number.grouping(.automatic)))"
+    /// Human range for the two deal-number entry fields — and the bound both fields actually
+    /// enforce, so the promise is real (bug/WF-7 was the two disagreeing).
+    static let seedRangeHint = "1–\(Game.maxSeed.formatted(.number.grouping(.automatic)))"
 
     /// A deal number as the app IDENTIFIES it — ungrouped, matching the board pill and the Wins
     /// range chips. (`Text("Deal #\(seed)")` interpolates through LocalizedStringKey and groups the

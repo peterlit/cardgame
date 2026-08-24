@@ -1,8 +1,16 @@
 # Proposal — more variety in Daily Challenge objectives
 
-**Status: partially shipped (2026-08-21).** Six objectives — A1, A2, B3, B4, F1, F2 — are
-implemented on all three copies of the logic and are live in the pre-epoch playtest sandbox
-(§8). The rest remain proposals. Decisions still needed from you are marked **[DECIDE]**.
+> **SUPERSEDED (2026-08-23) — kept as a design record.** This proposal's ideas shipped, but not in
+> the shape described here. The 2026-08 recut turned every objective into a *parameterised family*,
+> replaced the per-day RNG with an offline variety-maximising generator, moved the calendar to one
+> seeded month (August 2026, epoch 2026-08-01), and drew daily deals from seeds 500,001-1,000,000.
+> The pre-epoch playtest sandbox in §8 is gone — negative day indices no longer resolve. Read
+> [`daily-challenges.md`](daily-challenges.md) §4 and §7 for what actually shipped; read this for
+> the reasoning that got there, especially the feasibility measurements.
+
+**Status when written: partially shipped (2026-08-21).** Six objectives — A1, A2, B3, B4, F1, F2 —
+were implemented on all three copies of the logic and live in the pre-epoch playtest sandbox
+(§8). The rest remained proposals. Decisions still needed then are marked **[DECIDE]**.
 
 Companion to [`daily-challenges.md`](daily-challenges.md) (the original design) and
 [`solver.md`](solver.md) (certification). Every feasibility number below was measured, not estimated.

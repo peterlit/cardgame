@@ -31,14 +31,14 @@ func daysFromCivil(_ y0: Int, _ m: Int, _ d: Int) -> Int {
     let doe = yoe * 365 + floorDiv(yoe, 4) - floorDiv(yoe, 100) + doy
     return era * 146097 + doe - 719468
 }
-let EPOCH_DAYS = daysFromCivil(2026, 8, 12)   // launch epoch = day 0
+let EPOCH_DAYS = daysFromCivil(2026, 8, 1)    // launch epoch = day 0 = 2026-08-01
 func dayIndexFor(_ y: Int, _ m: Int, _ d: Int) -> Int { daysFromCivil(y, m, d) - EPOCH_DAYS }
 
-/// "Aug 12" for a day index (day 0 = the 2026-08-12 launch epoch; negatives are the pre-epoch
-/// playtest sandbox). Shared by the Daily sheet's day card and the board HUD's catch-up-day badge
-/// so the board can name WHICH day is in progress (ux/WF-5:board-hud-omits-challenge-day).
+/// "Aug 12" for a day index (day 0 = the 2026-08-01 launch epoch). Shared by the Daily sheet's day
+/// card and the board HUD's catch-up-day badge so the board can name WHICH day is in progress
+/// (ux/WF-5:board-hud-omits-challenge-day).
 func dayLabel(_ idx: Int) -> String {
-    var c = DateComponents(); c.year = 2026; c.month = 8; c.day = 12
+    var c = DateComponents(); c.year = 2026; c.month = 8; c.day = 1
     let cal = Calendar(identifier: .gregorian)
     guard let base = cal.date(from: c), let d = cal.date(byAdding: .day, value: idx, to: base) else { return "" }
     let f = DateFormatter(); f.dateFormat = "MMM d"
@@ -94,37 +94,69 @@ struct Attempt {
 
 // MARK: - Objective catalogue (checkers evaluate an Attempt)
 // Ported verbatim from tests/daily.mjs OBJECTIVES; each mirrors the solver's certification gate.
+// EVERY objective is a FAMILY with a parameter, so one id yields many visibly different challenges.
 
-private func acesFirst(_ t: Attempt) -> Bool {
-    var a = 0
-    for e in t.foundationOrder { if a >= 4 { break }; if e.rank == 1 { a += 1 } else { return false } }
-    return t.won && a == 4
+/// One objective's parameters. Each family reads only the fields it needs, and the baked pool
+/// carries exactly those keys (a missing key decodes to nil).
+struct ObjParam: Decodable, Equatable {
+    var N: Int? = nil        // moves cap / cell budget / run size / balance gap / rush deadline
+    var R: Int? = nil        // split point
+    var rank: Int? = nil     // which rank the family is about
+    var min: Int? = nil      // end-bias: at least `min` of every suit from `end`
+    var up: Int? = nil       // ends-first: how deep from the Ace end (0 = no Ace-end requirement)
+    var down: Int? = nil     // ends-first: how deep from the King end (14 = no King-end requirement)
+    var end: String? = nil   // "up" | "down"
 }
-private func kingsFirst(_ t: Attempt) -> Bool {
-    var k = 0
+
+/// Per-suit counts of ranks arriving from each end. u[suit] IS that suit's split point.
+private func upDown(_ t: Attempt) -> (u: [Int], d: [Int]) {
+    var u = [0, 0, 0, 0], d = [0, 0, 0, 0]
+    for e in t.foundationOrder { if e.end == "up" { u[e.suit] += 1 } else { d[e.suit] += 1 } }
+    return (u, d)
+}
+/// Widest gap between any two suits' home counts, folded over the foundation stream in play order.
+private func maxSpread(_ t: Attempt) -> Int {
+    var home = [0, 0, 0, 0], worst = 0
     for e in t.foundationOrder {
-        if e.rank == 13 && e.end == "down" { k += 1 }
-        else if e.rank == 1 && e.end == "up" && k < 4 { return false }
+        home[e.suit] += 1
+        worst = Swift.max(worst, (home.max() ?? 0) - (home.min() ?? 0))
     }
-    return t.won
+    return worst
 }
-private func jacksDownFirst(_ t: Attempt) -> Bool {
-    var j = 0
+/// STRICT prefix: nothing else goes home until every suit holds A..up and K..down.
+private func endsFirstOK(_ t: Attempt, _ p: ObjParam) -> Bool {
+    let upN = p.up ?? 0, downN = p.down ?? 14
+    var u = [0, 0, 0, 0], d = [14, 14, 14, 14]
+    func met() -> Bool { u.allSatisfy { $0 >= upN } && d.allSatisfy { $0 <= downN } }
     for e in t.foundationOrder {
-        if e.rank == 11 && e.end == "down" { j += 1 }
-        else if e.rank == 1 && e.end == "up" && j < 4 { return false }
+        if met() { break }
+        let required = e.end == "up" ? e.rank <= upN : e.rank >= downN
+        if !required { return false }
+        if e.end == "up" { u[e.suit] = e.rank } else { d[e.suit] = e.rank }
     }
-    return t.won
+    return true
 }
-private func suitsTopDown(_ t: Attempt) -> Bool {
-    var kd = [false, false, false, false]
+/// LOOSE prefix: every <rank> reaches the King-end foundation before any Ace goes home.
+private func beforeAceOK(_ t: Attempt, _ p: ObjParam) -> Bool {
+    let r = p.rank ?? 13
+    var n = 0
     for e in t.foundationOrder {
-        if e.rank == 13 && e.end == "down" { kd[e.suit] = true }
-        else if e.rank == 1 && e.end == "up" && !kd[e.suit] { return false }
+        if e.rank == r && e.end == "down" { n += 1 }
+        else if e.rank == 1 && e.end == "up" && n < 4 { return false }
     }
-    return t.won
+    return true
 }
-private func suitSprint(_ t: Attempt) -> Bool {
+/// Per-suit version: each suit's <rank> comes down before that same suit's Ace goes up.
+private func suitTopFirstOK(_ t: Attempt, _ p: ObjParam) -> Bool {
+    let r = p.rank ?? 13
+    var down = [false, false, false, false]
+    for e in t.foundationOrder {
+        if e.rank == r && e.end == "down" { down[e.suit] = true }
+        else if e.rank == 1 && e.end == "up" && !down[e.suit] { return false }
+    }
+    return true
+}
+private func suitSprintOK(_ t: Attempt) -> Bool {
     var home = [0, 0, 0, 0], started = [false, false, false, false]
     for e in t.foundationOrder {
         let S = e.suit
@@ -134,51 +166,41 @@ private func suitSprint(_ t: Attempt) -> Bool {
         }
         home[S] += 1
     }
-    return t.won
+    return true
 }
-/// Per-suit counts of ranks arriving from each end. u[suit] IS that suit's split point.
-private func upDown(_ t: Attempt) -> (u: [Int], d: [Int]) {
-    var u = [0, 0, 0, 0], d = [0, 0, 0, 0]
-    for e in t.foundationOrder { if e.end == "up" { u[e.suit] += 1 } else { d[e.suit] += 1 } }
-    return (u, d)
-}
-private func splitEven(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 7 } }
-private func downHeavy(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 <= 5 } }
-private func noDownFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).d.allSatisfy { $0 == 0 } }
-private func noUpFoundation(_ t: Attempt) -> Bool { t.won && upDown(t).u.allSatisfy { $0 == 0 } }
-private func noSupermoves(_ t: Attempt) -> Bool { t.won && t.maxRunMoved <= 1 }
-private func oneBigMove(_ t: Attempt) -> Bool { t.won && t.maxRunMoved >= 5 }
-
-private func downOpeners20(_ t: Attempt) -> Bool {
-    var k = 0, opened: Int? = nil
-    for e in t.foundationOrder where e.rank == 13 && e.end == "down" {
-        k += 1
-        if k == 4 { opened = e.moveIdx; break }
+/// The move index at which the fourth card of `rank` reached a foundation (nil = not yet).
+private func rushCompleted(_ t: Attempt, _ rank: Int) -> Int? {
+    var seen = [false, false, false, false], n = 0
+    for e in t.foundationOrder where e.rank == rank && !seen[e.suit] {
+        seen[e.suit] = true
+        n += 1
+        if n == 4 { return e.moveIdx }
     }
-    return t.won && opened != nil && opened! <= 20
+    return nil
 }
 
 /// The authoritative pass/fail for an objective id (mirrors OBJECTIVES[id].check).
-func objectiveCheck(_ id: String, _ t: Attempt, param: Int) -> Bool {
+func objectiveCheck(_ id: String, _ t: Attempt, param p: ObjParam) -> Bool {
     switch id {
-    case "moves":            return t.won && t.moves <= param
-    case "no-undo":          return t.won && t.undos == 0
-    case "cells-le-1":       return t.won && t.cellUses <= 1
-    case "cells-le-2":       return t.won && t.cellUses <= 2
-    case "down-openers-20":  return downOpeners20(t)
-    case "no-cells":         return t.won && t.cellUses == 0
-    case "aces-first":       return acesFirst(t)
-    case "kings-first":      return kingsFirst(t)
-    case "jacks-down-first": return jacksDownFirst(t)
-    case "suits-top-down":   return suitsTopDown(t)
-    case "suit-sprint":      return suitSprint(t)
-    case "down-heavy":       return downHeavy(t)
-    case "no-supermoves":    return noSupermoves(t)
-    case "split-even":       return splitEven(t)
-    case "no-down-foundation": return noDownFoundation(t)
-    case "no-up-foundation": return noUpFoundation(t)
-    case "one-big-move":     return oneBigMove(t)
-    default:                 return false
+    case "moves":          return t.won && t.moves <= (p.N ?? 0)
+    case "no-undo":        return t.won && t.undos == 0
+    case "cells-le":       return t.won && t.cellUses <= (p.N ?? 0)
+    case "max-run":        return t.won && t.maxRunMoved <= (p.N ?? 1)
+    case "big-move":       return t.won && t.maxRunMoved >= (p.N ?? 5)
+    case "split-at":       return t.won && upDown(t).u.allSatisfy { $0 == (p.R ?? 7) }
+    case "end-bias":
+        guard t.won else { return false }
+        let x = upDown(t)
+        return (p.end == "up" ? x.u : x.d).allSatisfy { $0 >= (p.min ?? 0) }
+    case "ends-first":     return t.won && endsFirstOK(t, p)
+    case "before-ace":     return t.won && beforeAceOK(t, p)
+    case "suit-top-first": return t.won && suitTopFirstOK(t, p)
+    case "suit-sprint":    return t.won && suitSprintOK(t)
+    case "rank-rush":
+        guard t.won, let at = rushCompleted(t, p.rank ?? 1) else { return false }
+        return at <= (p.N ?? 0)
+    case "suit-balance":   return t.won && maxSpread(t) <= (p.N ?? 13)
+    default:               return false
     }
 }
 
@@ -187,46 +209,80 @@ enum Grade: String { case silver, gold }
 struct Objective: Equatable {
     let id: String
     let grade: Grade
-    let param: Int      // N for 'moves'; unused (0) otherwise
+    let param: ObjParam
     let label: String
 }
 
-// FROZEN — APPEND-ONLY, NEVER REORDER (the per-day RNG indexes these). See daily.mjs.
-private let SILVER_UNIVERSAL = ["moves", "no-undo"]
-private let SILVER_CERTIFIED = ["cells-le-1", "cells-le-2", "down-openers-20", "down-heavy", "no-supermoves"]
-private let GOLD = ["no-cells", "aces-first", "kings-first", "jacks-down-first", "suits-top-down", "suit-sprint", "split-even", "no-down-foundation", "no-up-foundation", "one-big-move"]
+/// One day's objective as the baked pool states it.
+struct ObjSpec: Decodable, Equatable {
+    let id: String
+    let param: ObjParam
+}
 
-private func gradeFor(_ id: String) -> Grade { GOLD.contains(id) ? .gold : .silver }
-
-private func labelFor(_ id: String, _ param: Int) -> String {
-    switch id {
-    case "moves":            return "Win in \(param) moves or fewer"
-    case "no-undo":          return "Win without using undo"
-    case "cells-le-1":       return "Win using a free cell at most once"
-    case "cells-le-2":       return "Win using free cells at most twice"
-    case "down-openers-20":  return "Open all four down-foundations within your first 20 moves"
-    case "no-cells":         return "Win without ever using a free cell"
-    case "aces-first":       return "Send all four Aces home before any other card"
-    case "kings-first":      return "Send all four Kings to the down-foundation before any Ace"
-    case "jacks-down-first": return "Get every Jack onto the down-foundation before any Ace"
-    case "suits-top-down":   return "For every suit, send its King home before its Ace"
-    case "suit-sprint":      return "Finish one whole suit before any other suit is started"
-    case "down-heavy":       return "Take at least 8 of every suit from the King end"
-    case "no-supermoves":    return "Move one card at a time — never move a run"
-    case "split-even":       return "Split every suit exactly down the middle — A-7 up, 8-K down"
-    case "no-down-foundation": return "Win without ever using a down foundation"
-    case "no-up-foundation": return "Win without ever using an up foundation — every suit K down to A"
-    case "one-big-move":     return "Move a run of 5 or more cards in a single move"
-    default:                 return id
+private let RANK_NAME = ["", "Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen", "King"]
+private let RANK_SHORT = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+private func rankName(_ r: Int) -> String { (1...13).contains(r) ? RANK_NAME[r] : "\(r)" }
+private func rankShort(_ r: Int) -> String { (1...13).contains(r) ? RANK_SHORT[r] : "\(r)" }
+private func rankPlural(_ r: Int) -> String { r == 6 ? "Sixes" : rankName(r) + "s" }
+/// "Aces", "Aces and Twos", "Aces, Twos and Threes" — the same joiner the web copy uses.
+private func rankList(_ rs: [Int]) -> String {
+    rs.enumerated().reduce("") { acc, e in
+        acc + (e.offset == 0 ? "" : e.offset == rs.count - 1 ? " and " : ", ") + rankPlural(e.element)
     }
 }
 
-private func makeObjective(_ id: String, par: Int) -> Objective {
-    let param = id == "moves" ? Int((Double(par) * 1.2).rounded()) : 0
-    return Objective(id: id, grade: gradeFor(id), param: param, label: labelFor(id, param))
+private func gradeFor(_ id: String, _ p: ObjParam) -> Grade {
+    switch id {
+    case "cells-le":     return (p.N ?? 0) == 0 ? .gold : .silver
+    case "end-bias":     return (p.min ?? 0) >= 10 ? .gold : .silver
+    case "suit-balance": return (p.N ?? 13) <= 3 ? .gold : .silver
+    case "big-move", "split-at", "ends-first", "before-ace", "suit-top-first", "suit-sprint": return .gold
+    default:             return .silver
+    }
 }
 
-// MARK: - The deterministic date -> challenge generator
+private func labelFor(_ id: String, _ p: ObjParam) -> String {
+    switch id {
+    case "moves":   return "Win in \(p.N ?? 0) moves or fewer"
+    case "no-undo": return "Win without using undo"
+    case "cells-le":
+        let n = p.N ?? 0
+        if n == 0 { return "Win without ever using a free cell" }
+        return "Win using free cells at most \(n == 1 ? "once" : n == 2 ? "twice" : "\(n) times")"
+    case "max-run":
+        let n = p.N ?? 1
+        return n == 1 ? "Move one card at a time — never move a run" : "Never move more than \(n) cards in a single move"
+    case "big-move": return "Move a run of \(p.N ?? 5) or more cards in a single move"
+    case "split-at":
+        let r = p.R ?? 7
+        return "Split every suit exactly at the \(rankName(r)) — A-\(rankShort(r)) up, \(rankShort(r + 1))-K down"
+    case "end-bias":
+        let m = p.min ?? 0
+        if m == 13 {
+            return p.end == "up" ? "Win using only the Ace-end foundations — every suit A up to K"
+                                 : "Win using only the King-end foundations — every suit K down to A"
+        }
+        return "Take at least \(m) of every suit from the \(p.end == "up" ? "Ace" : "King") end"
+    case "ends-first":
+        let upN = p.up ?? 0, downN = p.down ?? 14
+        var parts: [String] = []
+        if upN > 0 { parts.append("all four " + rankList(Array(1...upN))) }
+        if downN < 14 { parts.append("all four " + rankList(Array((downN...13).reversed()))) }
+        return "Send \(parts.joined(separator: ", plus ")) home before any other card"
+    case "before-ace":     return "Get every \(rankName(p.rank ?? 13)) onto the King-end foundation before any Ace goes home"
+    case "suit-top-first": return "For every suit, send its \(rankName(p.rank ?? 13)) home from the King end before its Ace"
+    case "suit-sprint":    return "Finish one whole suit before any other suit is started"
+    case "rank-rush":      return "Get all four \(rankPlural(p.rank ?? 1)) home within your first \(p.N ?? 0) moves"
+    case "suit-balance":   return "Never let one suit get more than \(p.N ?? 13) cards ahead of another"
+    default:               return id
+    }
+}
+
+func makeObjective(_ spec: ObjSpec) -> Objective {
+    Objective(id: spec.id, grade: gradeFor(spec.id, spec.param), param: spec.param, label: labelFor(spec.id, spec.param))
+}
+
+// MARK: - The date -> challenge lookup
 
 struct Challenge: Equatable {
     let dayIndex: Int
@@ -236,33 +292,14 @@ struct Challenge: Equatable {
     let gold: Objective
 }
 
-/// Day D always maps to pool[D] (append-only ⇒ frozen history); a per-day RNG picks the
-/// Silver/Gold objective from what that seed is certified to support. Returns nil if D is out of
-/// the pool's current range. FROZEN rng-seed formula — never alter without a history migration.
-func dailyChallenge(_ dayIndex: Int, _ pool: [PoolSeed], pre: [PoolSeed] = DailyData.preSeeds) -> Challenge? {
-    // Day >= 0 indexes the frozen, append-only calendar. Day < 0 indexes the pre-epoch PLAYTEST
-    // SANDBOX, which is explicitly mutable — rewriting it can never disturb a day >= 0, because
-    // those indices, seeds and RNG draws are untouched. See docs/daily-objectives-proposal.md §8.
-    let rec: PoolSeed
-    if dayIndex >= 0 {
-        guard dayIndex < pool.count else { return nil }
-        rec = pool[dayIndex]
-    } else {
-        let i = -dayIndex - 1
-        guard i < pre.count else { return nil }
-        rec = pre[i]
-    }
-    var rng = Mulberry32(UInt32(truncatingIfNeeded: 0x9e37_79b9 ^ (dayIndex + 1)))
-    let silverPool = SILVER_UNIVERSAL + SILVER_CERTIFIED.filter { rec.supports.contains($0) }
-    let goldPool = GOLD.filter { rec.supports.contains($0) }
-    // Web yields `undefined` (misrenders) on an empty pool; Swift would hard-crash on the subscript.
-    // Treat "no objective available" as no challenge — the nil callers already handle for out-of-range.
-    guard !silverPool.isEmpty, !goldPool.isEmpty else { return nil }
-    let silverId = silverPool[rng.int(silverPool.count)]   // rng() call #1 (order matters — matches web)
-    let goldId = goldPool[rng.int(goldPool.count)]         // rng() call #2
+/// Day D reads pool[D] directly: the offline generator (tools/solver/build-month.mjs) chose that
+/// day's seed AND its two objectives deliberately, maximising variety across the seeded month, so
+/// there is no runtime RNG here. Returns nil outside the seeded range (no challenge that day).
+func dailyChallenge(_ dayIndex: Int, _ pool: [PoolDay]) -> Challenge? {
+    guard dayIndex >= 0, dayIndex < pool.count else { return nil }
+    let rec = pool[dayIndex]
     return Challenge(dayIndex: dayIndex, seed: rec.seed, par: rec.par,
-                     silver: makeObjective(silverId, par: rec.par),
-                     gold: makeObjective(goldId, par: rec.par))
+                     silver: makeObjective(rec.silver), gold: makeObjective(rec.gold))
 }
 
 // MARK: - Grading, accumulation, streaks
@@ -360,64 +397,30 @@ func streaks(_ records: [Int: TierResult], _ todayIndex: Int) -> Streaks {
 // scoring uses the checkers above at win.) Mirrors each checker's violation branch.
 
 func objViolated(_ obj: Objective, _ t: Attempt) -> Bool {
-    let fo = t.foundationOrder
+    let p = obj.param
     switch obj.id {
-    case "moves":    return t.moves > obj.param
+    case "moves":    return t.moves > (p.N ?? 0)
     case "no-undo":  return t.undos > 0
-    case "cells-le-1": return t.cellUses > 1
-    case "cells-le-2": return t.cellUses > 2
-    case "no-cells":   return t.cellUses > 0
-    case "aces-first":
-        var a = 0
-        for e in fo { if a >= 4 { break }; if e.rank == 1 { a += 1 } else { return true } }
-        return false
-    case "kings-first":
-        var k = 0
-        for e in fo {
-            if e.rank == 13 && e.end == "down" { k += 1 }
-            else if e.rank == 1 && e.end == "up" && k < 4 { return true }
-        }
-        return false
-    case "jacks-down-first":
-        var j = 0
-        for e in fo {
-            if e.rank == 11 && e.end == "down" { j += 1 }
-            else if e.rank == 1 && e.end == "up" && j < 4 { return true }
-        }
-        return false
-    case "suits-top-down":
-        var kd = [false, false, false, false]
-        for e in fo {
-            if e.rank == 13 && e.end == "down" { kd[e.suit] = true }
-            else if e.rank == 1 && e.end == "up" && !kd[e.suit] { return true }
-        }
-        return false
-    case "suit-sprint":
-        var home = [0, 0, 0, 0], st = [false, false, false, false]
-        for e in fo {
-            let S = e.suit
-            if !st[S] {
-                for T in 0..<4 where T != S && st[T] && home[T] < 13 { return true }
-                st[S] = true
-            }
-            home[S] += 1
-        }
-        return false
-    case "down-openers-20":
-        var k = 0
-        for e in fo where e.rank == 13 && e.end == "down" {
-            k += 1
-            if k == 4 { return e.moveIdx > 20 }
-        }
-        return t.moves > 20
-    case "split-even":       let x = upDown(t); return x.u.contains { $0 > 7 } || x.d.contains { $0 > 6 }
-    case "down-heavy":       return upDown(t).u.contains { $0 > 5 }
-    case "no-down-foundation": return upDown(t).d.contains { $0 > 0 }
-    case "no-up-foundation": return upDown(t).u.contains { $0 > 0 }
-    case "no-supermoves":    return t.maxRunMoved > 1
-    case "one-big-move":     return false   // positive goal — always still reachable
-    default:
-        return false
+    case "cells-le": return t.cellUses > (p.N ?? 0)
+    case "max-run":  return t.maxRunMoved > (p.N ?? 1)
+    case "big-move": return false                        // positive goal — always still reachable
+    case "split-at":
+        let r = p.R ?? 7, x = upDown(t)
+        return x.u.contains { $0 > r } || x.d.contains { $0 > 13 - r }
+    case "end-bias":
+        // Needing `min` of every suit from one end caps the OTHER pile at 13 - min.
+        let m = p.min ?? 0, x = upDown(t)
+        return (p.end == "up" ? x.d : x.u).contains { $0 > 13 - m }
+    case "ends-first":     return !endsFirstOK(t, p)
+    case "before-ace":     return !beforeAceOK(t, p)
+    case "suit-top-first": return !suitTopFirstOK(t, p)
+    case "suit-sprint":    return !suitSprintOK(t)
+    case "rank-rush":
+        let n = p.N ?? 0
+        if let at = rushCompleted(t, p.rank ?? 1) { return at > n }
+        return t.moves > n                               // deadline blown with cards still out
+    case "suit-balance":   return maxSpread(t) > (p.N ?? 13)
+    default:               return false
     }
 }
 
@@ -425,34 +428,44 @@ func objViolated(_ obj: Objective, _ t: Attempt) -> Bool {
 /// track" just by clearing the deal)? Achievement objectives only; the move/undo/free-cell budgets
 /// can still be blown, so they're never secured until the deal is done. UI-only hint (mirrors the
 /// web objSecured). `up`/`down` are the live foundation ranks.
+///
+/// Every case here reads live board state, so Undo un-secures a check exactly as it rewinds the
+/// board — including `big-move`, whose `maxRunMoved` Game.undo() restores from the move snapshot.
+/// That field must stay two-way: `max-run` reads the same counter, and a one-way version would make
+/// an undone 2-card move permanently fail it. The authoritative checker reads the same rolled-back
+/// value at win, so the chip always predicts the grade it will actually award.
 func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool {
     if objViolated(obj, t) { return false }
+    let p = obj.param
     switch obj.id {
-    case "aces-first":       return up.allSatisfy { $0 >= 1 }       // all four Aces home first
-    case "kings-first":      return down.allSatisfy { $0 <= 13 }    // all four Kings down before any Ace
-    case "suits-top-down":   return down.allSatisfy { $0 <= 13 }    // every suit's King down
-    case "jacks-down-first": return down.allSatisfy { $0 <= 11 }    // all four Jacks down
-    case "down-openers-20":  return down.allSatisfy { $0 <= 13 }    // all four down-foundations opened
-    case "suit-sprint":      return (0..<4).filter { down[$0] == up[$0] + 1 }.count >= 3  // ≥3 suits home (only one left; no interleave possible)
-    // Secured relative to the CURRENT line: the big move is banked for any completion from here.
-    // Undo rewinds it (Game.undo restores telem.maxRunMoved from the move snapshot) exactly as it
-    // rewinds every other case above — objSecured mirrors the board, and the authoritative checker
-    // (oneBigMove) reads the same rolled-back field at win, so the chip always predicts the grade.
-    // maxRunMoved must stay two-way: no-supermoves reads the same field, and a one-way counter
-    // would make an undone 2-card move permanently fail it.
-    case "one-big-move":     return t.maxRunMoved >= 5
-    default:                 return false   // budgets and end-restrictions — not securable until win
+    case "ends-first":
+        let upN = p.up ?? 0, downN = p.down ?? 14
+        return up.allSatisfy { $0 >= upN } && down.allSatisfy { $0 <= downN }
+    case "before-ace", "suit-top-first":
+        let r = p.rank ?? 13
+        return down.allSatisfy { $0 <= r }
+    case "suit-sprint":
+        return (0..<4).filter { down[$0] == up[$0] + 1 }.count >= 3   // only one suit left to start
+    case "rank-rush":
+        let r = p.rank ?? 1
+        return (0..<4).allSatisfy { up[$0] >= r || down[$0] <= r }    // all four already home
+    case "big-move":
+        return t.maxRunMoved >= (p.N ?? 5)
+    default:
+        return false   // budgets, split points and end-restrictions — not securable until the win
     }
 }
 
 // MARK: - Pool (baked JSON, loaded from the app bundle)
 
-struct PoolSeed: Decodable, Equatable {
+/// One seeded day: the deal plus the two objectives the offline generator picked for it.
+struct PoolDay: Decodable, Equatable {
     let seed: Int
     let par: Int
-    let supports: [String]
+    let silver: ObjSpec
+    let gold: ObjSpec
 }
-private struct PoolFile: Decodable { let seeds: [PoolSeed]; let preSeeds: [PoolSeed]? }
+private struct PoolFile: Decodable { let days: [PoolDay] }
 
 /// The baked winning lines for one seed, one per tier. `silver` is present only when the day's
 /// Silver is a certified (constraining) objective; a universal Silver falls back to `bronze`.
@@ -471,12 +484,9 @@ enum DailyData {
         return try? JSONDecoder().decode(PoolFile.self, from: data)
     }()
 
-    /// The certified seed pool for days >= 0 (the frozen calendar).
-    static let pool: [PoolSeed] = file?.seeds ?? []
-
-    /// Pre-epoch PLAYTEST SANDBOX, indexed by `-dayIndex - 1`. Explicitly mutable; empty in a
-    /// normal build. See docs/daily-objectives-proposal.md §8.
-    static let preSeeds: [PoolSeed] = file?.preSeeds ?? []
+    /// The seeded calendar: day D is `pool[D]`, day 0 = the epoch (2026-08-01). Days past the end
+    /// of this array simply have no challenge.
+    static let pool: [PoolDay] = file?.days ?? []
 
     /// Baked "Show me how to win" lines per seed (bronze/silver/gold). Empty if the resource is
     /// missing — the feature just doesn't offer itself for those seeds.

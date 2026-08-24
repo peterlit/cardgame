@@ -5,131 +5,218 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks, OBJECTIVES,
+  dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks,
+  OBJECTIVES, gradeOf, labelOf,
 } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const norm = s => s.replace(/\s+/g, ' ').trim();
 
-// a tiny fake pool: two seeds with different support sets
+// A tiny fake pool in the shipped shape: each day names its own two objectives.
 const POOL = {
-  version: 1, minSeed: 10000, seeds: [
-    { seed: 10001, par: 80, supports: ['no-cells', 'aces-first', 'kings-first', 'cells-le-2'] },
-    { seed: 10002, par: 90, supports: ['suits-top-down', 'down-openers-20'] },
+  version: 3, epoch: '2026-08-01', minSeed: 500001, maxSeed: 1000000,
+  days: [
+    { seed: 500123, par: 80, silver: { id: 'cells-le', param: { N: 2 } }, gold: { id: 'split-at', param: { R: 9 } } },
+    { seed: 900456, par: 90, silver: { id: 'moves', param: { N: 99 } }, gold: { id: 'ends-first', param: { up: 2, down: 12 } } },
+    // day 2 pairs a universal Silver with a counter-based Gold, so the grading tests below can
+    // drive both tiers straight from the plain telemetry counters.
+    { seed: 777777, par: 80, silver: { id: 'moves', param: { N: 96 } }, gold: { id: 'cells-le', param: { N: 0 } } },
   ],
 };
 
 const f = (suit, rank, end, moveIdx) => ({ suit, rank, end, moveIdx });
+const base = over => ({ won: true, moves: 50, elapsed: 60, cellUses: 0, undos: 0, usedAutoplay: false, usedAutoFinish: false, maxRunMoved: 0, foundationOrder: [], ...over });
+const ev = (id, param, t) => evaluate({ id, param }, t);
+// A complete, legal foundation stream: every suit takes A..split from the up end and K..split+1
+// from the down end, ups first then downs. `order` may reshuffle the events.
+const fullStream = (split = [7, 7, 7, 7]) => {
+  const out = [];
+  let i = 0;
+  for (let s = 0; s < 4; s++) for (let r = 1; r <= split[s]; r++) out.push(f(s, r, 'up', ++i));
+  for (let s = 0; s < 4; s++) for (let r = 13; r > split[s]; r--) out.push(f(s, r, 'down', ++i));
+  return out;
+};
 
 /* ---------- calendar ---------- */
-test('day index: launch epoch is 0 and days advance by one', () => {
-  assert.equal(dayIndexFor(2026, 8, 12), 0);
-  assert.equal(dayIndexFor(2026, 8, 13), 1);
-  assert.equal(dayIndexFor(2026, 9, 11), 30);
-  assert.equal(dayIndexFor(2026, 8, 11), -1);   // before launch
+test('day index: the launch epoch is 2026-08-01 = day 0, and days advance by one', () => {
+  assert.equal(dayIndexFor(2026, 8, 1), 0);
+  assert.equal(dayIndexFor(2026, 8, 2), 1);
+  assert.equal(dayIndexFor(2026, 8, 31), 30);
+  assert.equal(dayIndexFor(2026, 9, 1), 31);
+  assert.equal(dayIndexFor(2026, 7, 31), -1);
 });
 
-/* ---------- generator: deterministic, stable, in-range ---------- */
-test('dailyChallenge is deterministic and maps day D to pool.seeds[D]', () => {
-  const a = dailyChallenge(0, POOL), b = dailyChallenge(0, POOL);
-  assert.deepEqual(a, b);
-  assert.equal(a.seed, 10001);
-  assert.equal(dailyChallenge(1, POOL).seed, 10002);
-  assert.equal(dailyChallenge(2, POOL), null);    // out of range (not available yet)
+/* ---------- the day -> challenge lookup ---------- */
+test('dailyChallenge reads the day straight out of the pool, with labels resolved', () => {
+  const c = dailyChallenge(0, POOL);
+  assert.equal(c.seed, 500123);
+  assert.equal(c.par, 80);
+  assert.equal(c.silver.id, 'cells-le');
+  assert.deepEqual(c.silver.param, { N: 2 });
+  assert.equal(c.silver.label, 'Win using free cells at most twice');
+  assert.equal(c.gold.label, 'Split every suit exactly at the Nine — A-9 up, 10-K down');
+  assert.equal(c.gold.grade, 'gold');
+  assert.equal(c.silver.grade, 'silver');
 });
 
-test('generator only offers objectives the seed is certified to support', () => {
-  const c0 = dailyChallenge(0, POOL);
-  assert.ok(['no-cells', 'aces-first', 'kings-first'].includes(c0.gold.id));   // gold in supports
-  const c1 = dailyChallenge(1, POOL);
-  assert.equal(c1.gold.id, 'suits-top-down');    // the only gold this seed supports
+test('dailyChallenge is nil outside the seeded month (no challenge before or after)', () => {
+  assert.equal(dailyChallenge(-1, POOL), null);
+  assert.equal(dailyChallenge(3, POOL), null);
+  assert.equal(dailyChallenge(400, POOL), null);
 });
 
-test('appending to the pool never shifts a past day (frozen history)', () => {
-  const before = dailyChallenge(0, POOL);
-  const grown = { ...POOL, seeds: [...POOL.seeds, { seed: 10099, par: 70, supports: ['no-cells'] }] };
-  assert.deepEqual(dailyChallenge(0, grown), before);
+test('a day is stable: the same index always yields the same seed and objectives', () => {
+  assert.deepEqual(dailyChallenge(1, POOL), dailyChallenge(1, POOL));
 });
 
-/* ---------- GOLDEN MASTER: frozen (dayIndex, fixed-pool) -> (silverId, goldId) ---------- */
-// Pins the objective-selection outcome for a FIXED inline pool. It depends on the ordering/contents
-// of SILVER_UNIVERSAL/SILVER_CERTIFIED/GOLD *and* the rng seed formula in daily.mjs. If anyone
-// reorders or mid-array-inserts into those FROZEN arrays, or changes the seed formula, a pinned
-// day's pick shifts and this test fails — catching a silent retroactive reshuffle of history.
-const FROZEN_POOL = {
-  version: 1, minSeed: 10000, seeds: [
-    { seed: 10001, par: 80,  supports: ['no-cells', 'aces-first', 'kings-first', 'cells-le-2'] },
-    { seed: 10002, par: 90,  supports: ['suits-top-down', 'down-openers-20'] },
-    { seed: 10003, par: 100, supports: ['no-cells', 'suit-sprint', 'jacks-down-first', 'cells-le-1', 'down-openers-20'] },
-  ],
-};
-const GOLDEN_PICKS = [
-  { day: 0, seed: 10001, silverId: 'moves',           goldId: 'no-cells' },
-  { day: 1, seed: 10002, silverId: 'no-undo',         goldId: 'suits-top-down' },
-  { day: 2, seed: 10003, silverId: 'down-openers-20', goldId: 'no-cells' },
-];
+/* ---------- grades and labels are functions of the PARAMETER ---------- */
+test('a family grades and labels itself from its parameter', () => {
+  assert.equal(gradeOf('cells-le', { N: 0 }), 'gold');      // never touching a cell is a Gold
+  assert.equal(gradeOf('cells-le', { N: 2 }), 'silver');
+  assert.equal(gradeOf('end-bias', { end: 'up', min: 13 }), 'gold');
+  assert.equal(gradeOf('end-bias', { end: 'up', min: 8 }), 'silver');
+  assert.equal(gradeOf('suit-balance', { N: 3 }), 'gold');
+  assert.equal(gradeOf('suit-balance', { N: 5 }), 'silver');
 
-test('golden master: frozen days map to frozen (seed, silverId, goldId) picks', () => {
-  for (const g of GOLDEN_PICKS) {
-    const c = dailyChallenge(g.day, FROZEN_POOL);
-    assert.equal(c.seed, g.seed, `day ${g.day} seed`);
-    assert.equal(c.silver.id, g.silverId, `day ${g.day} silver`);
-    assert.equal(c.gold.id, g.goldId, `day ${g.day} gold`);
+  assert.equal(labelOf('cells-le', { N: 0 }), 'Win without ever using a free cell');
+  assert.equal(labelOf('cells-le', { N: 1 }), 'Win using free cells at most once');
+  assert.equal(labelOf('cells-le', { N: 3 }), 'Win using free cells at most 3 times');
+  assert.equal(labelOf('max-run', { N: 1 }), 'Move one card at a time — never move a run');
+  assert.equal(labelOf('max-run', { N: 3 }), 'Never move more than 3 cards in a single move');
+  assert.equal(labelOf('ends-first', { up: 1, down: 14 }), 'Send all four Aces home before any other card');
+  assert.equal(labelOf('ends-first', { up: 0, down: 13 }), 'Send all four Kings home before any other card');
+  assert.equal(labelOf('ends-first', { up: 2, down: 12 }),
+    'Send all four Aces and Twos, plus all four Kings and Queens home before any other card');
+  assert.equal(labelOf('ends-first', { up: 3, down: 14 }), 'Send all four Aces, Twos and Threes home before any other card');
+  assert.equal(labelOf('end-bias', { end: 'down', min: 13 }), 'Win using only the King-end foundations — every suit K down to A');
+  assert.equal(labelOf('end-bias', { end: 'up', min: 9 }), 'Take at least 9 of every suit from the Ace end');
+  assert.equal(labelOf('rank-rush', { rank: 6, N: 18 }), 'Get all four Sixes home within your first 18 moves');
+  assert.equal(labelOf('before-ace', { rank: 12 }), 'Get every Queen onto the King-end foundation before any Ace goes home');
+});
+
+test('every objective in the catalogue produces a label and a grade for a plausible parameter', () => {
+  const sample = { N: 2, R: 7, rank: 13, min: 9, up: 1, down: 13, end: 'up' };
+  for (const id of Object.keys(OBJECTIVES)) {
+    const label = labelOf(id, sample);
+    assert.ok(label && label !== id, `${id} has no label`);
+    assert.ok(['silver', 'gold'].includes(gradeOf(id, sample)), `${id} has no grade`);
   }
 });
 
-test('the move-cap objective derives N from par', () => {
-  const p = OBJECTIVES['moves'].param({ par: 100 });
-  assert.equal(p.N, 120);
-  assert.equal(OBJECTIVES['moves'].check({ won: true, moves: 120 }, p), true);
-  assert.equal(OBJECTIVES['moves'].check({ won: true, moves: 121 }, p), false);
-});
-
 /* ---------- objective checkers vs telemetry fixtures ---------- */
-const base = over => ({ won: true, moves: 50, elapsed: 60, cellUses: 0, undos: 0, usedAutoplay: false, usedAutoFinish: false, foundationOrder: [], ...over });
-
-test('aces-first passes only when the first four foundation cards are the Aces', () => {
-  const good = base({ foundationOrder: [f(0, 1, 'up', 1), f(1, 1, 'up', 2), f(2, 1, 'up', 3), f(3, 1, 'up', 4), f(0, 2, 'up', 5)] });
-  const bad = base({ foundationOrder: [f(0, 1, 'up', 1), f(0, 2, 'up', 2), f(1, 1, 'up', 3)] });   // a 2 before all aces
-  assert.equal(evaluate({ id: 'aces-first', param: {} }, good), true);
-  assert.equal(evaluate({ id: 'aces-first', param: {} }, bad), false);
+test('cells-le / max-run / big-move read their counters against the parameter', () => {
+  assert.equal(ev('cells-le', { N: 0 }, base({ cellUses: 0 })), true);
+  assert.equal(ev('cells-le', { N: 0 }, base({ cellUses: 1 })), false);
+  assert.equal(ev('cells-le', { N: 3 }, base({ cellUses: 3 })), true);
+  assert.equal(ev('cells-le', { N: 3 }, base({ cellUses: 4 })), false);
+  assert.equal(ev('max-run', { N: 1 }, base({ maxRunMoved: 1 })), true);
+  assert.equal(ev('max-run', { N: 1 }, base({ maxRunMoved: 2 })), false);
+  assert.equal(ev('max-run', { N: 3 }, base({ maxRunMoved: 3 })), true);
+  assert.equal(ev('big-move', { N: 5 }, base({ maxRunMoved: 5 })), true);
+  assert.equal(ev('big-move', { N: 6 }, base({ maxRunMoved: 5 })), false);
+  assert.equal(ev('big-move', { N: 5 }, base({ maxRunMoved: 9 })), true);
+  // a missing maxRunMoved (an older saved attempt) reads as zero, not as a pass
+  assert.equal(ev('big-move', { N: 5 }, base({ maxRunMoved: undefined })), false);
+  assert.equal(ev('max-run', { N: 1 }, base({ maxRunMoved: undefined })), true);
 });
 
-test('kings-first: no Ace up before all four Kings are down', () => {
-  const good = base({ foundationOrder: [f(0, 13, 'down', 1), f(1, 13, 'down', 2), f(2, 13, 'down', 3), f(3, 13, 'down', 4), f(0, 1, 'up', 5)] });
-  const bad = base({ foundationOrder: [f(0, 13, 'down', 1), f(0, 1, 'up', 2)] });
-  assert.equal(evaluate({ id: 'kings-first', param: {} }, good), true);
-  assert.equal(evaluate({ id: 'kings-first', param: {} }, bad), false);
+test('split-at passes only at exactly its split point', () => {
+  assert.equal(ev('split-at', { R: 7 }, base({ foundationOrder: fullStream([7, 7, 7, 7]) })), true);
+  assert.equal(ev('split-at', { R: 9 }, base({ foundationOrder: fullStream([9, 9, 9, 9]) })), true);
+  assert.equal(ev('split-at', { R: 9 }, base({ foundationOrder: fullStream([9, 9, 9, 8]) })), false);
+  assert.equal(ev('split-at', { R: 7 }, base({ foundationOrder: fullStream([9, 9, 9, 9]) })), false);
 });
 
-test('suits-top-down: each suit\'s King down before its Ace up', () => {
+test('end-bias counts how much of every suit came from the named end', () => {
+  const t = base({ foundationOrder: fullStream([3, 3, 4, 3]) });   // 3-4 up, 9-10 down per suit
+  assert.equal(ev('end-bias', { end: 'down', min: 9 }, t), true);
+  assert.equal(ev('end-bias', { end: 'down', min: 10 }, t), false);   // one suit only took 9 down
+  assert.equal(ev('end-bias', { end: 'up', min: 3 }, t), true);
+  assert.equal(ev('end-bias', { end: 'up', min: 4 }, t), false);
+  // min = 13 is the one-end game
+  assert.equal(ev('end-bias', { end: 'up', min: 13 }, base({ foundationOrder: fullStream([13, 13, 13, 13]) })), true);
+  assert.equal(ev('end-bias', { end: 'down', min: 13 }, base({ foundationOrder: fullStream([0, 0, 0, 0]) })), true);
+  assert.equal(ev('end-bias', { end: 'down', min: 13 }, base({ foundationOrder: fullStream([1, 0, 0, 0]) })), false);
+});
+
+test('ends-first: the required cards come home first, and nothing else may jump the queue', () => {
+  const p = { up: 2, down: 13 };
+  const prefix = [];
+  let i = 0;
+  for (let s = 0; s < 4; s++) prefix.push(f(s, 1, 'up', ++i));
+  for (let s = 0; s < 4; s++) prefix.push(f(s, 2, 'up', ++i));
+  for (let s = 0; s < 4; s++) prefix.push(f(s, 13, 'down', ++i));
+  assert.equal(ev('ends-first', p, base({ foundationOrder: [...prefix, f(0, 3, 'up', 99)] })), true);
+  // a 3 before the prefix is complete fails
+  const jumped = [...prefix.slice(0, 7), f(0, 3, 'up', 8), ...prefix.slice(7)];
+  assert.equal(ev('ends-first', p, base({ foundationOrder: jumped })), false);
+  // Aces-only is the same family with no King-end requirement
+  assert.equal(ev('ends-first', { up: 1, down: 14 },
+    base({ foundationOrder: [f(0, 1, 'up', 1), f(1, 1, 'up', 2), f(2, 1, 'up', 3), f(3, 1, 'up', 4), f(0, 2, 'up', 5)] })), true);
+  assert.equal(ev('ends-first', { up: 1, down: 14 },
+    base({ foundationOrder: [f(0, 1, 'up', 1), f(0, 2, 'up', 2), f(1, 1, 'up', 3)] })), false);
+});
+
+test('before-ace: every card of that rank is down before ANY Ace goes up', () => {
+  const good = base({ foundationOrder: [f(0, 12, 'down', 1), f(1, 12, 'down', 2), f(2, 12, 'down', 3), f(3, 12, 'down', 4), f(0, 1, 'up', 5)] });
+  const bad = base({ foundationOrder: [f(0, 12, 'down', 1), f(0, 1, 'up', 2)] });
+  assert.equal(ev('before-ace', { rank: 12 }, good), true);
+  assert.equal(ev('before-ace', { rank: 12 }, bad), false);
+});
+
+test('suit-top-first is the PER-SUIT version: this suit\'s card down before this suit\'s Ace', () => {
   const good = base({ foundationOrder: [f(0, 13, 'down', 1), f(0, 1, 'up', 2), f(1, 13, 'down', 3), f(1, 1, 'up', 4)] });
-  const bad = base({ foundationOrder: [f(0, 1, 'up', 1)] });   // ace up, king not down
-  assert.equal(evaluate({ id: 'suits-top-down', param: {} }, good), true);
-  assert.equal(evaluate({ id: 'suits-top-down', param: {} }, bad), false);
+  const bad = base({ foundationOrder: [f(0, 13, 'down', 1), f(1, 1, 'up', 2)] });   // hearts' Ace, hearts' King still out
+  assert.equal(ev('suit-top-first', { rank: 13 }, good), true);
+  assert.equal(ev('suit-top-first', { rank: 13 }, bad), false);
+  // the same stream fails a deeper requirement (Jack down, not just King)
+  assert.equal(ev('suit-top-first', { rank: 11 }, good), false);
 });
 
 test('suit-sprint: finish one suit before a second is started', () => {
   const seq = [];
   for (let r = 1; r <= 13; r++) seq.push(f(0, r, 'up', r));   // whole spade suit first
   seq.push(f(1, 1, 'up', 14));                                // then start hearts
-  const good = base({ foundationOrder: seq });
-  const bad = base({ foundationOrder: [f(0, 1, 'up', 1), f(1, 1, 'up', 2)] });   // second suit before first done
-  assert.equal(evaluate({ id: 'suit-sprint', param: {} }, good), true);
-  assert.equal(evaluate({ id: 'suit-sprint', param: {} }, bad), false);
+  assert.equal(ev('suit-sprint', {}, base({ foundationOrder: seq })), true);
+  assert.equal(ev('suit-sprint', {}, base({ foundationOrder: [f(0, 1, 'up', 1), f(1, 1, 'up', 2)] })), false);
 });
 
-test('resource checkers: no-cells, cells-le-2, no-undo, down-openers-20', () => {
-  assert.equal(evaluate({ id: 'no-cells', param: {} }, base({ cellUses: 0 })), true);
-  assert.equal(evaluate({ id: 'no-cells', param: {} }, base({ cellUses: 1 })), false);
-  assert.equal(evaluate({ id: 'cells-le-2', param: {} }, base({ cellUses: 2 })), true);
-  assert.equal(evaluate({ id: 'cells-le-2', param: {} }, base({ cellUses: 3 })), false);
-  assert.equal(evaluate({ id: 'no-undo', param: {} }, base({ undos: 0 })), true);
-  assert.equal(evaluate({ id: 'no-undo', param: {} }, base({ undos: 1 })), false);
-  const opened = base({ foundationOrder: [f(0, 13, 'down', 5), f(1, 13, 'down', 9), f(2, 13, 'down', 12), f(3, 13, 'down', 18)] });
-  assert.equal(evaluate({ id: 'down-openers-20', param: {} }, opened), true);
-  const late = base({ foundationOrder: [f(0, 13, 'down', 5), f(1, 13, 'down', 9), f(2, 13, 'down', 12), f(3, 13, 'down', 25)] });
-  assert.equal(evaluate({ id: 'down-openers-20', param: {} }, late), false);
+test('rank-rush: all four of the rank home, from either end, inside the deadline', () => {
+  const stream = [f(0, 13, 'down', 3), f(1, 13, 'down', 7), f(2, 13, 'down', 11), f(3, 13, 'down', 16), f(0, 12, 'down', 20)];
+  assert.equal(ev('rank-rush', { rank: 13, N: 16 }, base({ foundationOrder: stream })), true);
+  assert.equal(ev('rank-rush', { rank: 13, N: 15 }, base({ foundationOrder: stream })), false);
+  // only three of the four arrive -> never satisfied
+  assert.equal(ev('rank-rush', { rank: 13, N: 40 }, base({ foundationOrder: stream.slice(0, 3) })), false);
+  // either end counts: an Ace-end rush
+  const aces = [f(0, 1, 'up', 2), f(1, 1, 'up', 4), f(2, 1, 'up', 5), f(3, 1, 'up', 9)];
+  assert.equal(ev('rank-rush', { rank: 1, N: 9 }, base({ foundationOrder: aces })), true);
+});
+
+test('suit-balance: no suit may run more than N ahead at any point', () => {
+  const even = [];
+  let i = 0;
+  for (let r = 1; r <= 4; r++) for (let s = 0; s < 4; s++) even.push(f(s, r, 'up', ++i));   // round-robin
+  assert.equal(ev('suit-balance', { N: 1 }, base({ foundationOrder: even })), true);
+  const greedy = [];
+  i = 0;
+  for (let r = 1; r <= 6; r++) greedy.push(f(0, r, 'up', ++i));                             // one suit races ahead
+  assert.equal(ev('suit-balance', { N: 5 }, base({ foundationOrder: greedy })), false);
+  assert.equal(ev('suit-balance', { N: 6 }, base({ foundationOrder: greedy })), true);
+});
+
+test('the universal families read the plain counters', () => {
+  assert.equal(ev('moves', { N: 120 }, base({ moves: 120 })), true);
+  assert.equal(ev('moves', { N: 120 }, base({ moves: 121 })), false);
+  assert.equal(ev('no-undo', {}, base({ undos: 0 })), true);
+  assert.equal(ev('no-undo', {}, base({ undos: 1 })), false);
+});
+
+test('nothing passes without the win', () => {
+  const lost = over => base({ won: false, ...over });
+  assert.equal(ev('cells-le', { N: 3 }, lost({ cellUses: 0 })), false);
+  assert.equal(ev('split-at', { R: 7 }, lost({ foundationOrder: fullStream() })), false);
+  assert.equal(ev('rank-rush', { rank: 13, N: 40 }, lost({ foundationOrder: [f(0, 13, 'down', 1), f(1, 13, 'down', 2), f(2, 13, 'down', 3), f(3, 13, 'down', 4)] })), false);
+  assert.equal(ev('suit-sprint', {}, lost({ foundationOrder: [] })), false);
 });
 
 test('a lost game earns no tier', () => {
@@ -148,7 +235,7 @@ test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts'
 });
 
 test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, best moves/time)', () => {
-  const challenge = dailyChallenge(0, POOL);   // silver 'moves' (N=96), gold 'no-cells'
+  const challenge = dailyChallenge(2, POOL);   // silver moves{N:96}, gold cells-le{N:0}
   // A: wins silver (few moves, no-cells fails via a cell use), slower.
   const telemetryA = base({ won: true, moves: 90, elapsed: 240, cellUses: 1 });
   // B: wins gold (no cells), more moves, faster.
@@ -174,7 +261,7 @@ test('mergeTiers never loses a tier already earned on a later worse attempt', ()
 
 /* ---------- flawless (all three tiers in one attempt) ---------- */
 test('evaluateChallenge marks flawless only when a single attempt earns all three', () => {
-  const ch = dailyChallenge(0, POOL);   // silver 'moves' N=96, gold 'no-cells'
+  const ch = dailyChallenge(2, POOL);   // silver moves{N:96}, gold cells-le{N:0}
   const all = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 0 }));   // silver + gold in one run
   assert.equal(all.flawless, true);
   const partial = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 1 }));   // gold fails (used a cell)
@@ -182,7 +269,7 @@ test('evaluateChallenge marks flawless only when a single attempt earns all thre
 });
 
 test('flawless is NOT earned by banking silver and gold across two attempts', () => {
-  const ch = dailyChallenge(0, POOL);
+  const ch = dailyChallenge(2, POOL);
   const silverOnly = evaluateChallenge(ch, base({ won: true, moves: 90, cellUses: 1 }));   // silver, not gold
   const goldOnly   = evaluateChallenge(ch, base({ won: true, moves: 200, cellUses: 0 }));  // gold, not silver
   const day = mergeTiers(mergeTiers(undefined, silverOnly), goldOnly);
@@ -231,30 +318,6 @@ test('streaks count a day completed yesterday (today not yet played)', () => {
 });
 
 /* ---------- pre-epoch playtest sandbox (negative day indices) ---------- */
-test('negative day indices resolve to preSeeds, and never disturb days >= 0', () => {
-  const seedsOnly = { seeds: [
-    { seed: 10001, par: 100, supports: ['no-cells', 'cells-le-1'] },
-    { seed: 10002, par: 100, supports: ['kings-first'] },
-  ] };
-  const withPre = { ...seedsOnly, preSeeds: [
-    { seed: 555001, par: 90, supports: ['aces-first', 'cells-le-2'] },
-    { seed: 555002, par: 90, supports: ['suits-top-down'] },
-  ] };
-  // days >= 0 are byte-identical whether or not a sandbox exists — the whole safety claim
-  for (let d = 0; d < seedsOnly.seeds.length; d++) {
-    assert.deepEqual(dailyChallenge(d, withPre), dailyChallenge(d, seedsOnly));
-  }
-  // preSeeds[i] backs day -(i+1)
-  assert.equal(dailyChallenge(-1, withPre).seed, 555001);
-  assert.equal(dailyChallenge(-2, withPre).seed, 555002);
-  // out of sandbox range, and no sandbox at all, both yield null
-  assert.equal(dailyChallenge(-3, withPre), null);
-  assert.equal(dailyChallenge(-1, seedsOnly), null);
-  // a sandbox day is a real challenge: objectives drawn from that seed's supports
-  const c = dailyChallenge(-1, withPre);
-  assert.ok(['aces-first', 'cells-le-2'].includes(c.gold.id) || c.gold.id === 'aces-first');
-  assert.ok(c.silver.id && c.gold.id);
-});
 
 /* ---------- DRIFT GUARD: the web app inlines this logic; assert it hasn't diverged ---------- */
 // The daily logic is inlined into index.html (file:// can't import modules). Pin distinctive bodies
@@ -262,30 +325,32 @@ test('negative day indices resolve to preSeeds, and never disturb days >= 0', ()
 test('daily logic is inlined verbatim in index.html (no drift)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   const canon = [
-    'const acesFirst=t=>{let a=0;for(const e of t.foundationOrder){if(a>=4)break;if(e.rank===1)a++;else return false;}return t.won&&a===4;};',
-    'const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")k++;else if(e.rank===1&&e.end==="up"&&k<4)return false;}return t.won;};',
-    'const jacksDownFirst=t=>{let j=0;for(const e of t.foundationOrder){if(e.rank===11&&e.end==="down")j++;else if(e.rank===1&&e.end==="up"&&j<4)return false;}return t.won;};',
-    'const suitsTopDown=t=>{const kd=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")kd[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!kd[e.suit])return false;}return t.won;};',
-    'const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};',
-    'const downOpeners20=t=>{let k=0,opened=null;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down"){k++;if(k===4){opened=e.moveIdx;break;}}}return t.won&&opened!=null&&opened<=20;};',
-    'const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);',
-    'const silverPool=SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id=>rec.supports.includes(id)));',
-    'const goldPool=GOLD.filter(id=>rec.supports.includes(id));',
-    'const silverId=silverPool[Math.floor(rng()*silverPool.length)];',
-    'const EPOCH_DAYS=daysFromCivil(2026,8,12);',
-    'const dayIndexFor=(y,m,d)=>daysFromCivil(y,m,d)-EPOCH_DAYS;',
+    'const EPOCH_DAYS=daysFromCivil(2026,8,1);',
+    'const upDown=t=>{const u=[0,0,0,0],d=[0,0,0,0];for(const e of t.foundationOrder){if(e.end==="up")u[e.suit]++;else d[e.suit]++;}return{u,d};};',
+    'const endsFirst=(t,p)=>{const u=[0,0,0,0],d=[14,14,14,14];const met=()=>u.every(x=>x>=p.up)&&d.every(x=>x<=p.down);',
+    'const beforeAce=(t,p)=>{let n=0;for(const e of t.foundationOrder){if(e.rank===p.rank&&e.end==="down")n++;else if(e.rank===1&&e.end==="up"&&n<4)return false;}return t.won;};',
+    'const suitTopFirst=(t,p)=>{const down=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===p.rank&&e.end==="down")down[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!down[e.suit])return false;}return t.won;};',
+    'const rankRush=(t,p)=>{const seen=[false,false,false,false];let n=0;for(const e of t.foundationOrder){if(e.rank!==p.rank||seen[e.suit])continue;seen[e.suit]=true;if(++n===4)return t.won&&e.moveIdx<=p.N;}return false;};',
+    'const suitBalance=(t,p)=>t.won&&foldHome(t,(_e,home)=>Math.max(...home)-Math.min(...home)<=p.N);',
+    "'cells-le':{grade:p=>p.N===0?'gold':'silver',",
+    "'split-at':{grade:'gold',label:p=>`Split every suit exactly at the ${rankName(p.R)} — A-${rankShort(p.R)} up, ${rankShort(p.R+1)}-K down`,",
+    "check:(t,p)=>{if(!t.won)return false;const{u,d}=upDown(t);return (p.end==='up'?u:d).every(x=>x>=p.min);}},",
+    'function gradeOf(id,param){const g=OBJECTIVES[id].grade;return typeof g==="function"?g(param):g;}'.replace(/"/g, "'"),
+    'return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(rec.silver),gold:makeObjective(rec.gold)};',
     'const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold)};',
-    'moves:Math.min(p.moves??Infinity,attempt.moves??Infinity)',
-    'flawless:!!p.flawless||!!attempt.flawless',
-    'while(i!=null&&has(i,tier)){cur++;i--;}',
-    "return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};",
-    // new objective families (A1/A2/B3/B4/F1/F2) — pin the distinctive bodies
-    'const splitEven=t=>t.won&&upDown(t).u.every(x=>x===7);',
-    'const downHeavy=t=>t.won&&upDown(t).u.every(x=>x<=5);',
-    'const noDownFoundation=t=>t.won&&upDown(t).d.every(x=>x===0);',
-    'const noUpFoundation=t=>t.won&&upDown(t).u.every(x=>x===0);',
-    'const noSupermoves=t=>t.won&&(t.maxRunMoved??0)<=1;',
-    'const oneBigMove=t=>t.won&&(t.maxRunMoved??0)>=5;',
+    'flawless:!!p.flawless||!!attempt.flawless,',
+    'let i=played(todayIndex)?todayIndex:(played(todayIndex-1)?todayIndex-1:null); let cur=0;',
   ];
   for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
+});
+
+// The whole calendar was recut for August 2026; a stored record from before it names a different
+// challenge, so both platforms must drop a pre-v2 store rather than credit tiers never earned.
+test('both platforms gate the daily store on version 2 (the recut nukes older history)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  assert.ok(html.includes(norm('if(g&&g.days&&g.version===2) return g;')), 'web daily store is not v2-gated');
+  assert.ok(html.includes(norm('return {version:2, days:{}};')), 'web daily store does not reset to v2');
+  const swift = norm(readFileSync(join(REPO, 'ios/Causeway/Causeway/Model/DailyStore.swift'), 'utf8'));
+  assert.ok(swift.includes(norm('private let version = 2')), 'iOS daily store is not v2');
+  assert.ok(swift.includes(norm('guard decoded.version == version else {')), 'iOS daily store does not drop older versions');
 });

@@ -92,14 +92,12 @@ struct ContentView: View {
     /// the engine can actually deal. Gates the alert's `Play`.
     ///
     /// Previously this was a bare `if let n = Int(dealText) { game.deal(seed: n) }` against a field
-    /// advertising "1–1,000,000": `Game.deal` silently clamped 5,000,000,000 to 4,294,967,295 and
-    /// dealt a DIFFERENT board from the one typed, with no message (bug/WF-7). The bound is
-    /// `maxValidSeed`, NOT `maxSeed`: `maxSeed` is only the random-deal ceiling, and the
-    /// daily/sandbox pools legitimately deal seeds far above it — clamping the entry there would
-    /// make a won sandbox deal (e.g. #872,465,152, which the Wins list shows) untypeable.
+    /// advertising "1–1,000,000": `Game.deal` silently clamped an out-of-range entry and dealt a
+    /// DIFFERENT board from the one typed, with no message (bug/WF-7). Now the field, the hint and
+    /// `Game.deal` all agree on one ceiling, `Game.maxSeed`.
     private var enteredSeed: Int? {
         guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)),
-              n >= 1, n <= Game.maxValidSeed else { return nil }
+              n >= 1, n <= Game.maxSeed else { return nil }
         return n
     }
 

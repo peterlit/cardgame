@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import {
   isSeqHead, canStackTableau, maxMovable, legalMoves, applyMove, isWon,
 } from '../tools/solver/rules.mjs';
-import { solve, objective, dealState, certify, isDailyEligible, CERTIFIED } from '../tools/solver/solve.mjs';
+import { solve, objective, dealState, certify, isDailyEligible, VARIANTS, variantKey, isGold, rankHome } from '../tools/solver/solve.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '..');
@@ -74,8 +74,8 @@ test('maxMovable = (freeCells+1) * 2^emptyCols, minus the target if it is an emp
 
 test('legalMoves omits cell moves when the cell budget is exhausted (no-cells)', () => {
   const s = { tableau: [[C(0, 5)], [], [], [], [], [], [], []], cells: [null, null, null], up: [0, 0, 0, 0], down: [14, 14, 14, 14] };
-  const withCells = legalMoves(s, 0, objective('cells-le-2'));
-  const noCells = legalMoves(s, 0, objective('no-cells'));
+  const withCells = legalMoves(s, 0, objective('cells-le', { N: 2 }));
+  const noCells = legalMoves(s, 0, objective('cells-le', { N: 0 }));
   assert.ok(withCells.some(m => m.k === 'C'));
   assert.ok(!noCells.some(m => m.k === 'C'));
 });
@@ -94,22 +94,62 @@ test('solve: a valid near-win that needs a maneuver first (Q♦ off K♠, then c
 });
 
 /* ---------- certification (real deals; kept cheap) ---------- */
-test('a real deal above 10,000 is winnable with a sane par', () => {
-  const r = solve(dealState(10002), objective('unconstrained'), { budget: 300000 });
+test('a real deal from the daily range is winnable with a sane par', () => {
+  const r = solve(dealState(700001), objective('unconstrained'), { budget: 300000 });
   assert.equal(r.solved, true);
   assert.ok(r.par > 52 && r.par < 200, `par ${r.par}`);   // >= 52 foundation moves, plus maneuvering
 });
 
-test('constraint solves obey the constraint by construction (no-cells uses zero cells)', () => {
-  // If no-cells is solvable for a seed, the search literally never emits a cell move, so a win is a
-  // cells-free win. Assert it solves for a seed known to support it.
-  const r = solve(dealState(10002), objective('no-cells'), { budget: 300000 });
+test('constraint solves obey the constraint by construction (cells-le{0} uses zero cells)', () => {
+  // If cells-le{0} is solvable for a seed, the search literally never emits a cell move, so a win
+  // is a cells-free win. Assert it solves for a seed known to support it.
+  const r = solve(dealState(700001), objective('cells-le', { N: 0 }), { budget: 300000 });
   assert.equal(r.solved, true);
 });
 
-test('isDailyEligible requires a Gold-grade objective; CERTIFIED has no vacuous entries', () => {
+test('the parameterised gates admit exactly what their checker admits', () => {
+  const st = { up: [0, 0, 0, 0], down: [14, 14, 14, 14] };
+  const card = (suit, rank) => ({ suit, rank });
+  // split-at{7}: A-7 may only go up, 8-K may only go down.
+  const split = objective('split-at', { R: 7 });
+  assert.equal(split.allowFoundation(st, card(0, 7), 'up'), true);
+  assert.equal(split.allowFoundation(st, card(0, 8), 'up'), false);
+  assert.equal(split.allowFoundation(st, card(0, 8), 'down'), true);
+  assert.equal(split.allowFoundation(st, card(0, 7), 'down'), false);
+  // end-bias{up,9}: at least 9 per suit from the Ace end => the down pile may take at most 4,
+  // i.e. nothing below the Ten.
+  const bias = objective('end-bias', { end: 'up', min: 9 });
+  assert.equal(bias.allowFoundation(st, card(0, 10), 'down'), true);
+  assert.equal(bias.allowFoundation(st, card(0, 9), 'down'), false);
+  assert.equal(bias.allowFoundation(st, card(0, 13), 'up'), true);   // up end is unconstrained
+  // ends-first{up:1,down:13}: only Aces up and Kings down until every suit has both.
+  const ends = objective('ends-first', { up: 1, down: 13 });
+  assert.equal(ends.allowFoundation(st, card(0, 1), 'up'), true);
+  assert.equal(ends.allowFoundation(st, card(0, 13), 'down'), true);
+  assert.equal(ends.allowFoundation(st, card(0, 2), 'up'), false);
+  const met = { up: [1, 1, 1, 1], down: [13, 13, 13, 13] };
+  assert.equal(ends.allowFoundation(met, card(0, 2), 'up'), true);   // prefix satisfied, gate opens
+  // suit-balance{2}: a suit may not run more than 2 ahead of another.
+  const bal = objective('suit-balance', { N: 2 });
+  assert.equal(bal.allowFoundation({ up: [2, 0, 0, 0], down: [14, 14, 14, 14] }, card(0, 3), 'up'), false);
+  assert.equal(bal.allowFoundation({ up: [1, 0, 0, 0], down: [14, 14, 14, 14] }, card(0, 2), 'up'), true);
+});
+
+test('rankHome reports a rank home from EITHER end', () => {
+  assert.equal(rankHome({ up: [1, 1, 1, 1], down: [14, 14, 14, 14] }, 1), true);
+  assert.equal(rankHome({ up: [0, 0, 0, 0], down: [13, 13, 13, 13] }, 13), true);
+  assert.equal(rankHome({ up: [1, 1, 1, 0], down: [14, 14, 14, 14] }, 1), false);
+});
+
+test('isDailyEligible requires a Gold-grade variant; the matrix has no vacuous entries', () => {
+  const v = (id, param) => ({ id, param });
   assert.equal(isDailyEligible(null), false);
-  assert.equal(isDailyEligible({ winnable: true, supports: ['cells-le-2'] }), false);       // silver-only
-  assert.equal(isDailyEligible({ winnable: true, supports: ['aces-first'] }), true);
-  assert.ok(!CERTIFIED.includes('empty-column'));   // dropped: winning empties every column
+  assert.equal(isDailyEligible({ winnable: true, supports: [v('cells-le', { N: 2 })] }), false);   // silver-only
+  assert.equal(isDailyEligible({ winnable: true, supports: [v('cells-le', { N: 0 })] }), true);    // gold
+  assert.equal(isDailyEligible({ winnable: true, supports: [v('split-at', { R: 9 })] }), true);
+  // dropped: winning empties every column, so "empty a column" is vacuous
+  assert.ok(!VARIANTS.some(x => x.id === 'empty-column'));
+  // every variant is distinct, and enough of them are Gold to fill a month
+  assert.equal(new Set(VARIANTS.map(x => variantKey(x.id, x.param))).size, VARIANTS.length);
+  assert.ok(VARIANTS.filter(isGold).length >= 20);
 });

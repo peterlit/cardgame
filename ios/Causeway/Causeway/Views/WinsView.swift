@@ -55,15 +55,13 @@ struct WinsView: View {
         }
     }
 
-    /// The typed deal number, or nil when it is empty / not a number / outside what the engine can
-    /// deal. The field used to advertise "Number 1–1,000,000" and lean on a stale comment claiming
-    /// `Game.deal` clamped there; it clamps to `maxValidSeed` (4,294,967,295), so 2,000,000 loaded
-    /// fine and the promise was enforced nowhere (bug/WinsView:deal-entry-range-not-enforced).
-    /// The bound stays `maxValidSeed`: this list itself shows wins on daily/sandbox seeds above
-    /// 1,000,000 (e.g. #561325499), and clamping the field would make them untypeable.
+    /// The typed deal number, or nil when it is empty / not a number / out of range. The field
+    /// used to advertise "Number 1–1,000,000" while nothing enforced it
+    /// (bug/WinsView:deal-entry-range-not-enforced); the bound is now `Game.maxSeed`, the single
+    /// ceiling the whole app shares.
     private var enteredSeed: Int? {
         guard let n = Int(dealText.trimmingCharacters(in: .whitespaces)),
-              n >= 1, n <= Game.maxValidSeed else { return nil }
+              n >= 1, n <= Game.maxSeed else { return nil }
         return n
     }
 

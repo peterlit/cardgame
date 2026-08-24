@@ -1,5 +1,29 @@
 # Daily Challenges — design
 
+> ## ⚠ 2026-08 RECUT — read this first
+>
+> The daily system was **rebuilt on 2026-08-23** and much of the design record below is now history.
+> What changed:
+>
+> - **Every objective is a parameterised FAMILY**, not a fixed rule. `cells-le{N}`, `split-at{R}`,
+>   `end-bias{end,min}`, `ends-first{up,down}`, `rank-rush{rank,N}` … — 13 families that generate
+>   hundreds of visibly different challenges. §4 below is rewritten; the old frozen catalog is kept
+>   only as the *why*.
+> - **No runtime RNG.** The offline generator picks each day's seed *and* both objectives
+>   deliberately, maximising variety across the month, and writes them into the pool. §7's per-day
+>   `mulberry32` draw is gone.
+> - **The calendar is one month.** Epoch moved to **2026-08-01** (day 0); the pool holds exactly the
+>   31 days of August 2026 and nothing else. Days outside it have no challenge.
+> - **Challenge deals are drawn from seeds 500,001-1,000,000**, at or below the app's single deal
+>   ceiling `maxSeed = 1,000,000`. The old "IDs > 10,000" reservation and the > 10,000,000 playtest
+>   sandbox are both gone.
+> - **All prior challenge history was deliberately nuked** — a stored record's day index names a
+>   different challenge now, so both platforms drop any pre-v2 daily store (and prune wins on seeds
+>   the app can no longer deal).
+>
+> The generator is `tools/solver/build-month.mjs` (`build-pool.mjs` is deleted). The catalogue,
+> checkers and lookup are `tests/daily.mjs`, mirrored in `index.html` and `Model/Daily.swift`.
+
 **Status: SHIPPED on both platforms** (web + iOS). This document is the original design record —
 every decision below was signed off during design review — kept for the *why*. Where the built
 feature differs from the plan, an **As built** note says so; §12 and §13 record how the open items
@@ -69,7 +93,10 @@ The player may **retry the deal freely**; the best tier reached and best moves/t
 
 ---
 
-## 4. Objective catalog (frozen)
+## 4. Objective catalogue — parameterised families
+
+*(Rewritten in the 2026-08 recut. The original fixed catalog is preserved at the end of this
+section, because the eligibility distinction it introduced still governs the solver.)*
 
 All objectives are checkable from lightweight per-attempt telemetry (see §8). Each has an
 **eligibility** class that determines what the offline solver must prove:
@@ -77,51 +104,58 @@ All objectives are checkable from lightweight per-attempt telemetry (see §8). E
 - **Universal** — achievable on *any* winnable deal (the solver only supplies a *par* for
   calibration). These constrain *how well* you win, not *whether* a winning line exists.
 - **Certified** — the objective restricts the winning line itself, so the deal must be proven
-  winnable **subject to the constraint**, per seed. Offered only on seeds certified to support it.
+  winnable **subject to that objective AND its parameter**, per seed. Offered only on seeds
+  certified for that exact `(family, parameter)` pair.
 
-| # | Objective | Tier | Eligibility | Runtime check | Shipped? |
-|---|-----------|------|-------------|---------------|----------|
-| 1 | Clear the deal | 🥉 | Universal (winnable + par) | `won` | ✅ (Bronze) |
-| 2 | Win in ≤ N moves | 🥈 | Universal (par → N) | `moveCount ≤ N` | ✅ `moves` |
-| 3 | Win in ≤ T time | 🥈 | Universal (soft, par-derived) | `elapsed ≤ T` | ❌ never built |
-| 4 | Win without undo | 🥈 | Universal | `undoCount == 0` | ✅ `no-undo` |
-| 5 | Manual win — no auto-play / auto-finish | 🥈 | Universal | automation-used flags false | ❌ never built |
-| 6 | ≤ K free-cell uses (K = 1 or 2) | 🥈 | Certified | cumulative cell-entries ≤ K | ✅ `cells-le-1`, `cells-le-2` |
-| 7 | Start all four down-foundations within the first N moves | 🥈 | Certified (+par) | milestone + move index | ✅ `down-openers-20` (N = 20) |
-| 8 | Empty a tableau column at some point | 🥈 | Certified | board-state event | ❌ **dropped** — vacuous |
-| 9 | **No** free cell ever touched | 🥇 | Certified | cell-entries == 0 | ✅ `no-cells` |
-| 10 | All **Kings down** before any Ace goes up | 🥇 | Certified | foundation order | ✅ `kings-first` |
-| 11 | All **Jacks to the down-foundation** before any Ace goes up | 🥇 | Certified | foundation order | ✅ `jacks-down-first` |
-| 12 | **Every suit built top-down** — its King (down) home before its Ace (up) | 🥇 | Certified | foundation order | ✅ `suits-top-down` |
-| 13 | All **Aces up** before any other card goes home (hard; rare) | 🥇 | Certified | foundation order | ✅ `aces-first` |
-| 14 | **Suit sprint** — finish one whole suit before a second suit sends any card home | 🥈/🥇 | Certified | foundation order | ✅ `suit-sprint` (Gold only) |
+Every family below takes a parameter, and the generator varies it deliberately across the month.
+The full certification matrix — which parameter values are tried on every candidate seed — is
+`VARIANTS` in `tools/solver/solve.mjs`.
 
-**As built: 11 of the 14 shipped.** Two were never implemented — the **time cap** (#3, because a
-deterministic, fair time target could not be calibrated) and **manual win** (#5, which the
-automation policy in §5 made redundant: automation is the player's responsibility, not a tracked
-flag). One was **deliberately dropped**: #8 *empty a tableau column* is vacuously true of every win,
-since winning empties every column; it needs a non-trivial redefinition (e.g. "an empty column while
-≥ K cards remain") before it can mean anything. Its absence is pinned by a test
-(`tests/solver.test.mjs:114`) so it cannot be reintroduced by accident.
+| Family | Tier | Elig. | Parameter | Example label |
+|---|---|---|---|---|
+| `moves` | 🥈 | Univ. | `N` (par x 1.05-1.4) | "Win in 96 moves or fewer" |
+| `no-undo` | 🥈 | Univ. | — | "Win without using undo" |
+| `cells-le` | 🥈/🥇 | Cert. | `N` = 0-3 | "Win using free cells at most twice" (`N`=0 is Gold) |
+| `max-run` | 🥈 | Cert. | `N` = 1-3 | "Never move more than 2 cards in a single move" |
+| `big-move` | 🥇 | Cert. | `N` = 5-7 | "Move a run of 6 or more cards in a single move" |
+| `split-at` | 🥇 | Cert. | `R` = 3-10 | "Split every suit exactly at the Nine — A-9 up, 10-K down" |
+| `end-bias` | 🥈/🥇 | Cert. | `end`, `min` = 7-13 | "Take at least 9 of every suit from the Ace end"; `min`=13 is the one-end game |
+| `ends-first` | 🥇 | Cert. | `up` 0-3, `down` 10-14 | "Send all four Aces and Twos, plus all four Kings and Queens home before any other card" |
+| `before-ace` | 🥇 | Cert. | `rank` 10-13 | "Get every Queen onto the King-end foundation before any Ace goes home" |
+| `suit-top-first` | 🥇 | Cert. | `rank` 11-13 | "For every suit, send its Queen home from the King end before its Ace" |
+| `suit-sprint` | 🥇 | Cert. | — | "Finish one whole suit before any other suit is started" |
+| `rank-rush` | 🥈 | Cert. | `rank`, `N` | "Get all four Kings home within your first 18 moves" |
+| `suit-balance` | 🥈/🥇 | Cert. | `N` = 2-5 | "Never let one suit get more than 3 cards ahead of another" |
 
-Note also that `suit-sprint` ended up **Gold-only** rather than 🥈/🥇, and is supported by only 4 of
-the 366 pooled seeds — it is chosen on 3 days a year. The frozen id lists live at
-`tests/daily.mjs:59-61`.
+**Grades are a function of the parameter**, not of the family: `cells-le{0}` is Gold and
+`cells-le{2}` is Silver; `end-bias{min:13}` is Gold and `end-bias{min:8}` is Silver. `gradeOf()`
+owns that rule on all three platforms.
 
-The two-way-foundation cluster (10–13) is the signature — nothing in FreeCell can pose "build from
-the top" objectives. Aces-first (13) is deliberately hard and therefore appears rarely, only on
-certified seeds; the calendar never demands the impossible.
+**How the old catalog maps in.** Every shipped objective survives as a parameter of a family:
+`no-cells` = `cells-le{0}`; `cells-le-1/2` = `cells-le{1/2}`; `aces-first` = `ends-first{up:1}`;
+`kings-first` = `before-ace{13}`; `jacks-down-first` = `before-ace{11}`; `suits-top-down` =
+`suit-top-first{13}`; `split-even` = `split-at{7}`; `down-heavy` = `end-bias{down,8}`;
+`no-down-foundation` / `no-up-foundation` = `end-bias{up,13}` / `end-bias{down,13}`;
+`no-supermoves` = `max-run{1}`; `one-big-move` = `big-move{5}`; `down-openers-20` ≈
+`rank-rush{13,20}`. Three families are genuinely new: **`ends-first`** with both ends specified,
+**`rank-rush`** at any rank, and **`suit-balance`**.
+
+**`rank-rush` deadlines are certified, not guessed.** A middling rank cannot come home early (rank
+R from the Ace end needs A..R of every suit first), so only ranks near either extreme are searched,
+and the builder then re-searches against the witness line's own completion index until it stops
+improving. The `N` in the shipped label is a deadline a real line actually met.
 
 **Metric definitions**
-- Free-cell **uses** = cumulative number of cards parked into a cell (K = 0 ⇒ a cell is never
+- Free-cell **uses** = cumulative number of cards parked into a cell (`N` = 0 ⇒ a cell is never
   touched). Peak simultaneous occupancy is available as a softer variant if we want it later.
-- **Time caps** cannot be calibrated exactly and deterministically, so they are treated as
-  **generous, par-derived estimates**, not tight targets.
+- **Time caps** were never built: a deterministic, fair time target could not be calibrated.
+- **Manual win** (no auto-play / auto-finish) was never built either — the automation policy in §5
+  makes automation the player's responsibility rather than a tracked flag.
+- **"Empty a tableau column"** stays dropped: it is vacuously true of every win. Its absence is
+  pinned by `tests/solver.test.mjs` so it cannot be reintroduced by accident.
 
-**Silver vs Gold assignment.** Silver is drawn from the Silver-eligible set (universal ones + any
-Silver-grade certified objective this seed supports); Gold is drawn from the seed's certified
-Gold-grade set. The generator rotates objective families across days (deterministically) for
-variety (see §6).
+The two-way-foundation cluster (`ends-first`, `before-ace`, `suit-top-first`, `split-at`,
+`end-bias`) is the signature — nothing in FreeCell can pose "build from the top" objectives.
 
 ---
 
@@ -190,39 +224,32 @@ iOS. Only seeds with `winnable: true` **and** at least one certified Gold-grade 
 
 ---
 
-## 7. Deterministic generation & frozen history
+## 7. Generation (rewritten in the 2026-08 recut)
 
-`dailyChallenge(dateKey) → { seed, silverObjective, goldObjective }`, a pure function:
+`dailyChallenge(dayIndex, pool) → { seed, par, silver, gold }` is a **pure table lookup**:
 
-1. Seed `mulberry32` with the date (e.g. `YYYYMMDD` as an integer, or a day-index since an epoch).
-2. Pick a `seed` from the **frozen, append-only** daily-eligible list.
-3. Pick the Silver objective from the Silver-eligible set (rotating families for variety).
-4. Pick the Gold objective from that seed's certified Gold set.
+1. The day index is `daysFromCivil(y,m,d) - EPOCH_DAYS`, where `EPOCH_DAYS = daysFromCivil(2026, 8, 1)`
+   — day 0 is 2026-08-01, using the device's **local** calendar date.
+2. `pool.days[D]` names that day's seed, its par, and both objectives with their parameters.
+3. Labels and grades are computed from the parameters at read time.
 
-> **As built** (`tests/daily.mjs:72-83`, and mirrored verbatim on both platforms):
->
-> - The day index is `daysFromCivil(y,m,d) - EPOCH_DAYS`, where `EPOCH_DAYS = daysFromCivil(2026, 8, 12)`
->   — day 0 is 2026-08-12, using the device's **local** calendar date.
-> - The seed is **not drawn randomly**: day *D* maps directly to `pool.seeds[D]`. Append-only is what
->   freezes history, exactly as intended, but by indexing rather than by a stable draw.
-> - The per-day RNG is `mulberry32((0x9e3779b9 ^ (dayIndex + 1)) >>> 0)` — a golden-ratio constant
->   XORed with the day, not the date as `YYYYMMDD`. This formula is **frozen**; changing it would
->   retroactively reshuffle every past day's objectives.
-> - Silver is drawn first, then Gold — from `SILVER_UNIVERSAL + (SILVER_CERTIFIED ∩ supports)` and
->   `GOLD ∩ supports` respectively. **Draw order is load-bearing** and is pinned by the drift guards.
-> - There is **no objective-family rotation.** Variety comes from the per-day draw alone; the
->   "rotating families" idea in step 3 was never implemented.
->
-> A golden-master test (`tests/daily.test.mjs:66-70`) pins `(day → seed, silverId, goldId)` for a
-> frozen sample pool, so any reorder, mid-insert, or RNG change fails CI.
+There is **no runtime RNG at all**. The choice happens offline, once, in
+`tools/solver/build-month.mjs`, which:
 
-**Freezing (critical).** Once a date has shipped, its challenge must never change — otherwise
-growing the pool or re-tuning par would silently rewrite old days and invalidate streaks and bests.
-Therefore:
-- The generator **indexes into a frozen ordered list**; appending new certified seeds to the *end*
-  never shifts any past-date output.
-- Par values and objective params used by past dates are pinned (the baked file is versioned; a new
-  version affects only dates on/after its introduction).
+- draws candidate seeds deterministically from 500,001-1,000,000,
+- certifies each against the whole `(family, parameter)` matrix in parallel worker processes, with a
+  resumable JSONL cache,
+- then fills the month greedily, at each step taking the `(seed, gold, silver)` triple that adds the
+  most **new** variety — an unused family scores far above an unused parameter of a family already
+  used, and a certification only a few seeds support is preferred over a common one, since rare
+  material is the hardest to place,
+- and finally reorders the chosen days so no two consecutive dates share a family.
+
+**Why history is no longer "frozen."** The old design froze the calendar because a per-day RNG over
+an append-only pool would otherwise reshuffle past days. With the choice baked per day, the pool
+file *is* the history: a day changes only if someone edits that day's record. The recut deliberately
+rewrote every day, which is exactly why both platforms drop pre-v2 stored records (§9) rather than
+crediting tiers against challenges that no longer exist.
 
 **Time zone.** "Today" uses the **device-local calendar date**. Midnight boundaries / timezone
 travel are a minor documented edge; no server truth to reconcile against.
@@ -352,11 +379,13 @@ A new screen (its own entry; the toolbar is already crowded), containing:
   days the stored `par` is the unconstrained length, making the cap up to ~14 % looser than intended.
 - **Time-cap formula** — ❌ **Moot:** the time-cap objective was never built (§4 #3).
 - **Monthly badge** — ❌ **Not built.** Never started; would be additive.
-- **Objective-family rotation** — ❌ **Not built.** The plain per-day RNG draw was judged sufficient
-  variety in practice (§7 *As built*).
-- **Pool size / repeat spacing** — ✅ **Settled:** 366 seeds, one per day for a year, each used
-  exactly once — so repeat spacing never arises. Growing the pool is `build-pool.mjs` with a later
-  `--start`; appended seeds extend the calendar without disturbing any past day.
+- **Objective-family rotation** — ✅ **Built in the 2026-08 recut**, and it is now the whole point:
+  the offline generator maximises family and parameter variety across the month and spreads
+  families so no two consecutive days share one. (Between the original build and the recut, the
+  plain per-day RNG draw was judged sufficient.)
+- **Pool size / repeat spacing** — ↩ **Resettled:** one seeded month (31 days), each seed used
+  exactly once — so repeat spacing never arises. Seeding another month means running
+  `build-month.mjs` again; it no longer grows by appending.
 
 **Added after this design was written** (not anticipated here):
 

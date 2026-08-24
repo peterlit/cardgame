@@ -1163,56 +1163,59 @@ function hideWin(){ document.getElementById("overlay").classList.remove("show");
 /* Logic inlined from tests/daily.mjs (canonical, Node-tested); drift-guarded in tests/daily.test.mjs.
    mulberry32 is reused from the deal RNG above. */
 function daysFromCivil(y,m,d){y-=m<=2?1:0;const era=Math.floor((y>=0?y:y-399)/400);const yoe=y-era*400;const doy=Math.floor((153*(m+(m>2?-3:9))+2)/5)+d-1;const doe=yoe*365+Math.floor(yoe/4)-Math.floor(yoe/100)+doy;return era*146097+doe-719468;}
-const EPOCH_DAYS=daysFromCivil(2026,8,12);
+const EPOCH_DAYS=daysFromCivil(2026,8,1);
 const dayIndexFor=(y,m,d)=>daysFromCivil(y,m,d)-EPOCH_DAYS;
 function todayIndex(){const n=new Date();return dayIndexFor(n.getFullYear(),n.getMonth()+1,n.getDate());}
-const acesFirst=t=>{let a=0;for(const e of t.foundationOrder){if(a>=4)break;if(e.rank===1)a++;else return false;}return t.won&&a===4;};
-const kingsFirst=t=>{let k=0;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")k++;else if(e.rank===1&&e.end==="up"&&k<4)return false;}return t.won;};
-const jacksDownFirst=t=>{let j=0;for(const e of t.foundationOrder){if(e.rank===11&&e.end==="down")j++;else if(e.rank===1&&e.end==="up"&&j<4)return false;}return t.won;};
-const suitsTopDown=t=>{const kd=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down")kd[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!kd[e.suit])return false;}return t.won;};
-const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};
+const RANK_NAME=[null,'Ace','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Jack','Queen','King'];
+const RANK_SHORT=[null,'A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const rankName=r=>RANK_NAME[r], rankShort=r=>RANK_SHORT[r], rankPlural=r=>r===6?'Sixes':RANK_NAME[r]+'s';
 const upDown=t=>{const u=[0,0,0,0],d=[0,0,0,0];for(const e of t.foundationOrder){if(e.end==="up")u[e.suit]++;else d[e.suit]++;}return{u,d};};
-const splitEven=t=>t.won&&upDown(t).u.every(x=>x===7);
-const downHeavy=t=>t.won&&upDown(t).u.every(x=>x<=5);
-const noDownFoundation=t=>t.won&&upDown(t).d.every(x=>x===0);
-const noUpFoundation=t=>t.won&&upDown(t).u.every(x=>x===0);
-const noSupermoves=t=>t.won&&(t.maxRunMoved??0)<=1;
-const oneBigMove=t=>t.won&&(t.maxRunMoved??0)>=5;
-const downOpeners20=t=>{let k=0,opened=null;for(const e of t.foundationOrder){if(e.rank===13&&e.end==="down"){k++;if(k===4){opened=e.moveIdx;break;}}}return t.won&&opened!=null&&opened<=20;};
+const foldHome=(t,step)=>{const home=[0,0,0,0];for(const e of t.foundationOrder){home[e.suit]++;if(step(e,home)===false)return false;}return true;};
+const endsFirst=(t,p)=>{const u=[0,0,0,0],d=[14,14,14,14];const met=()=>u.every(x=>x>=p.up)&&d.every(x=>x<=p.down);
+  for(const e of t.foundationOrder){if(met())break;const required=e.end==="up"?e.rank<=p.up:e.rank>=p.down;if(!required)return false;if(e.end==="up")u[e.suit]=e.rank;else d[e.suit]=e.rank;}return t.won;};
+const beforeAce=(t,p)=>{let n=0;for(const e of t.foundationOrder){if(e.rank===p.rank&&e.end==="down")n++;else if(e.rank===1&&e.end==="up"&&n<4)return false;}return t.won;};
+const suitTopFirst=(t,p)=>{const down=[false,false,false,false];for(const e of t.foundationOrder){if(e.rank===p.rank&&e.end==="down")down[e.suit]=true;else if(e.rank===1&&e.end==="up"&&!down[e.suit])return false;}return t.won;};
+const suitSprint=t=>{const home=[0,0,0,0],started=[false,false,false,false];for(const e of t.foundationOrder){const S=e.suit;if(!started[S]){for(let T=0;T<4;T++)if(T!==S&&started[T]&&home[T]<13)return false;started[S]=true;}home[S]++;}return t.won;};
+const rankRush=(t,p)=>{const seen=[false,false,false,false];let n=0;for(const e of t.foundationOrder){if(e.rank!==p.rank||seen[e.suit])continue;seen[e.suit]=true;if(++n===4)return t.won&&e.moveIdx<=p.N;}return false;};
+const suitBalance=(t,p)=>t.won&&foldHome(t,(_e,home)=>Math.max(...home)-Math.min(...home)<=p.N);
 const OBJECTIVES={
-  'moves':{grade:'silver',param:rec=>({N:Math.round(rec.par*1.2)}),label:p=>`Win in ${p.N} moves or fewer`,check:(t,p)=>t.won&&t.moves<=p.N},
-  'no-undo':{grade:'silver',label:()=>'Win without using undo',check:t=>t.won&&t.undos===0},
-  'cells-le-1':{grade:'silver',label:()=>'Win using a free cell at most once',check:t=>t.won&&t.cellUses<=1},
-  'cells-le-2':{grade:'silver',label:()=>'Win using free cells at most twice',check:t=>t.won&&t.cellUses<=2},
-  'down-openers-20':{grade:'silver',label:()=>'Open all four down-foundations within your first 20 moves',check:downOpeners20},
-  'no-cells':{grade:'gold',label:()=>'Win without ever using a free cell',check:t=>t.won&&t.cellUses===0},
-  'aces-first':{grade:'gold',label:()=>'Send all four Aces home before any other card',check:acesFirst},
-  'kings-first':{grade:'gold',label:()=>'Send all four Kings to the down-foundation before any Ace',check:kingsFirst},
-  'jacks-down-first':{grade:'gold',label:()=>'Get every Jack onto the down-foundation before any Ace',check:jacksDownFirst},
-  'suits-top-down':{grade:'gold',label:()=>'For every suit, send its King home before its Ace',check:suitsTopDown},
+  'moves':{grade:'silver',universal:true,label:p=>`Win in ${p.N} moves or fewer`,check:(t,p)=>t.won&&t.moves<=p.N},
+  'no-undo':{grade:'silver',universal:true,label:()=>'Win without using undo',check:t=>t.won&&t.undos===0},
+  'cells-le':{grade:p=>p.N===0?'gold':'silver',
+    label:p=>p.N===0?'Win without ever using a free cell':`Win using free cells at most ${p.N===1?'once':p.N===2?'twice':p.N+' times'}`,
+    check:(t,p)=>t.won&&t.cellUses<=p.N},
+  'max-run':{grade:'silver',label:p=>p.N===1?'Move one card at a time — never move a run':`Never move more than ${p.N} cards in a single move`,
+    check:(t,p)=>t.won&&(t.maxRunMoved??0)<=p.N},
+  'big-move':{grade:'gold',label:p=>`Move a run of ${p.N} or more cards in a single move`,check:(t,p)=>t.won&&(t.maxRunMoved??0)>=p.N},
+  'split-at':{grade:'gold',label:p=>`Split every suit exactly at the ${rankName(p.R)} — A-${rankShort(p.R)} up, ${rankShort(p.R+1)}-K down`,
+    check:(t,p)=>t.won&&upDown(t).u.every(x=>x===p.R)},
+  'end-bias':{grade:p=>p.min>=10?'gold':'silver',
+    label:p=>p.min===13?(p.end==='up'?'Win using only the Ace-end foundations — every suit A up to K':'Win using only the King-end foundations — every suit K down to A')
+      :`Take at least ${p.min} of every suit from the ${p.end==='up'?'Ace':'King'} end`,
+    check:(t,p)=>{if(!t.won)return false;const{u,d}=upDown(t);return (p.end==='up'?u:d).every(x=>x>=p.min);}},
+  'ends-first':{grade:'gold',label:p=>{
+      const list=rs=>rs.map(rankPlural).reduce((a,x,i)=>a+(i===0?'':i===rs.length-1?' and ':', ')+x,'');
+      const parts=[];
+      if(p.up>0)parts.push(`all four ${list(Array.from({length:p.up},(_,i)=>i+1))}`);
+      if(p.down<14)parts.push(`all four ${list(Array.from({length:14-p.down},(_,i)=>13-i))}`);
+      return `Send ${parts.join(', plus ')} home before any other card`;},
+    check:endsFirst},
+  'before-ace':{grade:'gold',label:p=>`Get every ${rankName(p.rank)} onto the King-end foundation before any Ace goes home`,check:beforeAce},
+  'suit-top-first':{grade:'gold',label:p=>`For every suit, send its ${rankName(p.rank)} home from the King end before its Ace`,check:suitTopFirst},
   'suit-sprint':{grade:'gold',label:()=>'Finish one whole suit before any other suit is started',check:suitSprint},
-  'down-heavy':{grade:'silver',label:()=>'Take at least 8 of every suit from the King end',check:downHeavy},
-  'no-supermoves':{grade:'silver',label:()=>'Move one card at a time — never move a run',check:noSupermoves},
-  'split-even':{grade:'gold',label:()=>'Split every suit exactly down the middle — A-7 up, 8-K down',check:splitEven},
-  'no-down-foundation':{grade:'gold',label:()=>'Win without ever using a down foundation',check:noDownFoundation},
-  'no-up-foundation':{grade:'gold',label:()=>'Win without ever using an up foundation — every suit K down to A',check:noUpFoundation},
-  'one-big-move':{grade:'gold',label:()=>'Move a run of 5 or more cards in a single move',check:oneBigMove},
+  'rank-rush':{grade:'silver',label:p=>`Get all four ${rankPlural(p.rank)} home within your first ${p.N} moves`,check:rankRush},
+  'suit-balance':{grade:p=>p.N<=3?'gold':'silver',label:p=>`Never let one suit get more than ${p.N} cards ahead of another`,check:suitBalance},
 };
-const SILVER_UNIVERSAL=['moves','no-undo'], SILVER_CERTIFIED=['cells-le-1','cells-le-2','down-openers-20','down-heavy','no-supermoves'];
-const GOLD=['no-cells','aces-first','kings-first','jacks-down-first','suits-top-down','suit-sprint','split-even','no-down-foundation','no-up-foundation','one-big-move'];
-function makeObjective(id,rec){const o=OBJECTIVES[id];const param=o.param?o.param(rec):{};return{id,grade:o.grade,param,label:o.label(param)};}
-// Day >=0 = frozen calendar (pool array). Day <0 = pre-epoch PLAYTEST SANDBOX (dailyPre),
-// explicitly mutable — rewriting it can never disturb a day >=0. See docs/daily-objectives-proposal.md §8.
-function dailyRec(idx){ return idx>=0 ? (dailyPool&&dailyPool[idx]) : dailyPre[-idx-1]; }
+function gradeOf(id,param){const g=OBJECTIVES[id].grade;return typeof g==='function'?g(param):g;}
+function labelOf(id,param){return OBJECTIVES[id].label(param||{});}
+function makeObjective(spec){const param=spec.param||{};return{id:spec.id,grade:gradeOf(spec.id,param),param,label:labelOf(spec.id,param)};}
+// Day D reads pool.days[D] directly: the generator chose that day's seed AND its two objectives
+// deliberately, maximising variety across the seeded month, so there is no runtime RNG here.
+function dailyRec(idx){ return idx>=0 ? (dailyPool&&dailyPool[idx]) : null; }
 function dailyChallenge(dayIndex,pool){
-  const rec = dayIndex>=0 ? (pool&&pool[dayIndex]) : dailyPre[-dayIndex-1];
+  const rec = dayIndex>=0 ? (pool&&pool[dayIndex]) : null;
   if(!rec) return null;
-  const rng=mulberry32((0x9e3779b9^(dayIndex+1))>>>0);
-  const silverPool=SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id=>rec.supports.includes(id)));
-  const goldPool=GOLD.filter(id=>rec.supports.includes(id));
-  const silverId=silverPool[Math.floor(rng()*silverPool.length)];
-  const goldId=goldPool[Math.floor(rng()*goldPool.length)];
-  return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(silverId,rec),gold:makeObjective(goldId,rec)};
+  return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(rec.silver),gold:makeObjective(rec.gold)};
 }
 function evaluate(objective,telemetry){return OBJECTIVES[objective.id].check(telemetry,objective.param);}
 function evaluateChallenge(challenge,telemetry){
@@ -1243,12 +1246,14 @@ function streaks(records,todayIndex){
 }
 
 /* ---- pool + per-day store ---- */
-let dailyPool=null, dailyPre=[];
+let dailyPool=null;
 let dailyStore=loadDaily();
-function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days) return g; }catch(e){} return {version:1, days:{}}; }
+// v2 = the August-2026 recut. The whole calendar was regenerated (new epoch, new seeds, new
+// objectives), so day indices from a v1 store name different challenges — it is dropped, once.
+function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days&&g.version===2) return g; }catch(e){} return {version:2, days:{}}; }
 function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
 // The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
-fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.seeds; dailyPre=p.preSeeds||[]; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
+fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.days; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
 // Baked winning lines for "Show me how to win" (seed -> compact token string). Optional: absent =
 // the feature just doesn't offer itself for that seed.
 let dailySolutions=null;
@@ -1459,7 +1464,7 @@ function renderDailyCard(){
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
      ${btn}${showBtn}`;
 }
-function fmtDayLabel(idx){const b=new Date(Date.UTC(2026,7,12));b.setUTCDate(b.getUTCDate()+idx);return b.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
+function fmtDayLabel(idx){const b=new Date(Date.UTC(2026,7,1));b.setUTCDate(b.getUTCDate()+idx);return b.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
 function renderDailyCal(){
   const ti=todayIndex(); const now=new Date(); const y=now.getFullYear(), m=now.getMonth()+1;
   document.getElementById("dailyMonth").textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
@@ -1468,7 +1473,7 @@ function renderDailyCal(){
   for(let i=0;i<first;i++) html+='<div class="dcell empty"></div>';
   for(let d=1;d<=dim;d++){
     const idx=dayIndexFor(y,m,d); const rec=dailyStore.days[idx];
-    const avail=!!dailyRec(idx) && idx<=ti;   // sandbox days (idx<0) are playable too
+    const avail=!!dailyRec(idx) && idx<=ti;   // only the seeded month has challenges
     const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
     // Flawless days show a ⭐ in the marker slot (in place of the tier dots — flawless implies all
     // three), so it never overlaps the date number.

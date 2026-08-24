@@ -1,10 +1,10 @@
-// Shared Daily-Challenges logic: the deterministic date->challenge generator, the objective
-// checkers (evaluated from per-attempt telemetry), and streak computation. This is the canonical,
-// Node-tested source; the web app inlines an identical copy (drift-guarded) and iOS mirrors it in
-// Swift, so a given date yields the same challenge and the same pass/fail on every platform.
+// Shared Daily-Challenges logic: the deterministic date->challenge lookup, the objective
+// catalogue (checkers evaluated from per-attempt telemetry), and streak computation. This is the
+// canonical, Node-tested source; the web app inlines an identical copy (drift-guarded) and iOS
+// mirrors it in Swift, so a given date yields the same challenge and the same pass/fail on every
+// platform.
 //
 // See docs/daily-challenges.md.
-import { mulberry32 } from './engine.mjs';
 
 // ---- calendar: a day index (integer days since the launch epoch) is the stable challenge key ----
 // Proleptic-Gregorian days-from-civil (Howard Hinnant's algorithm).
@@ -16,11 +16,18 @@ export function daysFromCivil(y, m, d) {
   const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
   return era * 146097 + doe - 719468;
 }
-export const EPOCH_DAYS = daysFromCivil(2026, 8, 12);   // launch epoch = day 0
+export const EPOCH_DAYS = daysFromCivil(2026, 8, 1);   // launch epoch = day 0 = 2026-08-01
 export function dayIndexFor(y, m, d) { return daysFromCivil(y, m, d) - EPOCH_DAYS; }
 
+// ---- rank naming (labels are generated from parameters, so this is shared by every family) ----
+const RANK_NAME = [null, 'Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King'];
+const RANK_SHORT = [null, 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+export function rankName(r) { return RANK_NAME[r]; }
+export function rankShort(r) { return RANK_SHORT[r]; }
+export function rankPlural(r) { return r === 6 ? 'Sixes' : RANK_NAME[r] + 's'; }
+
 // ---- objective catalogue (checkers evaluate a telemetry record) ----
-// telemetry = { won, moves, elapsed, cellUses, undos, usedAutoplay, usedAutoFinish,
+// telemetry = { won, moves, elapsed, cellUses, undos, usedAutoplay, usedAutoFinish, maxRunMoved,
 //               foundationOrder: [{ suit, rank, end:'up'|'down', moveIdx }] }  (in play order)
 //
 // TRUSTED-TELEMETRY CONTRACT. The checkers below treat the telemetry as ground truth; they do NOT
@@ -31,75 +38,182 @@ export function dayIndexFor(y, m, d) { return daysFromCivil(y, m, d) - EPOCH_DAY
 // over-engineering. Checkers are kept deterministic and cheap, and are written to mirror EXACTLY
 // the solver's certification gates (tools/solver/solve.mjs) so that "certified => a passing line
 // exists" and "checker passes => a valid line" stay in agreement.
-const acesFirst = t => { let a = 0; for (const e of t.foundationOrder) { if (a >= 4) break; if (e.rank === 1) a++; else return false; } return t.won && a === 4; };
-const kingsFirst = t => { let k = 0; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') k++; else if (e.rank === 1 && e.end === 'up' && k < 4) return false; } return t.won; };
-const jacksDownFirst = t => { let j = 0; for (const e of t.foundationOrder) { if (e.rank === 11 && e.end === 'down') j++; else if (e.rank === 1 && e.end === 'up' && j < 4) return false; } return t.won; };
-const suitsTopDown = t => { const kd = [false, false, false, false]; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') kd[e.suit] = true; else if (e.rank === 1 && e.end === 'up' && !kd[e.suit]) return false; } return t.won; };
-const suitSprint = t => { const home = [0, 0, 0, 0], started = [false, false, false, false]; for (const e of t.foundationOrder) { const S = e.suit; if (!started[S]) { for (let T = 0; T < 4; T++) if (T !== S && started[T] && home[T] < 13) return false; started[S] = true; } home[S]++; } return t.won; };
-// Per-suit counts of how many ranks arrived from each end. The suit's SPLIT POINT is u[suit]:
-// with 13 cards per suit, u + d === 13 on a win, so u alone determines where the halves met.
-const upDown = t => { const u = [0, 0, 0, 0], d = [0, 0, 0, 0]; for (const e of t.foundationOrder) { if (e.end === 'up') u[e.suit]++; else d[e.suit]++; } return { u, d }; };
-const splitEven = t => t.won && upDown(t).u.every(x => x === 7);                 // A1: every suit A-7 up / 8-K down
-const downHeavy = t => t.won && upDown(t).u.every(x => x <= 5);                  // A2: >= 8 of every suit from the King end
-const noDownFoundation = t => t.won && upDown(t).d.every(x => x === 0);          // B3: only up foundations used
-const noUpFoundation = t => t.won && upDown(t).u.every(x => x === 0);            // B4: only down foundations used
-// maxRunMoved defaults to 0 when absent (an older saved attempt): 0 means no multi-card move
-// happened, which is exactly right for both checks below.
-const noSupermoves = t => t.won && (t.maxRunMoved ?? 0) <= 1;                    // F1
-const oneBigMove = t => t.won && (t.maxRunMoved ?? 0) >= 5;                      // F2
-const downOpeners20 = t => { let k = 0, opened = null; for (const e of t.foundationOrder) { if (e.rank === 13 && e.end === 'down') { k++; if (k === 4) { opened = e.moveIdx; break; } } } return t.won && opened != null && opened <= 20; };
+//
+// EVERY objective is a FAMILY with a parameter object. The generator (tools/solver/build-month.mjs)
+// picks both the id and the parameter per day, so one id yields many visibly different challenges.
 
-export const OBJECTIVES = {
-  'moves':           { grade: 'silver', universal: true, param: rec => ({ N: Math.round(rec.par * 1.2) }), label: p => `Win in ${p.N} moves or fewer`,               check: (t, p) => t.won && t.moves <= p.N },
-  'no-undo':         { grade: 'silver', universal: true, label: () => 'Win without using undo',                                                                        check: t => t.won && t.undos === 0 },
-  'cells-le-1':      { grade: 'silver', certified: true, label: () => 'Win using a free cell at most once',                                                             check: t => t.won && t.cellUses <= 1 },
-  'cells-le-2':      { grade: 'silver', certified: true, label: () => 'Win using free cells at most twice',                                                             check: t => t.won && t.cellUses <= 2 },
-  'down-openers-20': { grade: 'silver', certified: true, label: () => 'Open all four down-foundations within your first 20 moves',                                      check: downOpeners20 },
-  'no-cells':        { grade: 'gold',   certified: true, label: () => 'Win without ever using a free cell',                                                             check: t => t.won && t.cellUses === 0 },
-  'aces-first':      { grade: 'gold',   certified: true, label: () => 'Send all four Aces home before any other card',                                                  check: acesFirst },
-  'kings-first':     { grade: 'gold',   certified: true, label: () => 'Send all four Kings to the down-foundation before any Ace',                                      check: kingsFirst },
-  'jacks-down-first':{ grade: 'gold',   certified: true, label: () => 'Get every Jack onto the down-foundation before any Ace',                                         check: jacksDownFirst },
-  'suits-top-down':  { grade: 'gold',   certified: true, label: () => 'For every suit, send its King home before its Ace',                                              check: suitsTopDown },
-  'suit-sprint':     { grade: 'gold',   certified: true, label: () => 'Finish one whole suit before any other suit is started',                                         check: suitSprint },
-  'down-heavy':      { grade: 'silver', certified: true, label: () => 'Take at least 8 of every suit from the King end',                                                 check: downHeavy },
-  'no-supermoves':   { grade: 'silver', certified: true, label: () => 'Move one card at a time — never move a run',                                                      check: noSupermoves },
-  'split-even':      { grade: 'gold',   certified: true, label: () => 'Split every suit exactly down the middle — A-7 up, 8-K down',                                     check: splitEven },
-  'no-down-foundation': { grade: 'gold', certified: true, label: () => 'Win without ever using a down foundation',                                                       check: noDownFoundation },
-  'no-up-foundation':{ grade: 'gold',   certified: true, label: () => 'Win without ever using an up foundation — every suit K down to A',                                check: noUpFoundation },
-  'one-big-move':    { grade: 'gold',   certified: true, label: () => 'Move a run of 5 or more cards in a single move',                                                  check: oneBigMove },
+// Per-suit counts of how many ranks arrived from each end. With 13 cards per suit u + d === 13 on
+// a win, so u alone determines where that suit's two halves met (its "split point").
+const upDown = t => {
+  const u = [0, 0, 0, 0], d = [0, 0, 0, 0];
+  for (const e of t.foundationOrder) { if (e.end === 'up') u[e.suit]++; else d[e.suit]++; }
+  return { u, d };
+};
+// Cards home per suit, folded over foundationOrder in play order.
+const foldHome = (t, step) => {
+  const home = [0, 0, 0, 0];
+  for (const e of t.foundationOrder) { home[e.suit]++; if (step(e, home) === false) return false; }
+  return true;
 };
 
-// FROZEN — APPEND-ONLY, NEVER REORDER. dailyChallenge() indexes these three arrays with a per-day
-// RNG, so any reorder or mid-array insertion retroactively reshuffles which objective every PAST
-// day picked (frozen history). New objectives may only be *appended*. The golden-master test in
-// tests/daily.test.mjs pins several days and fails if this invariant is broken.
-const SILVER_UNIVERSAL = ['moves', 'no-undo'];
-const SILVER_CERTIFIED = ['cells-le-1', 'cells-le-2', 'down-openers-20', 'down-heavy', 'no-supermoves'];
-const GOLD = ['no-cells', 'aces-first', 'kings-first', 'jacks-down-first', 'suits-top-down', 'suit-sprint', 'split-even', 'no-down-foundation', 'no-up-foundation', 'one-big-move'];
+// STRICT prefix: nothing else goes home until every suit holds A..up on the up pile and K..down on
+// the down pile. up === 0 means "no Ace-end requirement"; down === 14 means "no King-end one".
+const endsFirst = (t, p) => {
+  const u = [0, 0, 0, 0], d = [14, 14, 14, 14];
+  const met = () => u.every(x => x >= p.up) && d.every(x => x <= p.down);
+  for (const e of t.foundationOrder) {
+    if (met()) break;
+    const required = e.end === 'up' ? e.rank <= p.up : e.rank >= p.down;
+    if (!required) return false;
+    if (e.end === 'up') u[e.suit] = e.rank; else d[e.suit] = e.rank;
+  }
+  return t.won;
+};
+// LOOSE prefix: every <rank> reaches the King-end foundation before any Ace goes home.
+const beforeAce = (t, p) => {
+  let n = 0;
+  for (const e of t.foundationOrder) {
+    if (e.rank === p.rank && e.end === 'down') n++;
+    else if (e.rank === 1 && e.end === 'up' && n < 4) return false;
+  }
+  return t.won;
+};
+// Per-suit version: each suit's <rank> comes down before that same suit's Ace goes up.
+const suitTopFirst = (t, p) => {
+  const down = [false, false, false, false];
+  for (const e of t.foundationOrder) {
+    if (e.rank === p.rank && e.end === 'down') down[e.suit] = true;
+    else if (e.rank === 1 && e.end === 'up' && !down[e.suit]) return false;
+  }
+  return t.won;
+};
+const suitSprint = t => {
+  const home = [0, 0, 0, 0], started = [false, false, false, false];
+  for (const e of t.foundationOrder) {
+    const S = e.suit;
+    if (!started[S]) { for (let T = 0; T < 4; T++) if (T !== S && started[T] && home[T] < 13) return false; started[S] = true; }
+    home[S]++;
+  }
+  return t.won;
+};
+// All four cards of one rank home (from either end) within N moves.
+const rankRush = (t, p) => {
+  const seen = [false, false, false, false];
+  let n = 0;
+  for (const e of t.foundationOrder) {
+    if (e.rank !== p.rank || seen[e.suit]) continue;
+    seen[e.suit] = true;
+    if (++n === 4) return t.won && e.moveIdx <= p.N;
+  }
+  return false;
+};
+// No suit may ever run more than N cards ahead of another.
+const suitBalance = (t, p) => t.won && foldHome(t, (_e, home) => Math.max(...home) - Math.min(...home) <= p.N);
 
-function makeObjective(id, rec) {
-  const o = OBJECTIVES[id];
-  const param = o.param ? o.param(rec) : {};
-  return { id, grade: o.grade, param, label: o.label(param) };
+export const OBJECTIVES = {
+  // --- universal: any winnable deal supports these, so they need no certification -------------
+  'moves':   { grade: 'silver', universal: true, label: p => `Win in ${p.N} moves or fewer`,          check: (t, p) => t.won && t.moves <= p.N },
+  'no-undo': { grade: 'silver', universal: true, label: () => 'Win without using undo',              check: t => t.won && t.undos === 0 },
+
+  // --- resource discipline --------------------------------------------------------------------
+  'cells-le': {
+    grade: p => (p.N === 0 ? 'gold' : 'silver'),
+    label: p => (p.N === 0 ? 'Win without ever using a free cell'
+                           : `Win using free cells at most ${p.N === 1 ? 'once' : p.N === 2 ? 'twice' : p.N + ' times'}`),
+    check: (t, p) => t.won && t.cellUses <= p.N,
+  },
+
+  // --- move shape ------------------------------------------------------------------------------
+  'max-run': {
+    grade: 'silver',
+    label: p => (p.N === 1 ? 'Move one card at a time — never move a run'
+                           : `Never move more than ${p.N} cards in a single move`),
+    check: (t, p) => t.won && (t.maxRunMoved ?? 0) <= p.N,
+  },
+  'big-move': {
+    grade: 'gold',
+    label: p => `Move a run of ${p.N} or more cards in a single move`,
+    check: (t, p) => t.won && (t.maxRunMoved ?? 0) >= p.N,
+  },
+
+  // --- split point: where each suit's two halves meet ------------------------------------------
+  'split-at': {
+    grade: 'gold',
+    label: p => `Split every suit exactly at the ${rankName(p.R)} — A-${rankShort(p.R)} up, ${rankShort(p.R + 1)}-K down`,
+    check: (t, p) => t.won && upDown(t).u.every(x => x === p.R),
+  },
+  'end-bias': {
+    grade: p => (p.min >= 10 ? 'gold' : 'silver'),
+    label: p => (p.min === 13
+      ? (p.end === 'up' ? 'Win using only the Ace-end foundations — every suit A up to K'
+                        : 'Win using only the King-end foundations — every suit K down to A')
+      : `Take at least ${p.min} of every suit from the ${p.end === 'up' ? 'Ace' : 'King'} end`),
+    check: (t, p) => {
+      if (!t.won) return false;
+      const { u, d } = upDown(t);
+      return (p.end === 'up' ? u : d).every(x => x >= p.min);
+    },
+  },
+
+  // --- ordering ---------------------------------------------------------------------------------
+  'ends-first': {
+    grade: 'gold',
+    label: p => {
+      const list = rs => rs.map(rankPlural).reduce((a, x, i) => a + (i === 0 ? '' : i === rs.length - 1 ? ' and ' : ', ') + x, '');
+      const parts = [];
+      if (p.up > 0) parts.push(`all four ${list(Array.from({ length: p.up }, (_, i) => i + 1))}`);
+      if (p.down < 14) parts.push(`all four ${list(Array.from({ length: 14 - p.down }, (_, i) => 13 - i))}`);
+      return `Send ${parts.join(', plus ')} home before any other card`;
+    },
+    check: endsFirst,
+  },
+  'before-ace': {
+    grade: 'gold',
+    label: p => `Get every ${rankName(p.rank)} onto the King-end foundation before any Ace goes home`,
+    check: beforeAce,
+  },
+  'suit-top-first': {
+    grade: 'gold',
+    label: p => `For every suit, send its ${rankName(p.rank)} home from the King end before its Ace`,
+    check: suitTopFirst,
+  },
+  'suit-sprint': {
+    grade: 'gold',
+    label: () => 'Finish one whole suit before any other suit is started',
+    check: suitSprint,
+  },
+
+  // --- tempo -------------------------------------------------------------------------------------
+  'rank-rush': {
+    grade: 'silver',
+    label: p => `Get all four ${rankPlural(p.rank)} home within your first ${p.N} moves`,
+    check: rankRush,
+  },
+  'suit-balance': {
+    grade: p => (p.N <= 3 ? 'gold' : 'silver'),
+    label: p => `Never let one suit get more than ${p.N} cards ahead of another`,
+    check: suitBalance,
+  },
+};
+
+// A challenge's grade may depend on its parameter (e.g. cells-le{0} is Gold, cells-le{2} Silver).
+export function gradeOf(id, param) {
+  const g = OBJECTIVES[id].grade;
+  return typeof g === 'function' ? g(param) : g;
+}
+export function labelOf(id, param) { return OBJECTIVES[id].label(param || {}); }
+export function makeObjective(spec) {
+  const param = spec.param || {};
+  return { id: spec.id, grade: gradeOf(spec.id, param), param, label: labelOf(spec.id, param) };
 }
 
-// Deterministic + stable: day D always maps to pool.seeds[D] (append-only pool never shifts a past
-// day), and a per-day RNG picks the Silver/Gold objective from what that seed is certified to
-// support. Returns null if D is out of the pool's current range (challenge not available yet).
+// Day D reads pool.days[D] directly: the generator (tools/solver/build-month.mjs) chose that day's
+// seed AND its two objectives deliberately, maximising variety across the seeded month, so there is
+// no runtime RNG here. Returns null outside the seeded range (no challenge that day).
 export function dailyChallenge(dayIndex, pool) {
-  // Day >= 0 indexes the frozen, append-only calendar. Day < 0 indexes `preSeeds` — the pre-epoch
-  // PLAYTEST SANDBOX (docs/daily-objectives-proposal.md §8), which is explicitly mutable: rewriting
-  // it can never disturb a day >= 0, because those indices, seeds and RNG draws are untouched.
-  const rec = dayIndex >= 0 ? pool.seeds[dayIndex] : (pool.preSeeds || [])[-dayIndex - 1];
+  const rec = dayIndex >= 0 ? (pool.days || [])[dayIndex] : null;
   if (!rec) return null;
-  // FROZEN rng seed formula — changing it retroactively reshuffles every past day's Silver/Gold
-  // pick. Golden-mastered in tests/daily.test.mjs. Never alter without a history migration.
-  const rng = mulberry32((0x9e3779b9 ^ (dayIndex + 1)) >>> 0);
-  const silverPool = SILVER_UNIVERSAL.concat(SILVER_CERTIFIED.filter(id => rec.supports.includes(id)));
-  const goldPool = GOLD.filter(id => rec.supports.includes(id));
-  const silverId = silverPool[Math.floor(rng() * silverPool.length)];
-  const goldId = goldPool[Math.floor(rng() * goldPool.length)];
-  return { dayIndex, seed: rec.seed, par: rec.par, silver: makeObjective(silverId, rec), gold: makeObjective(goldId, rec) };
+  return { dayIndex, seed: rec.seed, par: rec.par, silver: makeObjective(rec.silver), gold: makeObjective(rec.gold) };
 }
 
 export function evaluate(objective, telemetry) { return OBJECTIVES[objective.id].check(telemetry, objective.param); }

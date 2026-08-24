@@ -59,7 +59,7 @@ struct DailyView: View {
     }
 
     private var days: [Int: TierResult] { game.dailyStore.days }
-    private var pool: [PoolSeed] { game.pool }
+    private var pool: [PoolDay] { game.pool }
 
     private let medal = ["bronze": "🥉", "silver": "🥈", "gold": "🥇"]
     private let calCols = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
@@ -341,18 +341,15 @@ struct DailyView: View {
         // poison a best score: keep only keys THIS APP CAN LEGITIMATELY PRODUCE, and drop
         // non-positive moves/times.
         //
-        // The bounds must be the app's real output range, not a convenient subset — an earlier
-        // 0...dayMax / 1...Game.maxSeed pair silently ate the app's OWN untouched export
-        // (bug/WF-11): pre-epoch sandbox days carry dayIndex < 0, and their deals use seeds far
-        // above Game.maxSeed (which is only the RANDOM-deal / type-in ceiling, never a limit on
-        // what can be won). So:
-        //   days  → -preSeeds.count ... today+2 : every index dailyChallenge() can resolve
-        //                                          (sandbox below 0, calendar above), plus a
-        //                                          small grace for clock skew.
-        //   wins  → 1 ... Game.maxValidSeed     : every seed Game.deal() can actually deal.
+        // The bounds must be the app's real output range, not a convenient subset — a too-narrow
+        // pair silently ate the app's OWN untouched export once already (bug/WF-11). So:
+        //   days  → 0 ... max(today, pool.count) + 2 : every index dailyChallenge() can resolve,
+        //           plus a small grace for clock skew. (A backup taken later in the month restores
+        //           onto a device whose clock says earlier, so bound by the POOL, not just today.)
+        //   wins  → 1 ... Game.maxSeed               : every seed the app can deal.
         // Anything outside those is a hand-edited/corrupt key and is still dropped.
-        let dayMax = max(0, todayIndex() + 2)   // days run epoch→today; small grace for clock skew
-        let dayMin = -DailyData.preSeeds.count  // pre-epoch playtest sandbox (day -1 = preSeeds[0])
+        let dayMax = max(todayIndex(), DailyData.pool.count) + 2
+        let dayMin = 0
         let validDaily = backup.dailyInts
             .filter { (dayMin...dayMax).contains($0.key) }
             .mapValues { r in
@@ -361,7 +358,7 @@ struct DailyView: View {
                            elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil)
             }
         let validWins = backup.winsInts.filter {
-            (1...Game.maxValidSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0
+            (1...Game.maxSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0
         }
         let addedDays = game.dailyStore.merge(validDaily)
         let addedDeals = game.winStore.merge(validWins)
@@ -421,7 +418,7 @@ struct DailyView: View {
 
     private func calCell(idx: Int, day: Int, ti: Int) -> some View {
         let rec = days[idx]
-        let avail = idx <= ti && dailyChallenge(idx, pool) != nil   // sandbox days (idx < 0) are playable too
+        let avail = idx >= 0 && idx <= ti && dailyChallenge(idx, pool) != nil   // only the seeded month
         let dots = ["bronze", "silver", "gold"].filter { rec?[$0] == true }
         return ZStack {
             RoundedRectangle(cornerRadius: 8)

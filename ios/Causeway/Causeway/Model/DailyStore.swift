@@ -8,7 +8,10 @@ final class DailyStore: ObservableObject {
     @Published private(set) var days: [Int: TierResult] = [:]
 
     private let key = "causeway.daily"
-    private let version = 1
+    /// v2 = the August-2026 recut. The whole calendar was regenerated — new epoch, new seeds, new
+    /// objectives — so a v1 record's day index names a completely different challenge. Keeping it
+    /// would credit a Gold that was never played. A v1 store is therefore dropped, once.
+    private let version = 2
 
     init() { load() }
 
@@ -41,6 +44,12 @@ final class DailyStore: ObservableObject {
             // Don't silently discard history we can't read: stash the raw blob so the next
             // save() can't overwrite it, leaving a chance to recover it later.
             UserDefaults.standard.set(data, forKey: key + ".unreadable")
+            return
+        }
+        guard decoded.version == version else {
+            // Pre-recut history: stash the raw blob (so nothing is destroyed outright) and start
+            // clean. See the `version` note above.
+            UserDefaults.standard.set(data, forKey: key + ".v\(decoded.version)")
             return
         }
         // uniquingKeysWith so distinct string keys mapping to the same Int can't trap on launch.

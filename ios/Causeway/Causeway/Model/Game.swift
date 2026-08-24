@@ -43,13 +43,10 @@ private struct Snapshot {
 final class Game: ObservableObject {
     static let cellCount = 3
     static let colCount = 8
-    /// Highest deal number the player may type in (Deal # / Wins entry).
+    /// Highest deal number in the game, everywhere: the random-deal ceiling, the Deal # / Wins
+    /// entry bound, and the top of the daily-challenge range (dailies draw from 500,001-1,000,000).
+    /// One number, enforced in every entry point, so the advertised range is the real one.
     static let maxSeed = 1_000_000
-    /// Highest seed the deal RNG accepts. mulberry32 is seeded from a UInt32, and the web build
-    /// only does `theSeed >>> 0`, so any value in this range deals identically on both platforms.
-    /// Challenge pools may legitimately exceed `maxSeed` (the playtest sandbox uses > 10,000,000);
-    /// clamping those down here would silently deal a different board than web.
-    static let maxValidSeed = 4_294_967_295
 
     @Published var tableau: [[Card]] = Array(repeating: [], count: colCount)
     @Published var cells: [Card?] = Array(repeating: nil, count: cellCount)
@@ -170,7 +167,7 @@ final class Game: ObservableObject {
         // and lingering demoing/demoDoneMessage would keep the demo bar up and lock input.
         // showSolution re-arms demoing = true AFTER deal() returns, so this doesn't self-cancel it.
         stopDemo()
-        self.seed = max(1, min(Game.maxValidSeed, seed))
+        self.seed = max(1, min(Game.maxSeed, seed))
         var rng = Mulberry32(UInt32(truncatingIfNeeded: self.seed))
         var deck: [Card] = []
         for s in 0..<4 { for r in 1...13 { deck.append(Card(suit: Suit(rawValue: s)!, rank: r)) } }

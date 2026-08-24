@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { applyMove, isWon } from '../tools/solver/rules.mjs';
 import { dealState } from '../tools/solver/solve.mjs';
-import { dailyChallenge, evaluate } from './daily.mjs';
+import { dailyChallenge, evaluate, OBJECTIVES } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pool = JSON.parse(readFileSync(join(REPO, 'data/daily-pool.json'), 'utf8'));
@@ -47,9 +47,9 @@ function replay(seed, tokens) {
   return { won: isWon(s), moves, elapsed: 0, cellUses, undos: 0, foundationOrder, maxRunMoved };
 }
 
-test('daily-solutions.json is a well-formed v2 per-tier file covering every pool seed', () => {
+test('daily-solutions.json is a well-formed v2 per-tier file covering every seeded day', () => {
   assert.equal(sol.version, 2, 'solutions schema version should be 2 (per-tier)');
-  for (const rec of pool.seeds) {
+  for (const rec of pool.days) {
     const e = sol.solutions[String(rec.seed)];
     assert.ok(e && typeof e.bronze === 'string' && e.bronze.length, `seed ${rec.seed} missing bronze line`);
   }
@@ -57,10 +57,10 @@ test('daily-solutions.json is a well-formed v2 per-tier file covering every pool
 
 test('every baked line WINS its deal, and Silver/Gold lines satisfy their objective', () => {
   let goldChecked = 0, silverChecked = 0;
-  pool.seeds.forEach((rec, i) => {
+  pool.days.forEach((rec, i) => {
     const seed = rec.seed;
     const e = sol.solutions[String(seed)];
-    const ch = dailyChallenge(i, pool);   // objectives keyed by pool index (frozen)
+    const ch = dailyChallenge(i, pool);   // the pool names this day's two objectives
     assert.ok(ch, `seed ${seed} has no challenge`);
 
     const br = replay(seed, e.bronze);
@@ -84,33 +84,23 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
   // Exact expectations, so an absent line can't hide behind a loose lower bound:
   // every seed bakes a gold line, and a silver line iff that day's silver is a distinct
   // baked (certified) objective — i.e. its id is one of the certified-silver ids.
-  assert.equal(goldChecked, pool.seeds.length, `expected a gold line for every seed`);
-  const expectedSilver = pool.seeds.filter((_, i) =>
-    ['cells-le-1', 'cells-le-2', 'down-openers-20'].includes(dailyChallenge(i, pool).silver.id)
+  assert.equal(goldChecked, pool.days.length, `expected a gold line for every seed`);
+  // A universal Silver (win in N moves / no undo) is already satisfied by the bronze line, so it
+  // bakes none of its own; every other family constrains the search and must bake one.
+  const expectedSilver = pool.days.filter((_, i) =>
+    !OBJECTIVES[dailyChallenge(i, pool).silver.id].universal
   ).length;
   assert.equal(silverChecked, expectedSilver, `expected ${expectedSilver} certified-silver lines`);
 });
 
-test('sandbox (pre-epoch) baked lines win and satisfy their objective', () => {
-  const pre = pool.preSeeds || [];
-  assert.ok(pre.length > 0, 'expected a playtest sandbox in data/daily-pool.json');
-  let checked = 0;
-  pre.forEach((rec, i) => {
-    const day = -(i + 1);
-    const ch = dailyChallenge(day, pool);
-    assert.ok(ch, `sandbox day ${day} has no challenge`);
-    const e = sol.solutions[String(rec.seed)];
-    assert.ok(e && e.bronze, `sandbox seed ${rec.seed} missing bronze line`);
-    assert.ok(replay(rec.seed, e.bronze).won, `sandbox seed ${rec.seed} bronze does not win`);
-    assert.ok(e.gold, `sandbox seed ${rec.seed} missing gold line`);
-    const g = replay(rec.seed, e.gold);
-    assert.ok(g.won, `sandbox seed ${rec.seed} gold does not win`);
-    assert.ok(evaluate(ch.gold, g), `sandbox seed ${rec.seed} gold fails ${ch.gold.id}`);
-    if (e.silver) {
-      const t = replay(rec.seed, e.silver);
-      assert.ok(t.won && evaluate(ch.silver, t), `sandbox seed ${rec.seed} silver fails ${ch.silver.id}`);
-    }
-    checked++;
-  });
-  assert.equal(checked, pre.length);
+test('the pool is one seeded month drawn from the daily seed range', () => {
+  assert.equal(pool.version, 3, 'pool schema version should be 3 (per-day objectives)');
+  assert.equal(pool.epoch, '2026-08-01');
+  assert.equal(pool.days.length, 31, 'August 2026 is seeded in full and nothing else is');
+  for (const d of pool.days) {
+    assert.ok(d.seed >= pool.minSeed && d.seed <= pool.maxSeed, `seed ${d.seed} outside the daily range`);
+    assert.ok(d.seed <= 1000000, `seed ${d.seed} exceeds the app's deal-number ceiling`);
+  }
+  const seeds = new Set(pool.days.map(d => d.seed));
+  assert.equal(seeds.size, pool.days.length, 'a seed is used on more than one day');
 });

@@ -10,33 +10,34 @@ Location: `tools/solver/` · tests: `tests/solver.test.mjs` · output: `data/dai
 
 ## 1. What it produces
 
-For each candidate seed (ID > 10,000), a certification record:
+*(Updated for the 2026-08 recut: objectives are parameterised families, so a certification is per
+`(family, parameter)` pair, not per objective id.)*
+
+For each candidate seed drawn from the daily range (500,001-1,000,000), a certification record:
 
 ```json
 {
-  "seed": 10001,
+  "seed": 700001,
   "winnable": true,
-  "par": 83,                                  // reference solution length (moves)
-  "supports": ["no-cells", "aces-first", "kings-first", "jacks-down-first",
-               "suits-top-down", "cells-le-1", "cells-le-2"],
-  "constraintPar": { "no-cells": 86, "aces-first": 107, "kings-first": 91 }
+  "par": 90,                                  // reference solution length (moves)
+  "supports": [
+    { "id": "cells-le",  "param": { "N": 1 },              "par": 94 },
+    { "id": "split-at",  "param": { "R": 9 },              "par": 103 },
+    { "id": "end-bias",  "param": { "end": "up", "min": 11 }, "par": 98 },
+    { "id": "rank-rush", "param": { "rank": 13, "N": 18 }, "par": 96 }
+  ]
 }
 ```
 
-- `winnable` + `par` power Bronze and the **Universal** objectives (a move cap is derived from
-  `par`; time caps generously from `par`). `par` = **reference par = the shortest winning line
-  found in any of our searches** (unconstrained *and* every constrained one — each constrained line
-  is still a legal unconstrained win, and constrained sub-searches often beat the unconstrained
-  line). It is a real upper bound on the optimum, not proven-minimal.
+- `winnable` + `par` power Bronze and the **Universal** families (the `moves` cap is derived from
+  `par`). `par` = **reference par = the shortest winning line found in any of our searches**
+  (unconstrained *and* every constrained one — each constrained line is still a legal unconstrained
+  win, and constrained sub-searches often beat the unconstrained line). It is a real upper bound on
+  the optimum, not proven-minimal.
+- Each entry's own `par` is the reference length of that constrained solution.
+- `rank-rush` records a **tightened** `N`: the builder re-searches against the witness line's own
+  completion index until it stops improving, so the shipped deadline is one a real line met.
 
-  > **Shipped-data caveat.** `certify()` takes that minimum today (`solve.mjs:186-188`), but **274 of
-  > the 366 records in `data/daily-pool.json` predate that change** and store the *unconstrained*
-  > length instead, so their `par` is larger than `min(constraintPar)` (e.g. seed 10002: `par 78`,
-  > `min 77`; seed 10004: `par 97`, `min 85`). Because the pool is append-only (§5) they were never
-  > regenerated. The only consequence is that the `moves` Silver objective — `N = round(par × 1.2)`
-  > — is up to ~14 % looser than intended on those days, which errs toward the player. Regenerating
-  > would silently re-tune historical days, so it should not be done casually; if it ever is,
-  > migrate `moves` params for shipped dates rather than recomputing them.
 - `supports[]` are the **Certified** objectives this seed admits — a Silver/Gold objective is only
   ever offered by the daily generator on a seed that lists it. This is what guarantees every
   offered objective is beatable (§ solvability of ordering objectives).
@@ -129,32 +130,37 @@ cards remain") before it can be a real objective. Removed for now.
 
 ---
 
-## 5. Pool builder (`build-pool.mjs`)
+## 5. Month builder (`build-month.mjs`)
 
 ```
-node tools/solver/build-pool.mjs [--start N] [--scan N] [--target N] [--budget N] [--out path]
+node tools/solver/build-month.mjs [--candidates 320] [--days 31] [--budget 100000]
+                                  [--jobs 8] [--sample-seed 20260801] [--out data/daily-pool.json]
+                                  [--cache .cache/month-certs] [--select-only]
 ```
 
-Scans candidate seeds (**strictly > 10,000** — 1..10,000 are reserved for personal range-play),
-certifies each, and appends the daily-eligible ones until it hits `--target` or exhausts `--scan`
-candidates. Properties:
+*(Replaces the old append-only `build-pool.mjs`, which is deleted along with the "IDs > 10,000"
+reservation. Daily deals now come from 500,001-1,000,000, at or under the app's single
+`maxSeed = 1,000,000` ceiling.)*
 
-- **Append-only:** existing pool entries are preserved and never reordered, so the deterministic
-  `date → seed` mapping (which indexes into this list) can never shift a past day. Growing the pool
-  = running again with a later `--start`; it resumes after the highest seed already stored.
-- **Versioned:** `pool.version` guards the schema.
-- Resumable and idempotent (skips seeds already present).
+**Phase 1 — certify, in parallel and resumably.** Candidate seeds are drawn deterministically from
+the daily range (same `--sample-seed` ⇒ same list ⇒ cache hits), then certified against the whole
+`VARIANTS` matrix — 63 `(family, parameter)` pairs — across `--jobs` worker processes, each
+appending JSONL to its own cache file. An interrupted run resumes where it stopped.
 
-The pool currently holds **366 seeds** (10001–10376 — a full year of daily challenges); it grows by
-re-running with a later `--start`. Of the seeds scanned in that range, 10 were rejected as not
-daily-eligible. Certification is ~10–15 s/seed (most of it the *unsupported* objectives exhausting
-their budget), so building is a batch job.
+**Phase 2 — choose the month for maximum variety.** A greedy fill takes, at each step, the
+`(seed, gold, silver)` triple that adds the most new variety: an unused family scores far above an
+unused parameter of a family already used, an exact challenge is never repeated, and a rare
+certification (one only a few candidates support) is preferred, since rare material is hardest to
+place. The chosen days are then reordered so no two consecutive dates share a family.
 
-**Objective supply is uneven**, which is worth knowing before tuning the generator: across the 366
-seeds, `cells-le-2` is supported by 366, `cells-le-1` by 364, `suits-top-down` by 353, `no-cells` by
-304, `kings-first` by 292, `aces-first` by 223, `jacks-down-first` by 184, `down-openers-20` by 147
-— and **`suit-sprint` by only 4** (seeds 10105, 10192, 10210, 10312), so it is actually chosen as
-the day's Gold on just 3 days of the year.
+Certification is **~90-150 s/seed** at `--budget 100000` — most of it the *unsupported* variants
+exhausting their node budget — so a 320-candidate month is roughly an hour on 8 cores. Building is
+a batch job; run it with `nohup` and watch the log.
+
+**Objective supply is very uneven**, which is why the net has to be cast wide: on a typical seed,
+`cells-le`, `max-run`, `split-at` and `suit-balance` certify at nearly every parameter, while
+`ends-first` (the strict both-ends prefix) certifies on 2 of 13 parameters, `big-move` is
+seed-dependent, and mid-rank `rank-rush` deadlines are unreachable by construction.
 
 ---
 
@@ -162,7 +168,7 @@ the day's Gold on just 3 days of the year.
 
 ```bash
 node --test tests/solver.test.mjs                 # unit + search tests
-node tools/solver/build-pool.mjs --scan 40 --target 20   # build/grow the pool
+node tools/solver/build-month.mjs --candidates 320 --jobs 8   # rebuild the seeded month
 ```
 
 The solver imports the deal/RNG from the shared engine (`tests/engine.mjs`), so its deals are

@@ -22,10 +22,12 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { solve, objective, dealState, moveToken } from './solve.mjs';
 import { applyMove, isWon } from './rules.mjs';
-import { dailyChallenge, evaluate } from '../../tests/daily.mjs';
+import { dailyChallenge, evaluate, OBJECTIVES } from '../../tests/daily.mjs';
 
 const SOLUTIONS_VERSION = 2;   // v2: per-tier { bronze, silver?, gold? } (v1 was a bronze string)
-const CERTIFIED_SILVER = new Set(['cells-le-1', 'cells-le-2', 'down-openers-20']);
+// A `universal` Silver (win in N moves / no undo) is already satisfied by the bronze line, so it
+// gets no line of its own; every other family constrains the search and earns a distinct one.
+const needsOwnLine = id => !OBJECTIVES[id].universal;
 
 function arg(name, def) {
   const i = process.argv.indexOf('--' + name);
@@ -71,9 +73,10 @@ function replay(seed, tokens) {
   return { won: isWon(s), moves, elapsed: 0, cellUses, undos: 0, foundationOrder, maxRunMoved };
 }
 
-// Solve seed under `objId` and return the winning line as tokens, or null if unsolved in budget.
-function lineFor(seed, objId, budget) {
-  const r = solve(dealState(seed), objective(objId), { budget, withPath: true });
+// Solve seed under one (objective, param) pair and return the winning line as tokens, or null if
+// unsolved in budget.
+function lineFor(seed, objId, param, budget) {
+  const r = solve(dealState(seed), objective(objId, param), { budget, withPath: true });
   return (r.solved === true && r.moves) ? r.moves.map(moveToken).join(' ') : null;
 }
 
@@ -85,20 +88,20 @@ const pool = JSON.parse(readFileSync(poolPath, 'utf8'));
 let sol = { version: SOLUTIONS_VERSION, solutions: {} };
 try { const prev = JSON.parse(readFileSync(out, 'utf8')); if (prev.version === SOLUTIONS_VERSION) sol = prev; } catch { /* fresh */ }
 
-console.log(`pool ${pool.seeds.length} seeds; have ${Object.keys(sol.solutions).length}; budget ${budget}`);
+console.log(`pool ${pool.days.length} days; have ${Object.keys(sol.solutions).length}; budget ${budget}`);
 let added = 0, goldOk = 0, silverOk = 0, warn = 0;
-for (let i = 0; i < pool.seeds.length; i++) {
-  const seed = pool.seeds[i].seed;
+for (let i = 0; i < pool.days.length; i++) {
+  const seed = pool.days[i].seed;
   if (sol.solutions[String(seed)] && sol.solutions[String(seed)].bronze) continue;   // resume-friendly
   const ch = dailyChallenge(i, pool);
   if (!ch) { console.log(`! ${seed} no challenge`); warn++; continue; }
 
-  const bronze = lineFor(seed, 'unconstrained', budget);
+  const bronze = lineFor(seed, 'unconstrained', {}, budget);
   if (!bronze || !replay(seed, bronze).won) { console.log(`! ${seed} bronze unsolved`); warn++; continue; }
   const entry = { bronze };
 
   // Gold — always a certified objective; must win AND satisfy the checker.
-  const goldTokens = lineFor(seed, ch.gold.id, budget);
+  const goldTokens = lineFor(seed, ch.gold.id, ch.gold.param, budget);
   if (goldTokens) {
     const t = replay(seed, goldTokens);
     if (t.won && evaluate(ch.gold, t)) { entry.gold = goldTokens; goldOk++; }
@@ -106,8 +109,8 @@ for (let i = 0; i < pool.seeds.length; i++) {
   } else { console.log(`! ${seed} gold(${ch.gold.id}) unsolved`); warn++; }
 
   // Silver — only certified (constraining) objectives get a distinct line; universals fall back to bronze.
-  if (CERTIFIED_SILVER.has(ch.silver.id)) {
-    const silverTokens = lineFor(seed, ch.silver.id, budget);
+  if (needsOwnLine(ch.silver.id)) {
+    const silverTokens = lineFor(seed, ch.silver.id, ch.silver.param, budget);
     if (silverTokens) {
       const t = replay(seed, silverTokens);
       if (t.won && evaluate(ch.silver, t)) { entry.silver = silverTokens; silverOk++; }
