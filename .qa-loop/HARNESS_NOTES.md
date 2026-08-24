@@ -181,8 +181,35 @@ Blind tapping will not get you to a win. Use the baked demo line:
   `touch_path` with a final repeated point and `dt_ms: 4000` holds the card mid-drag so a
   background `simctl` film loop (~3 fps) can capture the lifted card's rendered position.
 - The dragged card is rendered CENTRED on the touch point (measured: finger x=52 → card span
-  30.0-74.0 pt), and the tableau drop frames equal the card frames, so the ~5 pt inter-column
-  gutter is a dead zone. Aim drops at a column CENTRE, never near x = centre+24.
+  30.0-74.0 pt). **Round 2 (369c365): the gutter dead zone is GONE** — column drop zones are
+  cardW+2·gap wide and overlap, and a release resolves to the NEAREST COLUMN CENTRE. Measured
+  boundary between col0 (centre 28.15) and col1 (77.15) sits between x=53 and x=54, i.e. the
+  geometric midpoint 52.65 ±1 pt of harness rounding. So a drop at x = centre+25 lands on the
+  NEXT column, not this one — aim at the centre if you care which column you hit.
+- **The Deal # alert geometry in the older notes is wrong on this build.** The number pad does
+  NOT come up. Working recipe (all device pt): Deal pill (184,175) for a 5-digit seed / (198,175)
+  for 6 digits → tap the text field at **(204,468)** → the edit menu appears → tap **Select All
+  (145,421)** → MCP `text` action to type the seed → **Play (274,537)**, Cancel (122,537).
+  Typing via `text` beats tapping a number pad entirely.
+- `sips -Z N` fits the LONGEST side, so a full portrait frame comes back 230x500 for `-Z 500`;
+  device pt = view px × 402/230. Estimating coordinates off a `-Z 500` frame while assuming it
+  is 500 wide puts every y out by 1.75x — that is what makes the stale alert coordinates look
+  plausible.
+- Reading a column's card tops as TEXT: `python3 col.py <shot>.png <x_pt>` (vertical scan at one
+  x → list of dark border rows). Card COUNT and fan pitch fall straight out, no image tokens.
+  `python3 hscan.py <shot>.png <y_pt>` at a y inside a card's blank area gives the card left/right
+  borders (so card width and the board-shrink state) — pick a y a few pt above the next card's
+  top edge or the scan hits rank glyphs and the spans turn to noise.
+- Filming a short animation: `film40.sh` in the worker scratch loops `simctl io screenshot`
+  (~4 fps, ~0.25 s/frame) into `film2/`; start it in the background, drive the taps, `pkill -f
+  film40.sh`, then `python3 diff.py <cy> <cx> <ch> <cw> 'film2/f*.png'` (args are NATIVE px =
+  3× device pt). Catches the 0.3 s unmovable-card wiggle in ~4 of 5 taps.
+- Holding a card mid-drag for inspection: MCP `touch_path` with the final point REPEATED and
+  `dt_ms: 4000` holds the lifted card for 4 s (~28 filmed frames).
+- **No deal is guaranteed to have an exposed A/K or a bottom run.** Pick the fixture with node
+  instead of hunting: `tests/engine.mjs deal(seed)` + a 20-line scan over seeds. Useful pins
+  found this round: **#10011 exposes A♦ at col6 bottom** (tap-to-foundation), **#10006 has the
+  2-card run Q♥/J♣ at col6 bottom with K♠ waiting at col4 bottom** (run-head tap).
 
 ## Chunk wf-3-1 notes (round 1, loop 3)
 
@@ -488,3 +515,18 @@ Blind tapping will not get you to a win. Use the baked demo line:
   imports resolve) and run it from the repo root; `wf-8-1/inj.sh` already carries qa-worker-1's
   udid. A hand-built save with a 15-card column 0 (`tall16.json`) is a ready tall-column
   fixture — note the board does NOT uniformly shrink even at 16 cards in portrait.
+
+## Chunk wf-1-1 notes (round 2, loop 3)
+
+- **Deal alert, corrected again (build 369c365):** the number pad is NOT up when the alert
+  opens (round-1's note is stale for this build). With no pad: field (201,471), `Cancel`
+  (127,539), `Play` (275,539). Tapping the field raises the *edit menu*, not the pad —
+  `Select All` lands at (143,423). Fastest reliable recipe: tap field → tap `Select All` →
+  MCP `text` action with the digits (hardware-keyboard injection works and replaces the
+  selection) → tap `Play` (275,539). Verify the digits with a crop before committing.
+- Foundation drags work with a plain MCP `swipe`, `duration: 0.8`, from the card centre to
+  the slot centre; no dwell needed. A refused foundation drop is a silent snap-back with
+  the Moves counter unchanged — that is the reliable pass/fail signal, not the animation.
+- Bottom card of a column is drawn TALL (rank at top, big pip below): its tap point is
+  ~35 pt below the `425 + 30*i` top, i.e. tap `y = 425 + 30*i + 35`. Columns 1-4 hold 7
+  cards, columns 5-8 hold 6.

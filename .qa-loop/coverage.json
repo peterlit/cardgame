@@ -449,6 +449,70 @@
           "reason": "Same clamp failure; 20-digit input silently disables Play with no explanation (not filed, extreme edge)."
         }
       }
+    },
+    "2": {
+      "TC-1.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Cold launch on 369c365: header subtitle, 'FOUNDATIONS \u00b7 A\u2191 / K\u2193' + A/K slot ghosts and FREE CELLS all legible; How to play states both-ended goal, row order, tap-to-move and drag; tapping bottom A\u2666 on pinned deal #10011 sent it to the diamond UP foundation, Moves 0->1, clock started, Undo enabled. Well inside the ~1 min bar."
+        }
+      },
+      "TC-1.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Tapped 10\u2663 (col4 bottom, deal #10011) whose only home was a free cell: smart-move parked it in free cell 1, Moves 1->2, no silent no-op. Control: tapping a buried card (K\u2666, col1 index 2) left Moves at 2 with no state change."
+        }
+      },
+      "TC-2.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10011: single tap on the exposed A\u2666 (321,620) sent it to the diamonds UP foundation; Moves 0->1; no confirmation, no press-and-hold."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same action, 1 tap, effort bar met."
+        }
+      },
+      "TC-2.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10006: tap on run head Q\u2665 (321,560) relocated Q\u2665+J\u2663 together onto K\u2660 in col4; Moves 0->1."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same; whole run moved as a group in one tap."
+        }
+      },
+      "TC-2.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10004 regression legs both pass: (322,613)->(28,700) and ->(28,800) each land 10\u2665 on col0 (Moves +1); ->(28,860) correctly snaps back (Moves 0). Free-cell drag (273,620)->(323,296) and foundation drag (321,620)->(126,296) on #10011 both land. Gutter now tiles. Filed ux/WF-2:no-drop-target-highlight as a separate feedback gap."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Pickup instant at swipe durations 0.05-0.4 s (no press-and-hold); drops land where released."
+        }
+      },
+      "TC-2.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10006: drag of buried 9\u2666 (28,530)->(224,700) did not lift the card and counted no move (Moves stayed 1). Tap on the same card produced the acknowledgement wiggle in 4 of 5 taps (filmed at ~4 fps; MAD 29.2-42.9, 35-46% of the card rect changed; \u00b14 pt horizontal displacement visible in frame f033)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same; no stuck-elevated-zIndex artifact after release."
+        }
+      },
+      "TC-2.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #10004, all four legs. (b) col0 fan pitch 30 pt at <=12 cards -> 28 at 13 -> 24 at 15 while every other column stayed at 30 and card width stayed 44 pt. (c) the 16th card triggered ONE uniform board shrink: card width 44->42 pt, pitch 47, tableau re-centred (col0 left edge 6.0->15.0 pt), foundations/free cells shrank with it. (a) bottom card top 763.7, bottom edge 834.3 pt - fully on screen and hit-testable. (d) tapping the bottom card moved it (Moves 13->14) with no regrow; Undo restored 16 cards, geometry byte-identical to before the tap."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same run; 13 drags, effort as documented."
+        }
+      }
     }
   }
 }

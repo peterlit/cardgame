@@ -1,6 +1,6 @@
 {
-  "round": 1,
-  "build_sha": "f949d82",
+  "round": 2,
+  "build_sha": "369c365",
   "max_rounds": 3,
   "parallel_testers": 2,
   "emit_regression_tests": true,
@@ -66,14 +66,18 @@
       "confidence": "confirmed",
       "region": "WF-1",
       "test_case": "TC-1.1",
-      "build_sha": "f949d82",
+      "build_sha": "369c365",
       "evidence": {
         "screenshots": [
           ".qa-loop/evidence/round-1/wf-1-1/tc11-06-foundation-rows-identical-zoom.png",
           ".qa-loop/evidence/round-1/wf-1-1/tc11-01-cold-launch.png",
           ".qa-loop/evidence/round-1/wf-1-1/tc11-02-howtoplay-top.png",
           ".qa-loop/evidence/round-1/wf-1-1/tc11-04-ace-dragged-to-down-row-refused.png",
-          ".qa-loop/evidence/round-1/wf-1-1/tc11-05-ace-drag-to-up-row-accepted.png"
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-05-ace-drag-to-up-row-accepted.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-01-foundation-labels-fixed.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-02-howtoplay-row-clause.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-04-ace-drag-to-K-row-refused.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-05-ace-drag-to-A-row-accepted.png"
         ],
         "repro": [
           "Fresh install, cold launch",
@@ -81,12 +85,16 @@
           "Tap 'How to play' (55,214): the Goal section names an up pile and a down pile but never says which screen row is which. Tap Done (359,103)",
           "Tap col2 bottom 8D at (126,650) -> it builds onto 9S, exposing AS",
           "DRAG AS from (126,620) to the LOWER spade foundation slot (28,374): card snaps back, Moves stays 6, no message (screenshot tc11-04)",
-          "Control: DRAG the same AS from (126,620) to the UPPER spade slot (28,296): it is accepted (screenshot tc11-05) - so the refusal above is a rule refusal, not a failed pickup"
+          "Control: DRAG the same AS from (126,620) to the UPPER spade slot (28,296): it is accepted (screenshot tc11-05) - so the refusal above is a rule refusal, not a failed pickup",
+          "Fresh install (uninstall+install), cold launch",
+          "Board now reads 'FOUNDATIONS \u00b7 A\u2191 / K\u2193'; every EMPTY up-row slot carries a faint 'A' + suit pip and every empty down-row slot a faint 'K' + pip (tc11-01)",
+          "Tap 'How to play' (55,214): Goal now says 'On the board the TOP foundation row is the up pile and the row beneath it is the down pile: empty slots show a faint A or K to say which card starts there.' (tc11-02)",
+          "Round-1 repro replayed on deal #10011: tap col3 bottom 8\u2666 (126,640) -> builds onto 9\u2660, exposing A\u2660; DRAG A\u2660 (126,600) to the LOWER spade slot (28,374) -> still a rule refusal / snap-back, Moves unchanged (tc11-04); DRAG the same A\u2660 to the UPPER spade slot (28,296) -> accepted, Moves 4 (tc11-05)"
         ],
         "measurements": {
-          "board_cues_distinguishing_up_row_from_down_row": 0,
-          "howtoplay_mentions_row_order": false,
-          "feedback_on_refused_drop": "none (silent snap-back)"
+          "board_cues_distinguishing_up_row_from_down_row": 3,
+          "howtoplay_mentions_row_order": true,
+          "feedback_on_refused_drop": "still a silent snap-back, but the destination slot now shows 'K' so the refusal is self-explanatory"
         }
       },
       "first_seen_round": 1,
@@ -95,10 +103,14 @@
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ],
-      "current_status": "open",
-      "note": "Not a blocker for WF-1: tap-to-smart-move routes an Ace to the up row and a King to the down row correctly, so a novice can finish the workflow without ever knowing. Cheapest fix is a ghost 'A' / 'K' (or an up/down chevron) watermark on the EMPTY foundation slots plus one clause in How to play - do not restyle occupied foundations."
+      "current_status": "fixed",
+      "note": "Verified on 369c365: group label + per-slot A/K ghosts + the How to play clause all present, and the ghosts appear on EMPTY slots only (the occupied A\u2666 and A\u2660 render as normal cards with no extra glyph \u2014 tc11-03/tc11-05), which was the constraint in the round-1 note. The refused drop is still silent, but that was the consequence of the missing labels, not a separate defect; not refiled."
     },
     {
       "id": "ux/WF-10:automation-undocumented",
@@ -475,19 +487,22 @@
     },
     {
       "id": "ux/WF-2:drop-gutter-dead-zone",
-      "claim": "Tableau column drop frames are only as wide as the cards, so the ~5 pt gutter between two columns belongs to no column: a legal drag released there is silently refused (card snaps back, Moves unchanged) even though the dragged card is rendered centred on the finger and visibly overlaps the intended column by ~45% of its width. An earlier fix extended these frames vertically to the bottom of the tableau; horizontally they still do not tile.",
+      "claim": "Tableau column drop frames are only as wide as the cards, so the ~5 pt gutter between two columns belongs to no column: a legal drag released there is silently refused (card snaps back, Moves unchanged) even though the dragged card is rendered centred on the finger and visibly overlaps the intended column by ~45% of its width.",
       "type": "ux-design",
       "routing": "auto",
       "severity": "minor",
       "confidence": "confirmed",
       "region": "WF-2",
       "test_case": "TC-2.3",
-      "build_sha": "f949d82",
+      "build_sha": "369c365",
       "evidence": {
         "screenshots": [
           ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-middrag.png",
           ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-refused-x52.png",
-          ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-lands-x48.png"
+          ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-lands-x48.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x52-lands-col0.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x53-lands-col0.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x54-lands-col1.png"
         ],
         "repro": [
           "fresh install + launch (no daily HUD, portrait)",
@@ -496,21 +511,21 @@
           "drag (28,620) -> (224,700)   [JC+10H run to col4, col0 bottom is now 4D, Moves 2]",
           "drag (175,642) -> (274,296)  [8S to free cell 1, exposing 5S at col3 bottom, Moves 3]",
           "drag (175,612) -> (52,700)   [release 5S in the gap between col0 and col1: card snaps back, Moves STAYS 3]",
-          "drag (175,612) -> (48,700)   [same drag released 4 pt further left: 5S lands on 4D in col0, Moves 4]"
+          "drag (175,612) -> (48,700)   [same drag released 4 pt further left: 5S lands on 4D in col0, Moves 4]",
+          "fresh install + launch, Deal # -> 10004 -> Play",
+          "drag (321,612)->(28,700); drag (28,620)->(224,700); drag (175,642)->(274,296)  [Moves 3, 5S exposed at col3 bottom]",
+          "drag (175,612)->(52,700)  [round-1 refusal point: 5S NOW LANDS on col0, Moves 4]",
+          "Undo, then drag (126,650)->(53,690)  [6H lands on col0, Moves 6]",
+          "drag (321,590)->(54,690)  [JD, legal only on col1, LANDS on col1]",
+          "drag (321,590)->(53,690)  [JD refused - x=53 resolves to col0 where JD is illegal; correct nearest-centre behaviour, not a dead zone]",
+          "steal checks: drag (273,620)->(28,380) [7C over the down-foundation slot above col0: refused, column did NOT steal it]; drag (273,620)->(323,296) [7C lands in free cell 2]"
         ],
         "measurements": {
-          "card_width_pt": 44,
-          "column_pitch_pt": 49,
-          "gutter_width_pt": 5,
-          "col0_card_span_pt": "6.0-50.0",
-          "col1_card_span_pt": "55.0-99.0",
-          "release_x_refused_pt": 52,
-          "release_x_accepted_pt": 48,
-          "dragged_card_span_at_release_pt": "30.0-74.0",
-          "overlap_with_col0_pt": 20,
-          "overlap_with_col1_pt": 19,
-          "moves_before": 3,
-          "moves_after_gutter_release": 3
+          "col0_card_span_pt": "6.0-50.3",
+          "col1_card_span_pt": "55.0-99.3",
+          "gutter_width_pt": 4.7,
+          "resolution_boundary_pt": "between 53 and 54 (geometric midpoint of the two column centres = 52.65)",
+          "dead_x_values_found": 0
         }
       },
       "first_seen_round": 1,
@@ -519,10 +534,14 @@
         {
           "round": 1,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ],
-      "current_status": "open",
-      "note": "Reproduced with two different cards (JD legal only on col1, 5S legal only on col0): BOTH are refused at x=52, which proves the gutter belongs to neither column rather than resolving to the nearer one. No drop-target highlight is drawn during a drag, so the only feedback is the snap-back. Cheap fix: make each column's drop frame span its full pitch (or resolve a release to the column with the greatest overlap / nearest centre). Not a move-count corruption: the refused release correctly counts no move."
+      "current_status": "fixed",
+      "note": "Verified fixed. Column drop zones now tile: every x across the gutter resolves to the nearer column centre, boundary measured between x=53 and x=54 vs the predicted 52.65. Round-1's exact refusal point x=52 now lands. No residual dead x. Collateral checks passed: a release over the foundation row (28,380) is still refused rather than stolen by col0's zone (column zones start at the tableau top y=425, well below the foundation rows), and free-cell drops still land."
     },
     {
       "id": "ux/WF-3:new-game-discards-in-progress-deal",
@@ -1271,10 +1290,51 @@
           "status": "open"
         }
       ]
+    },
+    {
+      "id": "ux/WF-2:no-drop-target-highlight",
+      "claim": "Nothing on the board indicates where a dragged card will land: no column, free cell or foundation is highlighted at any point during a drag, and a refused release is silently identical to a release over dead space (card returns to origin, Moves unchanged). Now that the round-1 gutter fix resolves a gutter release to the nearer column centre, an invisible 1 pt boundary decides the outcome - releasing J\u2666 at x=53 snaps back (resolved to col0, illegal) while x=54 lands on col1 - and a novice has no way to see which column is armed.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-2",
+      "test_case": "TC-2.3",
+      "build_sha": "369c365",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-middrag-no-target-highlight.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x53-jd-refused-snapback.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x54-lands-col1.png"
+        ],
+        "repro": [
+          "fresh install + launch, Deal # -> 10011 -> Play; tap (321,620) [A\u2666 to foundation, Moves 1]",
+          "touch_path [(28,650),(50,670),(77,700),(77,700) dt_ms 4000] - Q\u2665 held for 4 s directly over col1, a LEGAL target: filmed at ~4 fps, no frame shows any highlight/outline/tint on col1 or on any other zone; only the lifted card moves",
+          "contrast: on deal 10004 drag (321,590)->(53,690) [J\u2666 snaps back] vs ->(54,690) [J\u2666 lands on col1]. Both look identical up to the release."
+        ],
+        "measurements": {
+          "held_drag_duration_s": 4,
+          "frames_filmed_during_hold": 28,
+          "frames_showing_a_target_highlight": 0,
+          "resolution_boundary_pt": "between x=53 and x=54",
+          "boundary_width_pt": 1
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Not introduced by the gutter fix - the highlight was already absent in round 1 - but the fix makes it matter more, because which of two neighbouring columns receives a gutter release is now decided by an invisible midpoint. The app already invests in touch feedback elsewhere (the 0.3 s wiggle for an unliftable card, ux/WF-2:unmovable-card-no-feedback), so a silent snap-back is inconsistent with its own feedback vocabulary. Cheap fix: tint/outline the zone that dropTarget(at:) currently resolves to while the drag is live."
     }
   ],
   "round_shas": {
-    "1": "f949d82"
+    "1": "f949d82",
+    "2": "369c365"
   },
   "usage": {
     "1": {
