@@ -1,6 +1,10 @@
 // Build (or grow) the baked "Show me how to win" solutions for the daily pool. OFFLINE tool.
 //
-//   node tools/solver/build-solutions.mjs [--pool path] [--out path] [--budget N]
+//   node tools/solver/build-solutions.mjs [--pool path] [--out path] [--budget N] [--stripe W/N]
+//
+// `--stripe W/N` builds only days where `dayIndex % N === W`, writing to its own `--out`. Four
+// stripes into four files, then `--merge a.json b.json ...`, turns a ~90-minute serial batch into a
+// ~25-minute parallel one; the solver is single-threaded and CPU-bound.
 //
 // For every seed in the certified daily pool we bake up to THREE replayable winning lines — one per
 // tier — so the app can demonstrate not just clearing the deal but achieving that day's Silver and
@@ -84,6 +88,23 @@ const poolPath = arg('pool', 'data/daily-pool.json');
 const out = arg('out', 'data/daily-solutions.json');
 const budget = Number(arg('budget', 300000));
 
+// --merge: fold several stripe outputs into one file and exit.
+const mergeIdx = process.argv.indexOf('--merge');
+if (mergeIdx >= 0) {
+  const merged = { version: SOLUTIONS_VERSION, solutions: {} };
+  const rest = process.argv.slice(mergeIdx + 1);
+  const end = rest.findIndex(a => a.startsWith('--'));
+  for (const f of (end >= 0 ? rest.slice(0, end) : rest)) {
+    const part = JSON.parse(readFileSync(f, 'utf8'));
+    Object.assign(merged.solutions, part.solutions);
+  }
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, serialize(merged));
+  console.log(`merged ${Object.keys(merged.solutions).length} seeds -> ${out}`);
+  process.exit(0);
+}
+
+const [stripeW, stripeN] = (arg('stripe', '0/1')).split('/').map(Number);
 const pool = JSON.parse(readFileSync(poolPath, 'utf8'));
 let sol = { version: SOLUTIONS_VERSION, solutions: {} };
 try { const prev = JSON.parse(readFileSync(out, 'utf8')); if (prev.version === SOLUTIONS_VERSION) sol = prev; } catch { /* fresh */ }
@@ -91,6 +112,7 @@ try { const prev = JSON.parse(readFileSync(out, 'utf8')); if (prev.version === S
 console.log(`pool ${pool.days.length} days; have ${Object.keys(sol.solutions).length}; budget ${budget}`);
 let added = 0, goldOk = 0, silverOk = 0, warn = 0;
 for (let i = 0; i < pool.days.length; i++) {
+  if (i % stripeN !== stripeW) continue;
   const seed = pool.days[i].seed;
   if (sol.solutions[String(seed)] && sol.solutions[String(seed)].bronze) continue;   // resume-friendly
   const ch = dailyChallenge(i, pool);

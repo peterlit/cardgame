@@ -129,7 +129,7 @@ function silverOptions(rec) {
 const goldOptions = rec => rec.supports.filter(isGold)
   .map(v => ({ id: v.id, param: v.param, key: variantKey(v.id, v.param), rare: true }));
 
-function selectMonth(recs) {
+function selectMonth(recs, capPerFamily) {
   const eligible = recs.filter(isDailyEligible);
   // Rarity: how many eligible seeds certify each variant key. Rare material gets placed first.
   const support = new Map();
@@ -137,12 +137,17 @@ function selectMonth(recs) {
     const k = variantKey(v.id, v.param);
     support.set(k, (support.get(k) || 0) + 1);
   }
+  // Counters are PER TIER: a family used four times as the Gold should not also fill every Silver.
+  // Without the per-tier cap, families whose parameter is effectively continuous (rank-rush's
+  // deadline is per-seed, so its key is always new) win every slot and the tier reads as one idea.
   const idUses = new Map(), keyUses = new Map();
   const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
-  const novelty = o => {
-    const idN = idUses.get(o.id) || 0, keyN = keyUses.get(o.key) || 0;
-    let s = idN === 0 ? 120 : Math.max(0, 45 - 15 * idN);   // a NEW family is worth far more
-    s += keyN === 0 ? 35 : -40 * keyN;                      // never repeat an exact challenge
+  const capped = (tier, o) => (idUses.get(tier + ':' + o.id) || 0) >= capPerFamily;
+  const novelty = (tier, o) => {
+    const idN = idUses.get(tier + ':' + o.id) || 0, keyN = keyUses.get(o.key) || 0;
+    let s = 150 / (1 + idN);                                // diminishing, never quite zero
+    s += keyN === 0 ? 40 : -60 * keyN;                      // never repeat an exact challenge
+    s -= 12 * (idUses.get('gold:' + o.id) || 0) + 12 * (idUses.get('silver:' + o.id) || 0);
     if (o.rare) s += Math.max(0, 24 - 2 * (support.get(o.key) || 0));   // scarce certifications first
     return s;
   };
@@ -152,22 +157,39 @@ function selectMonth(recs) {
     let best = null;
     for (const rec of eligible) {
       if (used.has(rec.seed)) continue;
-      const golds = goldOptions(rec), silvers = silverOptions(rec);
+      const golds = goldOptions(rec).filter(o => !capped('gold', o));
+      const silvers = silverOptions(rec).filter(o => !capped('silver', o));
       for (const g of golds) {
-        const gs = novelty(g);
+        const gs = novelty('gold', g);
         for (const s of silvers) {
-          const score = gs + novelty(s);
+          // Never pair a family with itself: "at least 7 from the Ace end" as the Silver under
+          // "at least 10 from the Ace end" as the Gold is one objective printed twice, and the
+          // Gold implies the Silver.
+          if (s.id === g.id) continue;
+          const score = gs + novelty('silver', s);
           if (!best || score > best.score) best = { score, rec, gold: g, silver: s };
         }
       }
     }
     if (!best) break;
     used.add(best.rec.seed);
-    bump(idUses, best.gold.id); bump(keyUses, best.gold.key);
-    bump(idUses, best.silver.id); bump(keyUses, best.silver.key);
+    bump(idUses, 'gold:' + best.gold.id); bump(keyUses, best.gold.key);
+    bump(idUses, 'silver:' + best.silver.id); bump(keyUses, best.silver.key);
     chosen.push(best);
   }
   return chosen;
+}
+
+// Fill the month under the tightest per-family cap that still fills it. A tight cap is what forces
+// the tiers to range across families instead of one family with many parameters.
+function selectMonthBalanced(recs) {
+  let best = [];
+  for (let cap = 3; cap <= 12; cap++) {
+    const chosen = selectMonth(recs, cap);
+    if (chosen.length > best.length) best = chosen;
+    if (chosen.length >= nDays) return chosen;
+  }
+  return best;
 }
 
 // Spread the chosen days so no two consecutive dates share an objective family (a greedy pass over
@@ -198,7 +220,7 @@ const recs = [...readCache(cache).values()].filter(r => list.includes(r.seed));
 const winnable = recs.filter(r => r.winnable);
 console.log(`\ncertified ${recs.length} candidates: ${winnable.length} winnable, ${recs.filter(isDailyEligible).length} daily-eligible`);
 
-const chosen = spread(selectMonth(recs));
+const chosen = spread(selectMonthBalanced(recs));
 if (chosen.length < nDays) console.warn(`WARNING: only ${chosen.length} of ${nDays} days could be filled — widen --candidates`);
 
 const pool = {

@@ -530,3 +530,30 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
   working-habit changes.
 - **One earlier recommendation was retracted by the data:** passing the raw diff to the reviewer by
   path rather than in-context saves nothing. Diffs averaged 271 tokens across 48 calls.
+
+### QA loop 3 — parked, with a measured cost report (2026-08-23)
+- **`docs/qa-loop-feedback.md`** is the write-up: 23.5M effective subagent tokens for 29 findings
+  (811K/finding vs 2.21M last loop; 9.3K/request vs 14.0K). The gain came from cutting the 86 KB
+  tester brief to 6.9 KB before the run — it has already regrown to 22 KB.
+- **The loop is parked, not converged.** Round 2 ran 2 of 15 chunks. `.qa-loop/REPORT.md` carries a
+  banner: 17 of 18 round-1 fixes were reviewed as sound but only three were *verified against the
+  running app*. Resuming means re-running round 2 from its step 1.
+- Open from round 1: **11 proposal-routed findings await your decision** (they never block the
+  loop), plus the round-1 minors that round 2 never got to re-test.
+- Top recommendations that are plugin/skill changes, not repo code: cap and rotate
+  `HARNESS_NOTES.md`; make the implementer commit per region so targeted passes stay targeted;
+  promote the testers' throwaway rigs (PNG diff, save injection, cropping) into `.qa-loop/tools/`
+  instead of rebuilding them every round; fix `merge_ledger.py --region WF-1` matching WF-10..13.
+
+### Daily Challenges — the August 2026 recut (2026-08-23)
+- Objectives are now **parameterised families** (`docs/daily-challenges.md` §4). Adding variety is
+  adding a parameter value to `VARIANTS` in `tools/solver/solve.mjs` and re-running the generator.
+- **Only August 2026 is seeded.** After 2026-08-31 there is no daily challenge until someone runs
+  `node tools/solver/build-month.mjs` for another month — and the epoch/day-index mapping assumes
+  day 0 = 2026-08-01, so a second month needs a decision about whether to extend `days[]` (simple,
+  keeps history) or move the epoch again (nukes history again).
+- Regenerating the month **rewrites history by design**; both platforms drop a pre-v2 daily store.
+  If a future recut is ever meant to preserve history, that is a migration, not a rebuild.
+- Ideas certified but not currently offered anywhere: `end-bias` at `min` 7-8 (very common, low
+  value as a Gold), and mid-rank `rank-rush`, which is unreachable by construction and is excluded
+  from the matrix on purpose.

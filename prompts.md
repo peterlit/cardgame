@@ -626,3 +626,30 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     platforms, so the reverting chip is the truthful prediction of the grade; and every other
     `objSecured` case un-secures on undo too. The comment was the bug, and it was wrong in
     `index.html` as well.
+
+77. Run the QA loop (max 3 rounds, 2 testers), measure token usage, and write up feedback plus
+    suggestions for reducing it. Round 0 explored the new sandbox objectives, round 1 ran a full
+    57-case pass across 15 chunks on two simulators plus a solo perf lane, the implementer fixed 17
+    of 18 auto-routed findings and argued one down, and the fix reviewer upheld the decline. Round 2
+    was stopped by hand after 2 of 15 chunks. Measured from the raw transcripts: 23.5M effective
+    subagent tokens for 29 findings — 811K per finding against 2.21M in the previous loop, and 9.3K
+    per subagent request against 14.0K. Nearly all of that came from one change made before the run
+    started: `HARNESS_NOTES.md` had grown to 86 KB of obsolete driver lore that every tester paid
+    for on every dispatch, and cutting it to 6.9 KB is the whole delta. It regrew to 22 KB in one
+    round, which is why recommendation #1 is to cap and rotate it automatically. Write-up in
+    `docs/qa-loop-feedback.md`; the loop is parked with a banner on its report saying what is and
+    is not verified.
+
+78. Add more Daily Challenge variety: two new objective shapes by name (send every <rank> home from
+    the Ace end and every <higher rank> from the King end before anything else; get all four
+    <rank>s home in <N> moves or fewer), plus ideas of my own; nuke all existing challenges and
+    challenge history; put the deal-seed cap back to 1,000,000 and draw challenge deals from
+    500,001-1,000,000; seed exactly August 2026 with the most varied set the generator can find,
+    casting a wide net and varying every tunable parameter. Turned the whole catalogue into
+    parameterised families (13 ids, hundreds of distinct challenges) so that "vary the parameter" is
+    the design rather than a special case, and every previously shipped objective became a parameter
+    of one of them. Replaced the per-day RNG with an offline generator that certifies a wide net of
+    candidate seeds against all 63 (family, parameter) variants in parallel and then fills the month
+    greedily for maximum variety — the choice is baked per day, so `dailyChallenge` is now a table
+    lookup. Moved the epoch to 2026-08-01, deleted the pre-epoch sandbox, and collapsed
+    `maxValidSeed` back into a single `maxSeed` now that no challenge seed exceeds it.
