@@ -106,8 +106,14 @@ pin('Model/Game.swift', 'same-day attempt bookkeeping', [
         persist()`,
   // restartDeal: a retry is a NEW attempt, re-stamped from today.
   'if let day = day { challengeDay = day; challengeStartDay = todayIndex(); persist() }',
-  // restore: an older save without a start day falls back to the challenge's own day.
-  'challengeStartDay = s.challengeStartDay ?? s.challengeDay',
+  // persist: the start day is actually WRITTEN to the save (dropping it would make every relaunch
+  // look like a pre-⏰ save).
+  'challengeDay: challengeDay, challengeStartDay: challengeStartDay, telem: telem,',
+  // restore: an older save without a start day stays nil — never guessed from the challenge day
+  // (`?? s.challengeDay`), which would hand the midnight grace to a backfilled attempt that cannot
+  // prove it. Pinned with the following line so re-adding a fallback trips the guard.
+  `challengeStartDay = s.challengeStartDay
+        telem = s.telem ?? Telemetry()`,
   // ...and the recorded start day is what recordChallengeResult judges the win by.
   'onTime: isOnTime(challengeDay: day, winDay: todayIndex(),',
   'attemptStartDay: challengeStartDay))',
@@ -117,6 +123,33 @@ test('iOS stamps the ⏰ start day at both attempt entry points (no web↔iOS dr
   const n = src.split(norm('challengeStartDay = todayIndex()')).length - 1;
   assert.equal(n, 2, `Game.swift: expected challengeStartDay = todayIndex() at BOTH playChallenge and restartDeal, found ${n}`);
 });
+
+// The wiring above only computes ⏰; these pin the SURFACES that show it. Without them the whole
+// award is deletable green on the platform that ships: the calendar pip, the day-card line, the
+// streaks-strip column and the win-overlay line can each be removed from the Swift and the suite
+// stays quiet, while the web twins of all four ARE pinned in tests/daily.test.mjs.
+pin('Views/DailyView.swift', '⏰ award surfaces (streaks strip, day-card line, calendar pip)', [
+  // the Same-day column of the streaks strip, in the canonical order the web renders.
+  '[("🔥", "Play", s.play), ("⏰", "Same-day", s.onTime), ("🥈", "Silver", s.silver),',
+  // the day card's ⏰ line: earned on the day...
+  `if rec?.onTime == true {
+            Text("⏰ Cleared on the day")`,
+  // ...and today's invitation, which names the running streak.
+  'Text(run.current > 0 ? "⏰ Win today to keep your \\(run.current)-day same-day streak"',
+  // the calendar pip (paired with the shape it draws, so a constant condition can't satisfy it).
+  `if rec?.onTime == true {
+                Circle().fill(Theme.gold).frame(width: 5, height: 5)`,
+]);
+pin('Views/ContentView.swift', 'win-overlay ⏰ line', [
+  // The whole ternary, not just `d.onTime`: a pin on the bare read stays green if the value is
+  // ANDed with a constant, and the streak number must come from streaks(...).onTime.current.
+  `let onTime = d.onTime
+            ? " ⏰ On time — \\(streaks(game.dailyStore.days, todayIndex()).onTime.current)-day same-day streak."
+            : ""`,
+  // ...and it must actually be appended to whichever tier line this attempt earned.
+  'if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }',
+  'return "Daily challenge: \\(earned.isEmpty ? "—" : earned) earned." + onTime',
+]);
 
 // ---- once-only win record (guards the auto-finish deferred-win "record exactly once" invariant) ----
 pin('Model/Game.swift', 'recordWin once-only gate', [

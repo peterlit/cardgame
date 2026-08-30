@@ -234,8 +234,8 @@ final class Game: ObservableObject {
         var started: Bool
         var challengeDay: Int?      // preserve a challenge attempt (+ its telemetry) across relaunch
         /// The day the attempt began, for the ⏰ same-day grace. Optional so saves written before
-        /// this field existed still decode; a missing value falls back to `challengeDay`, which
-        /// never credits a date the attempt cannot prove.
+        /// this field existed still decode; a missing value restores as nil (unknown), which
+        /// forfeits the grace rather than crediting a date the attempt cannot prove.
         var challengeStartDay: Int?
         var telem: Telemetry?
         /// "Not yet" on the auto-finish prompt is a per-GAME decision, so it has to survive a kill:
@@ -296,7 +296,11 @@ final class Game: ObservableObject {
         moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
         challengeDay = s.challengeDay          // resume a challenge attempt if one was in progress
-        challengeStartDay = s.challengeStartDay ?? s.challengeDay
+        // A pre-⏰ save has no start day: keep it nil instead of guessing `s.challengeDay`. That
+        // guess would grant the midnight grace to an attempt that cannot prove it — a BACKFILLED
+        // day D begun today and finished after a relaunch on D+1 would be falsely awarded ⏰.
+        // nil ⇒ isOnTime() credits the save only for a win on the challenge's own date.
+        challengeStartDay = s.challengeStartDay
         telem = s.telem ?? Telemetry()
         dailyResult = nil
         winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)

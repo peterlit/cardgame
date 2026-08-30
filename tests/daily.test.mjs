@@ -360,7 +360,7 @@ test('web ⏰ same-day wiring is intact (start day recorded, carried, and fed to
     // in-progress save/restore: the grace survives a reload; an older save falls back to the
     // challenge day, so a resumed attempt can never be credited for a date it cannot prove.
     'challengeDay, challengeStartDay, telem',
-    'challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : challengeDay;',
+    'challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : null;',
     // restartDeal: a retry is a NEW attempt — its eligibility is judged from today.
     'if(day!=null){ challengeDay=day; challengeStartDay=(startDay!=null?todayIndex():null); saveGame(); render(); }',
     // recordChallengeResult: compute onTime from the recorded start day...
@@ -370,6 +370,11 @@ test('web ⏰ same-day wiring is intact (start day recorded, carried, and fed to
     // the award surfaces: win-overlay badge + same-day streak, and the calendar pip.
     'w.daily.onTime ?',
     "rec&&rec.onTime?'<i class=\"dot-ontime\"></i>':''",
+    // ...and the streak that badge and the Daily strip both read: the accessor must actually run
+    // tierRun over the 'onTime' flag (a zeroed stub would leave ⏰ permanently reading 0), and the
+    // strip must still carry an ⏰ column.
+    "flawless:tierRun('flawless'),onTime:tierRun('onTime')};",
+    "['⏰','Same-day',s.onTime],",
   ];
   for (const c of wiring) assert.ok(html.includes(norm(c)), `index.html ⏰ same-day wiring drifted / missing: ${c.slice(0, 60)}...`);
   // A constant would satisfy a substring pin trivially; the value must come from isOnTime().
@@ -395,6 +400,9 @@ test('both platforms gate the daily store on version 3 (the rebuild nukes older 
 test('isOnTime: the day itself counts, a later replay does not', () => {
   assert.equal(isOnTime({ challengeDay: 40, winDay: 40, attemptStartDay: 40 }), true);
   assert.equal(isOnTime({ challengeDay: 40, winDay: 41, attemptStartDay: 41 }), false);  // replayed next day
+  // An unknown start day (a pre-⏰ save restored with null) forfeits the grace rather than guessing.
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 41, attemptStartDay: null }), false);
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 40, attemptStartDay: null }), true);   // won on the day itself
   assert.equal(isOnTime({ challengeDay: 40, winDay: 55, attemptStartDay: 55 }), false);  // catch-up much later
   assert.equal(isOnTime({ challengeDay: null, winDay: 40, attemptStartDay: 40 }), false); // casual play
 });

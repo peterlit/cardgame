@@ -426,6 +426,12 @@ A new screen (its own entry; the toolbar is already crowded), containing:
     attempt *began* on that date and lands one day later. The grace clause is the anti-frustration
     rule — a game begun at 23:50 and won at 00:01 still counts — while a game merely resumed days
     later does not. A retry is a new attempt, judged from today.
+  - **An unprovable start day forfeits the grace.** The attempt's start day rides in the in-progress
+    save alongside `challengeDay`. A save written before ⏰ shipped has no start day; on restore both
+    platforms leave it *null* rather than assuming the challenge's own day. Assuming it would credit
+    an attempt that cannot prove it — a **backfilled** day D begun today and finished after a
+    relaunch on D+1 would be falsely awarded ⏰. With null, such a save can still earn ⏰ by winning
+    on day D itself, and nothing else.
   - **Its streak is strict.** 🔥 Play stays catch-up-repairable (finish yesterday's deal today and
     the run heals); ⏰ cannot be repaired, and that asymmetry is the incentive. Both are labelled in
     the UI so the difference is legible.

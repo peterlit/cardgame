@@ -568,9 +568,11 @@ function restoreGame(){
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
   challengeDay = (typeof g.challengeDay==="number") ? g.challengeDay : null;
-  // An older save has no start day; fall back to the challenge's own day so a resumed attempt is
-  // judged by when it FINISHES, never credited for a date it cannot prove.
-  challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : challengeDay;
+  // An older save (written before ⏰ shipped) has no start day. Leave it NULL rather than guessing
+  // the challenge's own day: that guess would hand the midnight grace to an attempt that cannot
+  // prove it, e.g. a BACKFILLED day D begun today and finished after a reload on D+1. With null,
+  // isOnTime() credits such a save only for a win on the challenge's own date.
+  challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : null;
   telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 };
   if(typeof telem.maxRunMoved!=="number") telem.maxRunMoved=0;
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
