@@ -275,7 +275,20 @@ struct ContentView: View {
             TextField(DealFormat.seedRangeHint, text: $dealText).keyboardType(.numberPad)
             Button("Cancel", role: .cancel) {}
             Button("Play") {
-                if let n = enteredSeed { withAnimation { game.deal(seed: n) } }
+                guard let n = enteredSeed else { return }
+                // The field is PRE-FILLED with the current deal, so `Play` reads as the harmless
+                // "play this deal" while it re-deals and destroys whatever is in progress —
+                // including a live daily attempt, which DailyView's own Play already considers
+                // worth confirming (ux/WF-7:deal-play-discards-live-game-no-confirm). Same state
+                // gate as the board pills, so the ≤3-tap "type a number and play it" budget is
+                // unchanged on an untouched board.
+                // The hop off this runloop turn is required: raising the confirmation from inside
+                // the dismissing alert's own action swallows it.
+                if game.hasLiveGame {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+                } else {
+                    withAnimation { game.deal(seed: n) }
+                }
             }
             .disabled(enteredSeed == nil)
         } message: { Text("Enter a deal number (\(DealFormat.seedRangeHint)) to play that exact deal.") }

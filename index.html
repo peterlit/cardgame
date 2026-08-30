@@ -1698,6 +1698,11 @@ function goDeal(){
   const v=document.getElementById("dealInput").value.trim();
   if(v==="" || isNaN(+v)) return;
   const n=Math.max(1, Math.min(1000000, Math.floor(+v)));
+  // The field is pre-filled with the CURRENT deal, so `Play` reads as the harmless "play this
+  // deal" while it actually re-deals and destroys whatever is in progress — including a live
+  // daily attempt (ux/WF-7:deal-play-discards-live-game-no-confirm). Same state gate as the
+  // board pills, so the empty-board case is still one tap.
+  if(!confirmReset()) return;
   closeDeal(); deal(n);
 }
 

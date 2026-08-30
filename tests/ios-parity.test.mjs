@@ -336,3 +336,22 @@ test('board reset controls confirm only when there is a live game to lose (no we
       `${name}: the casual reset copy lost its "no way back" warning`);
   }
 });
+
+// ---- the Deal # alert's `Play` is destructive and must say so ----
+// ux/WF-7:deal-play-discards-live-game-no-confirm — the field is pre-filled with the CURRENT deal,
+// so `Play` reads as "play this deal" while it re-deals and throws away a live daily attempt (its
+// moves, its clock, its objectives HUD) with no warning, one mis-tap from `Cancel` in the same row.
+// It shares the board pills' state gate: an unconditional confirm would cost the common path a tap.
+test('the deal-number entry confirms before discarding a live game (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const content = read('Views/ContentView.swift');
+  assert.ok(content.includes(norm(`if game.hasLiveGame {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+                } else {
+                    withAnimation { game.deal(seed: n) }
+                }`)),
+    'the iOS "Play a deal" alert no longer confirms (or no longer state-gates) its re-deal');
+  assert.ok(html.includes(norm(`if(!confirmReset()) return;
+  closeDeal(); deal(n);`)),
+    'the web deal modal no longer confirms its re-deal');
+});
