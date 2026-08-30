@@ -226,15 +226,30 @@ test('web applyDemoToken shares the iOS/solver token format', () => {
 test('web demo exit paths re-deal (no playable demo-touched board)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   for (const s of [
-    'document.getElementById("demoStop").onclick=()=>restartDeal();',
+    // Stop/Done go through endDemo, which ALWAYS re-deals — either into that day's fresh scored
+    // challenge (playChallenge → deal) or into a plain re-deal. Both branches are pinned below, so
+    // "re-deal" can't be quietly dropped from either one (ux/WF-6:demo-exit-drops-challenge-binding
+    // moved this call site; the invariant it guards is unchanged).
+    'document.getElementById("demoStop").onclick=()=>endDemo();',
+    `function endDemo(){
+  const day = demoDay;
+  if(day!=null && day<=todayIndex() && dailyRec(day)) playChallenge(day);
+  else restartDeal();
+}`,
     'if(!state.tableau.every(c=>c.length===0) || !state.cells.every(c=>c===null)){ restartDeal(); return; }',
     'if(!applyDemoToken(demoMoves[demoIdx++])){ restartDeal(); return false; }',
   ]) {
     assert.ok(html.includes(norm(s)), `index.html demo exit integrity drifted: ${s.slice(0, 60)}...`);
   }
   const swift = read('Views/ContentView.swift');
-  assert.ok(swift.includes(norm('demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }')),
-    'ContentView demo Stop/Done no longer re-deals');
+  assert.ok(swift.includes(norm('demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.endDemo() } }')),
+    'ContentView demo Stop/Done no longer routes through endDemo');
+  assert.ok(read('Model/Game.swift').includes(norm(`let day = demoDay
+        if let d = day, d <= todayIndex(), dailyChallenge(d, pool) != nil {
+            playChallenge(d)
+        } else {
+            restartDeal()
+        }`)), 'Game.endDemo no longer re-deals on both branches');
   // The iOS model-side guards, mirroring the three web pins above: finishDemo only unlocks a
   // genuinely complete board, and demoAdvance aborts to a re-deal on a token that fails to apply.
   const game = read('Model/Game.swift');
@@ -398,4 +413,30 @@ test('⏰ Same-day is labelled, dated, and never forfeited silently (no web↔iO
     'web win overlay no longer names a past-day / grace win');
   assert.ok(html.includes(norm('dailyDay: daily ? daily.day : null')),
     'web pendingWin no longer carries the day it scored');
+});
+
+// ---- leaving a demo lands on the SCORED challenge, still as a fresh attempt ----
+// ux/WF-6:demo-exit-drops-challenge-binding — every exit from a how-to-win demo (mid-line Stop and
+// post-line Done alike) dropped the player on a CASUAL deal of the day's seed, so "tap Done to try
+// it yourself" banked no tier, no streak and no ⏰. The trap is the naive re-arm: the FRESH re-deal
+// must stay, or a player could watch the app's own line and bank a tier on it. Both platforms
+// therefore re-bind through playChallenge, which routes through deal() and zeroes the board, the
+// clock, the move count and the telemetry.
+test('demo exit re-binds the day as a FRESH attempt (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const game = read('Model/Game.swift');
+  const daily = read('Views/DailyView.swift');
+  // the day travels from the card that opened the demo...
+  assert.ok(daily.includes(norm('game.showSolution(seed, tier: tier, label: label, day: day)')),
+    'iOS demo pill no longer hands showSolution the day it was opened from');
+  assert.ok(html.includes(norm("`<button class=\"btn dshow\" onclick=\"showSolution(${c.seed},'${tier}','${esc(label)}',${day})\">${txt}</button>`")),
+    'web demo button no longer hands showSolution the day it was opened from');
+  // ...is stored only AFTER the deal that clears it...
+  assert.ok(game.includes(norm('demoDay = day                // AFTER deal(), which clears it — see endDemo()')),
+    'iOS showSolution no longer records the demo\'s day after its deal');
+  assert.ok(html.includes(norm('demoDay = (typeof day==="number") ? day : null;')),
+    'web showSolution no longer records the demo\'s day after its deal');
+  // ...and the re-bind goes through playChallenge, never through a resume of the demo board.
+  assert.ok(game.includes(norm('demoDay = nil')), 'iOS deal() no longer clears demoDay');
+  assert.ok(html.includes(norm('challengeStartDay=null; demoDay=null;')), 'web deal() no longer clears demoDay');
 });

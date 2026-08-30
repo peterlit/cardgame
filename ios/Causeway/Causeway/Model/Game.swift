@@ -907,10 +907,11 @@ final class Game: ObservableObject {
     /// tier's objective text, for the bar). Reset to the fresh deal, then animate the baked moves.
     /// It's a demo — challengeDay stays nil and nothing is scored (we never route through commit()).
     /// Playing auto-advances on a timer; the player can pause and step one move at a time.
-    func showSolution(_ seed: Int, tier: String = "bronze", label: String = "") {
+    func showSolution(_ seed: Int, tier: String = "bronze", label: String = "", day: Int? = nil) {
         guard let tokens = solutionLine(seed, tier: tier) else { return }
         stopDemo()
         deal(seed: seed)             // fresh deal, casual (challengeDay nil), telemetry reset
+        demoDay = day                // AFTER deal(), which clears it — see endDemo()
         autoplaying = false          // the line already includes the safe sends — don't race autoplay
         demoing = true
         demoPaused = true            // open in a READY (not-started) state — the player presses Start
@@ -973,6 +974,27 @@ final class Game: ObservableObject {
     func demoStepOnce() {
         guard demoing, demoPaused else { return }
         demoAdvance()
+    }
+
+    /// Leave a "how to win" demo — mid-line "Stop" or post-line "Done".
+    ///
+    /// The re-deal is mandatory and unchanged: a demo-touched board must never become playable, or
+    /// a player could take over the app's own solution moves and bank a genuine win/best time. What
+    /// changes is where the fresh board LANDS. Every exit used to drop the player on a CASUAL deal
+    /// of the day's seed — no objectives HUD, challengeDay nil — so the play the banner invites
+    /// ("That's a winning line — tap Done to try it yourself") banked no tier, no streak and no ⏰
+    /// unless they independently reopened Daily and tapped Play
+    /// (ux/WF-6:demo-exit-drops-challenge-binding). If the demo was opened from a playable day's
+    /// card, the exit now re-binds THAT day — as a brand-new attempt, because playChallenge routes
+    /// through deal(), which zeroes the board, the clock, the move count and the telemetry. The
+    /// demo's own progress can never carry through, which is the trap this must not fall into.
+    func endDemo() {
+        let day = demoDay
+        if let d = day, d <= todayIndex(), dailyChallenge(d, pool) != nil {
+            playChallenge(d)
+        } else {
+            restartDeal()
+        }
     }
 
     /// Stop any running/finished demo (and clear its banner), invalidating queued steps.

@@ -803,8 +803,10 @@ struct ContentView: View {
             // Both mid-demo "Stop" and post-line "Done" re-deal the seed: a demo-touched board
             // must never become playable (taking over the app's own solution moves and finishing
             // would bank a genuine win/best-time). The player lands on a fresh board of the same
-            // deal, which they can still solve legitimately.
-            demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.restartDeal() } }
+            // deal, which they can still solve legitimately — and, when the demo came from a
+            // playable day's card, on that day's SCORED challenge rather than a casual deal of its
+            // seed (Game.endDemo, ux/WF-6:demo-exit-drops-challenge-binding).
+            demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.endDemo() } }
                 .accessibilityIdentifier(game.demoing ? "demo.stop" : "demo.done")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)

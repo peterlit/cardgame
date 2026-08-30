@@ -33,7 +33,7 @@ struct DailyView: View {
     /// game silently (ux/WF-6). Three reports, one shape: the app guarded the rare path and not the
     /// common ones.
     private enum PendingAction {
-        case demo(seed: Int, tier: String, label: String)
+        case demo(seed: Int, tier: String, label: String, day: Int)
         case play(day: Int)
     }
     @State private var pending: PendingAction?
@@ -121,7 +121,8 @@ struct DailyView: View {
         ) {
             Button(confirmVerb, role: .destructive) {
                 switch pending {
-                case .demo(let seed, let tier, let label): game.showSolution(seed, tier: tier, label: label)
+                case .demo(let seed, let tier, let label, let day):
+                    game.showSolution(seed, tier: tier, label: label, day: day)
                 case .play(let day):                       game.playChallenge(day)
                 case .none:                                return
                 }
@@ -326,11 +327,15 @@ struct DailyView: View {
     /// restore-the-attempt-after-the-demo: resuming a demo-touched flow is exactly the
     /// "finish the app's own line" scoring hole the demo teardown exists to close.
     private func showPill(_ seed: Int, _ tier: String, _ title: String, _ label: String) -> some View {
-        Button {
+        // `dayView` rides along so leaving the demo can re-bind THAT day's challenge instead of
+        // dropping the player on a casual deal of its seed (Game.endDemo,
+        // ux/WF-6:demo-exit-drops-challenge-binding).
+        let day = dayView
+        return Button {
             if hasLiveGame {
-                pending = .demo(seed: seed, tier: tier, label: label)
+                pending = .demo(seed: seed, tier: tier, label: label, day: day)
             } else {
-                game.showSolution(seed, tier: tier, label: label)
+                game.showSolution(seed, tier: tier, label: label, day: day)
                 dismiss()
             }
         } label: {

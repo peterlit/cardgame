@@ -513,7 +513,7 @@ function deal(theSeed){
     down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
   };
   history=[]; moveCount=0; selection=null;
-  resetTelem(); challengeDay=null; challengeStartDay=null;   // a fresh deal is casual play until a challenge Play sets it
+  resetTelem(); challengeDay=null; challengeStartDay=null; demoDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
   winRecorded=false; pendingWin=null;   // fresh game — allow the next win to record
@@ -1313,6 +1313,9 @@ function playChallenge(day){
    splits those. When playing, a timer auto-advances; when paused, the "Next" button advances one
    move at a time via demoStepOnce(). Completion drops demoing but leaves the bar showing "Done". */
 let demoing=false, demoPaused=false, demoStarted=false, demoTimer=null, demoMoves=null, demoIdx=0, demoTier='bronze', demoLabel='';
+// The day index whose card opened this demo (null = not opened from a day card). Cleared by
+// every deal(); see endDemo().
+let demoDay=null;
 // Apply one solution token to the live board (mirrors tools/solver rules.mjs applyMove and the iOS
 // Game.applyDemoToken). end: 0=up,1=down. Returns false on a malformed/inapplicable token (missing
 // card, no free cell, bad index) — defense in depth against bad baked data; the caller aborts the
@@ -1420,7 +1423,7 @@ function solutionLine(seed, tier){
 // Demonstrate a winning line for `seed` at `tier` ('bronze'|'silver'|'gold'|'flawless'; `label` = that tier's
 // objective text, for the bar). Reset to the fresh deal, then play the baked moves out. It's a demo —
 // challengeDay stays null and nothing is scored (we never route through commitMove).
-function showSolution(seed, tier, label){
+function showSolution(seed, tier, label, day){
   tier = tier || 'bronze';
   const tokens = solutionLine(seed, tier);
   if(!tokens) return;
@@ -1432,6 +1435,7 @@ function showSolution(seed, tier, label){
   stopDemo();
   closeDaily();
   deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
+  demoDay = (typeof day==="number") ? day : null;   // AFTER deal(), which clears it — see endDemo()
   stopAutoplay();        // the line already includes the safe sends — don't race the app's autoplay
   // Open in a READY (not-started) state — paused with no timer — so the player presses Start (or
   // steps with Next) rather than the line auto-running.
@@ -1500,7 +1504,7 @@ function renderDailyCard(){
   let showBtn = '';
   if(sol && sol.bronze){
     const esc=t=>String(t).replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    const b=(tier,label,txt)=>`<button class="btn dshow" onclick="showSolution(${c.seed},'${tier}','${esc(label)}')">${txt}</button>`;
+    const b=(tier,label,txt)=>`<button class="btn dshow" onclick="showSolution(${c.seed},'${tier}','${esc(label)}',${day})">${txt}</button>`;
     const parts=[b('bronze','Clear the deal','🥉 Clear')];
     if(sol.silver) parts.push(b('silver',c.silver.label,'🥈 Silver'));   // distinct only when Silver is certified
     if(sol.gold)   parts.push(b('gold',c.gold.label,'🥇 Gold'));
@@ -1746,11 +1750,23 @@ document.getElementById("newBtn").onclick=()=>{ if(!confirmReset()) return; stop
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=()=>{ stopDemo(); undo(); };
-// Both mid-demo "Stop" and post-line "Done" re-deal the seed (via restartDeal, hoisted below;
-// parity with iOS demoBar): a demo-touched board must never become playable — taking over the
-// app's own solution moves and finishing by hand would bank a genuine win + best time. The
-// player lands on a fresh board of the same deal, which they can still solve legitimately.
-document.getElementById("demoStop").onclick=()=>restartDeal();
+// Both mid-demo "Stop" and post-line "Done" re-deal the seed (via endDemo/restartDeal, hoisted
+// below; parity with iOS demoBar): a demo-touched board must never become playable — taking over
+// the app's own solution moves and finishing by hand would bank a genuine win + best time. The
+// player lands on a FRESH board of the same deal, which they can still solve legitimately — and,
+// when the demo came from a playable day's card, on that day's SCORED challenge rather than a
+// casual deal of its seed (ux/WF-6:demo-exit-drops-challenge-binding).
+document.getElementById("demoStop").onclick=()=>endDemo();
+// Leaving a demo. The re-deal is mandatory and unchanged; only where it LANDS changes. Every exit
+// used to drop the player on a casual deal — no objectives, challengeDay null — so the play the
+// banner invites ("tap Done to try it yourself") banked no tier, no streak and no ⏰. Re-binding
+// goes through playChallenge, which routes through deal(): the demo's progress can never carry
+// through, the attempt is brand new.
+function endDemo(){
+  const day = demoDay;
+  if(day!=null && day<=todayIndex() && dailyRec(day)) playChallenge(day);
+  else restartDeal();
+}
 document.getElementById("demoPause").onclick=demoTogglePause;
 document.getElementById("demoNext").onclick=demoStepOnce;
 // Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
