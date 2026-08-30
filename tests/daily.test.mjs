@@ -346,6 +346,36 @@ test('daily logic is inlined verbatim in index.html (no drift)', () => {
   for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
 });
 
+// The canon above pins the ⏰ DECISION (isOnTime's body, the result/merge literals) but not the
+// WIRING that feeds it. Without this test the whole web same-day feature can be deleted — stop
+// recording challengeStartDay, or pass a constant `false` into evaluateChallenge — and every test
+// stays green while ⏰ is never awarded again (no badge, no streak, no calendar pip). Each snippet
+// below is one link in that chain: start-day stamped on play, preserved across save/restore and
+// re-stamped on restart, read at win time, and forwarded as evaluateChallenge's third argument.
+test('web ⏰ same-day wiring is intact (start day recorded, carried, and fed to evaluateChallenge)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const wiring = [
+    // playChallenge: a fresh attempt stamps TODAY as its start day (not the challenge's day).
+    'challengeDay=day; challengeStartDay=todayIndex(); saveGame();',
+    // in-progress save/restore: the grace survives a reload; an older save falls back to the
+    // challenge day, so a resumed attempt can never be credited for a date it cannot prove.
+    'challengeDay, challengeStartDay, telem',
+    'challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : challengeDay;',
+    // restartDeal: a retry is a NEW attempt — its eligibility is judged from today.
+    'if(day!=null){ challengeDay=day; challengeStartDay=(startDay!=null?todayIndex():null); saveGame(); render(); }',
+    // recordChallengeResult: compute onTime from the recorded start day...
+    'const onTime=isOnTime({challengeDay,winDay:todayIndex(),attemptStartDay:challengeStartDay});',
+    // ...and actually forward it as evaluateChallenge's third argument (the tail of that call).
+    'maxRunMoved:telem.maxRunMoved},onTime);',
+    // the award surfaces: win-overlay badge + same-day streak, and the calendar pip.
+    'w.daily.onTime ?',
+    "rec&&rec.onTime?'<i class=\"dot-ontime\"></i>':''",
+  ];
+  for (const c of wiring) assert.ok(html.includes(norm(c)), `index.html ⏰ same-day wiring drifted / missing: ${c.slice(0, 60)}...`);
+  // A constant would satisfy a substring pin trivially; the value must come from isOnTime().
+  assert.ok(!/const\s+onTime\s*=\s*(true|false)\b/.test(html), 'index.html: onTime is hard-coded, not computed by isOnTime()');
+});
+
 // The calendar was rebuilt for Aug+Sep 2026 under the flawless gate; a stored record from before it
 // names a different challenge, so both platforms must drop a pre-v3 store rather than credit tiers
 // never earned.

@@ -95,11 +95,28 @@ pin('Model/Daily.swift', 'isOnTime (same-day recognition)', [
   'return attemptStartDay == day && winDay == day + 1',
   'onTime: bronze && onTime)',
 ]);
+// `challengeStartDay = todayIndex()` alone appears TWICE (restartDeal + playChallenge), so a bare
+// substring stays green if either call site is deleted — killing the midnight grace for every fresh
+// attempt (or every retry) while the web keeps it. Pin CONTIGUOUS blocks that name their own call
+// site, and count the occurrences so neither can vanish.
 pin('Model/Game.swift', 'same-day attempt bookkeeping', [
-  'challengeStartDay = todayIndex()',
+  // playChallenge: a fresh attempt stamps TODAY (no semicolons — restartDeal's one-liner differs).
+  `challengeDay = day
+        challengeStartDay = todayIndex()
+        persist()`,
+  // restartDeal: a retry is a NEW attempt, re-stamped from today.
+  'if let day = day { challengeDay = day; challengeStartDay = todayIndex(); persist() }',
+  // restore: an older save without a start day falls back to the challenge's own day.
   'challengeStartDay = s.challengeStartDay ?? s.challengeDay',
+  // ...and the recorded start day is what recordChallengeResult judges the win by.
   'onTime: isOnTime(challengeDay: day, winDay: todayIndex(),',
+  'attemptStartDay: challengeStartDay))',
 ]);
+test('iOS stamps the ⏰ start day at both attempt entry points (no web↔iOS drift)', () => {
+  const src = read('Model/Game.swift');
+  const n = src.split(norm('challengeStartDay = todayIndex()')).length - 1;
+  assert.equal(n, 2, `Game.swift: expected challengeStartDay = todayIndex() at BOTH playChallenge and restartDeal, found ${n}`);
+});
 
 // ---- once-only win record (guards the auto-finish deferred-win "record exactly once" invariant) ----
 pin('Model/Game.swift', 'recordWin once-only gate', [
