@@ -1,8 +1,223 @@
 {
-  "round": 0,
-  "round_start_sha": null,
+  "round": 2,
+  "round_start_sha": "16db5a7603f853cd1d4bce3c275cfd01e7a30814",
   "max_rounds": 2,
   "token_budget": null,
-  "findings": [],
-  "scope": "5fe6be4~1..HEAD"
+  "findings": [
+    {
+      "id": "tests/daily.test.mjs:ontime-wiring-unpinned",
+      "claim": "The whole web-side \u23f0 same-day feature could be deleted green, and the iOS pin matched both call sites of `challengeStartDay = todayIndex()` so either could be deleted green.",
+      "evidence": {},
+      "severity": "major",
+      "region": "tests/daily.test.mjs:349-382, tests/ios-parity.test.mjs:100-125",
+      "current_status": "fixed",
+      "note": "Re-verified in round 2 by my own run of .review-loop/briefs/round-2-mutants.json: web-drop-startday-stamp, web-ontime-constant, web-drop-ontime-arg, web-drop-calendar-pip, web-drop-restart-restamp all killed, and BOTH iOS stamp mutants (ios-drop-playchallenge-stamp, ios-drop-restartdeal-stamp) now actually run and are killed. Stays fixed.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "correctness/daily.mjs:ontime-grace-window-too-wide",
+      "claim": "isOnTime's grace clause is documented as a midnight grace ('a game begun at 23:50 and won at 00:01 still counts') but the implementation compares DAY INDICES only, so it grants \u23f0 to any attempt started at any hour of day D and finished at any hour of day D+1 \u2014 up to ~48h late. Because the in-progress attempt is persisted, a player can start each day's challenge and always finish it the following evening and still collect the gold pip and the text '\u23f0 Cleared on the day' for a day they never cleared on its date, defeating the point of the strict non-repairable streak.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tests/daily.mjs:260-270",
+      "current_status": "open",
+      "note": "Round 2 made this marginally WORSE, not better: the doc edit added \u00a712's 'unprovable start day' paragraph without touching the 23:50/00:01 sentence it sits under, and two new code comments now repeat 'midnight grace' for a window that is really 'finish by the end of the next day'. Since the design forbids timestamps, the cheap fix is still wording: say 'finish by end of the following day' in docs/daily-challenges.md:426-428, index.html:530, ios/.../Game.swift:300. Untouched code, so the behaviour itself is unchanged.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "ui/DailyView.swift:ontime-line-contradicts-grace",
+      "claim": "On day D+1 the card for day D reads '\u23f0 Same-day is earned on the day itself', but an attempt begun on day D and still in progress WILL earn \u23f0 if finished on D+1. A player who believes the card abandons the resumed attempt, or taps Replay \u2014 which re-stamps challengeStartDay to today and genuinely destroys the grace.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:271-286",
+      "current_status": "open",
+      "note": "Round 2 pinned DailyView.swift:275 and :279 but not :284, so the misleading branch is still both wrong and now the only unpinned one of the three. Cheapest fix unchanged: when game.challengeDay == dayView && game.challengeStartDay == dayView, show a 'finish today and it still counts' variant. Both platforms wrong the same way, so no parity break.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "tools/loop-usage.py:since-filter-is-file-granular",
+      "claim": "--since filters whole transcripts by st_mtime then sums every usage record in the file, so the docstring's own `--since $(date -v-3H +%s)` over-reports a long session touched 5 minutes ago in full and drops a long-idle session entirely; the loop-cost docs inherit the error.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tools/loop-usage.py:55-89",
+      "current_status": "open",
+      "note": "Untouched by round 2 (not in the diff). Dev tool, low weight; records carry a per-record `timestamp` that would make the flag mean what it says.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "tests/ios-parity.test.mjs:ontime-surfaces-unpinned",
+      "claim": "The round-1 guard pinned the \u23f0 award surfaces on web only, so the iOS calendar pip, day-card line, streaks-strip column and win-overlay line were all deletable green on the platform that ships; the web onTime streak accessor and iOS's persist of challengeStartDay were likewise unpinned.",
+      "evidence": {},
+      "severity": "major",
+      "region": "tests/ios-parity.test.mjs:127-151",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "VERIFIED by my own independent mutation run, not the implementer's claim: all five round-1 survivors are now killed (ios-drop-calendar-pip, ios-drop-daycard-ontime-line, ios-drop-streaks-strip-column, ios-drop-win-overlay-ontime, ios-drop-persist-startday), plus web-drop-ontime-streak and web-drop-streak-row. I also probed the two constant-satisfaction escapes the pins were supposed to close: ios-win-overlay-ontime-and-false (AND with a constant on the other side) is killed, and ios-restore-guesses-todayindex (a differently-shaped fallback re-added at restore) is killed. 17/17, exit 0. NOTE the mirror gap this round OPENED on the web side: see tests/daily.test.mjs:web-ontime-surfaces-unpinned.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tools/mutate.py:manifest-mutant-never-ran",
+      "claim": "The round-1 manifest paired a multi-line `original` with a `line` key, so mutate.py never ran ios-drop-playchallenge-stamp; the implementer reported a kill it had not observed and did not notice mutate.py exiting 1.",
+      "evidence": {},
+      "severity": "minor",
+      "region": ".review-loop/briefs/round-2-mutants.json",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Confirmed independently: the round-2 manifest drops the `line` key for the multi-line mutant, the mutant executes, and the whole manifest exits 0 with 17 killed / 0 survived / 0 mismatches. The underlying mutate.py limitation (a `line` key plus a multi-line `original` always errors) lives in the plugin cache, outside this repo, so nothing further to do here.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "parity/index.html:restartdeal-null-startday-divergence",
+      "claim": "Round 2 made a null challengeStartDay reachable at restore, which switches on a previously-dead branch in web restartDeal that iOS does not have: web keeps the retry's start day null (`startDay!=null?todayIndex():null`) while iOS unconditionally re-stamps todayIndex(). Concrete divergence: a player with a pre-\u23f0 in-progress save of challenge D who taps Replay on day D at 23:50 and wins at 00:05 gets \u23f0 on iOS and no \u23f0 on web, from identical inputs. The web branch also contradicts its own comment one line above ('a retry is a NEW attempt: its \u23f0 eligibility is judged from today') \u2014 a retry started today IS provable, so the null is wrong on its own terms.",
+      "evidence": [
+        "index.html:1690-1693 (`const startDay = challengeStartDay;` ... `challengeStartDay=(startDay!=null?todayIndex():null)`)",
+        "ios/Causeway/Causeway/Model/Game.swift:216-219 (`if let day = day { challengeDay = day; challengeStartDay = todayIndex(); persist() }` \u2014 no null-preserving branch)",
+        "index.html:575 and ios/.../Game.swift:303 (round 2: both restore null/nil, which is what makes the web branch live)",
+        "tests/daily.test.mjs:365 (the divergent web line is PINNED, so the parity suite now certifies the divergence as canonical)",
+        "docs/daily-challenges.md:433-434 ('such a save can still earn \u23f0 by winning on day D itself, and nothing else') is false on iOS: after a Replay on day D the iOS save can also earn \u23f0 on D+1"
+      ],
+      "severity": "minor",
+      "region": "index.html:1688-1694",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "CONFIRMED by reading both restartDeal implementations; narrow (pre-\u23f0 saves only, one attempt) which is why it is minor, not major. Fix is one character-class of edit: make index.html:1693 `challengeStartDay=todayIndex();` to match iOS and its own comment, update the pin at tests/daily.test.mjs:365, and drop 'and nothing else' from docs/daily-challenges.md:434. Choosing the other direction (teach iOS to preserve null) would be wrong \u2014 the retry genuinely starts today.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/daily.test.mjs:web-ontime-surfaces-unpinned",
+      "claim": "The round-2 fix pinned the iOS \u23f0 surfaces but left the mirror-image hole on web: the day card's whole \u23f0 block and the win-overlay's same-day STREAK NUMBER are deletable/zeroable with the suite green. A refactor can silently make the web overlay read '0-day same-day streak' forever, or remove the day-card line that tells the player the rule before they play, and CI stays quiet \u2014 the exact failure the round-1 finding named, now on the other platform.",
+      "evidence": [
+        "MY MUTATION RUN against `node tests/daily.test.mjs && node tests/ios-parity.test.mjs`, 3 SURVIVED:",
+        "web-overlay-ontime-streak-const: index.html:1169 `${streaks(dailyStore.days, todayIndex()).onTime.current}-day same-day streak.` -> `0-day same-day streak.` \u2014 SURVIVED. The existing pin is the bare substring 'w.daily.onTime ?' (tests/daily.test.mjs:371), which does not reach the streak source; the iOS twin IS pinned whole at tests/ios-parity.test.mjs:146-148.",
+        "web-drop-daycard-earned-line: index.html:1495 `? `<div class=\"dontime earned\">\u23f0 Cleared on the day</div>`` -> `? ``` \u2014 SURVIVED. iOS twin pinned at tests/ios-parity.test.mjs:135-136.",
+        "web-drop-daycard-muted-line: index.html:1498 dropped \u2014 SURVIVED.",
+        "The round-2 manifest .review-loop/briefs/round-2-mutants.json contains no mutant for any of these three, which is why it read 17/17."
+      ],
+      "severity": "minor",
+      "region": "tests/daily.test.mjs:357-378",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "Pre-existing gap, but round 2 inverted the asymmetry rather than closing it, and the manifest omitted exactly the mutants that would have exposed it. Minor because web is the prototype and iOS is what ships. Cheap fix: add to the `wiring` array in tests/daily.test.mjs the strings 'onTime.current}-day same-day streak.', '\u23f0 Cleared on the day' and '\u23f0 Same-day is earned on the day itself'.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/daily.test.mjs:stale-fallback-comment",
+      "claim": "The comment directly above the pin now states the opposite of the line it annotates: 'an older save falls back to the challenge day' sits on top of the pin for `... : null;`. A future maintainer reading the comment will re-add the `?? challengeDay` fallback the round-2 change deliberately removed \u2014 and the failing pin will look like the bug rather than the guard.",
+      "evidence": [
+        "tests/daily.test.mjs:360-361 (comment: 'an older save falls back to the challenge day, so a resumed attempt can never be credited for a date it cannot prove')",
+        "tests/daily.test.mjs:363 (the pinned line: `challengeStartDay = (typeof g.challengeStartDay===\"number\") ? g.challengeStartDay : null;`)",
+        "index.html:528-531 (the code comment WAS updated; only the test comment was missed)"
+      ],
+      "severity": "minor",
+      "region": "tests/daily.test.mjs:358-365",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "One-line comment edit. Cheap and unambiguous.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    }
+  ],
+  "scope": "f42c632..HEAD -- ':!prompts.md'",
+  "usage": {
+    "0": {
+      "reviewer": 79621
+    },
+    "1": {
+      "implementer": 30287,
+      "reviewer": 43343
+    },
+    "2": {
+      "implementer": 57446,
+      "reviewer": 64490
+    }
+  },
+  "round_shas": {
+    "1": "f0680ef9ff97f0cf57e4ace3f6fca79fb59be1a4",
+    "2": "16db5a7603f853cd1d4bce3c275cfd01e7a30814"
+  }
 }

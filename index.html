@@ -569,7 +569,7 @@ function restoreGame(){
   history=[]; selection=null; moveCount=g.moveCount||0;
   challengeDay = (typeof g.challengeDay==="number") ? g.challengeDay : null;
   // An older save (written before ⏰ shipped) has no start day. Leave it NULL rather than guessing
-  // the challenge's own day: that guess would hand the midnight grace to an attempt that cannot
+  // the challenge's own day: that guess would hand the next-day grace to an attempt that cannot
   // prove it, e.g. a BACKFILLED day D begun today and finished after a reload on D+1. With null,
   // isOnTime() credits such a save only for a win on the challenge's own date.
   challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : null;
@@ -1491,11 +1491,18 @@ function renderDailyCard(){
   // ⏰ is earned by clearing the day on its own date — say so where the player decides to play,
   // rather than letting a past-day replay silently fail to earn it.
   const otRun=streaks(dailyStore.days, ti).onTime;
+  // A past day whose attempt is STILL IN PROGRESS and began on that day is inside isOnTime's grace
+  // (start day D, win day D+1), so the plain "earned on the day itself" line would be a lie that
+  // talks the player out of a win they can still have. Say the truth instead — and say "resume",
+  // because Replay re-stamps the start day to today and really does forfeit it.
+  const graceLive = challengeDay===day && challengeStartDay===day && ti===day+1;
   const onTimeLine = rec.onTime
     ? `<div class="dontime earned">⏰ Cleared on the day</div>`
     : isToday
       ? `<div class="dontime">⏰ Win today to ${otRun.current>0?`keep your ${otRun.current}-day same-day streak`:'start a same-day streak'}</div>`
-      : `<div class="dontime muted">⏰ Same-day is earned on the day itself</div>`;
+      : graceLive
+        ? `<div class="dontime">⏰ Resume your attempt today and it still counts</div>`
+        : `<div class="dontime muted">⏰ Same-day is earned on the day itself</div>`;
   document.getElementById("dailyCard").innerHTML=
     `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
@@ -1687,10 +1694,12 @@ document.getElementById("demoNext").onclick=demoStepOnce;
 // context if one is active (so a challenge replay stays scored as that same challenge/day).
 function restartDeal(){
   stopDemo();
-  const day = challengeDay, startDay = challengeStartDay;
+  const day = challengeDay;
   deal(seed);                                   // re-deal same seed; resets telemetry + clears challengeDay
-  // A retry is a NEW attempt: its ⏰ eligibility is judged from today, not from the first try.
-  if(day!=null){ challengeDay=day; challengeStartDay=(startDay!=null?todayIndex():null); saveGame(); render(); }
+  // A retry is a NEW attempt: its ⏰ eligibility is judged from today, not from the first try — and
+  // a retry's start day is always provable, so it is stamped even when the save it replaces had none
+  // (parity with iOS Game.restartDeal, which re-stamps unconditionally).
+  if(day!=null){ challengeDay=day; challengeStartDay=todayIndex(); saveGame(); render(); }
 }
 document.getElementById("replayBtn").onclick=restartDeal;
 function refreshAutoFinishBtn(){

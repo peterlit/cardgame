@@ -187,7 +187,7 @@ struct DailyView: View {
                 }
                 // ⏰ is earned by clearing the day on its own date — said plainly where the player
                 // decides to play, so a past-day replay can't silently fail to earn it.
-                onTimeLine(rec: rec, isToday: dayView == ti)
+                onTimeLine(rec: rec, day: dayView, ti: ti)
                 playButton(day: dayView, ti: ti, rec: rec)
                 // "Show me how to win": one line per tier — Bronze clears the deal; Silver/Gold obey
                 // that day's objective. Demonstrations (assisted) — never count toward tiers.
@@ -268,16 +268,26 @@ struct DailyView: View {
         }
     }
 
-    /// The ⏰ same-day line on the day card: earned / today's invitation / a past-day explainer.
-    @ViewBuilder private func onTimeLine(rec: TierResult?, isToday: Bool) -> some View {
+    /// The ⏰ same-day line on the day card: earned / today's invitation / a live grace / a past-day
+    /// explainer. The grace branch matters: a past day whose attempt is still IN PROGRESS and began
+    /// on that day is inside isOnTime's window (start day D, win day D+1), so the plain "earned on
+    /// the day itself" line would be a lie that talks the player out of a win they can still have.
+    /// It says "resume" on purpose — Replay re-stamps the start day to today and really does forfeit
+    /// the grace. Web twin: renderDailyCard's `graceLive` in index.html.
+    @ViewBuilder private func onTimeLine(rec: TierResult?, day: Int, ti: Int) -> some View {
         let run = streaks(days, todayIndex()).onTime
+        let graceLive = game.challengeDay == day && game.challengeStartDay == day && ti == day + 1
         if rec?.onTime == true {
             Text("⏰ Cleared on the day")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.gold)
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } else if isToday {
+        } else if day == ti {
             Text(run.current > 0 ? "⏰ Win today to keep your \(run.current)-day same-day streak"
                                  : "⏰ Win today to start a same-day streak")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if graceLive {
+            Text("⏰ Resume your attempt today and it still counts")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {

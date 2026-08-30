@@ -357,19 +357,31 @@ test('web ⏰ same-day wiring is intact (start day recorded, carried, and fed to
   const wiring = [
     // playChallenge: a fresh attempt stamps TODAY as its start day (not the challenge's day).
     'challengeDay=day; challengeStartDay=todayIndex(); saveGame();',
-    // in-progress save/restore: the grace survives a reload; an older save falls back to the
-    // challenge day, so a resumed attempt can never be credited for a date it cannot prove.
+    // in-progress save/restore: the grace survives a reload; a save written before ⏰ shipped has NO
+    // start day and must stay null (never `?? challengeDay`), so a resumed attempt can never be
+    // credited for a date it cannot prove. The null here is the guard, not an oversight.
     'challengeDay, challengeStartDay, telem',
     'challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : null;',
-    // restartDeal: a retry is a NEW attempt — its eligibility is judged from today.
-    'if(day!=null){ challengeDay=day; challengeStartDay=(startDay!=null?todayIndex():null); saveGame(); render(); }',
+    // restartDeal: a retry is a NEW attempt — its eligibility is judged from today, unconditionally
+    // (iOS Game.restartDeal does the same; a null-preserving branch here was a parity divergence).
+    'if(day!=null){ challengeDay=day; challengeStartDay=todayIndex(); saveGame(); render(); }',
     // recordChallengeResult: compute onTime from the recorded start day...
     'const onTime=isOnTime({challengeDay,winDay:todayIndex(),attemptStartDay:challengeStartDay});',
     // ...and actually forward it as evaluateChallenge's third argument (the tail of that call).
     'maxRunMoved:telem.maxRunMoved},onTime);',
-    // the award surfaces: win-overlay badge + same-day streak, and the calendar pip.
+    // the award surfaces: win-overlay badge + same-day streak, and the calendar pip. The overlay
+    // pin reaches the STREAK NUMBER's source, not just the flag: a bare 'w.daily.onTime ?' stays
+    // green while the number is frozen at a constant (mutation-verified — that mutant survived).
     'w.daily.onTime ?',
+    '${streaks(dailyStore.days, todayIndex()).onTime.current}-day same-day streak.',
     "rec&&rec.onTime?'<i class=\"dot-ontime\"></i>':''",
+    // the day card's ⏰ line, all four branches: earned, today's invitation, the LIVE next-day grace
+    // (yesterday's attempt still in progress — pinned with its condition so it cannot be constant-
+    // folded), and the past-day explainer. Each was deletable green before this pin.
+    '`<div class="dontime earned">⏰ Cleared on the day</div>`',
+    'const graceLive = challengeDay===day && challengeStartDay===day && ti===day+1;',
+    '`<div class="dontime">⏰ Resume your attempt today and it still counts</div>`',
+    '`<div class="dontime muted">⏰ Same-day is earned on the day itself</div>`',
     // ...and the streak that badge and the Daily strip both read: the accessor must actually run
     // tierRun over the 'onTime' flag (a zeroed stub would leave ⏰ permanently reading 0), and the
     // strip must still carry an ⏰ column.

@@ -261,8 +261,11 @@ export function mergeTiers(prev, attempt) {
 // ⏰ Same-day: was this win earned on the challenge's own date? `winDay` and `attemptStartDay` are
 // day indices (same basis as `challengeDay`), taken from the device's LOCAL calendar date — there is
 // no server to ask, and a personal streak needs no anti-cheat (see docs/daily-challenges.md §2).
-// The grace clause is the anti-frustration rule: an attempt begun before midnight that lands just
-// after it still counts, but a game resumed days later does not.
+// The grace clause is the anti-frustration rule for the player who starts late in the evening. It is
+// DAY-GRANULAR, because no clock time is stored: an attempt begun on day D counts if it is won any
+// time on D+1 — not only just after midnight. That is deliberately generous (the tight version would
+// need a start TIMESTAMP, which §2 rules out); a game resumed two or more days later never counts,
+// and a Replay re-stamps the start day to today, so the window cannot be chained past D+1.
 export function isOnTime({ challengeDay, winDay, attemptStartDay }) {
   if (challengeDay == null || winDay == null) return false;
   if (winDay === challengeDay) return true;

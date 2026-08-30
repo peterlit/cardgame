@@ -89,14 +89,14 @@ pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless, Same-day)', [
   'return Streaks(play: tierRun { $0.bronze }, onTime: tierRun { $0.onTime },',
 ]);
 
-// ---- ⏰ same-day: the date rule and its midnight grace must match tests/daily.mjs isOnTime() ----
+// ---- ⏰ same-day: the date rule and its next-day grace must match tests/daily.mjs isOnTime() ----
 pin('Model/Daily.swift', 'isOnTime (same-day recognition)', [
   'if winDay == day { return true }',
   'return attemptStartDay == day && winDay == day + 1',
   'onTime: bronze && onTime)',
 ]);
 // `challengeStartDay = todayIndex()` alone appears TWICE (restartDeal + playChallenge), so a bare
-// substring stays green if either call site is deleted — killing the midnight grace for every fresh
+// substring stays green if either call site is deleted — killing the next-day grace for every fresh
 // attempt (or every retry) while the web keeps it. Pin CONTIGUOUS blocks that name their own call
 // site, and count the occurrences so neither can vanish.
 pin('Model/Game.swift', 'same-day attempt bookkeeping', [
@@ -110,7 +110,7 @@ pin('Model/Game.swift', 'same-day attempt bookkeeping', [
   // look like a pre-⏰ save).
   'challengeDay: challengeDay, challengeStartDay: challengeStartDay, telem: telem,',
   // restore: an older save without a start day stays nil — never guessed from the challenge day
-  // (`?? s.challengeDay`), which would hand the midnight grace to a backfilled attempt that cannot
+  // (`?? s.challengeDay`), which would hand the next-day grace to a backfilled attempt that cannot
   // prove it. Pinned with the following line so re-adding a fallback trips the guard.
   `challengeStartDay = s.challengeStartDay
         telem = s.telem ?? Telemetry()`,
@@ -136,6 +136,13 @@ pin('Views/DailyView.swift', '⏰ award surfaces (streaks strip, day-card line, 
             Text("⏰ Cleared on the day")`,
   // ...and today's invitation, which names the running streak.
   'Text(run.current > 0 ? "⏰ Win today to keep your \\(run.current)-day same-day streak"',
+  // ...the LIVE next-day grace variant (yesterday's attempt still in progress), pinned WITH the
+  // condition that gates it so it cannot be constant-folded into always/never, and the past-day
+  // explainer it replaces. Web twin: `graceLive` in index.html's renderDailyCard.
+  'let graceLive = game.challengeDay == day && game.challengeStartDay == day && ti == day + 1',
+  `} else if graceLive {
+            Text("⏰ Resume your attempt today and it still counts")`,
+  'Text("⏰ Same-day is earned on the day itself")',
   // the calendar pip (paired with the shape it draws, so a constant condition can't satisfy it).
   `if rec?.onTime == true {
                 Circle().fill(Theme.gold).frame(width: 5, height: 5)`,

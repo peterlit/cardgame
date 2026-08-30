@@ -136,7 +136,7 @@ not test helpers), and each product carries its own transcription.
 |---|---|---|
 | engine ↔ web | `tests/engine.test.mjs:240-268` | mulberry32 body, deck build, Fisher–Yates, 7/7/7/7/6/6/6/6 layout, `isSafeAutoplay`, save validation, `autoFinishWouldWin`, `sendOneHome` |
 | rules ↔ web | `tests/solver.test.mjs:24-47` | `isSeqHead`, `runDir`, `tailDir`, `canStackTableau` no-reverse rules, `maxMovable`, foundation predicates |
-| daily ↔ web | `tests/daily.test.mjs` | all ordering checkers, epoch constant, `mergeTiers` (incl. `onTime`), `isOnTime`'s midnight grace, streak walk, daily-store version gate |
+| daily ↔ web | `tests/daily.test.mjs` | all ordering checkers, epoch constant, `mergeTiers` (incl. `onTime`), `isOnTime`'s next-day grace, streak walk, daily-store version gate |
 | canonical ↔ Swift | `tests/ios-parity.test.mjs` | Swift mulberry32 wrapping arithmetic, deal layout, floor-division calendar, frozen objective arrays, generator seed, all six checkers, `mergeTiers`/streaks, `guard !winRecorded`, `applyDemoToken` — plus a cross-check that the web and iOS token appliers agree |
 
 These pins were introduced as a substitute for a native test target: `tests/ios-parity.test.mjs:1-9`

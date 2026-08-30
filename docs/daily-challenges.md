@@ -424,19 +424,25 @@ A new screen (its own entry; the toolbar is already crowded), containing:
   to drift and no new privacy surface.
   - **The rule** (`isOnTime`, shared core): the win lands on the challenge's own day index, OR the
     attempt *began* on that date and lands one day later. The grace clause is the anti-frustration
-    rule — a game begun at 23:50 and won at 00:01 still counts — while a game merely resumed days
-    later does not. A retry is a new attempt, judged from today.
+    rule for the late-evening start — but since **no clock time is stored**, it is day-granular: an
+    attempt begun on day D counts if it is finished *any time on D+1*, not just just-after-midnight.
+    That is knowingly generous (a tight midnight window would need a start timestamp, which §2 rules
+    out); it is bounded by the fact that only the single in-progress attempt carries a start day, a
+    game resumed two or more days later never counts, and a retry is a new attempt judged from today.
   - **An unprovable start day forfeits the grace.** The attempt's start day rides in the in-progress
     save alongside `challengeDay`. A save written before ⏰ shipped has no start day; on restore both
     platforms leave it *null* rather than assuming the challenge's own day. Assuming it would credit
     an attempt that cannot prove it — a **backfilled** day D begun today and finished after a
     relaunch on D+1 would be falsely awarded ⏰. With null, such a save can still earn ⏰ by winning
-    on day D itself, and nothing else.
+    on day D itself; the grace comes back only via **Replay**, which begins a provably-today attempt
+    and so re-stamps the start day on both platforms (`restartDeal`).
   - **Its streak is strict.** 🔥 Play stays catch-up-repairable (finish yesterday's deal today and
     the run heals); ⏰ cannot be repaired, and that asymmetry is the incentive. Both are labelled in
     the UI so the difference is legible.
   - **Surfaces:** a fifth streak card, a line on the day card that states the rule *before* you play
-    (so a past-day replay can't silently fail to earn it), a gold corner pip on earned calendar days,
+    (so a past-day replay can't silently fail to earn it — and when yesterday's attempt is still in
+    progress, that line switches to "resume your attempt today and it still counts", because the
+    grace is live and Replay would forfeit it), a gold corner pip on earned calendar days,
     and a win-overlay callout with the running streak. Deliberately **no countdown timer** — the goal
     is a reason to open the app, not time pressure.
   - **Cheatability:** the device clock is authoritative and trivially spoofable. That is fine and

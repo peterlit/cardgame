@@ -96,9 +96,10 @@ final class Game: ObservableObject {
     /// The day index currently being played as a challenge (nil = casual play). @Published so the
     /// live objectives HUD shows/hides as a challenge starts/ends.
     @Published var challengeDay: Int? = nil
-    /// The day index this attempt BEGAN on — what gives an attempt started before midnight its ⏰
-    /// same-day grace. Persisted with the attempt; nil for casual play.
-    var challengeStartDay: Int? = nil
+    /// The day index this attempt BEGAN on — what gives an attempt begun on day D its ⏰ same-day
+    /// grace when it is won on D+1. Persisted with the attempt; nil for casual play. @Published
+    /// because DailyView's ⏰ day-card line reads it to offer the "resume today" variant.
+    @Published var challengeStartDay: Int? = nil
     /// Per-attempt telemetry (reset on deal/restore) — the ordered foundation stream + resource
     /// counters the objective checkers read. Persisted with the in-progress game across relaunch.
     private var telem = Telemetry()
@@ -297,7 +298,7 @@ final class Game: ObservableObject {
         selection = nil; history = []; won = false; autoplaying = false
         challengeDay = s.challengeDay          // resume a challenge attempt if one was in progress
         // A pre-⏰ save has no start day: keep it nil instead of guessing `s.challengeDay`. That
-        // guess would grant the midnight grace to an attempt that cannot prove it — a BACKFILLED
+        // guess would grant the next-day grace to an attempt that cannot prove it — a BACKFILLED
         // day D begun today and finished after a relaunch on D+1 would be falsely awarded ⏰.
         // nil ⇒ isOnTime() credits the save only for a win on the challenge's own date.
         challengeStartDay = s.challengeStartDay

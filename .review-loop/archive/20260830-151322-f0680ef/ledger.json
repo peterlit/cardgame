@@ -1,0 +1,8 @@
+{
+  "round": 0,
+  "round_start_sha": null,
+  "max_rounds": 2,
+  "token_budget": null,
+  "findings": [],
+  "scope": "5fe6be4~1..HEAD"
+}
