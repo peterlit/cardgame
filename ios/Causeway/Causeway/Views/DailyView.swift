@@ -17,6 +17,13 @@ struct DailyView: View {
     @State private var exportDoc = StatsBackupDocument(data: Data())
     @State private var backupNote: String?
 
+    /// The day index of an UNAVAILABLE calendar cell the player just tapped (nil = none). A future
+    /// day's cell used to swallow the tap silently — no highlight, no tint, no message — so it was
+    /// indistinguishable from a broken calendar, while the "Unlocks <date>" copy the app already
+    /// ships lives on the day card, which an unavailable day can never reach
+    /// (ux/WF-13:future-day-tap-no-feedback).
+    @State private var lockedDay: Int?
+
     /// A board-replacing request parked behind the "you have a game in progress" confirmation
     /// (nil = no confirmation showing).
     ///
@@ -178,7 +185,11 @@ struct DailyView: View {
                         Text("🌟 Flawless").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.gold)
                     }
                     Spacer()
-                    Text("Deal #\(c.seed)").font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
+                    // Ungrouped, through DealFormat.seed: `Text("Deal #\(c.seed)")` interpolates into a
+                    // LocalizedStringKey, which GROUPS the digits, so this card said "Deal #691,039"
+                    // while the board pill and every Wins surface said "691039" for the same deal
+                    // (bug/WF-13:daily-card-seed-grouped).
+                    Text("Deal #" + DealFormat.seed(c.seed)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 VStack(spacing: 8) {
                     tierRow("Bronze", "bronze", "Clear the deal", rec, future: dayView > ti)
@@ -249,6 +260,7 @@ struct DailyView: View {
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)))
         } else {
             let replay = rec?.bronze == true
+            let daySuffix = day == ti ? "" : " \(dayLabel(day))"
             Button {
                 if hasLiveGame {
                     pending = .play(day: day)
@@ -257,7 +269,11 @@ struct DailyView: View {
                     dismiss()
                 }
             } label: {
-                Text(replay ? "Replay to improve ↻" : "Play")
+                // Name the day ON the button: when the sheet is scrolled to the calendar, the card
+                // header that identifies the selected day is above the fold while this button is
+                // still on screen, so a mis-tapped 44x33 pt cell would otherwise start the wrong
+                // day's deal with nothing on screen to catch it (ux/WF-13:selected-day-invisible-at-play).
+                Text(replay ? "Replay\(daySuffix) to improve ↻" : "Play\(daySuffix)")
                     .font(.system(size: 15, weight: .bold))
                     .frame(maxWidth: .infinity).padding(.vertical, 11)
                     .background(RoundedRectangle(cornerRadius: 10).fill(replay ? Color.gray.opacity(0.18) : Theme.gold))
@@ -454,18 +470,40 @@ struct DailyView: View {
                     calCell(idx: dayIndexFor(y, m, d), day: d, ti: ti)
                 }
             }
+            // The answer to a tap on an unavailable cell, said next to the calendar rather than on
+            // the day card (which an unavailable day can never open).
+            if let locked = lockedDay {
+                Text(lockedNote(locked, ti: ti))
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("daily.lockednote")
+            }
         }
+    }
+
+    /// Why an unavailable calendar cell can't be opened: not yet its date, or outside the seeded
+    /// calendar entirely.
+    private func lockedNote(_ idx: Int, ti: Int) -> String {
+        idx > ti && dailyChallenge(idx, pool) != nil
+            ? "🔒 \(dayLabel(idx)) unlocks on the day itself — come back then."
+            : "No challenge on \(dayLabel(idx))."
     }
 
     private func calCell(idx: Int, day: Int, ti: Int) -> some View {
         let rec = days[idx]
         let avail = idx >= 0 && idx <= ti && dailyChallenge(idx, pool) != nil   // only the seeded month
+        // A seeded day that simply hasn't arrived yet — distinct from "no challenge here at all",
+        // and the only one worth a lock glyph (ux/WF-13:future-day-tap-no-feedback).
+        let locked = idx > ti && dailyChallenge(idx, pool) != nil
         let dots = ["bronze", "silver", "gold"].filter { rec?[$0] == true }
         return ZStack {
             RoundedRectangle(cornerRadius: 8)
-                .fill(idx == dayView ? Theme.gold.opacity(0.28) : Color.gray.opacity(avail ? 0.12 : 0.04))
+                .fill(idx == dayView ? Theme.gold.opacity(0.28)
+                                     : Color.gray.opacity(avail ? 0.12 : (idx == lockedDay ? 0.14 : 0.04)))
                 .overlay(RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(idx == ti ? Theme.gold : .clear, lineWidth: 1.5))
+                    .strokeBorder(idx == ti ? Theme.gold
+                                            : (idx == lockedDay ? Color.secondary.opacity(0.5) : .clear),
+                                  lineWidth: 1.5))
             // ⏰ earned on the day itself: a corner pip, clear of the today ring and the tier dots.
             if rec?.onTime == true {
                 Circle().fill(Theme.gold).frame(width: 5, height: 5)
@@ -479,6 +517,9 @@ struct DailyView: View {
                 // it never overlaps the date; other days show the earned-tier dots.
                 if rec?.flawless == true {
                     Text("🌟").font(.system(size: 11)).frame(height: 6)   // same reserved height as the dots row → no date jitter
+                } else if locked {
+                    // A standing affordance, so "not yet" is legible without tapping at all.
+                    Text("🔒").font(.system(size: 8)).frame(height: 6).opacity(0.55)
                 } else {
                     HStack(spacing: 2) {
                         ForEach(dots, id: \.self) { t in
@@ -490,7 +531,11 @@ struct DailyView: View {
         }
         .frame(height: 40)
         .contentShape(Rectangle())
-        .onTapGesture { if avail { dayView = idx } }
+        .onTapGesture {
+            // An unavailable cell now ANSWERS the tap instead of swallowing it.
+            if avail { dayView = idx; lockedDay = nil } else { lockedDay = idx }
+        }
+        .accessibilityLabel(locked ? "\(dayLabel(idx)), locked until that date" : dayLabel(idx))
     }
 
     private func dotColor(_ tier: String) -> Color {

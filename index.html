@@ -258,6 +258,10 @@
   .dcell .dot-ontime{ position:absolute; top:3px; right:3px; width:5px; height:5px; border-radius:50%;
     background:var(--gold); box-shadow:0 0 0 1px rgba(0,0,0,.25); }
   .dcell .dd{ display:flex; gap:2.5px; height:7px; align-items:center; }
+  /* A future day answers a tap instead of swallowing it (ux/WF-13:future-day-tap-no-feedback). */
+  .dcell .dlockg{ font-size:9px; line-height:7px; }
+  .dcell.lockedsel{ opacity:.6; border-color:rgba(255,255,255,.45); }
+  .dlock{ font-size:11px; font-weight:600; opacity:.75; margin:7px 2px 0; min-height:14px; }
 </style>
 </head>
 <body>
@@ -412,6 +416,7 @@
       <span class="dleg"><span><i class="d3" style="background:#c98b3a"></i>🥉</span><span><i class="d3" style="background:#9aa0a6"></i>🥈</span><span><i class="d3" style="background:#d9ad55"></i>🥇</span><span>🌟 Flawless</span></span></div>
     <div class="ddow"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
     <div class="dgrid" id="dailyGrid"></div>
+    <div class="dlock" id="dailyLock"></div>
     <div class="wins-actions"><button class="btn primary" id="dailyClose">Close</button></div>
   </div>
 </div>
@@ -1445,8 +1450,10 @@ const MEDAL={bronze:'🥉',silver:'🥈',gold:'🥇'};
 const DOTCOL={bronze:'#c98b3a',silver:'#9aa0a6',gold:'#d9ad55'};
 function refreshDailyBtn(){ const b=document.getElementById("dailyBtn"); if(b){ b.disabled=!dailyPool; b.title=dailyPool?"Today's challenge + your streaks":"Daily challenges unavailable"; } }
 let dailyView=null;   // which day the Daily overlay is showing (defaults to today)
-function openDaily(){ if(!dailyPool) return; dailyView=Math.max(0,Math.min(todayIndex(),dailyPool.length-1)); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
+function openDaily(){ if(!dailyPool) return; lockedDay=null; dailyView=Math.max(0,Math.min(todayIndex(),dailyPool.length-1)); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
 function closeDaily(){ document.getElementById("dailyOverlay").classList.remove("show"); }
+// The unavailable calendar cell the player last tapped (null = none) — see renderDailyCal.
+let lockedDay=null;
 function renderDaily(){
   const ti=todayIndex();
   const s=streaks(dailyStore.days, ti);
@@ -1470,9 +1477,13 @@ function renderDailyCard(){
     <span class="tb"><span class="tn">${name}</span><span class="to">${text}</span></span><span class="ts">${icon(tier)}</span></div>`;
   const dstr=fmtDayLabel(day);
   let btn;
+  // The button NAMES the day it will play: scrolled to the calendar, the card header that
+  // identifies the selected day is above the fold while the button is still on screen, so a
+  // mis-tapped cell would otherwise start the wrong day's deal (ux/WF-13:selected-day-invisible-at-play).
+  const daySuffix = isToday ? '' : ` ${dstr}`;
   if(future) btn=`<button class="btn" disabled style="opacity:.5;width:100%">Unlocks ${dstr}</button>`;
-  else if(rec.bronze) btn=`<button class="btn" style="width:100%" onclick="playChallenge(${day})">Replay to improve ↻</button>`;
-  else btn=`<button class="btn primary" style="width:100%" onclick="playChallenge(${day})">Play</button>`;
+  else if(rec.bronze) btn=`<button class="btn" style="width:100%" onclick="playChallenge(${day})">Replay${daySuffix} to improve ↻</button>`;
+  else btn=`<button class="btn primary" style="width:100%" onclick="playChallenge(${day})">Play${daySuffix}</button>`;
   // "Show me how to win": offered on any playable day whose seed has a baked solution. One line per
   // tier — Bronze clears the deal; Silver/Gold obey that day's objective. Demonstrations (assisted),
   // never counted toward tiers/streaks.
@@ -1520,15 +1531,27 @@ function renderDailyCal(){
   for(let d=1;d<=dim;d++){
     const idx=dayIndexFor(y,m,d); const rec=dailyStore.days[idx];
     const avail=!!dailyRec(idx) && idx<=ti;   // only the seeded month has challenges
+    // A seeded day that simply hasn't arrived yet — distinct from "no challenge here at all", and
+    // the only one worth a lock glyph (ux/WF-13:future-day-tap-no-feedback).
+    const locked=!!dailyRec(idx) && idx>ti;
     const cls=['dcell']; if(idx===dailyView)cls.push('sel'); if(idx===ti)cls.push('today'); if(!avail)cls.push('off');
+    if(idx===lockedDay)cls.push('lockedsel');
     // Flawless days show a ⭐ in the marker slot (in place of the tier dots — flawless implies all
     // three), so it never overlaps the date number.
     const dots=rec?['bronze','silver','gold'].filter(t=>rec[t]).map(t=>`<i class="d3" style="background:${DOTCOL[t]}"></i>`).join(''):'';
-    const marks=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':dots;
+    const marks=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':(locked?'<span class="dlockg">🔒</span>':dots);
     const pip=rec&&rec.onTime?'<i class="dot-ontime"></i>':'';
-    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}>${pip}<span class="dn">${d}</span><span class="dd">${marks}</span></div>`;
+    const click=avail?`dailyView=${idx};lockedDay=null;renderDaily()`:`lockedDay=${idx};renderDaily()`;
+    html+=`<div class="${cls.join(' ')}" onclick="${click}">${pip}<span class="dn">${d}</span><span class="dd">${marks}</span></div>`;
   }
   document.getElementById("dailyGrid").innerHTML=html;
+  // Why an unavailable cell can't be opened, said next to the calendar rather than on the day card
+  // (which an unavailable day can never open).
+  document.getElementById("dailyLock").textContent =
+    lockedDay==null ? '' :
+    (!!dailyRec(lockedDay) && lockedDay>ti)
+      ? `🔒 ${fmtDayLabel(lockedDay)} unlocks on the day itself — come back then.`
+      : `No challenge on ${fmtDayLabel(lockedDay)}.`;
 }
 // Has this objective already been made IMPOSSIBLE (fail-fast)? UI-only live hint — the authoritative
 // scoring uses the drift-guarded checkers at win. Mirrors each checker's violation branch.

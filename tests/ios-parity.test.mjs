@@ -263,3 +263,39 @@ test('the 🌟 Flawless demo label says "all three" on both platforms (no web↔
   // twin for) is still saying "all three".
   assert.ok(daily.includes(norm('Flawless = 🥉🥈🥇 all three earned in a single run')), 'iOS streak legend lost its Flawless definition');
 });
+
+// ---- the Daily calendar: day identity travels with the action, and a locked cell answers ----
+// Three round-1 findings, one theme: the calendar told the player less than it knew.
+//   * bug/WF-13:daily-card-seed-grouped — the card printed "Deal #691,039" (LocalizedStringKey
+//     grouping) while the board pill and every Wins surface printed "691039" for the same deal.
+//   * ux/WF-13:selected-day-invisible-at-play — scrolled to the grid, the only confirmation of
+//     WHICH day Play would start was a pale tint on a 44x33 pt cell.
+//   * ux/WF-13:future-day-tap-no-feedback — a tap on a future cell changed nothing at all.
+test('the Daily calendar names the day it will play and answers a locked tap (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const daily = read('Views/DailyView.swift');
+  // deal number: ungrouped, through the shared formatter (never Text("Deal #\(c.seed)")).
+  assert.ok(daily.includes(norm('Text("Deal #" + DealFormat.seed(c.seed))')),
+    'DailyView day card no longer formats its deal number through DealFormat.seed (it will group the digits)');
+  // (the negative form is anchored on the rendered call, since the explanatory comment beside it
+  // quotes the old interpolation on purpose)
+  assert.ok(!daily.includes(norm('Text("Deal #\\(c.seed)").font(')),
+    'DailyView day card is back to the digit-grouping interpolation');
+  // the day name rides on the Play/Replay button on both platforms...
+  assert.ok(daily.includes(norm('let daySuffix = day == ti ? "" : " \\(dayLabel(day))"')),
+    'iOS Play button no longer names the selected day');
+  assert.ok(daily.includes(norm('Text(replay ? "Replay\\(daySuffix) to improve ↻" : "Play\\(daySuffix)")')),
+    'iOS Play button label dropped its day suffix');
+  assert.ok(html.includes(norm("const daySuffix = isToday ? '' : ` ${dstr}`;")),
+    'web Play button no longer names the selected day');
+  assert.ok(html.includes(norm('>Play${daySuffix}</button>')), 'web Play button label dropped its day suffix');
+  // ...and an unavailable cell produces feedback instead of swallowing the tap.
+  assert.ok(daily.includes(norm('if avail { dayView = idx; lockedDay = nil } else { lockedDay = idx }')),
+    'iOS calendar cell no longer records a tap on an unavailable day');
+  assert.ok(daily.includes(norm('"🔒 \\(dayLabel(idx)) unlocks on the day itself — come back then."')),
+    'iOS lost the "unlocks on the day itself" message for a locked cell');
+  assert.ok(html.includes(norm('`lockedDay=${idx};renderDaily()`')),
+    'web calendar cell no longer records a tap on an unavailable day');
+  assert.ok(html.includes(norm('unlocks on the day itself — come back then.')),
+    'web lost the "unlocks on the day itself" message for a locked cell');
+});
