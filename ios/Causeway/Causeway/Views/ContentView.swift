@@ -66,6 +66,10 @@ struct ContentView: View {
     }
     @State private var pendingReset: PendingReset?
 
+    /// The still-earnable tiers the auto-finish cascade would deny, while the "finish anyway?"
+    /// confirmation is up (empty = not showing). See Game.autoFinishTierCost.
+    @State private var finishCost: [String] = []
+
     // Manual drag-and-drop (see cardGesture): source+offset while dragging, and the live
     // frames of every drop target in the "board" coordinate space for hit-testing on drop.
     @State private var drag: DragInfo?
@@ -309,6 +313,26 @@ struct ContentView: View {
         } message: {
             Text(resetConfirmMessage)
         }
+        // The manual Finish button, when the cascade would cost a live tier. maybeAutoFinish()
+        // never offers or auto-runs in that state, so this is the only way to reach it — and it
+        // names the price first (bug/WF-4:autofinish-cascade-can-deny-gold).
+        .alert("Finish now and miss \(finishCost.joined(separator: " and "))?", isPresented: Binding(
+            get: { !finishCost.isEmpty },
+            set: { if !$0 { finishCost = [] } })
+        ) {
+            Button("Finish anyway", role: .destructive) { finishCost = []; withAnimation { game.runAutoFinish() } }
+            Button("Keep playing", role: .cancel) { finishCost = [] }
+        } message: {
+            Text("Sending every remaining card home from here puts them on the foundations in an order this day's objective doesn't allow. Play the rest yourself and it is still within reach.")
+        }
+    }
+
+    /// Run the finish cascade — or, when it would cost a tier this attempt can still earn, ask
+    /// first. The cascade's send ORDER is never altered to protect a tier: that would be the app
+    /// playing the challenge for the player. It is offered, or it is declined, on the player's word.
+    private func requestFinish() {
+        let cost = game.autoFinishTierCost()
+        if cost.isEmpty { withAnimation { game.runAutoFinish() } } else { finishCost = cost }
     }
 
     // MARK: destructive board controls (confirm before throwing a live game away)
@@ -391,7 +415,7 @@ struct ContentView: View {
                     railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
                         .accessibilityIdentifier("toolbar.autofinish")
                     if game.canOfferFinish {
-                        railPill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                        railPill("Finish", primary: true) { requestFinish() }
                             .accessibilityIdentifier("toolbar.finish")
                     }
                     railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
@@ -510,7 +534,7 @@ struct ContentView: View {
             pill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
                 .accessibilityIdentifier("toolbar.autofinish")
             if game.canOfferFinish {
-                pill("Finish", primary: true) { withAnimation { game.runAutoFinish() } }
+                pill("Finish", primary: true) { requestFinish() }
                     .accessibilityIdentifier("toolbar.finish")
             }
             pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {

@@ -677,13 +677,37 @@ function isSafeAutoplay(card){
   const opp = card.color==="red" ? BLACK_SUITS : RED_SUITS;
   return opp.every(x=>rankOnFound(x, card.rank-1) && rankOnFound(x, card.rank+1));
 }
+// Would auto-sending `c` home break a daily objective that is STILL EARNABLE in this attempt?
+// Auto-play is on by default and was making scored decisions the player never made: at day 29's
+// certified-flawless position it sent 8♠ to the DOWN foundation (the only end legal at that
+// instant) while the day's Gold asked for A-8 up, losing Gold and Flawless with zero card input
+// (bug/WF-4:autoplay-denies-daily-gold). Which end a card goes to IS the game on many days.
+// The rule is NOT "pick a better end" — the app must never steer a scored run toward an objective,
+// and auto-play does not choose an end anyway (only one is legal, except on a suit's closing card,
+// where both finish it identically). The rule is: don't act. Look one send ahead through the same
+// fail-fast checkers the HUD uses, and leave the card for the player if it would newly break a tier
+// that is still open. Casual play is untouched; an objective already lost stops blocking anything.
+// (iOS twin: Game.autoSendWouldBreakTier.)
+function autoSendWouldBreakTier(c, toUp){
+  if(challengeDay==null || !dailyPool) return false;
+  const ch=dailyChallenge(challengeDay,dailyPool); if(!ch) return false;
+  const base={won:false,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,
+              foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved};
+  const sLive=!objViolated(ch.silver,base), gLive=!objViolated(ch.gold,base);
+  if(!sLive && !gLive) return false;   // nothing left to lose
+  const t={...base, moves:moveCount+1,
+           foundationOrder: base.foundationOrder.concat([{suit:c.suit,rank:c.rank,end:toUp?"up":"down",moveIdx:moveCount+1}])};
+  return (sLive && objViolated(ch.silver,t)) || (gLive && objViolated(ch.gold,t));
+}
 // Move one safe card (free cells first, then tableau tops). Returns true if one moved.
 function autoplayOneStep(){
   for(let i=0;i<NCELLS;i++){
     const c=state.cells[i];
     if(c && isSafeAutoplay(c)){
+      const toUp=canFoundationUp(c);
+      if(autoSendWouldBreakTier(c,toUp)) continue;
       snapshot(); state.cells[i]=null;
-      if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
+      if(toUp) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
       moveCount++; setMoves(moveCount); recordHomed(); render(); saveGame(); return true;
     }
   }
@@ -691,8 +715,10 @@ function autoplayOneStep(){
     const t=state.tableau[col]; if(!t.length) continue;
     const c=t[t.length-1];
     if(isSafeAutoplay(c)){
+      const toUp=canFoundationUp(c);
+      if(autoSendWouldBreakTier(c,toUp)) continue;
       snapshot(); t.pop();
-      if(canFoundationUp(c)) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
+      if(toUp) state.up[c.suit]=c.rank; else state.down[c.suit]=c.rank;
       moveCount++; setMoves(moveCount); recordHomed(); render(); saveGame(); return true;
     }
   }
@@ -907,36 +933,77 @@ function runAutoFinish(){
   finishTimer=setTimeout(stepFinish,140);
 }
 
-// Would forcing every available card home (autoFinish) empty the board and win? A pure
-// simulation on copies of the state — the trigger for automatic finishing. Uses the same
-// greedy rule as autoFinish, so detection and execution can never disagree.
-function autoFinishWouldWin(){
+// Replay the cascade on copies of the state, in sendOneHome's EXACT order — cells first, then
+// tableau tops left->right, ONE card, then start again from the cells — and report what it would
+// do: whether it empties the board, the ordered foundation stream it would produce, and the move
+// count it would land on. Running the real send order (rather than sweeping each pass to
+// completion) is what lets prediction and execution agree card-for-card, which matters because a
+// different order can predict a different SPLIT, and the split is what most days are scored on.
+// (iOS twin: Game.simulateAutoFinish.)
+function simulateAutoFinish(){
   const up=state.up.slice(), down=state.down.slice();
   const cells=state.cells.slice();
   const tab=state.tableau.map(c=>c.slice());
+  const events=[]; let moves=moveCount;
   const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit];
   const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];
-  let moved=true;
-  while(moved){
-    moved=false;
+  const send=c=>{ moves++; const toUp=canUp(c);
+    if(toUp) up[c.suit]=c.rank; else down[c.suit]=c.rank;
+    events.push({suit:c.suit,rank:c.rank,end:toUp?"up":"down",moveIdx:moves}); };
+  let sent=true;
+  while(sent){
+    sent=false;
     for(let i=0;i<NCELLS;i++){
       const c=cells[i]; if(!c) continue;
-      if(canUp(c)){ up[c.suit]=c.rank; cells[i]=null; moved=true; }
-      else if(canDown(c)){ down[c.suit]=c.rank; cells[i]=null; moved=true; }
+      if(canUp(c)||canDown(c)){ cells[i]=null; send(c); sent=true; break; }
     }
+    if(sent) continue;
     for(let col=0;col<NCOLS;col++){
       const t=tab[col]; if(!t.length) continue;
       const c=t[t.length-1];
-      if(canUp(c)){ up[c.suit]=c.rank; t.pop(); moved=true; }
-      else if(canDown(c)){ down[c.suit]=c.rank; t.pop(); moved=true; }
+      if(canUp(c)||canDown(c)){ t.pop(); send(c); sent=true; break; }
     }
   }
-  for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false;
-  return true;
+  let won=true; for(let s=0;s<4;s++) if(down[s]!==up[s]+1) won=false;
+  return {won, events, moves};
+}
+// Would forcing every available card home (autoFinish) empty the board and win? The trigger for
+// automatic finishing — the same simulation, so detection and execution can never disagree.
+function autoFinishWouldWin(){ return simulateAutoFinish().won; }
+// Which still-earnable tiers running the cascade RIGHT NOW would deny. Empty for casual play, and
+// empty whenever finishing is harmless.
+//
+// The cascade is greedy — each card takes whichever end is legal, first come first served — and on
+// most days that order can violate the day's own objective. The app was OFFERING it ("Ready to
+// finish — send them all now?") partway through a certified flawless line and then awarding 🥉🥈
+// with no 🥇 (bug/WF-4:autofinish-cascade-can-deny-gold). The fix is deliberately NOT to make the
+// cascade objective-aware: reordering its sends would have the app quietly play the challenge for
+// the player, a worse defect than the one it fixes. Detection is only used to WITHHOLD the
+// automatic offer; the manual Finish button still runs it, after naming the price.
+// (iOS twin: Game.autoFinishTierCost.)
+function autoFinishTierCost(){
+  if(challengeDay==null || !dailyPool) return [];
+  const ch=dailyChallenge(challengeDay,dailyPool); if(!ch) return [];
+  const base={won:false,moves:moveCount,elapsed:0,cellUses:telem.cellUses,undos:telem.undos,
+              foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved};
+  const sLive=!objViolated(ch.silver,base), gLive=!objViolated(ch.gold,base);
+  if(!sLive && !gLive) return [];
+  const sim=simulateAutoFinish();
+  if(!sim.won) return [];
+  const t={...base, won:true, moves:sim.moves, foundationOrder:base.foundationOrder.concat(sim.events)};
+  const after=evaluateChallenge(ch,t);
+  const lost=[];
+  if(sLive && !after.silver) lost.push('🥈 Silver');
+  if(gLive && !after.gold) lost.push('🥇 Gold');
+  return lost;
 }
 // Offer or perform auto-finish when the board becomes finishable, per the current mode.
 function maybeAutoFinish(){
   if(!startTime || isWon() || finishing || finishPromptOpen || !autoFinishWouldWin()) return;
+  // Never offer, and never auto-run, a cascade that would spend a tier this attempt can still earn.
+  // The board stays finishable and the manual Finish button stays available — that path asks first
+  // and names the cost, so ending the run this way is a decision, not a surprise.
+  if(autoFinishTierCost().length) return;
   if(autoFinishMode==="on") runAutoFinish();
   else if(autoFinishMode==="ask"){ if(!autoFinishDeferred){ stopAutoplay(); showFinishPrompt(); } }
   // "off": the Finish button (refreshFinishBtn) lets the player start it
@@ -1567,28 +1634,33 @@ function renderDailyCal(){
       : `No challenge on ${fmtDayLabel(lockedDay)}.`;
 }
 // Has this objective already been made IMPOSSIBLE (fail-fast)? UI-only live hint — the authoritative
-// scoring uses the drift-guarded checkers at win. Mirrors each checker's violation branch.
+// scoring uses the drift-guarded checkers at win. Mirrors each checker's violation branch, family
+// for family, with the SAME parameters the checkers read. (This had been left behind on the
+// pre-parameterised id set — 'aces-first', 'split-even', 'cells-le-1' — none of which the pool can
+// emit any more, so every objective fell through to `default: false` and nothing ever went ✗. iOS
+// Daily.swift objViolated is the canonical copy.)
 function objViolated(obj, t){
-  const fo=t.foundationOrder;
+  const p=obj.param||{}, fo=t.foundationOrder;
+  const won={...t,won:true};   // the order-only half of each checker: they end with `return t.won`
   switch(obj.id){
-    case 'moves': return t.moves>obj.param.N;
-    case 'no-undo': return t.undos>0;
-    case 'cells-le-1': return t.cellUses>1;
-    case 'cells-le-2': return t.cellUses>2;
-    case 'no-cells': return t.cellUses>0;
-    case 'aces-first': { let a=0; for(const e of fo){ if(a>=4) break; if(e.rank===1) a++; else return true; } return false; }
-    case 'kings-first': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down") k++; else if(e.rank===1&&e.end==="up"&&k<4) return true; } return false; }
-    case 'jacks-down-first': { let j=0; for(const e of fo){ if(e.rank===11&&e.end==="down") j++; else if(e.rank===1&&e.end==="up"&&j<4) return true; } return false; }
-    case 'suits-top-down': { const kd=[0,0,0,0]; for(const e of fo){ if(e.rank===13&&e.end==="down") kd[e.suit]=1; else if(e.rank===1&&e.end==="up"&&!kd[e.suit]) return true; } return false; }
-    case 'suit-sprint': { const home=[0,0,0,0],st=[false,false,false,false]; for(const e of fo){ const S=e.suit; if(!st[S]){ for(let T=0;T<4;T++) if(T!==S&&st[T]&&home[T]<13) return true; st[S]=true; } home[S]++; } return false; }
-    case 'down-openers-20': { let k=0; for(const e of fo){ if(e.rank===13&&e.end==="down"){ k++; if(k===4) return e.moveIdx>20; } } return t.moves>20; }
-    case 'split-even': { const {u,d}=upDown(t); return u.some(x=>x>7)||d.some(x=>x>6); }
-    case 'down-heavy': return upDown(t).u.some(x=>x>5);
-    case 'no-down-foundation': return upDown(t).d.some(x=>x>0);
-    case 'no-up-foundation': return upDown(t).u.some(x=>x>0);
-    case 'no-supermoves': return (t.maxRunMoved??0)>1;
-    case 'one-big-move': return false;   // positive goal — always still reachable
-    default: return false;
+    case 'moves':          return t.moves>p.N;
+    case 'no-undo':        return t.undos>0;
+    case 'cells-le':       return t.cellUses>p.N;
+    case 'max-run':        return (t.maxRunMoved??0)>p.N;
+    case 'big-move':       return false;                       // positive goal — always still reachable
+    case 'split-at':       { const {u,d}=upDown(t); return u.some(x=>x>p.R)||d.some(x=>x>13-p.R); }
+    // Needing `min` of every suit from one end caps the OTHER pile at 13 - min.
+    case 'end-bias':       { const {u,d}=upDown(t); return (p.end==='up'?d:u).some(x=>x>13-p.min); }
+    case 'ends-first':     return !endsFirst(won,p);
+    case 'before-ace':     return !beforeAce(won,p);
+    case 'suit-top-first': return !suitTopFirst(won,p);
+    case 'suit-sprint':    return !suitSprint(won);
+    case 'rank-rush':      { const seen=[false,false,false,false]; let n=0;
+                             for(const e of fo){ if(e.rank!==p.rank||seen[e.suit]) continue; seen[e.suit]=true;
+                               if(++n===4) return e.moveIdx>p.N; }
+                             return t.moves>p.N; }              // deadline blown with cards still out
+    case 'suit-balance':   return !suitBalance(won,p);
+    default:               return false;
   }
 }
 // Is this objective already LOCKED IN — guaranteed to be earned on ANY completion (so the player is
@@ -1596,17 +1668,17 @@ function objViolated(obj, t){
 // can still be blown, so they're never secured until the deal is actually done. UI-only hint.
 function objSecured(obj, up, down, t){
   if(objViolated(obj,t)) return false;
+  const p=obj.param||{};
   switch(obj.id){
-    case 'aces-first':       return up.every(u=>u>=1);      // all four Aces home first
-    case 'kings-first':      return down.every(d=>d<=13);   // all four Kings down before any Ace
-    case 'suits-top-down':   return down.every(d=>d<=13);   // every suit's King down
-    case 'jacks-down-first': return down.every(d=>d<=11);   // all four Jacks down
-    case 'down-openers-20':  return down.every(d=>d<=13);   // all four down-foundations opened (within 20, else violated)
-    case 'suit-sprint':      return [0,1,2,3].filter(s=>down[s]===up[s]+1).length>=3;  // ≥3 suits home (only one left; no interleave possible)
+    case 'ends-first':     return up.every(u=>u>=p.up) && down.every(d=>d<=p.down);
+    case 'before-ace':
+    case 'suit-top-first': return down.every(d=>d<=p.rank);
+    case 'suit-sprint':    return [0,1,2,3].filter(s=>down[s]===up[s]+1).length>=3;  // only one suit left to start
+    case 'rank-rush':      return [0,1,2,3].every(s=>up[s]>=p.rank||down[s]<=p.rank); // all four already home
     // Secured relative to the CURRENT line (undo rewinds telem.maxRunMoved, like every case above);
     // the win-time checker reads the same field, so the chip always predicts the grade.
-    case 'one-big-move':     return (t.maxRunMoved??0)>=5;
-    default: return false;   // budgets and end-restrictions — not securable until win
+    case 'big-move':       return (t.maxRunMoved??0)>=p.N;
+    default: return false;   // budgets, split points and end-restrictions — not securable until win
   }
 }
 // Compact live objectives HUD shown over the board during a challenge attempt.
@@ -1797,7 +1869,15 @@ document.getElementById("autoBtn").onclick=()=>{
   maybeAutoFinish();   // e.g. switching to On finishes now if the board is already decided
 };
 refreshAutoFinishBtn();
-document.getElementById("finishBtn").onclick=()=>runAutoFinish();
+// The manual Finish button, when the cascade would cost a live tier: maybeAutoFinish() never
+// offers or auto-runs in that state, so this is the only way to reach it — and it names the price
+// first (bug/WF-4:autofinish-cascade-can-deny-gold). The send ORDER is never altered to protect a
+// tier: that would be the app playing the challenge for the player.
+document.getElementById("finishBtn").onclick=()=>{
+  const cost=autoFinishTierCost();
+  if(cost.length && !confirm(`Finish now and miss ${cost.join(' and ')}? Sending every remaining card home from here puts them on the foundations in an order this day's objective doesn't allow. Play the rest yourself and it is still within reach.`)) return;
+  runAutoFinish();
+};
 document.getElementById("finishGo").onclick=()=>runAutoFinish();
 document.getElementById("finishLater").onclick=()=>deferAutoFinish();
 document.getElementById("winsBtn").onclick=openWins;

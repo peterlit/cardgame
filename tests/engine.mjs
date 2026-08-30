@@ -74,33 +74,45 @@ export function isSafeAutoplay(state, card){
   return opp.every(x=>rankOnFound(state,x, card.rank-1) && rankOnFound(state,x, card.rank+1));
 }
 
-// CANON:autoFinishWouldWin
-// Would forcing every available card home empty the board and win? Pure simulation on
-// copies — the trigger for automatic finishing. Same greedy rule as autoFinish.
-export function autoFinishWouldWin(state){
+// CANON:simulateAutoFinish
+// Replay the cascade on copies of the state, in sendOneHome's EXACT order — cells first, then
+// tableau tops left->right, ONE card, then start again from the cells — and report what it would
+// do: whether it empties the board, the ordered foundation stream it would produce, and the move
+// count it would land on. Running the real send order (rather than sweeping each pass to
+// completion) is what lets prediction and execution agree card-for-card, which matters because a
+// different order can predict a different SPLIT, and the split is what most days are scored on.
+// `moveCount` is the caller's move total so the returned moveIdx values line up with the app's.
+export function simulateAutoFinish(state, moveCount = 0){
   const up=state.up.slice(), down=state.down.slice();
   const cells=state.cells.slice();
   const tab=state.tableau.map(c=>c.slice());
+  const events=[]; let moves=moveCount;
   const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit];
   const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];
-  let moved=true;
-  while(moved){
-    moved=false;
+  const send=c=>{ moves++; const toUp=canUp(c);
+    if(toUp) up[c.suit]=c.rank; else down[c.suit]=c.rank;
+    events.push({suit:c.suit,rank:c.rank,end:toUp?"up":"down",moveIdx:moves}); };
+  let sent=true;
+  while(sent){
+    sent=false;
     for(let i=0;i<NCELLS;i++){
       const c=cells[i]; if(!c) continue;
-      if(canUp(c)){ up[c.suit]=c.rank; cells[i]=null; moved=true; }
-      else if(canDown(c)){ down[c.suit]=c.rank; cells[i]=null; moved=true; }
+      if(canUp(c)||canDown(c)){ cells[i]=null; send(c); sent=true; break; }
     }
+    if(sent) continue;
     for(let col=0;col<NCOLS;col++){
       const t=tab[col]; if(!t.length) continue;
       const c=t[t.length-1];
-      if(canUp(c)){ up[c.suit]=c.rank; t.pop(); moved=true; }
-      else if(canDown(c)){ down[c.suit]=c.rank; t.pop(); moved=true; }
+      if(canUp(c)||canDown(c)){ t.pop(); send(c); sent=true; break; }
     }
   }
-  for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false;
-  return true;
+  let won=true; for(let s=0;s<4;s++) if(down[s]!==up[s]+1) won=false;
+  return {won, events, moves};
 }
+
+// Would forcing every available card home empty the board and win? The trigger for automatic
+// finishing — the same simulation, so detection and execution can never disagree.
+export function autoFinishWouldWin(state){ return simulateAutoFinish(state).won; }
 
 // CANON:sendOneHome
 // One greedy send home — the single step the finish chain repeats to fixpoint. Mirrors

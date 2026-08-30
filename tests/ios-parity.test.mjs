@@ -440,3 +440,43 @@ test('demo exit re-binds the day as a FRESH attempt (no web↔iOS drift)', () =>
   assert.ok(game.includes(norm('demoDay = nil')), 'iOS deal() no longer clears demoDay');
   assert.ok(html.includes(norm('challengeStartDay=null; demoDay=null;')), 'web deal() no longer clears demoDay');
 });
+
+// ---- the app never spends a tier the player has not spent (bug/WF-4, both halves) ----
+// Auto-play and the auto-finish cascade are the only two places the app moves cards by itself, and
+// on a scored daily both were taking tiers with no player input at all. The behavioural ground
+// truth lives in tests/autofinish-tiers.test.mjs; these pin that both platforms actually consult
+// it, and — just as important — that the fix is a REFUSAL and not a reorder: neither cascade may
+// ever choose a different end to protect an objective, because that is the app playing the
+// challenge for the player.
+test('auto-play and auto-finish refuse (never reorder) when a live tier is at stake (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const game = read('Model/Game.swift');
+  const content = read('Views/ContentView.swift');
+  // auto-play looks one send ahead and skips the card rather than sending it elsewhere.
+  assert.ok(game.includes(norm('if autoSendWouldBreakTier(c, toUp: toUp) { continue }')),
+    'iOS auto-play no longer declines a send that breaks a live tier');
+  assert.ok(html.includes(norm('if(autoSendWouldBreakTier(c,toUp)) continue;')),
+    'web auto-play no longer declines a send that breaks a live tier');
+  assert.ok(game.includes(norm('return (silverWasLive && objViolated(ch.silver, t)) || (goldWasLive && objViolated(ch.gold, t))')),
+    'iOS look-ahead no longer compares live-before against violated-after');
+  assert.ok(html.includes(norm('return (sLive && objViolated(ch.silver,t)) || (gLive && objViolated(ch.gold,t));')),
+    'web look-ahead no longer compares live-before against violated-after');
+  // ...and the end it would use is the one the engine already picked, never a "better" one.
+  assert.ok(game.includes(norm('let toUp = canFoundationUp(c)')), 'iOS auto-play no longer takes the engine\'s end');
+  assert.ok(html.includes(norm('const toUp=canFoundationUp(c);')), 'web auto-play no longer takes the engine\'s end');
+  // auto-finish: not offered, not auto-run, while it would cost a live tier.
+  assert.ok(game.includes(norm('guard autoFinishTierCost().isEmpty else { return }')),
+    'iOS maybeAutoFinish no longer withholds a tier-costing cascade');
+  assert.ok(html.includes(norm('if(autoFinishTierCost().length) return;')),
+    'web maybeAutoFinish no longer withholds a tier-costing cascade');
+  // ...but still reachable by hand, after naming the price.
+  assert.ok(content.includes(norm('let cost = game.autoFinishTierCost()')) &&
+            content.includes(norm('if cost.isEmpty { withAnimation { game.runAutoFinish() } } else { finishCost = cost }')),
+    'the iOS Finish button no longer asks before a tier-costing cascade');
+  assert.ok(html.includes(norm('const cost=autoFinishTierCost();')) && html.includes('Finish now and miss'),
+    'the web Finish button no longer asks before a tier-costing cascade');
+  // the cascade simulation must keep predicting in the EXECUTION order (one card, then restart from
+  // the cells) — a sweep-order prediction can predict a different split from the one that runs.
+  assert.ok(game.includes(norm('if sent { continue }')), 'iOS simulateAutoFinish left sendOneHome\'s order');
+  assert.ok(html.includes(norm('if(sent) continue;')), 'web simulateAutoFinish left sendOneHome\'s order');
+});

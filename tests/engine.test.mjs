@@ -254,9 +254,17 @@ test("engine.mjs logic still matches index.html (no drift)", () => {
     'if(!(canFoundationUp(card)||canFoundationDown(card))) return false; const opp = card.color==="red" ? BLACK_SUITS : RED_SUITS; return opp.every(x=>rankOnFound(x, card.rank-1) && rankOnFound(x, card.rank+1));',
     // mark() with the F3 suit guard
     "const mark = (suit,rank)=>{ if(!(suit>=0 && suit<=3)) return false; if(!(rank>=1 && rank<=13)) return false;",
-    // autoFinishWouldWin: the greedy cascade predicates + the win check
+    // simulateAutoFinish: the greedy cascade predicates, the ONE-card-then-restart order that makes
+    // prediction and execution agree card-for-card (a different order predicts a different SPLIT,
+    // and the split is what most days are scored on), the recorded foundation stream, and the win
+    // check. bug/WF-4:autofinish-cascade-can-deny-gold rests on this stream being exact.
     "const canUp=c=> c.rank===up[c.suit]+1 && c.rank<down[c.suit]; const canDown=c=> c.rank===down[c.suit]-1 && c.rank>up[c.suit];",
-    "for(let s=0;s<4;s++) if(down[s]!==up[s]+1) return false; return true;",
+    'const send=c=>{ moves++; const toUp=canUp(c); if(toUp) up[c.suit]=c.rank; else down[c.suit]=c.rank; events.push({suit:c.suit,rank:c.rank,end:toUp?"up":"down",moveIdx:moves}); };',
+    "if(canUp(c)||canDown(c)){ cells[i]=null; send(c); sent=true; break; }",
+    "if(sent) continue;",
+    "if(canUp(c)||canDown(c)){ t.pop(); send(c); sent=true; break; }",
+    "let won=true; for(let s=0;s<4;s++) if(down[s]!==up[s]+1) won=false; return {won, events, moves};",
+    "function autoFinishWouldWin(){ return simulateAutoFinish().won; }",
     // sendOneHome: the greedy single-send (cells then columns, up-before-down) mirrored by
     // engine.mjs sendOneHomeStep and looped by the finish chain.
     "const c=state.cells[i]; if(!c) continue; if(canFoundationUp(c)){ snapshot(); state.cells[i]=null; state.up[c.suit]=c.rank; return true; } if(canFoundationDown(c)){ snapshot(); state.cells[i]=null; state.down[c.suit]=c.rank; return true; }",

@@ -653,19 +653,50 @@ final class Game: ObservableObject {
         return opp.allSatisfy { rankOnFoundation($0, c.rank - 1) && rankOnFoundation($0, c.rank + 1) }
     }
 
+    /// Would auto-sending `c` home break a daily objective that is STILL EARNABLE in this attempt?
+    ///
+    /// Auto-play is on by default, and on a daily it was making scored decisions the player never
+    /// made: at day 29's certified-flawless position it sent 8♠ to the DOWN foundation (the only
+    /// end legal at that instant) while the day's Gold asked for A-8 up, flipping Gold and Flawless
+    /// from pending to failed with zero card input (bug/WF-4:autoplay-denies-daily-gold). Which end
+    /// a card goes to IS the game on many days — several objective families are about nothing else.
+    ///
+    /// So the rule is not "pick a better end" — the app must never steer a scored run toward an
+    /// objective, and auto-play does not choose an end anyway (only one is legal, except on a
+    /// suit's closing card, where both finish it identically). The rule is: DON'T ACT. This looks
+    /// one send ahead through the same fail-fast checkers the live HUD uses, and if the send would
+    /// newly violate a tier that is still open, auto-play leaves the card alone for the player.
+    /// Casual play is untouched (`liveChallenge` is nil), and an objective already lost stops
+    /// blocking anything, so the endgame sweep still works once nothing is left to protect.
+    private func autoSendWouldBreakTier(_ c: Card, toUp: Bool) -> Bool {
+        guard let ch = liveChallenge else { return false }
+        var t = liveAttempt()
+        let silverWasLive = !objViolated(ch.silver, t)
+        let goldWasLive = !objViolated(ch.gold, t)
+        guard silverWasLive || goldWasLive else { return false }   // nothing left to lose
+        t.moves = moveCount + 1
+        t.foundationOrder.append(FoundationEvent(suit: c.suit.rawValue, rank: c.rank,
+                                                 end: toUp ? "up" : "down", moveIdx: t.moves))
+        return (silverWasLive && objViolated(ch.silver, t)) || (goldWasLive && objViolated(ch.gold, t))
+    }
+
     @discardableResult
     private func autoplayOneStep() -> Bool {
         for i in 0..<Game.cellCount {
             if let c = cells[i], isSafeAutoplay(c) {
+                let toUp = canFoundationUp(c)
+                if autoSendWouldBreakTier(c, toUp: toUp) { continue }
                 snapshot(); selection = nil; cells[i] = nil
-                if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
+                if toUp { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
                 moveCount += 1; recordHomed(); persist(); return true
             }
         }
         for col in 0..<Game.colCount {
             guard let c = tableau[col].last, isSafeAutoplay(c) else { continue }
+            let toUp = canFoundationUp(c)
+            if autoSendWouldBreakTier(c, toUp: toUp) { continue }
             snapshot(); selection = nil; tableau[col].removeLast()
-            if canFoundationUp(c) { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
+            if toUp { up[c.suit.rawValue] = c.rank } else { down[c.suit.rawValue] = c.rank }
             moveCount += 1; recordHomed(); persist(); return true
         }
         return false
@@ -757,34 +788,81 @@ final class Game: ObservableObject {
     /// Would forcing every available card home (the aggressive `autoFinish`) empty the board and
     /// win? A pure simulation on copies of the state — the trigger for automatic finishing. Uses
     /// the same greedy rule as `autoFinish` so detection and execution can never disagree.
-    private func autoFinishWouldWin() -> Bool {
+    private func autoFinishWouldWin() -> Bool { simulateAutoFinish().won }
+
+    /// Replay the cascade on copies of the state, in `sendOneHome`'s EXACT order — cells first,
+    /// then tableau tops left→right, one card, then start again from the cells — and report what it
+    /// would do: whether it empties the board, the ordered foundation stream it would produce, and
+    /// the move count it would land on. `autoFinishWouldWin()` is this predicate; `autoFinishTierCost()`
+    /// reads the stream. Running the real send order (rather than sweeping each pass to completion)
+    /// is what lets the two agree card-for-card, which is the whole point: a prediction in a
+    /// different order can predict a different SPLIT, and the split is what most days are scored on.
+    private func simulateAutoFinish() -> (won: Bool, events: [FoundationEvent], moves: Int) {
         var u = up, d = down, cs = cells, tb = tableau
+        var events: [FoundationEvent] = []
+        var moves = moveCount
         func canUp(_ c: Card) -> Bool { c.rank == u[c.suit.rawValue] + 1 && c.rank < d[c.suit.rawValue] }
         func canDown(_ c: Card) -> Bool { c.rank == d[c.suit.rawValue] - 1 && c.rank > u[c.suit.rawValue] }
-        var moved = true
-        while moved {
-            moved = false
+        func send(_ c: Card) {
+            moves += 1
+            let toUp = canUp(c)
+            if toUp { u[c.suit.rawValue] = c.rank } else { d[c.suit.rawValue] = c.rank }
+            events.append(FoundationEvent(suit: c.suit.rawValue, rank: c.rank,
+                                          end: toUp ? "up" : "down", moveIdx: moves))
+        }
+        var sent = true
+        while sent {
+            sent = false
             for i in 0..<Game.cellCount {
-                if let c = cs[i], canUp(c) || canDown(c) {
-                    cs[i] = nil
-                    if canUp(c) { u[c.suit.rawValue] = c.rank } else { d[c.suit.rawValue] = c.rank }
-                    moved = true
-                }
+                if let c = cs[i], canUp(c) || canDown(c) { cs[i] = nil; send(c); sent = true; break }
             }
+            if sent { continue }
             for col in 0..<Game.colCount {
-                if let c = tb[col].last, canUp(c) || canDown(c) {
-                    tb[col].removeLast()
-                    if canUp(c) { u[c.suit.rawValue] = c.rank } else { d[c.suit.rawValue] = c.rank }
-                    moved = true
-                }
+                if let c = tb[col].last, canUp(c) || canDown(c) { tb[col].removeLast(); send(c); sent = true; break }
             }
         }
-        return (0..<4).allSatisfy { d[$0] == u[$0] + 1 }
+        return ((0..<4).allSatisfy { d[$0] == u[$0] + 1 }, events, moves)
+    }
+
+    /// Which still-earnable tiers running the cascade RIGHT NOW would deny, as display strings
+    /// ("🥈 Silver", "🥇 Gold"). Empty for casual play, and empty whenever finishing is harmless.
+    ///
+    /// The cascade is greedy — each card takes whichever end is legal, first come first served —
+    /// and on 19 of 30 reachable days that order violates the day's own objective. The app was
+    /// OFFERING it ("Ready to finish — send them all now?") at move 64 of an 87-move certified
+    /// flawless line and then awarding 🥉🥈 with no 🥇 and no 🌟
+    /// (bug/WF-4:autofinish-cascade-can-deny-gold).
+    ///
+    /// The fix is deliberately NOT to make the cascade objective-aware: reordering its sends would
+    /// have the app quietly play the challenge for the player, which is a worse defect than the one
+    /// it fixes. Instead the app declines to offer or auto-run a cascade that costs a live tier, and
+    /// the manual Finish button asks first, naming exactly what it would cost. Detection is only
+    /// ever used to WITHHOLD an automatic action — never to change the order of a single send.
+    func autoFinishTierCost() -> [String] {
+        guard let ch = liveChallenge else { return [] }
+        var t = liveAttempt()
+        let silverWasLive = !objViolated(ch.silver, t)
+        let goldWasLive = !objViolated(ch.gold, t)
+        guard silverWasLive || goldWasLive else { return [] }
+        let sim = simulateAutoFinish()
+        guard sim.won else { return [] }
+        t.won = true
+        t.moves = sim.moves
+        t.foundationOrder.append(contentsOf: sim.events)
+        let after = evaluateChallenge(ch, t)
+        var lost: [String] = []
+        if silverWasLive && !after.silver { lost.append("🥈 Silver") }
+        if goldWasLive && !after.gold { lost.append("🥇 Gold") }
+        return lost
     }
 
     /// Offer or perform auto-finish when the board becomes finishable, per the current mode.
     func maybeAutoFinish() {
         guard started, !won, !finishing, !promptAutoFinish, !checkWin(), autoFinishWouldWin() else { return }
+        // Never offer, and never auto-run, a cascade that would spend a tier this attempt can still
+        // earn. The board stays finishable and the manual Finish button stays available — that path
+        // asks first and names the cost, so ending the run this way is a decision, not a surprise.
+        guard autoFinishTierCost().isEmpty else { return }
         switch autoFinishMode {
         case .on:  runAutoFinish()
         case .ask: if !autoFinishDeferred { stopAutoplayPending(); promptAutoFinish = true }
