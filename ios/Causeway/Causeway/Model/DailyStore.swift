@@ -12,6 +12,12 @@ final class DailyStore: ObservableObject {
     /// record's day index names a completely different challenge. Keeping it would credit a Gold
     /// that was never played. A pre-v3 store is therefore dropped (stashed, not destroyed), once.
     private let version = 3
+    /// The same generation number as `version` above, exposed so the stats-backup exporter can
+    /// STAMP it and the importer can refuse a day map earned on an older calendar — without which
+    /// an import walks straight past the wipe this version gate performs
+    /// (bug/WF-11:legacy-backup-defeats-daily-v3-wipe). Must equal `version`; both are pinned in
+    /// tests/daily.test.mjs.
+    static let version = 3
 
     init() { load() }
 

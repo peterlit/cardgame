@@ -403,6 +403,26 @@ test('both platforms gate the daily store on version 3 (the rebuild nukes older 
   const swift = norm(readFileSync(join(REPO, 'ios/Causeway/Causeway/Model/DailyStore.swift'), 'utf8'));
   assert.ok(swift.includes(norm('private let version = 3')), 'iOS daily store is not v3');
   assert.ok(swift.includes(norm('guard decoded.version == version else {')), 'iOS daily store does not drop older versions');
+  // The same generation number, exposed for the stats-backup stamp. The local wipe above is only
+  // half the guard: the import path is the other door into the day map, and it was wide open
+  // (bug/WF-11:legacy-backup-defeats-daily-v3-wipe). These two literals must not drift apart.
+  assert.ok(swift.includes(norm('static let version = 3')), 'iOS daily store no longer exposes its generation for the backup stamp');
+  const backup = norm(readFileSync(join(REPO, 'ios/Causeway/Causeway/Model/StatsBackup.swift'), 'utf8'));
+  assert.ok(backup.includes(norm('dailyVersion: DailyStore.version')), 'stats backups no longer stamp the daily-store generation');
+  assert.ok(backup.includes(norm('poolEpoch: EPOCH_DAYS')), 'stats backups no longer stamp the calendar epoch');
+  assert.ok(backup.includes(norm('dailyVersion == DailyStore.version && poolEpoch == EPOCH_DAYS')),
+    'the backup importer no longer checks the pool generation of a daily map');
+  // A missing stamp must read as NO. An `?? DailyStore.version`-style default anywhere here would
+  // re-open the door for every pre-stamp file, which is exactly the legacy case that broke.
+  assert.ok(!/dailyVersion\s*=\s*try\s*c\.decodeIfPresent\(Int\.self,\s*forKey:\s*\.dailyVersion\)\s*\?\?/.test(backup),
+    'a missing pool-generation stamp is being defaulted instead of refused');
+  const view = norm(readFileSync(join(REPO, 'ios/Causeway/Causeway/Views/DailyView.swift'), 'utf8'));
+  assert.ok(view.includes(norm('let poolMatches = backup.dailyRecordsMatchThisPool')),
+    'the import path no longer gates the daily map on the pool generation');
+  assert.ok(view.includes(norm('let validDaily = !poolMatches ? [:] : backup.dailyInts')),
+    'an unprovable daily map is no longer dropped at import');
+  assert.ok(view.includes('of challenge history from an older'),
+    'the import no longer TELLS the player its daily history was from an older calendar');
 });
 
 // ---- ⏰ same-day recognition --------------------------------------------------------------------

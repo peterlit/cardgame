@@ -416,9 +416,19 @@ struct DailyView: View {
         //           onto a device whose clock says earlier, so bound by the POOL, not just today.)
         //   wins  → 1 ... Game.maxSeed               : every seed the app can deal.
         // Anything outside those is a hand-edited/corrupt key and is still dropped.
+        //
+        // FIRST, though: a `daily` map is only meaningful against the challenge calendar it was
+        // earned on. Day indices name a pool entry, and the Aug-30 recut re-picked every day, so a
+        // pre-recut record for "day 12" credits a different deal's Gold. DailyStore.load() already
+        // drops a pre-v3 LOCAL store for exactly that reason — this import path was the last door
+        // left open, and a legacy file walked through it with zero entries skipped, fabricating a
+        // 10-day Gold streak (bug/WF-11:legacy-backup-defeats-daily-v3-wipe). Exports now stamp
+        // their generation; a file that cannot prove it (any pre-stamp export, including ones this
+        // app itself wrote) takes the degraded path below — deals in, days out, reason stated.
+        let poolMatches = backup.dailyRecordsMatchThisPool
         let dayMax = max(todayIndex(), DailyData.pool.count) + 2
         let dayMin = 0
-        let validDaily = backup.dailyInts
+        let validDaily = !poolMatches ? [:] : backup.dailyInts
             .filter { (dayMin...dayMax).contains($0.key) }
             .mapValues { r in
                 TierResult(bronze: r.bronze, silver: r.silver, gold: r.gold, flawless: r.flawless,
@@ -433,13 +443,22 @@ struct DailyView: View {
         let addedDeals = game.winStore.merge(validWins)
         // Report the two kinds separately: "Skipped 2 invalid entries" told the player nothing
         // about WHAT was dropped, which is the whole question when a restore loses progress.
-        let skippedDays = backup.daily.count - validDaily.count
+        let skippedDays = poolMatches ? backup.daily.count - validDaily.count : 0
         let skippedDeals = backup.wins.count - validWins.count
         var note = "Imported — merged \(pl(validDaily.count, "day")) (\(addedDays) new) and \(pl(validWins.count, "deal")) (\(addedDeals) new)."
         if skippedDays + skippedDeals > 0 {
             let parts = [skippedDays > 0 ? pl(skippedDays, "day") : nil,
                          skippedDeals > 0 ? pl(skippedDeals, "deal") : nil].compactMap { $0 }
             note += " Skipped \(parts.joined(separator: " and ")) this app can't have produced."
+        }
+        // The older-calendar case gets its OWN sentence: those days weren't malformed, they were
+        // earned on a calendar where each date held a different deal, so crediting them would be
+        // crediting challenges that were never played. Deal numbers are pool-independent and come
+        // across regardless.
+        if !poolMatches && !backup.daily.isEmpty {
+            note += " Skipped \(pl(backup.daily.count, "day")) of challenge history from an older"
+                  + " challenge calendar — those dates hold different deals now. Your solved deals"
+                  + " came across."
         }
         backupNote = note
     }
