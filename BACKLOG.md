@@ -599,3 +599,30 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
 - Open, not done: the App Store listing copy (`store/app-store-listing.md`) still says nothing about
   Daily Challenges, streaks, or the demo — it predates the whole feature.
 
+
+## Review loop 2026-08-30 (scope `f42c632..HEAD`) — findings left open at closeout
+
+Full report: `.review-loop/REPORT.md` (converged after round 2 + closeout; 0 blockers, 0 majors).
+
+- **The ⏰ grace rewording is only half applied** (`correctness/daily.mjs:ontime-grace-window-too-wide`,
+  partial). Behaviour is unchanged and correct, but the comments sitting on BOTH shipping `isOnTime`
+  implementations still assert the disproven "midnight grace" framing: `index.html:1240-1241`,
+  `ios/Causeway/Causeway/Model/Daily.swift:341-344`, plus `index.html:450-451` and
+  `docs/architecture/overview.md:369`. Only the shared-core/test/restore comments were rewritten, so a
+  maintainer reading either shipping implementation still learns the wrong rule. Fix: paste the
+  `tests/daily.mjs:264-266` wording onto those four sites. (`prompts.md:698` is a historical prompt
+  log — leave it.)
+- **The new "resume and it still counts" line sits above a button that forfeits the grace**
+  (`ux/index.html:gracelive-play-button-forfeits`, introduced by the closeout's own fix). On web,
+  `index.html:1474-1475` calls `playChallenge()` with NO confirmation, re-dealing the live attempt and
+  re-stamping `challengeStartDay=todayIndex()` — one silent tap loses both the game and the ⏰ the line
+  just promised. iOS has a dialog, but its reassurance "You can replay the challenge afterwards"
+  (`DailyView.swift:53`) is exactly false in this state. Cheapest fix: extend the line to "Resume your
+  attempt today (close this) and it still counts"; better: gate the web button behind a confirm and
+  append "— this forfeits ⏰ same-day" to the iOS `confirmMessage`.
+- **`tools/loop-usage.py` never reports an agent type** (`tools/loop-usage.py:agent-always-null`,
+  pre-existing). `agent_type_of()` scans for keys that do not appear in real subagent transcripts, so
+  every row emits `"agent": null` and sidechain cost cannot be split implementer vs reviewer. Token
+  numbers are unaffected (`sidechain: true` still works). Fix: try
+  `json.load(path + '.meta.json')["agentType"]` first, then the first record's `attributionAgent`,
+  keeping the existing scan as a last resort.
