@@ -202,17 +202,25 @@
   .demobar.show{ display:flex; }
   .demobtns{ display:flex; gap:6px; flex-shrink:0; }
   .demobar .btn{ padding:5px 12px; font-size:12px; }
-  button.btn.dshow{ background:rgba(217,173,85,.24); border-color:rgba(217,173,85,.6); flex:1; }
+  /* The day card is white, so these pills need the card's own ink — the base .btn's near-white
+     label (meant for its dark translucent background) was invisible here. iOS already uses
+     Theme.ink for the same pills; this is the web catching up. */
+  button.btn.dshow{ background:rgba(217,173,85,.24); border-color:rgba(217,173,85,.6);
+    color:var(--ink); flex:1 1 calc(50% - 3px); }
   button.btn.dshow:hover{ background:rgba(217,173,85,.36); }
   .dshowlbl{ margin-top:8px; font-size:12px; opacity:.7; }
-  .dshowrow{ display:flex; gap:6px; margin-top:4px; }
+  .dshowrow{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
   .panel.daily{ text-align:left; max-width:460px; }
   .panel.daily h2{ text-align:center; }
-  .dstreaks{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:2px 0 14px; }
+  /* three across (5 cards -> 3 + 2), matching iOS: one row of five truncates the labels */
+  .dstreaks{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:2px 0 14px; }
   .dstreak{ background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); border-radius:12px;
     padding:8px 3px; text-align:center; }
   .dstreak .ic{ font-size:16px; } .dstreak .cur{ font-family:Georgia,serif; font-size:22px; font-weight:700; color:var(--gold); line-height:1.1; }
   .dstar{ font-size:12px; color:var(--gold); font-weight:700; letter-spacing:.02em; }
+  .dontime{ font-size:11.5px; margin-top:8px; font-weight:600; opacity:.9; }
+  .dontime.earned{ color:var(--gold); }
+  .dontime.muted{ opacity:.55; font-weight:500; }
   .dstar-c{ font-size:11px; line-height:1; }
   .dstreak .l{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:.75; font-weight:600; }
   .dstreak .t{ font-size:10.5px; opacity:.78; font-weight:600; margin-top:1px; }
@@ -246,6 +254,9 @@
   .dcell.sel{ border-color:var(--gold); background:rgba(255,255,255,.16); }
   .dcell.today{ box-shadow:inset 0 0 0 1.5px var(--gold); }
   .dcell .dn{ font-variant-numeric:tabular-nums; font-weight:600; }
+  /* ⏰ earned on the day itself — a corner pip, so it can't collide with the today ring below it */
+  .dcell .dot-ontime{ position:absolute; top:3px; right:3px; width:5px; height:5px; border-radius:50%;
+    background:var(--gold); box-shadow:0 0 0 1px rgba(0,0,0,.25); }
   .dcell .dd{ display:flex; gap:2.5px; height:7px; align-items:center; }
 </style>
 </head>
@@ -436,8 +447,10 @@ let autoplayOn = lsGet("causeway.autoplay") !== "off";   // default ON, like Mob
 let autoFinishMode = (()=>{ const m=lsGet("causeway.autofinishmode"); return (m==="on"||m==="off"||m==="ask")?m:"ask"; })();  // ask (default) | on | off
 let finishing=false, autoFinishDeferred=false, finishPromptOpen=false;
 // Daily-challenge per-attempt telemetry (reset on deal/restore). `challengeDay` = the day index
-// being played as a challenge (null = casual play). See the "daily challenges" section below.
-let telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }, challengeDay = null;
+// being played as a challenge (null = casual play). `challengeStartDay` = the day index the attempt
+// BEGAN on, which is what gives an attempt started before midnight its ⏰ grace. See the "daily
+// challenges" section below.
+let telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }, challengeDay = null, challengeStartDay = null;
 function resetTelem(){ telem = { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 }; }
 // Record any cards newly sent home this move, by diffing the foundations against the pre-move
 // snapshot (each move homes at most one card). Non-invasive — leaves the drift-guarded send
@@ -491,7 +504,7 @@ function deal(theSeed){
     down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
   };
   history=[]; moveCount=0; selection=null;
-  resetTelem(); challengeDay=null;   // a fresh deal is casual play until a challenge Play sets it
+  resetTelem(); challengeDay=null; challengeStartDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
   winRecorded=false; pendingWin=null;   // fresh game — allow the next win to record
@@ -516,7 +529,7 @@ function saveGame(){
   lsSet("causeway.game", JSON.stringify({
     seed, tableau: state.tableau, cells: state.cells, up: state.up, down: state.down,
     moveCount, elapsedSecs, started: !!startTime,
-    challengeDay, telem   // preserve a challenge attempt (+ its telemetry) across reload
+    challengeDay, challengeStartDay, telem   // preserve a challenge attempt (+ its telemetry, + its ⏰ grace) across reload
   }));
 }
 function clearSavedGame(){ lsRemove("causeway.game"); }
@@ -555,6 +568,9 @@ function restoreGame(){
   state = { tableau: g.tableau, cells: g.cells, up: g.up, down: g.down };
   history=[]; selection=null; moveCount=g.moveCount||0;
   challengeDay = (typeof g.challengeDay==="number") ? g.challengeDay : null;
+  // An older save has no start day; fall back to the challenge's own day so a resumed attempt is
+  // judged by when it FINISHES, never credited for a date it cannot prove.
+  challengeStartDay = (typeof g.challengeStartDay==="number") ? g.challengeStartDay : challengeDay;
   telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 };
   if(typeof telem.maxRunMoved!=="number") telem.maxRunMoved=0;
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
@@ -1145,9 +1161,10 @@ function onWin(){
   const w = pendingWin || { seed, moves:moveCount, prev:wins[seed],
                             secs: startTime?Math.floor((Date.now()-startTime)/1000):0 };
   const dailyLine = w.daily
-    ? (w.daily.flawless
+    ? ((w.daily.flawless
         ? " 🌟 Flawless! 🥉🥈🥇 all in a single run."
         : ` Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`)
+       + (w.daily.onTime ? ` ⏰ On time — ${streaks(dailyStore.days, todayIndex()).onTime.current}-day same-day streak.` : ""))
     : (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
   document.getElementById("winMsg").textContent =
     `Deal #${w.seed} · ${w.moves} moves · ${fmtTime(w.secs)}.` + dailyLine;
@@ -1218,18 +1235,25 @@ function dailyChallenge(dayIndex,pool){
   return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(rec.silver),gold:makeObjective(rec.gold)};
 }
 function evaluate(objective,telemetry){return OBJECTIVES[objective.id].check(telemetry,objective.param);}
-function evaluateChallenge(challenge,telemetry){
+// ⏰ Same-day: was this win earned on the challenge's own date? Day indices from the device's LOCAL
+// calendar; the grace clause keeps an attempt begun before midnight that lands just after it.
+function isOnTime({challengeDay,winDay,attemptStartDay}){
+  if(challengeDay==null||winDay==null) return false;
+  if(winDay===challengeDay) return true;
+  return attemptStartDay===challengeDay&&winDay===challengeDay+1;
+}
+function evaluateChallenge(challenge,telemetry,onTime){
   const bronze=!!telemetry.won;
   const silver=bronze&&evaluate(challenge.silver,telemetry);
   const gold=bronze&&evaluate(challenge.gold,telemetry);
-  const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold)};
+  const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold),onTime:bronze&&!!onTime};
   if(bronze){result.moves=telemetry.moves;result.elapsed=telemetry.elapsed;}
   return result;
 }
 function mergeTiers(prev,attempt){
-  const p=prev||{bronze:false,silver:false,gold:false,flawless:false,moves:Infinity,elapsed:Infinity};
+  const p=prev||{bronze:false,silver:false,gold:false,flawless:false,onTime:false,moves:Infinity,elapsed:Infinity};
   return{bronze:!!p.bronze||!!attempt.bronze,silver:!!p.silver||!!attempt.silver,gold:!!p.gold||!!attempt.gold,
-    flawless:!!p.flawless||!!attempt.flawless,
+    flawless:!!p.flawless||!!attempt.flawless,onTime:!!p.onTime||!!attempt.onTime,
     moves:Math.min(p.moves??Infinity,attempt.moves??Infinity),elapsed:Math.min(p.elapsed??Infinity,attempt.elapsed??Infinity)};
 }
 function streaks(records,todayIndex){
@@ -1242,15 +1266,15 @@ function streaks(records,todayIndex){
     while(i!=null&&has(i,tier)){cur++;i--;}
     return{current:cur,best,total:days.length};
   };
-  return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless')};
+  return{play:tierRun('bronze'),silver:tierRun('silver'),gold:tierRun('gold'),flawless:tierRun('flawless'),onTime:tierRun('onTime')};
 }
 
 /* ---- pool + per-day store ---- */
 let dailyPool=null;
 let dailyStore=loadDaily();
-// v2 = the August-2026 recut. The whole calendar was regenerated (new epoch, new seeds, new
-// objectives), so day indices from a v1 store name different challenges — it is dropped, once.
-function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days&&g.version===2) return g; }catch(e){} return {version:2, days:{}}; }
+// v3 = the Aug+Sep 2026 rebuild: every day re-picked under the flawless gate, so a v2 record's day
+// index names a different challenge and would credit tiers that were never played. Dropped, once.
+function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days&&g.version===3) return g; }catch(e){} return {version:3, days:{}}; }
 function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
 // The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
 fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.days; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
@@ -1264,7 +1288,7 @@ function playChallenge(day){
   if(!dailyPool||!dailyRec(day)||day>todayIndex()) return;
   stopDemo();
   deal(dailyPool[day].seed);   // resets telem + clears challengeDay
-  challengeDay=day; saveGame();
+  challengeDay=day; challengeStartDay=todayIndex(); saveGame();
   closeDaily(); render();
 }
 
@@ -1304,8 +1328,8 @@ function updateDemoBar(){
   const next=document.getElementById("demoNext"), pause=document.getElementById("demoPause"), stop=document.getElementById("demoStop");
   const total=demoMoves?demoMoves.length:0;
   const done = !demoing && bar.classList.contains("show");   // completed line: banner + Done only
-  const TIER={bronze:'🥉 Clear the deal',silver:'🥈 Silver',gold:'🥇 Gold'};
-  const tierName={bronze:'winning',silver:'Silver',gold:'Gold'}[demoTier]||'winning';
+  const TIER={bronze:'🥉 Clear the deal',silver:'🥈 Silver',gold:'🥇 Gold',flawless:'🌟 Flawless'};
+  const tierName={bronze:'winning',silver:'Silver',gold:'Gold',flawless:'Flawless'}[demoTier]||'winning';
   if(done){
     if(msg) msg.textContent=`That's a ${tierName} line — tap Done to try it yourself.`;
     if(next) next.style.display="none";
@@ -1372,11 +1396,12 @@ function demoStepOnce(){
 // objective (win in N moves / no undo) — the clear-the-deal line already satisfies it.
 function solutionLine(seed, tier){
   const s = dailySolutions && dailySolutions[seed]; if(!s) return null;
+  if(tier==='flawless') return s.flawless || null;
   if(tier==='gold') return s.gold || null;
   if(tier==='silver') return s.silver || s.bronze || null;
   return s.bronze || null;
 }
-// Demonstrate a winning line for `seed` at `tier` ('bronze'|'silver'|'gold'; `label` = that tier's
+// Demonstrate a winning line for `seed` at `tier` ('bronze'|'silver'|'gold'|'flawless'; `label` = that tier's
 // objective text, for the bar). Reset to the fresh deal, then play the baked moves out. It's a demo —
 // challengeDay stays null and nothing is scored (we never route through commitMove).
 function showSolution(seed, tier, label){
@@ -1405,10 +1430,11 @@ function showSolution(seed, tier, label){
 function recordChallengeResult(secs){
   if(challengeDay==null || !dailyPool) return null;
   const ch=dailyChallenge(challengeDay,dailyPool);
-  const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved});
+  const onTime=isOnTime({challengeDay,winDay:todayIndex(),attemptStartDay:challengeStartDay});
+  const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved},onTime);
   dailyStore.days[challengeDay]=mergeTiers(dailyStore.days[challengeDay],res);
   saveDaily();
-  const day=challengeDay; challengeDay=null;
+  const day=challengeDay; challengeDay=null; challengeStartDay=null;
   return {day, res};
 }
 
@@ -1423,7 +1449,7 @@ function renderDaily(){
   const ti=todayIndex();
   const s=streaks(dailyStore.days, ti);
   document.getElementById("dailyStreaks").innerHTML=
-    [['🔥','Play',s.play],['🥈','Silver',s.silver],['🥇','Gold',s.gold],['🌟','Flawless',s.flawless]].map(([ic,l,v])=>
+    [['🔥','Play',s.play],['⏰','Same-day',s.onTime],['🥈','Silver',s.silver],['🥇','Gold',s.gold],['🌟','Flawless',s.flawless]].map(([ic,l,v])=>
       `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="t">${v.total} total</div><div class="b">best ${v.best}</div></div>`).join('');
   renderDailyCard(); renderDailyCal();
 }
@@ -1456,11 +1482,22 @@ function renderDailyCard(){
     const parts=[b('bronze','Clear the deal','🥉 Clear')];
     if(sol.silver) parts.push(b('silver',c.silver.label,'🥈 Silver'));   // distinct only when Silver is certified
     if(sol.gold)   parts.push(b('gold',c.gold.label,'🥇 Gold'));
+    // 🌟 the line the Flawless tier actually asks for: both objectives satisfied in ONE run.
+    if(sol.flawless) parts.push(b('flawless','Both objectives in one run','🌟 Flawless'));
     showBtn = `<div class="dshowlbl">Show me how to win:</div><div class="dshowrow">${parts.join('')}</div>`;
   }
+  // ⏰ is earned by clearing the day on its own date — say so where the player decides to play,
+  // rather than letting a past-day replay silently fail to earn it.
+  const otRun=streaks(dailyStore.days, ti).onTime;
+  const onTimeLine = rec.onTime
+    ? `<div class="dontime earned">⏰ Cleared on the day</div>`
+    : isToday
+      ? `<div class="dontime">⏰ Win today to ${otRun.current>0?`keep your ${otRun.current}-day same-day streak`:'start a same-day streak'}</div>`
+      : `<div class="dontime muted">⏰ Same-day is earned on the day itself</div>`;
   document.getElementById("dailyCard").innerHTML=
     `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
+     ${onTimeLine}
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
      ${btn}${showBtn}`;
 }
@@ -1479,7 +1516,8 @@ function renderDailyCal(){
     // three), so it never overlaps the date number.
     const dots=rec?['bronze','silver','gold'].filter(t=>rec[t]).map(t=>`<i class="d3" style="background:${DOTCOL[t]}"></i>`).join(''):'';
     const marks=rec&&rec.flawless?'<span class="dstar-c">🌟</span>':dots;
-    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}><span class="dn">${d}</span><span class="dd">${marks}</span></div>`;
+    const pip=rec&&rec.onTime?'<i class="dot-ontime"></i>':'';
+    html+=`<div class="${cls.join(' ')}" ${avail?`onclick="dailyView=${idx};renderDaily()"`:''}>${pip}<span class="dn">${d}</span><span class="dd">${marks}</span></div>`;
   }
   document.getElementById("dailyGrid").innerHTML=html;
 }
@@ -1647,9 +1685,10 @@ document.getElementById("demoNext").onclick=demoStepOnce;
 // context if one is active (so a challenge replay stays scored as that same challenge/day).
 function restartDeal(){
   stopDemo();
-  const day = challengeDay;
+  const day = challengeDay, startDay = challengeStartDay;
   deal(seed);                                   // re-deal same seed; resets telemetry + clears challengeDay
-  if(day!=null){ challengeDay=day; saveGame(); render(); }   // keep it a challenge if it was one (refresh HUD)
+  // A retry is a NEW attempt: its ⏰ eligibility is judged from today, not from the first try.
+  if(day!=null){ challengeDay=day; challengeStartDay=(startDay!=null?todayIndex():null); saveGame(); render(); }
 }
 document.getElementById("replayBtn").onclick=restartDeal;
 function refreshAutoFinishBtn(){

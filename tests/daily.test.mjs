@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks,
-  OBJECTIVES, gradeOf, labelOf,
+  OBJECTIVES, gradeOf, labelOf, isOnTime,
 } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -222,7 +222,7 @@ test('nothing passes without the win', () => {
 test('a lost game earns no tier', () => {
   const challenge = dailyChallenge(0, POOL);
   const r = evaluateChallenge(challenge, base({ won: false }));
-  assert.deepEqual(r, { bronze: false, silver: false, gold: false, flawless: false });
+  assert.deepEqual(r, { bronze: false, silver: false, gold: false, flawless: false, onTime: false });
 });
 
 /* ---------- per-attempt grading + OR-accumulation across attempts ---------- */
@@ -231,7 +231,7 @@ test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts'
   const silverAttempt = { bronze: true, silver: true, gold: false, moves: 95, elapsed: 200 };
   const goldAttempt   = { bronze: true, silver: false, gold: true, moves: 110, elapsed: 150 };
   const day = mergeTiers(mergeTiers(undefined, silverAttempt), goldAttempt);
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: false, moves: 95, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 95, elapsed: 150 });
 });
 
 test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, best moves/time)', () => {
@@ -246,17 +246,17 @@ test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, bes
   assert.equal(rB.silver, true);  assert.equal(rB.gold, true);
   const day = mergeTiers(mergeTiers(undefined, rA), rB);
   // OR of tiers, and best (min) of each metric across the two attempts.
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: true, moves: 90, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150 });
   // A subsequent lost attempt must not clobber the recorded best moves/time.
   const held = mergeTiers(day, evaluateChallenge(challenge, base({ won: false, moves: 5, elapsed: 5 })));
-  assert.deepEqual(held, { bronze: true, silver: true, gold: true, flawless: true, moves: 90, elapsed: 150 });
+  assert.deepEqual(held, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150 });
 });
 
 test('mergeTiers never loses a tier already earned on a later worse attempt', () => {
   const prev = { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 };
   const worse = { bronze: true, silver: false, gold: false, moves: 200, elapsed: 300 };
   const merged = mergeTiers(prev, worse);
-  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, flawless: false, moves: 80, elapsed: 100 });
+  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 80, elapsed: 100 });
 });
 
 /* ---------- flawless (all three tiers in one attempt) ---------- */
@@ -337,20 +337,71 @@ test('daily logic is inlined verbatim in index.html (no drift)', () => {
     "check:(t,p)=>{if(!t.won)return false;const{u,d}=upDown(t);return (p.end==='up'?u:d).every(x=>x>=p.min);}},",
     'function gradeOf(id,param){const g=OBJECTIVES[id].grade;return typeof g==="function"?g(param):g;}'.replace(/"/g, "'"),
     'return{dayIndex,seed:rec.seed,par:rec.par,silver:makeObjective(rec.silver),gold:makeObjective(rec.gold)};',
-    'const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold)};',
-    'flawless:!!p.flawless||!!attempt.flawless,',
+    'const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold),onTime:bronze&&!!onTime};',
+    'flawless:!!p.flawless||!!attempt.flawless,onTime:!!p.onTime||!!attempt.onTime,',
+    'if(winDay===challengeDay) return true;',
+    'return attemptStartDay===challengeDay&&winDay===challengeDay+1;',
     'let i=played(todayIndex)?todayIndex:(played(todayIndex-1)?todayIndex-1:null); let cur=0;',
   ];
   for (const c of canon) assert.ok(html.includes(norm(c)), `index.html daily logic drifted / missing: ${c.slice(0, 55)}...`);
 });
 
-// The whole calendar was recut for August 2026; a stored record from before it names a different
-// challenge, so both platforms must drop a pre-v2 store rather than credit tiers never earned.
-test('both platforms gate the daily store on version 2 (the recut nukes older history)', () => {
+// The calendar was rebuilt for Aug+Sep 2026 under the flawless gate; a stored record from before it
+// names a different challenge, so both platforms must drop a pre-v3 store rather than credit tiers
+// never earned.
+test('both platforms gate the daily store on version 3 (the rebuild nukes older history)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
-  assert.ok(html.includes(norm('if(g&&g.days&&g.version===2) return g;')), 'web daily store is not v2-gated');
-  assert.ok(html.includes(norm('return {version:2, days:{}};')), 'web daily store does not reset to v2');
+  assert.ok(html.includes(norm('if(g&&g.days&&g.version===3) return g;')), 'web daily store is not v3-gated');
+  assert.ok(html.includes(norm('return {version:3, days:{}};')), 'web daily store does not reset to v3');
   const swift = norm(readFileSync(join(REPO, 'ios/Causeway/Causeway/Model/DailyStore.swift'), 'utf8'));
-  assert.ok(swift.includes(norm('private let version = 2')), 'iOS daily store is not v2');
+  assert.ok(swift.includes(norm('private let version = 3')), 'iOS daily store is not v3');
   assert.ok(swift.includes(norm('guard decoded.version == version else {')), 'iOS daily store does not drop older versions');
+});
+
+// ---- ⏰ same-day recognition --------------------------------------------------------------------
+// Orthogonal to the tiers: it records WHEN a day was cleared, not how well. See §12 of
+// docs/daily-challenges.md.
+
+test('isOnTime: the day itself counts, a later replay does not', () => {
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 40, attemptStartDay: 40 }), true);
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 41, attemptStartDay: 41 }), false);  // replayed next day
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 55, attemptStartDay: 55 }), false);  // catch-up much later
+  assert.equal(isOnTime({ challengeDay: null, winDay: 40, attemptStartDay: 40 }), false); // casual play
+});
+
+test('isOnTime: an attempt begun before midnight still counts when it lands after', () => {
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 41, attemptStartDay: 40 }), true);
+  // ...but a game merely RESUMED days later does not get the grace.
+  assert.equal(isOnTime({ challengeDay: 40, winDay: 43, attemptStartDay: 40 }), false);
+});
+
+test('evaluateChallenge records onTime only on a win, and mergeTiers makes it sticky', () => {
+  const ch = { silver: { id: 'no-undo', param: {} }, gold: { id: 'cells-le', param: { N: 0 } } };
+  const lost = evaluateChallenge(ch, { won: false, moves: 40, undos: 0, cellUses: 0, foundationOrder: [] }, true);
+  assert.equal(lost.onTime, false, 'a loss on the day earns nothing');
+
+  const won = evaluateChallenge(ch, { won: true, moves: 90, elapsed: 300, undos: 0, cellUses: 0, foundationOrder: [] }, true);
+  assert.equal(won.onTime, true);
+  assert.equal(won.bronze && won.silver && won.gold && won.flawless, true);
+
+  // A later catch-up attempt on another day never clears the badge, and never sets it either.
+  const later = evaluateChallenge(ch, { won: true, moves: 80, elapsed: 200, undos: 0, cellUses: 0, foundationOrder: [] }, false);
+  assert.equal(mergeTiers(won, later).onTime, true);
+  assert.equal(mergeTiers(undefined, later).onTime, false);
+});
+
+test('streaks: the same-day run is strict — a catch-up day never repairs it', () => {
+  // Days 3-5 cleared on their own dates; day 6 cleared late; day 7 (today) on time.
+  const records = {
+    3: { bronze: true, onTime: true },
+    4: { bronze: true, onTime: true },
+    5: { bronze: true, onTime: true },
+    6: { bronze: true, onTime: false },
+    7: { bronze: true, onTime: true },
+  };
+  const s = streaks(records, 7);
+  assert.equal(s.play.current, 5, 'the play streak counts the catch-up day');
+  assert.equal(s.onTime.current, 1, 'the same-day streak restarted at today');
+  assert.equal(s.onTime.best, 3);
+  assert.equal(s.onTime.total, 4);
 });

@@ -132,9 +132,11 @@ struct DailyView: View {
     private var streaksRow: some View {
         let s = streaks(days, todayIndex())
         let items: [(String, String, StreakRun)] =
-            [("🔥", "Play", s.play), ("🥈", "Silver", s.silver), ("🥇", "Gold", s.gold), ("🌟", "Flawless", s.flawless)]
+            [("🔥", "Play", s.play), ("⏰", "Same-day", s.onTime), ("🥈", "Silver", s.silver),
+             ("🥇", "Gold", s.gold), ("🌟", "Flawless", s.flawless)]
         return VStack(spacing: 6) {
-            HStack(spacing: 8) {
+            // Three columns, not one row of five: five cards across truncate their labels on a phone.
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(items, id: \.1) { ic, label, run in
                     VStack(spacing: 1) {
                         HStack(spacing: 3) {
@@ -156,7 +158,7 @@ struct DailyView: View {
                     .accessibilityLabel("\(label): current streak \(run.current) days, \(run.total) days total, best \(run.best) days")
                 }
             }
-            Text("A streak counts consecutive days holding that medal. Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal.")
+            Text("A streak counts consecutive days holding that medal. Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal. Same-day = the deal cleared on its own date — replaying a past day never earns it.")
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
@@ -183,6 +185,9 @@ struct DailyView: View {
                     tierRow("Silver", "silver", c.silver.label, rec, future: dayView > ti)
                     tierRow("Gold", "gold", c.gold.label, rec, future: dayView > ti)
                 }
+                // ⏰ is earned by clearing the day on its own date — said plainly where the player
+                // decides to play, so a past-day replay can't silently fail to earn it.
+                onTimeLine(rec: rec, isToday: dayView == ti)
                 playButton(day: dayView, ti: ti, rec: rec)
                 // "Show me how to win": one line per tier — Bronze clears the deal; Silver/Gold obey
                 // that day's objective. Demonstrations (assisted) — never count toward tiers.
@@ -190,10 +195,16 @@ struct DailyView: View {
                     Text("Show me how to win:")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(spacing: 6) {
+                    // Two columns: with Flawless there are up to four pills, and one row of four
+                    // truncates their labels on a narrow phone.
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+                              spacing: 6) {
                         showPill(c.seed, "bronze", "🥉 Clear", "Clear the deal")
                         if game.hasSilverLine(c.seed) { showPill(c.seed, "silver", "🥈 Silver", c.silver.label) }
                         if game.hasGoldLine(c.seed) { showPill(c.seed, "gold", "🥇 Gold", c.gold.label) }
+                        if game.hasFlawlessLine(c.seed) {
+                            showPill(c.seed, "flawless", "🌟 Flawless", "Both objectives in one run")
+                        }
                     }
                 }
             }
@@ -254,6 +265,25 @@ struct DailyView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("daily.play")
+        }
+    }
+
+    /// The ⏰ same-day line on the day card: earned / today's invitation / a past-day explainer.
+    @ViewBuilder private func onTimeLine(rec: TierResult?, isToday: Bool) -> some View {
+        let run = streaks(days, todayIndex()).onTime
+        if rec?.onTime == true {
+            Text("⏰ Cleared on the day")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.gold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if isToday {
+            Text(run.current > 0 ? "⏰ Win today to keep your \(run.current)-day same-day streak"
+                                 : "⏰ Win today to start a same-day streak")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            Text("⏰ Same-day is earned on the day itself")
+                .font(.system(size: 12)).foregroundStyle(.secondary.opacity(0.7))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -354,6 +384,7 @@ struct DailyView: View {
             .filter { (dayMin...dayMax).contains($0.key) }
             .mapValues { r in
                 TierResult(bronze: r.bronze, silver: r.silver, gold: r.gold, flawless: r.flawless,
+                           onTime: r.onTime,
                            moves: (r.moves ?? 0) > 0 ? r.moves : nil,
                            elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil)
             }
@@ -425,6 +456,12 @@ struct DailyView: View {
                 .fill(idx == dayView ? Theme.gold.opacity(0.28) : Color.gray.opacity(avail ? 0.12 : 0.04))
                 .overlay(RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(idx == ti ? Theme.gold : .clear, lineWidth: 1.5))
+            // ⏰ earned on the day itself: a corner pip, clear of the today ring and the tier dots.
+            if rec?.onTime == true {
+                Circle().fill(Theme.gold).frame(width: 5, height: 5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(3)
+            }
             VStack(spacing: 2) {
                 Text("\(day)").font(.system(size: 12, weight: .medium))
                     .foregroundStyle(avail ? Color.primary : Color.secondary.opacity(0.5))
@@ -475,6 +512,7 @@ private extension TierResult {
         case "silver": return silver
         case "gold": return gold
         case "flawless": return flawless
+        case "onTime": return onTime
         default: return false
         }
     }

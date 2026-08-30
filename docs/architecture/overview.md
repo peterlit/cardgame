@@ -136,7 +136,7 @@ not test helpers), and each product carries its own transcription.
 |---|---|---|
 | engine ↔ web | `tests/engine.test.mjs:240-268` | mulberry32 body, deck build, Fisher–Yates, 7/7/7/7/6/6/6/6 layout, `isSafeAutoplay`, save validation, `autoFinishWouldWin`, `sendOneHome` |
 | rules ↔ web | `tests/solver.test.mjs:24-47` | `isSeqHead`, `runDir`, `tailDir`, `canStackTableau` no-reverse rules, `maxMovable`, foundation predicates |
-| daily ↔ web | `tests/daily.test.mjs:236-258` | all six ordering checkers, the frozen per-day RNG seed, silver/gold pool construction and pick order, epoch constant, `mergeTiers`, streak walk |
+| daily ↔ web | `tests/daily.test.mjs` | all ordering checkers, epoch constant, `mergeTiers` (incl. `onTime`), `isOnTime`'s midnight grace, streak walk, daily-store version gate |
 | canonical ↔ Swift | `tests/ios-parity.test.mjs` | Swift mulberry32 wrapping arithmetic, deal layout, floor-division calendar, frozen objective arrays, generator seed, all six checkers, `mergeTiers`/streaks, `guard !winRecorded`, `applyDemoToken` — plus a cross-check that the web and iOS token appliers agree |
 
 These pins were introduced as a substitute for a native test target: `tests/ios-parity.test.mjs:1-9`
@@ -237,13 +237,16 @@ This is the largest subsystem and the main reason the shared-logic problem matte
 **Model.** One featured deal per calendar day, with three graded tiers on that single deal: 🥉 Bronze
 (clear the deal — required, keeps the streak), 🥈 Silver and 🥇 Gold (one objective each, optional).
 A fourth derived tier, 🌟 **Flawless**, means all three earned in a *single* attempt
-(`tests/daily.mjs:97-105`).
+(`tests/daily.mjs`) — and since the 2026-08-30 rebuild every seeded day is **certified** to admit
+one such line. Orthogonal to all four, ⏰ **Same-day** records that the day was cleared on its own
+date (`isOnTime`); it has its own strict streak and is never earned by replaying a past day.
 
 **Determinism.** `dailyChallenge(dayIndex, pool)` is a pure **table lookup**. Day index = days since
 the epoch **2026-08-01** (`tests/daily.mjs`). Day *D* reads `pool.days[D]`, which names that day's
 seed, its par, and both objectives with their parameters. There is **no runtime RNG**: the offline
 generator (`tools/solver/build-month.mjs`) chose all of it, maximising variety across the month.
-Only **August 2026** is seeded — days outside it resolve to `null`.
+**August and September 2026** are seeded (61 days, indices 0-60) — days outside them resolve to
+`null`.
 
 **Objective catalogue** — 13 parameterised families (`tests/daily.mjs`). A family's *grade* is a
 function of its parameter, so the same id can be a Silver or a Gold:
@@ -290,8 +293,8 @@ flowchart LR
         BS["build-solutions.mjs"]
     end
 
-    Pool[("data/daily-pool.json<br/>31 days")]
-    Sol[("data/daily-solutions.json<br/>31 seeds x tiers")]
+    Pool[("data/daily-pool.json<br/>61 days")]
+    Sol[("data/daily-solutions.json<br/>61 seeds x tiers")]
 
     Rules --> Solve
     Solve --> BP
@@ -307,7 +310,8 @@ flowchart LR
 
 - **`build-month.mjs`** draws candidate seeds from 500 001–1 000 000, certifies each against all 63
   `(family, parameter)` variants in parallel worker processes (resumable through a JSONL cache under
-  `.cache/`), then chooses the month's 31 days greedily for maximum variety. Output: 31 records of
+  `.cache/`), then chooses the calendar's 61 days greedily for maximum variety — each pick gated on
+  `certifyFlawless` proving one line earns both of that day's tiers. Output: 61 records of
   `{seed, par, silver:{id,param}, gold:{id,param}}`, plus the cached certifications
   `{seed, winnable, par, supports:[{id,param,par}]}`.
 - **`build-solutions.mjs`** bakes replayable winning lines per seed — bronze always, gold always, and
@@ -361,9 +365,10 @@ Verified feature-by-feature; this is the authoritative answer to "how do the two
 | In-progress game persistence | ✅ | ✅ | same validation logic |
 | Wins list with range compression + drill-down | ✅ | ✅ | |
 | Daily Challenges, streaks, calendar | ✅ | ✅ | pool via `fetch` vs bundle |
-| Flawless tier | ✅ | ✅ | |
+| Flawless tier (+ certified per day) | ✅ | ✅ | |
+| ⏰ Same-day recognition + streak | ✅ | ✅ | device-local date; grace for a pre-midnight attempt |
 | Live objectives HUD (incl. "on track") | ✅ | ✅ | |
-| "Show me how to win" demo, pause/step | ✅ | ✅ | |
+| "Show me how to win" demo, pause/step | ✅ | ✅ | four tiers incl. 🌟 Flawless |
 | Landscape-specific layout | ❌ | ✅ | web has only a `max-width: 560px` media query (`index.html:183`) |
 | Stats export / import backup | ❌ | ✅ | iOS-only (`Model/StatsBackup.swift`) |
 | Keyboard shortcuts (`n`, Cmd+Z) | ✅ | — | `index.html:1614-1617`; not applicable on iPhone |

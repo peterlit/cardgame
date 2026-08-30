@@ -572,3 +572,22 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
 - **Not implemented** — enforcing it means regenerating the month, which rewrites daily history
   again. Cheapest path: land the gate in `build-month.mjs` and let the *next* month be the first
   certified one. Details and an implementation sketch in `docs/solver.md` §7.7.
+
+### Daily Challenges — the Aug+Sep 2026 rebuild (2026-08-30)
+- **Every day is flawless-certified.** `certifyFlawless` (in `tools/solver/solve.mjs`) proves a
+  single line wins and satisfies both objectives before a day may ship; `contradiction()` rejects
+  the structurally impossible pairings with no search. The month builder gates every greedy pick on
+  it. Regenerating a month therefore costs one joint search per pick (plus retries) on top of
+  phase 1 — cheap next to certification itself.
+- **Two months are seeded** (Aug 1 – Sep 30 2026, `days[0..60]`, epoch unchanged). Seeding October
+  means re-running `build-month.mjs --days 92` and extending `days[]`; the epoch stays put.
+- **History was nuked again** (daily store v2 → v3, both platforms). Any future rebuild that must
+  PRESERVE history is a migration, not a rebuild — the day index is the key, and re-picking days
+  invalidates it.
+- **⏰ Same-day recognition** ships with it: one boolean (`onTime`) on the record, a fifth strict
+  streak, a calendar pip, a day-card line and a win-overlay callout. No timestamps are stored, so
+  the flag can never be reconstructed after the fact — a later feature would have started from zero,
+  which is why it shipped in the same release as the history wipe.
+- Open, not done: the App Store listing copy (`store/app-store-listing.md`) still says nothing about
+  Daily Challenges, streaks, or the demo — it predates the whole feature.
+

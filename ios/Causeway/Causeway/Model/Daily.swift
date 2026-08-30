@@ -310,12 +310,15 @@ struct TierResult: Codable, Equatable {
     var silver = false
     var gold = false
     var flawless = false
+    /// ⏰ cleared on the challenge's own date. Orthogonal to the tiers: it records WHEN, not how well.
+    var onTime = false
     var moves: Int? = nil
     var elapsed: Int? = nil
 
     init(bronze: Bool = false, silver: Bool = false, gold: Bool = false, flawless: Bool = false,
-         moves: Int? = nil, elapsed: Int? = nil) {
+         onTime: Bool = false, moves: Int? = nil, elapsed: Int? = nil) {
         self.bronze = bronze; self.silver = silver; self.gold = gold; self.flawless = flawless
+        self.onTime = onTime
         self.moves = moves; self.elapsed = elapsed
     }
     // Tolerate old/partial records (e.g. a pre-Flawless day map) — decode missing keys as defaults.
@@ -325,6 +328,7 @@ struct TierResult: Codable, Equatable {
         silver = try c.decodeIfPresent(Bool.self, forKey: .silver) ?? false
         gold = try c.decodeIfPresent(Bool.self, forKey: .gold) ?? false
         flawless = try c.decodeIfPresent(Bool.self, forKey: .flawless) ?? false
+        onTime = try c.decodeIfPresent(Bool.self, forKey: .onTime) ?? false
         moves = try c.decodeIfPresent(Int.self, forKey: .moves)
         elapsed = try c.decodeIfPresent(Int.self, forKey: .elapsed)
     }
@@ -334,13 +338,25 @@ func evaluate(_ objective: Objective, _ t: Attempt) -> Bool {
     objectiveCheck(objective.id, t, param: objective.param)
 }
 
+/// ⏰ Same-day: was this win earned on the challenge's own date? Day indices come from the device's
+/// LOCAL calendar — there is no server to ask, and a personal streak needs no anti-cheat. The grace
+/// clause is deliberate: an attempt begun before midnight that lands just after it still counts,
+/// but a game resumed days later does not.
+func isOnTime(challengeDay: Int?, winDay: Int, attemptStartDay: Int?) -> Bool {
+    guard let day = challengeDay else { return false }
+    if winDay == day { return true }
+    return attemptStartDay == day && winDay == day + 1
+}
+
 /// Grade ONE attempt. Bronze = won; Silver/Gold = won AND that tier's objective met this attempt.
 /// `flawless` = all three in THIS single attempt (harder than banking them across retries).
-func evaluateChallenge(_ challenge: Challenge, _ t: Attempt) -> TierResult {
+/// `onTime` is orthogonal: a bare Bronze earned on the day counts, a Flawless replay does not.
+func evaluateChallenge(_ challenge: Challenge, _ t: Attempt, onTime: Bool = false) -> TierResult {
     let bronze = t.won
     let silver = bronze && evaluate(challenge.silver, t)
     let gold = bronze && evaluate(challenge.gold, t)
-    var result = TierResult(bronze: bronze, silver: silver, gold: gold, flawless: bronze && silver && gold)
+    var result = TierResult(bronze: bronze, silver: silver, gold: gold, flawless: bronze && silver && gold,
+                            onTime: bronze && onTime)
     if bronze { result.moves = t.moves; result.elapsed = t.elapsed }
     return result
 }
@@ -363,12 +379,13 @@ func mergeTiers(_ prev: TierResult?, _ attempt: TierResult) -> TierResult {
         silver: p.silver || attempt.silver,
         gold: p.gold || attempt.gold,
         flawless: p.flawless || attempt.flawless,   // sticky once any single attempt aces all three
+        onTime: p.onTime || attempt.onTime,         // sticky once the day was cleared on its own date
         moves: minOpt(p.moves, attempt.moves),
         elapsed: minOpt(p.elapsed, attempt.elapsed))
 }
 
 struct StreakRun: Equatable { let current: Int; let best: Int; let total: Int }
-struct Streaks: Equatable { let play, silver, gold, flawless: StreakRun }
+struct Streaks: Equatable { let play, onTime, silver, gold, flawless: StreakRun }
 
 /// Streaks derived from the per-day record map. Catch-up-friendly: a streak is the longest run of
 /// consecutive day indices all holding the tier. Current run anchors on today if today was played
@@ -389,7 +406,8 @@ func streaks(_ records: [Int: TierResult], _ todayIndex: Int) -> Streaks {
         while let ii = i, let r = records[ii], has(r) { cur += 1; i = ii - 1 }
         return StreakRun(current: cur, best: best, total: days.count)   // total = all days ever holding the tier
     }
-    return Streaks(play: tierRun { $0.bronze }, silver: tierRun { $0.silver },
+    return Streaks(play: tierRun { $0.bronze }, onTime: tierRun { $0.onTime },
+                   silver: tierRun { $0.silver },
                    gold: tierRun { $0.gold }, flawless: tierRun { $0.flawless })
 }
 
@@ -469,10 +487,13 @@ private struct PoolFile: Decodable { let days: [PoolDay] }
 
 /// The baked winning lines for one seed, one per tier. `silver` is present only when the day's
 /// Silver is a certified (constraining) objective; a universal Silver falls back to `bronze`.
+/// `flawless` is the single line that satisfies BOTH objectives — what the 🌟 tier asks for; it is
+/// optional only so an older (v2) solutions file still decodes.
 struct TierSolutions: Decodable, Equatable {
     let bronze: String
     let silver: String?
     let gold: String?
+    let flawless: String?
 }
 private struct SolutionsFile: Decodable { let solutions: [String: TierSolutions] }
 

@@ -1,6 +1,25 @@
 # Daily Challenges — design
 
-> ## ⚠ 2026-08 RECUT — read this first
+> ## ⚠ 2026-08-30 REBUILD — read this first
+>
+> The calendar was rebuilt again on **2026-08-30**, on top of the 2026-08-23 recut below:
+>
+> - **Every day is FLAWLESS-CERTIFIED.** The generator now proves, per day, that ONE line wins and
+>   satisfies both objectives before that day may ship — so 🌟 Flawless is reachable on every date.
+>   Previously Silver and Gold were certified independently and three August days were provably
+>   impossible. `certifyFlawless` / `contradiction` in `tools/solver/solve.mjs`; the gate is in
+>   `build-month.mjs`'s greedy pick. See [`solver.md`](solver.md) §7.7.
+> - **Two months are seeded** — August *and* September 2026 (61 days), epoch unchanged at
+>   2026-08-01, so `days[]` simply runs 0-60.
+> - **"How to win flawless"** — `daily-solutions.json` is v3 and bakes the certified flawless line
+>   per day, offered as a fourth 🌟 demo button beside 🥉/🥈/🥇.
+> - **⏰ Same-day recognition** — clearing a day *on its own date* earns a fourth boolean on the
+>   record (`onTime`), a fifth streak, a calendar pip and a win-overlay callout. Orthogonal to the
+>   tiers: it records WHEN, not how well. §12 has the design.
+> - **History was nuked again** (daily store v2 → **v3**): every day was re-picked, so a stored
+>   record's day index names a different challenge.
+>
+> The 2026-08-23 recut, still current except where the above supersedes it:
 >
 > The daily system was **rebuilt on 2026-08-23** and much of the design record below is now history.
 > What changed:
@@ -392,14 +411,30 @@ A new screen (its own entry; the toolbar is already crowded), containing:
 - 🌟 **Flawless** — a fourth tier for earning Bronze + Silver + Gold in a *single* attempt, rather
   than banking them across free retries. It gets its own streak, a calendar star, and a win-overlay
   callout.
-  > ⚠ **Not certified.** The pool certifies the day's Silver and Gold *independently* — nothing
-  > proves one line satisfies both, so a day's Flawless can be unattainable and its streak breaks
-  > with no way for the player to know why. Measured on the shipped month (2026-08-30): 24 of 31
-  > days are flawless-certifiable at the default budget, **3 are provably impossible** — Aug 1 and
-  > Aug 26 pair `suit-sprint` with a Silver it contradicts, Aug 30 asks for a run of 5+ under
-  > "never move more than 2" — and 3 more went uncertified. Gating the generator on joint
-  > feasibility costs **no variety at all** (still 13 families / 52 distinct challenges over 31
-  > days, 29 of the 31 seeds unchanged); see [`solver.md`](solver.md) §7.7.
+  > ✅ **Certified since the 2026-08-30 rebuild.** Every seeded day now ships with a proven line
+  > that earns all three tiers at once, and that same line is baked as the 🌟 "How to win flawless"
+  > demo. Before the gate, three of August's 31 days were provably impossible (`suit-sprint` under a
+  > Silver it contradicts; a 5-card run under "never move more than 2"). Gating cost no variety —
+  > see [`solver.md`](solver.md) §7.7.
+
+- ⏰ **Same-day** — recognition for clearing a day *on the date it posted*, added 2026-08-30 to give
+  daily play a reason to be daily. It is **orthogonal to the tiers** (it records WHEN, not how well):
+  a bare Bronze earned today counts, a Flawless replay of a past day does not. One boolean on the
+  record (`onTime`), OR-accumulated like the tiers; **no timestamps are stored**, so there is nothing
+  to drift and no new privacy surface.
+  - **The rule** (`isOnTime`, shared core): the win lands on the challenge's own day index, OR the
+    attempt *began* on that date and lands one day later. The grace clause is the anti-frustration
+    rule — a game begun at 23:50 and won at 00:01 still counts — while a game merely resumed days
+    later does not. A retry is a new attempt, judged from today.
+  - **Its streak is strict.** 🔥 Play stays catch-up-repairable (finish yesterday's deal today and
+    the run heals); ⏰ cannot be repaired, and that asymmetry is the incentive. Both are labelled in
+    the UI so the difference is legible.
+  - **Surfaces:** a fifth streak card, a line on the day card that states the rule *before* you play
+    (so a past-day replay can't silently fail to earn it), a gold corner pip on earned calendar days,
+    and a win-overlay callout with the running streak. Deliberately **no countdown timer** — the goal
+    is a reason to open the app, not time pressure.
+  - **Cheatability:** the device clock is authoritative and trivially spoofable. That is fine and
+    consistent with §2 — the game is offline, account-free, and the streak is personal.
 - **"Show me how to win"** — a baked, replayable winning line per tier
   (`data/daily-solutions.json`), animated as an assisted, pausable, single-steppable demo that is
   never scored. See [`solver.md`](solver.md) § Solutions.

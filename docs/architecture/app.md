@@ -160,8 +160,9 @@ A line-for-line Swift mirror of canonical `tests/daily.mjs`. Contents:
 - **Generator** `dailyChallenge(_:_:)` (`:202-216`). One deliberate divergence from web: empty
   silver/gold pools return `nil` rather than crashing on a subscript (`:208-210`) — the comment notes
   web yields `undefined` and merely misrenders, whereas Swift would trap.
-- **Grading**: `TierResult` (tolerant `init(from:)`), `evaluateChallenge`, `mergeTiers`, `streaks`
-  returning `StreakRun {current, best, total}`.
+- **Grading**: `TierResult` (tolerant `init(from:)`; five booleans — bronze/silver/gold/flawless plus
+  ⏰ `onTime`), `evaluateChallenge(_:_:onTime:)`, `isOnTime(challengeDay:winDay:attemptStartDay:)`,
+  `mergeTiers`, `streaks` returning five `StreakRun {current, best, total}`s.
 - **UI-only hints**: `objViolated(_:_:)` and `objSecured(_:_:up:down:)` (`:312-383`) — the same
   unguarded fourth copy of objective semantics that exists on web.
 - **`enum DailyData`** (`:403-421`) — `static let pool` and `static let solutions`, lazily decoded
@@ -174,8 +175,9 @@ key `causeway.wins`, plus `ranges()` which compresses solved seeds into contiguo
 `ClosedRange<Int>` runs for the Wins screen, and `merge(_:)` for backup import. Persisted as a flat
 `[String: WinRecord]` JSON object with **no version wrapper**.
 
-**`Model/DailyStore.swift`** (58 lines) — `@Published private(set) days: [Int: TierResult]`,
-key `causeway.daily`, persisted as `{version, days}`. `record(day:result:)` OR-accumulates through
+**`Model/DailyStore.swift`** (67 lines) — `@Published private(set) days: [Int: TierResult]`,
+key `causeway.daily`, persisted as `{version, days}` (**v3** since the 2026-08-30 rebuild; a pre-v3
+blob is stashed under `causeway.daily.v<n>` and the store starts clean). `record(day:result:)` OR-accumulates through
 `mergeTiers` so an earned badge can never be lost.
 
 Both use the same corruption strategy: on decode failure, write the raw blob to

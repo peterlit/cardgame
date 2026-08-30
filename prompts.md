@@ -684,3 +684,18 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     3-8 alternative Silvers on the same seed and Gold. Wrote the finding up in `docs/solver.md` §7.7
     and `docs/daily-challenges.md` §12; no code change, because enforcing it regenerates the month
     and rewrites daily history.
+
+81. Nuke August and its history, backfill it and add September so both months are populated and
+    certified; add a "How to win flawless" button; propose a design for recognising a challenge
+    solved on the day it posted, and say whether it should ship with the rest. Shipped all three as
+    one release in ordered commits. The solver gained `certifyFlawless` (compose both gates, take
+    the tighter budgets, OR the existential latches, and prune on `g > moveCap` so a `moves` Silver
+    is searched rather than checked afterwards) plus a `contradiction()` table that rejects the
+    provably impossible pairings without search; the month builder now gates every greedy pick on a
+    certified flawless line and blacklists what fails. `build-solutions.mjs` bakes that same
+    certified line as the v3 `flawless` tier, which is what the new 🌟 button demonstrates. For the
+    third piece I proposed ⏰ Same-day as an axis orthogonal to the tiers — it records WHEN, not how
+    well — with a midnight grace for an attempt begun before it, a deliberately strict streak (🔥
+    Play stays catch-up-repairable, ⏰ cannot be), and no countdown timer; and argued for shipping it
+    in the same release, because the record schema was being wiped anyway and no `onTime` flag can
+    ever be reconstructed for days played before it exists.

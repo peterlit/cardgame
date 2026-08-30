@@ -8,10 +8,10 @@ final class DailyStore: ObservableObject {
     @Published private(set) var days: [Int: TierResult] = [:]
 
     private let key = "causeway.daily"
-    /// v2 = the August-2026 recut. The whole calendar was regenerated — new epoch, new seeds, new
-    /// objectives — so a v1 record's day index names a completely different challenge. Keeping it
-    /// would credit a Gold that was never played. A v1 store is therefore dropped, once.
-    private let version = 2
+    /// v3 = the Aug+Sep 2026 rebuild: every day was re-picked under the flawless gate, so a v2
+    /// record's day index names a completely different challenge. Keeping it would credit a Gold
+    /// that was never played. A pre-v3 store is therefore dropped (stashed, not destroyed), once.
+    private let version = 3
 
     init() { load() }
 

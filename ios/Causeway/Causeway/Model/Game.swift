@@ -96,6 +96,9 @@ final class Game: ObservableObject {
     /// The day index currently being played as a challenge (nil = casual play). @Published so the
     /// live objectives HUD shows/hides as a challenge starts/ends.
     @Published var challengeDay: Int? = nil
+    /// The day index this attempt BEGAN on — what gives an attempt started before midnight its ⏰
+    /// same-day grace. Persisted with the attempt; nil for casual play.
+    var challengeStartDay: Int? = nil
     /// Per-attempt telemetry (reset on deal/restore) — the ordered foundation stream + resource
     /// counters the objective checkers read. Persisted with the in-progress game across relaunch.
     private var telem = Telemetry()
@@ -192,6 +195,7 @@ final class Game: ObservableObject {
         won = false
         telem = Telemetry()      // fresh attempt; a plain deal is casual play until playChallenge sets challengeDay
         challengeDay = nil
+        challengeStartDay = nil
         dailyResult = nil
         winRecorded = false      // fresh game — allow the next win to record
         started = false
@@ -211,7 +215,8 @@ final class Game: ObservableObject {
         stopDemo()
         let day = challengeDay
         deal(seed: seed)                    // re-deal same seed; resets telemetry/board, clears challengeDay
-        if let day = day { challengeDay = day; persist() }   // keep it a challenge if it was one
+        // A retry is a NEW attempt: its ⏰ eligibility is judged from today, not from the first try.
+        if let day = day { challengeDay = day; challengeStartDay = todayIndex(); persist() }
     }
 
     // MARK: - In-progress persistence (survives backgrounding / eviction)
@@ -228,6 +233,10 @@ final class Game: ObservableObject {
         var elapsed: Int
         var started: Bool
         var challengeDay: Int?      // preserve a challenge attempt (+ its telemetry) across relaunch
+        /// The day the attempt began, for the ⏰ same-day grace. Optional so saves written before
+        /// this field existed still decode; a missing value falls back to `challengeDay`, which
+        /// never credits a date the attempt cannot prove.
+        var challengeStartDay: Int?
         var telem: Telemetry?
         /// "Not yet" on the auto-finish prompt is a per-GAME decision, so it has to survive a kill:
         /// without it a cold relaunch re-offers "Ready to finish" on the identical board. Optional
@@ -247,7 +256,7 @@ final class Game: ObservableObject {
         guard !won, !boardComplete, !demoing else { return }
         let s = SavedGame(seed: seed, tableau: tableau, cells: cells, up: up, down: down,
                           moveCount: moveCount, elapsed: clock.elapsed, started: started,
-                          challengeDay: challengeDay, telem: telem,
+                          challengeDay: challengeDay, challengeStartDay: challengeStartDay, telem: telem,
                           autoFinishDeferred: autoFinishDeferred)
         if let data = try? JSONEncoder().encode(s) {
             UserDefaults.standard.set(data, forKey: gameKey)
@@ -287,6 +296,7 @@ final class Game: ObservableObject {
         moveCount = s.moveCount; clock.set(s.elapsed); started = s.started
         selection = nil; history = []; won = false; autoplaying = false
         challengeDay = s.challengeDay          // resume a challenge attempt if one was in progress
+        challengeStartDay = s.challengeStartDay ?? s.challengeDay
         telem = s.telem ?? Telemetry()
         dailyResult = nil
         winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)
@@ -809,6 +819,7 @@ final class Game: ObservableObject {
         guard day <= todayIndex(), let ch = dailyChallenge(day, pool) else { return }
         deal(seed: ch.seed)          // resets telem + clears challengeDay + dailyResult
         challengeDay = day
+        challengeStartDay = todayIndex()
         persist()
     }
 
@@ -820,9 +831,12 @@ final class Game: ObservableObject {
                               cellUses: telem.cellUses, undos: telem.undos,
                               foundationOrder: telem.foundationOrder,
                               maxRunMoved: telem.maxRunMoved)
-        let res = evaluateChallenge(ch, attempt)
+        let res = evaluateChallenge(ch, attempt,
+                                    onTime: isOnTime(challengeDay: day, winDay: todayIndex(),
+                                                     attemptStartDay: challengeStartDay))
         dailyStore.record(day: day, result: res)
         challengeDay = nil
+        challengeStartDay = nil
         return res
     }
 
@@ -847,18 +861,21 @@ final class Game: ObservableObject {
     /// Whether a DISTINCT Silver / Gold line exists for `seed` (i.e. worth its own demo button).
     func hasSilverLine(_ seed: Int) -> Bool { DailyData.solutions[seed]?.silver != nil }
     func hasGoldLine(_ seed: Int) -> Bool { DailyData.solutions[seed]?.gold != nil }
+    /// Whether a 🌟 Flawless line exists — one run that earns all three tiers at once.
+    func hasFlawlessLine(_ seed: Int) -> Bool { DailyData.solutions[seed]?.flawless != nil }
 
     /// The baked line for `seed` at `tier`. Silver falls back to bronze for a universal Silver.
     private func solutionLine(_ seed: Int, tier: String) -> String? {
         guard let s = DailyData.solutions[seed] else { return nil }
         switch tier {
-        case "gold":   return s.gold
-        case "silver": return s.silver ?? s.bronze
-        default:       return s.bronze
+        case "flawless": return s.flawless
+        case "gold":     return s.gold
+        case "silver":   return s.silver ?? s.bronze
+        default:         return s.bronze
         }
     }
 
-    /// Demonstrate a winning line for `seed` at `tier` ("bronze"/"silver"/"gold"; `label` is that
+    /// Demonstrate a winning line for `seed` at `tier` ("bronze"/"silver"/"gold"/"flawless"; `label` is that
     /// tier's objective text, for the bar). Reset to the fresh deal, then animate the baked moves.
     /// It's a demo — challengeDay stays nil and nothing is scored (we never route through commit()).
     /// Playing auto-advances on a timer; the player can pause and step one move at a time.
@@ -911,7 +928,8 @@ final class Game: ObservableObject {
         guard boardComplete else { restartDeal(); return }
         demoing = false
         demoPaused = false
-        let name = demoTier == "gold" ? "Gold" : demoTier == "silver" ? "Silver" : "winning"
+        let name = demoTier == "flawless" ? "Flawless"
+                 : demoTier == "gold" ? "Gold" : demoTier == "silver" ? "Silver" : "winning"
         demoDoneMessage = "That's a \(name) line — tap Done to try it yourself."
     }
 

@@ -228,12 +228,14 @@ export function evaluate(objective, telemetry) { return OBJECTIVES[objective.id]
 // mergeTiers can keep best-of. A LOST attempt omits moves/elapsed entirely — a loss has no "best
 // time" to record, and omitting lets mergeTiers's `?? Infinity` preserve the prior best rather than
 // clobbering it with a losing run's metrics.
-export function evaluateChallenge(challenge, telemetry) {
+export function evaluateChallenge(challenge, telemetry, onTime = false) {
   const bronze = !!telemetry.won;
   const silver = bronze && evaluate(challenge.silver, telemetry);
   const gold = bronze && evaluate(challenge.gold, telemetry);
   // `flawless` = all three tiers in THIS single attempt (harder than banking them across retries).
-  const result = { bronze, silver, gold, flawless: !!(bronze && silver && gold) };
+  // `onTime` is orthogonal to all of them: it records WHEN, not how well — a bare Bronze earned on
+  // the day counts, and a Flawless replay of a past day does not.
+  const result = { bronze, silver, gold, flawless: !!(bronze && silver && gold), onTime: bronze && !!onTime };
   if (bronze) { result.moves = telemetry.moves; result.elapsed = telemetry.elapsed; }
   return result;
 }
@@ -244,15 +246,27 @@ export function evaluateChallenge(challenge, telemetry) {
 // a lost game) are treated as Infinity so they never displace a prior best. This encodes the design
 // rule that Bronze/Silver/Gold are earned independently and never lost by a later attempt.
 export function mergeTiers(prev, attempt) {
-  const p = prev || { bronze: false, silver: false, gold: false, flawless: false, moves: Infinity, elapsed: Infinity };
+  const p = prev || { bronze: false, silver: false, gold: false, flawless: false, onTime: false, moves: Infinity, elapsed: Infinity };
   return {
     bronze: !!p.bronze || !!attempt.bronze,
     silver: !!p.silver || !!attempt.silver,
     gold: !!p.gold || !!attempt.gold,
     flawless: !!p.flawless || !!attempt.flawless,   // sticky once any single attempt aces all three
+    onTime: !!p.onTime || !!attempt.onTime,         // sticky once the day was cleared on its own date
     moves: Math.min(p.moves ?? Infinity, attempt.moves ?? Infinity),
     elapsed: Math.min(p.elapsed ?? Infinity, attempt.elapsed ?? Infinity),
   };
+}
+
+// ⏰ Same-day: was this win earned on the challenge's own date? `winDay` and `attemptStartDay` are
+// day indices (same basis as `challengeDay`), taken from the device's LOCAL calendar date — there is
+// no server to ask, and a personal streak needs no anti-cheat (see docs/daily-challenges.md §2).
+// The grace clause is the anti-frustration rule: an attempt begun before midnight that lands just
+// after it still counts, but a game resumed days later does not.
+export function isOnTime({ challengeDay, winDay, attemptStartDay }) {
+  if (challengeDay == null || winDay == null) return false;
+  if (winDay === challengeDay) return true;
+  return attemptStartDay === challengeDay && winDay === challengeDay + 1;
 }
 
 // Streaks derived from the per-day record map { dayIndex: {bronze,silver,gold} }. Catch-up-friendly:
@@ -271,5 +285,6 @@ export function streaks(records, todayIndex) {
     while (i != null && has(i, tier)) { cur++; i--; }
     return { current: cur, best, total: days.length };   // total = all days ever holding the tier
   };
-  return { play: tierRun('bronze'), silver: tierRun('silver'), gold: tierRun('gold'), flawless: tierRun('flawless') };
+  return { play: tierRun('bronze'), silver: tierRun('silver'), gold: tierRun('gold'),
+           flawless: tierRun('flawless'), onTime: tierRun('onTime') };
 }

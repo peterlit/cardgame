@@ -82,10 +82,23 @@ pin('Model/Daily.swift', 'grades and labels derive from the parameter', [
   'return "Send \\(parts.joined(separator: ", plus ")) home before any other card"',
   'case "rank-rush":      return "Get all four \\(rankPlural(p.rank ?? 1)) home within your first \\(p.N ?? 0) moves"',
 ]);
-pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless)', [
+pin('Model/Daily.swift', 'mergeTiers + streaks (Flawless, Same-day)', [
   'bronze: p.bronze || attempt.bronze,',
   'flawless: p.flawless || attempt.flawless,',
-  'return Streaks(play: tierRun { $0.bronze }, silver: tierRun { $0.silver },',
+  'onTime: p.onTime || attempt.onTime,',
+  'return Streaks(play: tierRun { $0.bronze }, onTime: tierRun { $0.onTime },',
+]);
+
+// ---- ⏰ same-day: the date rule and its midnight grace must match tests/daily.mjs isOnTime() ----
+pin('Model/Daily.swift', 'isOnTime (same-day recognition)', [
+  'if winDay == day { return true }',
+  'return attemptStartDay == day && winDay == day + 1',
+  'onTime: bronze && onTime)',
+]);
+pin('Model/Game.swift', 'same-day attempt bookkeeping', [
+  'challengeStartDay = todayIndex()',
+  'challengeStartDay = s.challengeStartDay ?? s.challengeDay',
+  'onTime: isOnTime(challengeDay: day, winDay: todayIndex(),',
 ]);
 
 // ---- once-only win record (guards the auto-finish deferred-win "record exactly once" invariant) ----

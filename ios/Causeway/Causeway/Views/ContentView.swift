@@ -727,6 +727,7 @@ struct ContentView: View {
         guard game.demoing else { return game.demoDoneMessage ?? "" }
         let head: String
         switch game.demoTier {
+        case "flawless": head = "🌟 Flawless: \(game.demoLabel)"
         case "gold":   head = "🥇 Gold: \(game.demoLabel)"
         case "silver": head = "🥈 Silver: \(game.demoLabel)"
         default:       head = "Winning line"
@@ -758,10 +759,14 @@ struct ContentView: View {
     /// casual (non-challenge) wins.
     private var winDailyText: String? {
         guard let d = game.dailyResult else { return nil }
-        if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." }
+        // ⏰ rides along with whichever tier line this attempt earned — it says WHEN, not how well.
+        let onTime = d.onTime
+            ? " ⏰ On time — \(streaks(game.dailyStore.days, todayIndex()).onTime.current)-day same-day streak."
+            : ""
+        if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }
         let earned = [(d.bronze, "🥉"), (d.silver, "🥈"), (d.gold, "🥇")]
             .filter { $0.0 }.map { $0.1 }.joined(separator: " ")
-        return "Daily challenge: \(earned.isEmpty ? "—" : earned) earned."
+        return "Daily challenge: \(earned.isEmpty ? "—" : earned) earned." + onTime
     }
 
     private var winOverlay: some View {
