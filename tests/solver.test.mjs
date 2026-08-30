@@ -7,7 +7,9 @@ import { dirname, join } from 'node:path';
 import {
   isSeqHead, canStackTableau, maxMovable, legalMoves, applyMove, isWon,
 } from '../tools/solver/rules.mjs';
-import { solve, objective, dealState, certify, isDailyEligible, VARIANTS, variantKey, isGold, rankHome } from '../tools/solver/solve.mjs';
+import { evaluate } from './daily.mjs';
+import { solve, objective, dealState, certify, isDailyEligible, VARIANTS, variantKey, isGold, rankHome,
+         certifyFlawless, contradiction, jointObjective, traceOf } from '../tools/solver/solve.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '..');
@@ -152,4 +154,66 @@ test('isDailyEligible requires a Gold-grade variant; the matrix has no vacuous e
   // every variant is distinct, and enough of them are Gold to fill a month
   assert.equal(new Set(VARIANTS.map(x => variantKey(x.id, x.param))).size, VARIANTS.length);
   assert.ok(VARIANTS.filter(isGold).length >= 20);
+});
+
+// ---- the flawless gate -------------------------------------------------------------------------
+// Every shipped day must admit ONE line earning all three tiers; these lock the machinery that
+// proves it. See docs/solver.md §7.7.
+
+test('contradiction() catches the pairings that are impossible by construction', () => {
+  // maxRunMoved cannot be both >= 5 and <= 2.
+  assert.match(contradiction({ id: 'max-run', param: { N: 2 } }, { id: 'big-move', param: { N: 5 } }) || '',
+               /big-move/);
+  assert.equal(contradiction({ id: 'max-run', param: { N: 5 } }, { id: 'big-move', param: { N: 5 } }), null);
+  // suit-sprint drives one suit 13 clear before another may start.
+  assert.match(contradiction({ id: 'suit-balance', param: { N: 4 } }, { id: 'suit-sprint', param: {} }) || '',
+               /suit-balance/);
+  // ...and cannot have all four of a rank home before 39 cards are.
+  assert.match(contradiction({ id: 'rank-rush', param: { rank: 1, N: 20 } }, { id: 'suit-sprint', param: {} }) || '',
+               /39/);
+  assert.equal(contradiction({ id: 'rank-rush', param: { rank: 3, N: 42 } }, { id: 'suit-sprint', param: {} }), null);
+  // A rank-gated Gold sets a floor on the earliest a rank can be home: under "only the Ace end",
+  // a King is its suit's 13th card, so four Kings cost 52 sends.
+  assert.match(contradiction({ id: 'rank-rush', param: { rank: 13, N: 26 } },
+                             { id: 'end-bias', param: { end: 'up', min: 13 } }) || '', /52/);
+  // ...but from the King end a King is the FIRST card, so the same rush is not contradictory.
+  assert.equal(contradiction({ id: 'rank-rush', param: { rank: 13, N: 26 } },
+                             { id: 'end-bias', param: { end: 'down', min: 13 } }), null);
+  // Unrelated families are never flagged.
+  assert.equal(contradiction({ id: 'cells-le', param: { N: 2 } }, { id: 'split-at', param: { R: 7 } }), null);
+});
+
+test('jointObjective takes the tighter bound of both objectives', () => {
+  const j = jointObjective([{ id: 'cells-le', param: { N: 2 } }, { id: 'max-run', param: { N: 1 } }]);
+  assert.equal(j.cellBudget, 2);
+  assert.equal(j.maxRun, 1);
+  const m = jointObjective([{ id: 'moves', param: { N: 90 } }, { id: 'cells-le', param: { N: 0 } }]);
+  assert.equal(m.moveCap, 90);          // a `moves` Silver bounds the SEARCH, not a post-hoc check
+  assert.equal(m.cellBudget, 0);
+});
+
+test('certifyFlawless returns a line that both checkers accept, and refuses the impossible', () => {
+  const pool = JSON.parse(readFileSync(join(REPO, 'data/daily-pool.json'), 'utf8'));
+  const day = pool.days[0];
+  const r = certifyFlawless(day.seed, day.silver, day.gold, { budget: 200000 });
+  assert.equal(r.ok, true, `day 0 (#${day.seed}) should be flawless-certified in the shipped pool`);
+  const t = traceOf(day.seed, r.moves);
+  assert.ok(t.won, 'the certified line wins');
+  assert.ok(evaluate(day.silver, t) && evaluate(day.gold, t), 'and earns both tiers');
+
+  // Impossible pairings are refused instantly, without burning the search budget.
+  const bad = certifyFlawless(day.seed, { id: 'max-run', param: { N: 2 } }, { id: 'big-move', param: { N: 5 } });
+  assert.equal(bad.ok, false);
+  assert.match(bad.why, /contradiction/);
+});
+
+test('every shipped day is flawless-certifiable — no unreachable 🌟', () => {
+  const pool = JSON.parse(readFileSync(join(REPO, 'data/daily-pool.json'), 'utf8'));
+  const sol = JSON.parse(readFileSync(join(REPO, 'data/daily-solutions.json'), 'utf8'));
+  // The baked flawless line IS the certificate: replaying it is the cheap CI form of the check
+  // (certifyFlawless re-runs the search, which is a build-time cost, not a test-time one).
+  for (const d of pool.days) {
+    const line = sol.solutions[String(d.seed)]?.flawless;
+    assert.ok(line, `seed ${d.seed} has no baked flawless line`);
+  }
 });

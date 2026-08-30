@@ -9,7 +9,8 @@
 // For every seed in the certified daily pool we bake up to THREE replayable winning lines — one per
 // tier — so the app can demonstrate not just clearing the deal but achieving that day's Silver and
 // Gold objectives:
-//   bronze : the shortest UNCONSTRAINED win (clear the deal).
+//   bronze  : the shortest UNCONSTRAINED win (clear the deal).
+//   flawless: ONE line that wins and satisfies BOTH objectives — what the 🌟 tier asks for.
 //   gold   : a win that OBEYS the day's Gold objective (always a certified/constraining objective).
 //   silver : a win that OBEYS the day's Silver objective — but only when that objective is a
 //            *certified* (constraining) one (free-cell limits / down-openers). A "universal" Silver
@@ -24,11 +25,12 @@
 // Keyed by seed; entries are `{ bronze, silver?, gold? }`. Regenerated fresh on a schema bump.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { solve, objective, dealState, moveToken } from './solve.mjs';
+import { solve, objective, dealState, moveToken, certifyFlawless, variantKey } from './solve.mjs';
 import { applyMove, isWon } from './rules.mjs';
 import { dailyChallenge, evaluate, OBJECTIVES } from '../../tests/daily.mjs';
 
-const SOLUTIONS_VERSION = 2;   // v2: per-tier { bronze, silver?, gold? } (v1 was a bronze string)
+const SOLUTIONS_VERSION = 3;   // v3: adds `flawless` — ONE line that earns all three tiers at once
+                               // (v2 was per-tier { bronze, silver?, gold? }; v1 a bronze string)
 // A `universal` Silver (win in N moves / no undo) is already satisfied by the bronze line, so it
 // gets no line of its own; every other family constrains the search and earns a distinct one.
 const needsOwnLine = id => !OBJECTIVES[id].universal;
@@ -87,6 +89,13 @@ function lineFor(seed, objId, param, budget) {
 const poolPath = arg('pool', 'data/daily-pool.json');
 const out = arg('out', 'data/daily-solutions.json');
 const budget = Number(arg('budget', 300000));
+// The month builder already certified a flawless line per day and cached it; re-use it rather than
+// re-searching, and fall back to a fresh search when the cache is cold.
+const fcache = new Map();
+try {
+  for (const line of readFileSync(arg('flawless-cache', '.cache/flawless-certs.jsonl'), 'utf8').split('\n'))
+    if (line.trim()) { const r = JSON.parse(line); if (r.ok && r.line) fcache.set(r.k, r.line); }
+} catch { /* no cache — every flawless line gets searched below */ }
 
 // --merge: fold several stripe outputs into one file and exit.
 const mergeIdx = process.argv.indexOf('--merge');
@@ -110,7 +119,7 @@ let sol = { version: SOLUTIONS_VERSION, solutions: {} };
 try { const prev = JSON.parse(readFileSync(out, 'utf8')); if (prev.version === SOLUTIONS_VERSION) sol = prev; } catch { /* fresh */ }
 
 console.log(`pool ${pool.days.length} days; have ${Object.keys(sol.solutions).length}; budget ${budget}`);
-let added = 0, goldOk = 0, silverOk = 0, warn = 0;
+let added = 0, goldOk = 0, silverOk = 0, flawOk = 0, warn = 0;
 for (let i = 0; i < pool.days.length; i++) {
   if (i % stripeN !== stripeW) continue;
   const seed = pool.days[i].seed;
@@ -140,11 +149,26 @@ for (let i = 0; i < pool.days.length; i++) {
     } else { console.log(`! ${seed} silver(${ch.silver.id}) unsolved`); warn++; }
   }
 
+  // Flawless — ONE line that wins and satisfies BOTH objectives, so "How to win flawless" can
+  // demonstrate the thing the 🌟 tier actually asks for. Every day in a v4 pool is certified, so a
+  // missing line here is a build bug, not an expected gap: it is reported, loudly.
+  const fk = `${seed}|${variantKey(ch.silver.id, ch.silver.param)}|${variantKey(ch.gold.id, ch.gold.param)}`;
+  let flawTokens = fcache.get(fk) || null;
+  if (!flawTokens) {
+    const r = certifyFlawless(seed, ch.silver, ch.gold, { budget });
+    if (r.ok) flawTokens = r.moves.map(moveToken).join(' ');
+  }
+  if (flawTokens) {
+    const t = replay(seed, flawTokens);
+    if (t.won && evaluate(ch.silver, t) && evaluate(ch.gold, t)) { entry.flawless = flawTokens; flawOk++; }
+    else { console.log(`! ${seed} flawless line failed the checkers`); warn++; }
+  } else { console.log(`! ${seed} flawless unsolved (${ch.silver.id} + ${ch.gold.id})`); warn++; }
+
   sol.solutions[String(seed)] = entry;
   added++;
-  if (added % 25 === 0) process.stdout.write(`  …${added} (gold ${goldOk}, silver ${silverOk})\n`);
+  if (added % 25 === 0) process.stdout.write(`  …${added} (gold ${goldOk}, silver ${silverOk}, flawless ${flawOk})\n`);
 }
 
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, serialize(sol));
-console.log(`done: +${added} (gold ${goldOk}, silver ${silverOk}, warnings ${warn}), total ${Object.keys(sol.solutions).length} -> ${out}`);
+console.log(`done: +${added} (gold ${goldOk}, silver ${silverOk}, flawless ${flawOk}, warnings ${warn}), total ${Object.keys(sol.solutions).length} -> ${out}`);

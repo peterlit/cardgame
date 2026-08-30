@@ -47,12 +47,26 @@ function replay(seed, tokens) {
   return { won: isWon(s), moves, elapsed: 0, cellUses, undos: 0, foundationOrder, maxRunMoved };
 }
 
-test('daily-solutions.json is a well-formed v2 per-tier file covering every seeded day', () => {
-  assert.equal(sol.version, 2, 'solutions schema version should be 2 (per-tier)');
+test('daily-solutions.json is a well-formed v3 per-tier file covering every seeded day', () => {
+  assert.equal(sol.version, 3, 'solutions schema version should be 3 (per-tier + flawless)');
   for (const rec of pool.days) {
     const e = sol.solutions[String(rec.seed)];
     assert.ok(e && typeof e.bronze === 'string' && e.bronze.length, `seed ${rec.seed} missing bronze line`);
+    assert.ok(typeof e.flawless === 'string' && e.flawless.length,
+              `seed ${rec.seed} missing the flawless line — every day is certified, so one must exist`);
   }
+});
+
+// 🌟 "How to win flawless": the baked line is the day's flawless CERTIFICATE, so replaying it must
+// win and satisfy BOTH objectives at once. This is the cheap CI form of certifyFlawless.
+test('every flawless line wins and earns all three tiers in that single run', () => {
+  pool.days.forEach((rec, i) => {
+    const ch = dailyChallenge(i, pool);
+    const t = replay(rec.seed, sol.solutions[String(rec.seed)].flawless);
+    assert.ok(t.won, `seed ${rec.seed} flawless line does not win`);
+    assert.ok(evaluate(ch.silver, t), `seed ${rec.seed} flawless line fails Silver (${ch.silver.id})`);
+    assert.ok(evaluate(ch.gold, t), `seed ${rec.seed} flawless line fails Gold (${ch.gold.id})`);
+  });
 });
 
 test('every baked line WINS its deal, and Silver/Gold lines satisfy their objective', () => {
@@ -93,10 +107,10 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
   assert.equal(silverChecked, expectedSilver, `expected ${expectedSilver} certified-silver lines`);
 });
 
-test('the pool is one seeded month drawn from the daily seed range', () => {
-  assert.equal(pool.version, 3, 'pool schema version should be 3 (per-day objectives)');
+test('the pool is two seeded months drawn from the daily seed range', () => {
+  assert.equal(pool.version, 4, 'pool schema version should be 4 (flawless-certified, two months)');
   assert.equal(pool.epoch, '2026-08-01');
-  assert.equal(pool.days.length, 31, 'August 2026 is seeded in full and nothing else is');
+  assert.equal(pool.days.length, 61, 'August + September 2026 are seeded in full and nothing else is');
   for (const d of pool.days) {
     assert.ok(d.seed >= pool.minSeed && d.seed <= pool.maxSeed, `seed ${d.seed} outside the daily range`);
     assert.ok(d.seed <= 1000000, `seed ${d.seed} exceeds the app's deal-number ceiling`);

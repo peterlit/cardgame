@@ -16,7 +16,7 @@ import { applyMove, legalMoves, isWon, isSafeAutoplay, canUp, stateKey } from '.
 //
 // Each gate MUST mirror the matching checker in tests/daily.mjs exactly, so that
 // "certified => a passing line exists" and "checker passes => a valid line" stay in agreement.
-import { gradeOf } from '../../tests/daily.mjs';
+import { gradeOf, evaluate } from '../../tests/daily.mjs';
 
 const homeCount = (s, x) => s.up[x] + (14 - s.down[x]);
 const started = (s, T) => s.up[T] > 0 || s.down[T] < 14;
@@ -26,9 +26,14 @@ const blockAceUpUntil = cond => (s, c, end) => !(end === 'up' && c.rank === 1) |
 export function objective(id, param = {}) {
   const p = param;
   const base = { allowFoundation: () => true, cellBudget: Infinity, maxRun: Infinity,
-                 wantBigMove: false, wantRank: null };
+                 wantBigMove: false, wantRank: null, moveCap: Infinity };
   switch (id) {
     case 'unconstrained': return { ...base };
+
+    // Universal families. `no-undo` is free (a solver line never undoes); a `moves` cap is a real
+    // search bound, so it becomes a prune rather than a post-hoc check.
+    case 'no-undo': return { ...base };
+    case 'moves':   return { ...base, moveCap: p.N };
 
     case 'cells-le':  return { ...base, cellBudget: p.N };
     case 'max-run':   return { ...base, maxRun: p.N };
@@ -179,7 +184,10 @@ export function solve(state0, constraint, { budget = 300000, withPath = false } 
     stateKey(s) + '#' + (usesCells ? 'c' + cellUses : '') + (usesRush ? 'r' + (rushed ? 1 : 0) : '')
                       + (usesBig ? 'b' + (big ? 1 : 0) : '');
 
+  const moveCap = constraint.moveCap ?? Infinity;
   const push = (s, g, cellUses, rushed, big, parent, seg) => {
+    if (g > moveCap) return;              // move-budget prune: a `moves` cap is SEARCHED, not
+                                          // checked afterwards, so a joint line can meet it.
     const k = key(s, cellUses, rushed, big);
     if (best.has(k) && best.get(k) <= g) return;
     best.set(k, g);
@@ -289,4 +297,102 @@ export function rushIndex(seed, moves, rank) {
 // Silver is "win in N moves" is a thin day).
 export function isDailyEligible(rec) {
   return !!rec && rec.winnable && rec.supports.some(isGold);
+}
+
+// ---- joint (Flawless) certification -------------------------------------------------------------
+// A day ships a Silver AND a Gold, certified INDEPENDENTLY above — nothing there proves a single
+// line can satisfy both, yet 🌟 Flawless requires exactly that (all three tiers in one attempt).
+// `certifyFlawless` proves it constructively: one line that wins and passes both real checkers.
+
+// Compose several objectives into one search constraint: gates AND together, budgets take the
+// tighter bound, existential goals OR (solve() already tracks a `rushed` and a `big` latch).
+// Only one wantRank / one wantBigMove is representable — that is not a limitation in practice,
+// because a day never pairs a family with itself and only `rank-rush` / `big-move` use them.
+export function jointObjective(specs) {
+  const cs = specs.map(o => objective(o.id, o.param));
+  return {
+    allowFoundation: (s, c, end) => cs.every(x => x.allowFoundation(s, c, end)),
+    cellBudget: Math.min(...cs.map(x => x.cellBudget)),
+    maxRun: Math.min(...cs.map(x => x.maxRun)),
+    wantBigMove: cs.some(x => x.wantBigMove),
+    bigMoveN: cs.find(x => x.wantBigMove)?.bigMoveN,
+    wantRank: cs.find(x => x.wantRank)?.wantRank ?? null,
+    moveCap: Math.min(...cs.map(x => x.moveCap)),
+  };
+}
+
+// Which foundation end a rank may use under a per-card gate, and the cheapest number of that
+// suit's cards that must go home for it to arrive (itself included): r from the Ace end needs
+// A..r; r from the King end needs K..r. Only the families whose gate is a pure rank/end rule are
+// modelled — prefix rules (`ends-first`, `before-ace`, …) are left to the search.
+function rankCost(rank, o) {
+  const up = { ok: true, n: rank }, down = { ok: true, n: 14 - rank };
+  if (o.id === 'split-at')  { up.ok = rank <= o.param.R; down.ok = rank >= o.param.R + 1; }
+  if (o.id === 'end-bias')  {
+    if (o.param.end === 'up')   down.ok = rank >= o.param.min + 1;
+    else                        up.ok   = rank <= 13 - o.param.min;
+  }
+  return Math.min(up.ok ? up.n : Infinity, down.ok ? down.n : Infinity);
+}
+
+// Contradictions provable WITHOUT search — each one a real pairing the greedy fill would otherwise
+// hand to the solver for a long, doomed run. Returns a reason string, or null if not provably
+// impossible (which is NOT a proof of possibility — that is what certifyFlawless is for).
+export function contradiction(a, b) {
+  const of = id => [a, b].find(o => o.id === id);
+  const big = of('big-move'), run = of('max-run'), sprint = of('suit-sprint');
+  const bal = of('suit-balance'), rush = of('rank-rush');
+
+  // Both read the same telemetry counter: maxRunMoved must be >= N and <= M.
+  if (big && run && run.param.N < big.param.N)
+    return `big-move{${big.param.N}} needs a run max-run{${run.param.N}} forbids`;
+  // suit-sprint drives one suit to 13 home before any other starts, so the spread hits 13.
+  if (sprint && bal && bal.param.N <= 12)
+    return `suit-sprint runs one suit 13 ahead, over suit-balance{${bal.param.N}}`;
+  // The 4th card of any rank means all four suits have started; under suit-sprint the fourth suit
+  // cannot start until the other three are COMPLETE (39 cards home, so >= 39 moves).
+  if (sprint && rush && rush.param.N < 39)
+    return `suit-sprint needs 39 moves before the 4th suit starts, over rank-rush{N=${rush.param.N}}`;
+  // A rank-gated Gold sets a floor on how early a rank can come home: each suit must first send
+  // rankCost() cards, and all four suits must do so.
+  if (rush) {
+    const other = rush === a ? b : a;
+    const floor = 4 * rankCost(rush.param.rank, other);
+    if (floor > rush.param.N)
+      return `${other.id} forces >= ${floor} sends before all four ${rush.param.rank}s, over rank-rush{N=${rush.param.N}}`;
+  }
+  return null;
+}
+
+// Replay a solver move list into the telemetry the SHIPPED checkers read (tests/daily.mjs).
+// Mirrors build-solutions.mjs's token replay, from move descriptors rather than tokens.
+export function traceOf(seed, moves) {
+  let s = dealState(seed);
+  const foundationOrder = [];
+  let cellUses = 0, n = 0, maxRunMoved = 0;
+  for (const m of moves) {
+    n++;
+    if (m.k === 'F') {
+      const c = m.from.col !== undefined ? s.tableau[m.from.col][s.tableau[m.from.col].length - 1]
+                                         : s.cells[m.from.cell];
+      foundationOrder.push({ suit: c.suit, rank: c.rank, end: m.end, moveIdx: n });
+    } else if (m.k === 'C') cellUses++;
+    else if (m.k === 'T') maxRunMoved = Math.max(maxRunMoved, s.tableau[m.src].length - m.idx);
+    s = applyMove(s, m);
+  }
+  return { won: isWon(s), moves: n, elapsed: 0, cellUses, undos: 0, foundationOrder, maxRunMoved };
+}
+
+// Prove a (seed, silver, gold) triple is FLAWLESS-achievable: find one line, then re-check it
+// against both real checkers rather than trusting the search gates. Returns
+// { ok:true, par, moves, trace } | { ok:false, why }.
+export function certifyFlawless(seed, silver, gold, opts = {}) {
+  const why = contradiction(silver, gold);
+  if (why) return { ok: false, why: 'contradiction: ' + why };
+  const r = solve(dealState(seed), jointObjective([silver, gold]), { ...opts, withPath: true });
+  if (r.solved !== true) return { ok: false, why: r.solved === false ? 'proven-impossible' : 'budget' };
+  const t = traceOf(seed, r.moves);
+  const okS = evaluate(silver, t), okG = evaluate(gold, t);
+  if (!okS || !okG) return { ok: false, why: `line rejected by the ${!okS ? 'Silver' : 'Gold'} checker` };
+  return { ok: true, par: r.par, moves: r.moves, trace: t };
 }

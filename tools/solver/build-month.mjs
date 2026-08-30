@@ -5,14 +5,17 @@
 //   node tools/solver/build-month.mjs [--candidates 240] [--days 31] [--budget 120000]
 //                                     [--jobs 8] [--sample-seed 20260801] [--out data/daily-pool.json]
 //                                     [--cache .cache/month-certs] [--select-only]
+//                                     [--flawless-budget 120000] [--no-flawless-gate]
 //
 // Phase 1 (parallel, resumable): draw `candidates` deal seeds deterministically from the daily
 // range (500,001 - 1,000,000), and certify each against the full variant matrix in
 // solve.mjs — every (objective, parameter) pair, not just every objective. Results are appended to
 // per-worker JSONL cache files, so an interrupted run resumes instead of restarting.
 //
-// Phase 2 (selection): greedily fill the month, at each step taking the (seed, gold, silver) triple
-// that adds the most NEW variety — an unused objective family scores far above an unused parameter
+// Phase 2 (selection): greedily fill the month, at each step taking the FLAWLESS-CERTIFIED
+// (seed, gold, silver) triple that adds the most NEW variety — certified meaning one line has been
+// found that wins and satisfies both objectives, so 🌟 Flawless is actually reachable on every day
+// (a triple that fails the gate is blacklisted and the slot re-picked) — an unused objective family scores far above an unused parameter
 // of a family already used, and a rare certification (one only a few seeds support) is preferred
 // over a common one, since rare material is the hardest to place. Adjacent days are then reordered
 // so no two consecutive days share an objective family.
@@ -21,10 +24,12 @@ import { dirname, basename } from 'node:path';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { mulberry32 } from '../../tests/engine.mjs';
-import { certify, VARIANTS, variantKey, isGold, isDailyEligible } from './solve.mjs';
+import { certify, VARIANTS, variantKey, isGold, isDailyEligible,
+         certifyFlawless, contradiction, moveToken } from './solve.mjs';
 import { gradeOf, labelOf } from '../../tests/daily.mjs';
 
-const POOL_VERSION = 3;          // v3: explicit per-day objectives, one seeded month, seeds <= 1e6
+const POOL_VERSION = 4;          // v4: every day FLAWLESS-certified; Aug+Sep 2026 in one file
+const EPOCH = '2026-08-01';      // day 0; the pool now covers August AND September 2026
 const MIN_SEED = 500001;         // daily deals live in the upper half of the deal space...
 const MAX_SEED = 1000000;        // ...and never exceed the app's deal-number ceiling.
 // Universal Silvers need no certification. `moves` is listed once per multiplier so the month can
@@ -92,6 +97,8 @@ const budget = Number(arg('budget', 120000));
 const sampleSeed = Number(arg('sample-seed', 20260801));
 const cache = arg('cache', '.cache/month-certs');
 const out = arg('out', 'data/daily-pool.json');
+const flawlessBudget = Number(arg('flawless-budget', 120000));
+const gateOn = !has('no-flawless-gate');
 
 const list = candidates(nCandidates, sampleSeed);
 
@@ -111,6 +118,41 @@ async function certifyAll() {
     });
     child.on('exit', res);
   })));
+}
+
+// ---- the flawless gate --------------------------------------------------------------------------
+// A day is only allowed to ship if ONE line wins and satisfies BOTH its objectives — otherwise its
+// 🌟 Flawless star is unreachable and that streak breaks with no way for the player to know why.
+// Results (and the certified line itself, for build-solutions.mjs) are cached like phase 1's, since
+// the selection below runs repeatedly as it searches for the tightest per-family cap.
+const flawlessCache = new Map();
+const FCACHE = arg('flawless-cache', '.cache/flawless-certs.jsonl');
+const fkey = (seed, s, g) => `${seed}|${variantKey(s.id, s.param)}|${variantKey(g.id, g.param)}`;
+function loadFlawlessCache() {
+  if (!existsSync(FCACHE)) return;
+  for (const line of readFileSync(FCACHE, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try { const r = JSON.parse(line); flawlessCache.set(r.k, r); } catch { /* torn line */ }
+  }
+}
+let fSolves = 0, fStatic = 0;
+function flawlessOK(seed, silver, gold) {
+  const k = fkey(seed, silver, gold);
+  if (flawlessCache.has(k)) return flawlessCache.get(k).ok;
+  // Cheap structural rejection first — no search, no cache write worth 30 s of CPU.
+  const why = contradiction(silver, gold);
+  let rec;
+  if (why) { fStatic++; rec = { k, ok: false, why: 'contradiction: ' + why }; }
+  else {
+    const r = certifyFlawless(seed, silver, gold, { budget: flawlessBudget });
+    fSolves++;
+    rec = r.ok ? { k, ok: true, par: r.par, line: r.moves.map(moveToken).join(' ') }
+               : { k, ok: false, why: r.why };
+  }
+  flawlessCache.set(k, rec);
+  mkdirSync(dirname(FCACHE), { recursive: true });
+  appendFileSync(FCACHE, JSON.stringify(rec) + '\n');
+  return rec.ok;
 }
 
 // ---- phase 2: choose the month ------------------------------------------------------------------
@@ -152,30 +194,40 @@ function selectMonth(recs, capPerFamily) {
     return s;
   };
 
-  const used = new Set(), chosen = [];
+  const used = new Set(), chosen = [], rejected = new Set();
   for (let slot = 0; slot < nDays; slot++) {
-    let best = null;
-    for (const rec of eligible) {
-      if (used.has(rec.seed)) continue;
-      const golds = goldOptions(rec).filter(o => !capped('gold', o));
-      const silvers = silverOptions(rec).filter(o => !capped('silver', o));
-      for (const g of golds) {
-        const gs = novelty('gold', g);
-        for (const s of silvers) {
-          // Never pair a family with itself: "at least 7 from the Ace end" as the Silver under
-          // "at least 10 from the Ace end" as the Gold is one objective printed twice, and the
-          // Gold implies the Silver.
-          if (s.id === g.id) continue;
-          const score = gs + novelty('silver', s);
-          if (!best || score > best.score) best = { score, rec, gold: g, silver: s };
+    // Take the most-varied triple that is also FLAWLESS-certified; a triple that fails the gate is
+    // blacklisted and the slot re-picked, so the gate costs variety only when nothing else fits.
+    let placed = false;
+    while (!placed) {
+      let best = null;
+      for (const rec of eligible) {
+        if (used.has(rec.seed)) continue;
+        const golds = goldOptions(rec).filter(o => !capped('gold', o));
+        const silvers = silverOptions(rec).filter(o => !capped('silver', o));
+        for (const g of golds) {
+          const gs = novelty('gold', g);
+          for (const s of silvers) {
+            // Never pair a family with itself: "at least 7 from the Ace end" as the Silver under
+            // "at least 10 from the Ace end" as the Gold is one objective printed twice, and the
+            // Gold implies the Silver.
+            if (s.id === g.id) continue;
+            if (rejected.has(fkey(rec.seed, s, g))) continue;
+            const score = gs + novelty('silver', s);
+            if (!best || score > best.score) best = { score, rec, gold: g, silver: s };
+          }
         }
       }
+      if (!best) return chosen;                 // nothing left that fits the caps and the gate
+      if (gateOn && !flawlessOK(best.rec.seed, best.silver, best.gold)) {
+        rejected.add(fkey(best.rec.seed, best.silver, best.gold));
+        continue;
+      }
+      used.add(best.rec.seed);
+      bump(idUses, 'gold:' + best.gold.id); bump(keyUses, best.gold.key);
+      bump(idUses, 'silver:' + best.silver.id); bump(keyUses, best.silver.key);
+      chosen.push(best); placed = true;
     }
-    if (!best) break;
-    used.add(best.rec.seed);
-    bump(idUses, 'gold:' + best.gold.id); bump(keyUses, best.gold.key);
-    bump(idUses, 'silver:' + best.silver.id); bump(keyUses, best.silver.key);
-    chosen.push(best);
   }
   return chosen;
 }
@@ -209,12 +261,20 @@ function spread(chosen) {
   return out;
 }
 
+// Day index -> "Aug 07" / "Sep 12", read off the pool epoch (the calendar now spans two months).
+function dayLabel(i) {
+  const [y, m, d] = EPOCH.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + i));
+  return `${t.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} ${String(t.getUTCDate()).padStart(2, '0')}`;
+}
+
 function serialize(pool) {
   const rows = pool.days.map(d => '    ' + JSON.stringify(d)).join(',\n');
   return `{\n  "version": ${pool.version},\n  "epoch": ${JSON.stringify(pool.epoch)},\n  "minSeed": ${pool.minSeed},\n  "maxSeed": ${pool.maxSeed},\n  "days": [\n${rows}\n  ]\n}\n`;
 }
 
 if (!has('select-only')) await certifyAll();
+loadFlawlessCache();
 
 const recs = [...readCache(cache).values()].filter(r => list.includes(r.seed));
 const winnable = recs.filter(r => r.winnable);
@@ -222,9 +282,10 @@ console.log(`\ncertified ${recs.length} candidates: ${winnable.length} winnable,
 
 const chosen = spread(selectMonthBalanced(recs));
 if (chosen.length < nDays) console.warn(`WARNING: only ${chosen.length} of ${nDays} days could be filled — widen --candidates`);
+console.log(`flawless gate: ${gateOn ? `${fSolves} joint searches + ${fStatic} rejected structurally` : 'DISABLED (--no-flawless-gate)'}`);
 
 const pool = {
-  version: POOL_VERSION, epoch: '2026-08-01', minSeed: MIN_SEED, maxSeed: MAX_SEED,
+  version: POOL_VERSION, epoch: EPOCH, minSeed: MIN_SEED, maxSeed: MAX_SEED,
   days: chosen.map(c => ({
     seed: c.rec.seed,
     par: c.rec.par,
@@ -240,6 +301,6 @@ for (const c of chosen) { ids.add(c.gold.id); ids.add(c.silver.id); keys.add(c.g
 console.log(`\nmonth written to ${out}: ${pool.days.length} days, ${ids.size} distinct objective families, ${keys.size} distinct challenges`);
 for (let i = 0; i < chosen.length; i++) {
   const c = chosen[i];
-  console.log(`  Aug ${String(i + 1).padStart(2)}  #${c.rec.seed}  par ${String(c.rec.par).padStart(3)}  ` +
+  console.log(`  ${dayLabel(i)}  #${c.rec.seed}  par ${String(c.rec.par).padStart(3)}  ` +
               `S: ${labelOf(c.silver.id, c.silver.param)}\n              G: ${labelOf(c.gold.id, c.gold.param)}`);
 }
