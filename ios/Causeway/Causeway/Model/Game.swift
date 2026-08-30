@@ -106,6 +106,10 @@ final class Game: ObservableObject {
     /// The graded result of the just-won challenge attempt, for the win overlay (nil for casual
     /// wins). Set in recordWin(); cleared on the next deal.
     @Published var dailyResult: TierResult? = nil
+    /// Which day `dailyResult` graded. The overlay never named the day, so a past-day or ⏰-grace
+    /// win read exactly like today's — "On time" plus an advancing streak on a day that is not
+    /// today invites "today is done" (ux/WF-14:win-overlay-omits-the-day). Cleared with the result.
+    @Published var dailyResultDay: Int? = nil
 
     /// True while a "Show me how to win" line is loaded (playing OR paused). Input is locked and
     /// nothing is scored.
@@ -120,6 +124,9 @@ final class Game: ObservableObject {
     @Published private(set) var demoDoneMessage: String? = nil
     /// Monotonic token so a queued demo step from a superseded/stopped/paused run bails.
     private var demoGen = 0
+    /// The day index whose card opened this demo (nil = not opened from a day card). Cleared by
+    /// every deal(); see endDemo().
+    private var demoDay: Int? = nil
     /// The loaded winning line and cursor (for pause/step).
     private var demoMoves: [String] = []
     private var demoIdx = 0
@@ -198,6 +205,8 @@ final class Game: ObservableObject {
         challengeDay = nil
         challengeStartDay = nil
         dailyResult = nil
+        dailyResultDay = nil
+        demoDay = nil
         winRecorded = false      // fresh game — allow the next win to record
         started = false
         autoplaying = false
@@ -840,9 +849,23 @@ final class Game: ObservableObject {
                                     onTime: isOnTime(challengeDay: day, winDay: todayIndex(),
                                                      attemptStartDay: challengeStartDay))
         dailyStore.record(day: day, result: res)
+        dailyResultDay = day      // the overlay names the day whenever it isn't today's challenge
         challengeDay = nil
         challengeStartDay = nil
         return res
+    }
+
+    /// Is a ⏰ same-day GRACE currently riding on this attempt? True only for the one window
+    /// isOnTime's grace clause covers: an attempt begun on day D, still unfinished, being played on
+    /// D+1 — win it today and it still counts as same-day. Any re-deal ends that attempt and
+    /// re-stamps the start day to today, so the day can never earn ⏰ again, which is why the
+    /// board's reset controls have to say so before they do it
+    /// (ux/WF-14:replay-forfeits-grace-silently). Deliberately NOT fixed by preserving
+    /// challengeStartDay across a restart: that would let a fresh run begun on D+1 bank ⏰, which
+    /// is exactly what "same-day" excludes.
+    var graceLive: Bool {
+        guard let day = challengeDay, let start = challengeStartDay else { return false }
+        return start == day && todayIndex() == day + 1
     }
 
     /// The live objectives HUD's view of the current challenge attempt (nil when not on a challenge).

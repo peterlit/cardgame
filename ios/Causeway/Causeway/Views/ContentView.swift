@@ -329,7 +329,10 @@ struct ContentView: View {
         }
     }
     private var resetConfirmTitle: String {
-        game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
+        // A live ⏰ grace is the one loss no replay can undo, so it leads the dialog
+        // (ux/WF-14:replay-forfeits-grace-silently).
+        if game.graceLive, let day = game.challengeDay { return "Give up ⏰ Same-day for \(dayLabel(day))?" }
+        return game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
     }
     private var resetConfirmVerb: String {
         switch pendingReset {
@@ -341,6 +344,13 @@ struct ContentView: View {
     }
     private var resetConfirmMessage: String {
         let cost = "Your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded."
+        // The ⏰ case is NOT covered by "you can replay the challenge afterwards": the tiers come
+        // back, the same-day award never does. Say exactly what is unrecoverable.
+        if game.graceLive, let day = game.challengeDay {
+            let d = dayLabel(day)
+            return "You began \(d)'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. "
+                 + "Starting over makes it an attempt begun today, and \(d) can never earn ⏰ again. " + cost
+        }
         // A daily attempt is replayable, a casual game is not — the daily-specific promise must
         // never be reused for a casual game, whose loss really is final. (Same split as
         // DailyView's confirmation copy.)
@@ -837,16 +847,24 @@ struct ContentView: View {
     /// The daily-challenge line for the win overlay, mirroring the web onWin(): a Flawless callout
     /// when all three tiers fell in this single run, else the medals earned this attempt. nil for
     /// casual (non-challenge) wins.
+    /// "Aug 29: " when the attempt just scored was NOT today's challenge (a past-day replay or a
+    /// ⏰-grace win), empty for today's. Without it the overlay's "On time — 2-day same-day streak"
+    /// on a day that is not today reads as "today is done"
+    /// (ux/WF-14:win-overlay-omits-the-day).
+    private var winDayLabel: String {
+        guard let day = game.dailyResultDay, day != todayIndex() else { return "" }
+        return "\(dayLabel(day)): "
+    }
     private var winDailyText: String? {
         guard let d = game.dailyResult else { return nil }
         // ⏰ rides along with whichever tier line this attempt earned — it says WHEN, not how well.
         let onTime = d.onTime
             ? " ⏰ On time — \(streaks(game.dailyStore.days, todayIndex()).onTime.current)-day same-day streak."
             : ""
-        if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }
+        if d.flawless { return winDayLabel + "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }
         let earned = [(d.bronze, "🥉"), (d.silver, "🥈"), (d.gold, "🥇")]
             .filter { $0.0 }.map { $0.1 }.joined(separator: " ")
-        return "Daily challenge: \(earned.isEmpty ? "—" : earned) earned." + onTime
+        return winDayLabel + "Daily challenge: \(earned.isEmpty ? "—" : earned) earned." + onTime
     }
 
     private var winOverlay: some View {

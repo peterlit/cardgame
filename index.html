@@ -244,6 +244,10 @@
   .dcalhd .dm{ font-family:Georgia,serif; font-size:15px; font-weight:700; }
   .dcalhd .dleg{ display:flex; gap:8px; font-size:10px; opacity:.8; } .dcalhd .dleg span{ display:inline-flex; align-items:center; gap:3px; }
   .d3{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+  /* The ⏰ corner pip in the legend: five marker types are drawn in the grid and the legend named
+     four, and the pip is a bare gold dot a hair from the gold TIER dot — so it is taught AS a dot
+     (ux/WF-14:calendar-pip-unlabelled). */
+  .legpip{ background:var(--gold); box-shadow:0 0 0 1px rgba(0,0,0,.25); }
   .ddow{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:3px; }
   .ddow div{ text-align:center; font-size:10px; opacity:.55; font-weight:600; }
   .dgrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
@@ -413,7 +417,7 @@
     <div class="dstreaks" id="dailyStreaks"></div>
     <div class="dcard" id="dailyCard"></div>
     <div class="dcalhd"><span class="dm" id="dailyMonth"></span>
-      <span class="dleg"><span><i class="d3" style="background:#c98b3a"></i>🥉</span><span><i class="d3" style="background:#9aa0a6"></i>🥈</span><span><i class="d3" style="background:#d9ad55"></i>🥇</span><span>🌟 Flawless</span></span></div>
+      <span class="dleg"><span><i class="d3" style="background:#c98b3a"></i>🥉</span><span><i class="d3" style="background:#9aa0a6"></i>🥈</span><span><i class="d3" style="background:#d9ad55"></i>🥇</span><span>🌟 Flawless</span><span><i class="d3 legpip"></i>⏰ Same-day</span></span></div>
     <div class="ddow"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
     <div class="dgrid" id="dailyGrid"></div>
     <div class="dlock" id="dailyLock"></div>
@@ -1161,16 +1165,21 @@ function recordWin(){
   saveWins();
   refreshHud();
   const daily = recordChallengeResult(secs);   // score the daily attempt (if any); clears challengeDay
-  pendingWin = { seed, moves:moveCount, secs, prev, daily: daily ? daily.res : null };
+  pendingWin = { seed, moves:moveCount, secs, prev, daily: daily ? daily.res : null,
+                 dailyDay: daily ? daily.day : null };
 }
 function onWin(){
   recordWin();   // durable side effects, exactly once (no-op if already recorded)
   const w = pendingWin || { seed, moves:moveCount, prev:wins[seed],
                             secs: startTime?Math.floor((Date.now()-startTime)/1000):0 };
+  // Name the day whenever the attempt just scored was NOT today's challenge (a past-day replay or
+  // a ⏰-grace win): "On time" plus an advancing streak on a day that is not today otherwise reads
+  // as "today is done" (ux/WF-14:win-overlay-omits-the-day).
+  const winDay = (w.dailyDay!=null && w.dailyDay!==todayIndex()) ? `${fmtDayLabel(w.dailyDay)}: ` : '';
   const dailyLine = w.daily
-    ? ((w.daily.flawless
-        ? " 🌟 Flawless! 🥉🥈🥇 all in a single run."
-        : ` Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`)
+    ? " " + winDay + ((w.daily.flawless
+        ? "🌟 Flawless! 🥉🥈🥇 all in a single run."
+        : `Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`)
        + (w.daily.onTime ? ` ⏰ On time — ${streaks(dailyStore.days, todayIndex()).onTime.current}-day same-day streak.` : ""))
     : (w.prev ? " You'd already solved this one — nice repeat!" : " Pure skill — nicely done.");
   document.getElementById("winMsg").textContent =
@@ -1718,10 +1727,21 @@ function hasLiveGame(){ return moveCount>0 && !isWon() && !demoing; }
 function confirmReset(){
   if(!hasLiveGame()) return true;
   const cost = `Your ${moveCount} move${moveCount===1?'':'s'} and your time will be discarded.`;
+  // The ⏰ grace is the one loss "you can replay the challenge afterwards" does not cover: the
+  // tiers come back, the same-day award never does, because every re-deal re-stamps the start day
+  // to today (ux/WF-14:replay-forfeits-grace-silently). Preserving challengeStartDay across the
+  // restart would be the WRONG fix — it would let a fresh run begun on D+1 bank ⏰.
+  if(graceLiveNow()){
+    const d = fmtDayLabel(challengeDay);
+    return confirm(`Give up ⏰ Same-day for ${d}? You began ${d}'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. Starting over makes it an attempt begun today, and ${d} can never earn ⏰ again. ${cost}`);
+  }
   return confirm(challengeDay!=null
     ? `End your daily attempt? ${cost} You can replay the challenge afterwards.`
     : `Discard the game in progress? ${cost} This game is not a challenge, so there is no way back to it.`);
 }
+// Is a ⏰ same-day GRACE riding on the current attempt? Exactly isOnTime's grace window: begun on
+// day D, still unfinished, being played on D+1. (iOS twin: Game.graceLive.)
+function graceLiveNow(){ return challengeDay!=null && challengeStartDay===challengeDay && todayIndex()===challengeDay+1; }
 document.getElementById("newBtn").onclick=()=>{ if(!confirmReset()) return; stopDemo(); deal(randomSeed()); };
 document.getElementById("winRandom").onclick=()=>deal(randomSeed());
 document.getElementById("winClose").onclick=hideWin;

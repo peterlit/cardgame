@@ -56,6 +56,13 @@ struct DailyView: View {
         case .none:  cause = "This re-deals the board"
         }
         let cost = "your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded"
+        // The ⏰ grace is the one loss "you can replay the challenge afterwards" does not cover:
+        // the tiers come back, the same-day award never does (ux/WF-14:replay-forfeits-grace-silently).
+        if game.graceLive, let day = game.challengeDay {
+            let d = dayLabel(day)
+            return "\(cause), so \(cost). You began \(d)'s challenge on the day itself — starting over "
+                 + "makes it an attempt begun today, and \(d) can never earn ⏰ Same-day again."
+        }
         return game.challengeDay != nil
             ? "\(cause), so \(cost). You can replay the challenge afterwards."
             : "\(cause), so \(cost). This game is not a challenge, so there is no way back to it."
@@ -444,10 +451,20 @@ struct DailyView: View {
             HStack {
                 Text(monthLabel(y, m)).font(.system(size: 14, weight: .semibold))
                 Spacer()
-                HStack(spacing: 10) {
+                // Five marker types are drawn in the grid; the legend used to name four. The ⏰
+                // corner pip — a bare 5 pt gold dot — was the unnamed one, and it is drawn in the
+                // same colour and size as the gold TIER dot, so it had to be shown AS a dot here
+                // rather than as the ⏰ glyph alone (ux/WF-14:calendar-pip-unlabelled).
+                HStack(spacing: 8) {
                     ForEach(["bronze", "silver", "gold"], id: \.self) { t in Text(medal[t] ?? "") }
                     Text("🌟 Flawless")
-                }.font(.system(size: 11)).foregroundStyle(.secondary)
+                    HStack(spacing: 3) {
+                        Circle().fill(Theme.gold).frame(width: 5, height: 5)
+                        Text("⏰ Same-day")
+                    }
+                }
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .lineLimit(1).minimumScaleFactor(0.7)
             }
             LazyVGrid(columns: calCols, spacing: 4) {
                 // All three ForEach blocks below are siblings inside ONE LazyVGrid, so their ids share

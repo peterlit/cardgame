@@ -153,9 +153,13 @@ pin('Views/ContentView.swift', 'win-overlay ⏰ line', [
   `let onTime = d.onTime
             ? " ⏰ On time — \\(streaks(game.dailyStore.days, todayIndex()).onTime.current)-day same-day streak."
             : ""`,
-  // ...and it must actually be appended to whichever tier line this attempt earned.
-  'if d.flawless { return "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }',
-  'return "Daily challenge: \\(earned.isEmpty ? "—" : earned) earned." + onTime',
+  // ...and it must actually be appended to whichever tier line this attempt earned, which now
+  // also carries the DAY the attempt scored (empty for today's challenge) — a grace/past-day win
+  // used to render identically to today's (ux/WF-14:win-overlay-omits-the-day).
+  'if d.flawless { return winDayLabel + "🌟 Flawless! 🥉🥈🥇 all in a single run." + onTime }',
+  'return winDayLabel + "Daily challenge: \\(earned.isEmpty ? "—" : earned) earned." + onTime',
+  `guard let day = game.dailyResultDay, day != todayIndex() else { return "" }
+        return "\\(dayLabel(day)): "`,
 ]);
 
 // ---- once-only win record (guards the auto-finish deferred-win "record exactly once" invariant) ----
@@ -354,4 +358,44 @@ test('the deal-number entry confirms before discarding a live game (no web↔iOS
   assert.ok(html.includes(norm(`if(!confirmReset()) return;
   closeDeal(); deal(n);`)),
     'the web deal modal no longer confirms its re-deal');
+});
+
+// ---- ⏰ Same-day: named in the legend, named in the overlay, and never lost in silence ----
+// Three round-1 findings against the ⏰ award's surfaces:
+//   * ux/WF-14:replay-forfeits-grace-silently — one Replay tap during a live grace destroyed it
+//     with no dialog and no notice, and no user action can ever restore it.
+//   * ux/WF-14:calendar-pip-unlabelled — the ⏰ marker is an unlabelled 5 pt gold dot and the
+//     legend listed only 🥉🥈🥇🌟.
+//   * ux/WF-14:win-overlay-omits-the-day — the overlay never named which day was completed.
+test('⏰ Same-day is labelled, dated, and never forfeited silently (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const game = read('Model/Game.swift');
+  const content = read('Views/ContentView.swift');
+  const daily = read('Views/DailyView.swift');
+  // the grace predicate: exactly isOnTime's grace window, on both platforms. It must NOT be
+  // "fixed" by preserving challengeStartDay across a restart — that would bank ⏰ for a run begun
+  // the next day — so the guard is a warning, and these pin the warning.
+  assert.ok(game.includes(norm(`guard let day = challengeDay, let start = challengeStartDay else { return false }
+        return start == day && todayIndex() == day + 1`)),
+    'Game.graceLive no longer matches isOnTime\'s grace window');
+  assert.ok(html.includes(norm('function graceLiveNow(){ return challengeDay!=null && challengeStartDay===challengeDay && todayIndex()===challengeDay+1; }')),
+    'web graceLiveNow no longer matches isOnTime\'s grace window');
+  // ...and both reset confirmations lead with the loss that no replay can undo.
+  for (const [name, src] of [['ContentView.swift', content], ['index.html', html], ['DailyView.swift', daily]]) {
+    assert.ok(src.includes('can never earn ⏰'),
+      `${name}: a live ⏰ grace can be destroyed without saying that the day can never earn it again`);
+  }
+  // the calendar legend names the pip, as a DOT (it is drawn the same size/colour as the gold
+  // tier dot, so an ⏰ glyph alone would not teach it).
+  assert.ok(daily.includes(norm(`HStack(spacing: 3) {
+                        Circle().fill(Theme.gold).frame(width: 5, height: 5)
+                        Text("⏰ Same-day")
+                    }`)), 'iOS calendar legend lost its ⏰ pip entry');
+  assert.ok(html.includes(norm('<span><i class="d3 legpip"></i>⏰ Same-day</span>')),
+    'web calendar legend lost its ⏰ pip entry');
+  // the win overlay names the day whenever it is not today's challenge.
+  assert.ok(html.includes(norm("const winDay = (w.dailyDay!=null && w.dailyDay!==todayIndex()) ? `${fmtDayLabel(w.dailyDay)}: ` : '';")),
+    'web win overlay no longer names a past-day / grace win');
+  assert.ok(html.includes(norm('dailyDay: daily ? daily.day : null')),
+    'web pendingWin no longer carries the day it scored');
 });
