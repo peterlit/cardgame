@@ -1,5 +1,7 @@
 # Causeway — reviewer-agent evaluation examples
 
+Repo: https://github.com/peterlit/cardgame
+
 Five real commits from this repository, each with a **verified answer key**: the defect(s) the diff
 actually contained, established by later commits in the same history that fixed or reverted them
 (or, in one case, by code that is still wrong at that commit). Use them to score AI reviewer agents

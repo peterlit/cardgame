@@ -239,3 +239,27 @@ test('web demo exit paths re-deal (no playable demo-touched board)', () => {
   assert.ok(game.includes(norm('guard applied else { restartDeal(); return false }')),
     'Game.demoAdvance no longer aborts to a re-deal on a bad token');
 });
+
+// ---- 🌟 Flawless says the SAME thing on every surface (ux/WF-15:flawless-pill-both-vs-three) ----
+// The how-to-win pill's label is the only definition of 🌟 a novice reads before spending a demo on
+// it, and it feeds the demo bar's headline verbatim. It used to say "Both objectives in one run"
+// while the legend, the day card and the win overlay all said "all three earned in a single run" —
+// two surfaces contradicting three, on the one screen that exists to teach the tier. Pin the agreed
+// wording on both platforms AND the absence of the old two-objective phrasing, so neither copy can
+// drift back on its own.
+test('the 🌟 Flawless demo label says "all three" on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const daily = read('Views/DailyView.swift');
+  const label = '🥉🥈🥇 all three in a single run';
+  assert.ok(daily.includes(norm(`showPill(c.seed, "flawless", "🌟 Flawless", "${label}")`)),
+    'iOS 🌟 pill no longer labels Flawless as all three tiers in one run');
+  assert.ok(html.includes(norm(`b('flawless','${label}','🌟 Flawless')`)),
+    'web 🌟 pill no longer labels Flawless as all three tiers in one run');
+  for (const [name, src] of [['index.html', html], ['DailyView.swift', daily]]) {
+    assert.ok(!src.includes('Both objectives in one run'),
+      `${name}: the 🌟 pill is back to "Both objectives in one run", which contradicts the legend/day card/win overlay`);
+  }
+  // ...and the iOS surface it must agree WITH (the streaks legend, which the web sheet has no
+  // twin for) is still saying "all three".
+  assert.ok(daily.includes(norm('Flawless = 🥉🥈🥇 all three earned in a single run')), 'iOS streak legend lost its Flawless definition');
+});

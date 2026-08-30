@@ -203,7 +203,7 @@ struct DailyView: View {
                         if game.hasSilverLine(c.seed) { showPill(c.seed, "silver", "🥈 Silver", c.silver.label) }
                         if game.hasGoldLine(c.seed) { showPill(c.seed, "gold", "🥇 Gold", c.gold.label) }
                         if game.hasFlawlessLine(c.seed) {
-                            showPill(c.seed, "flawless", "🌟 Flawless", "Both objectives in one run")
+                            showPill(c.seed, "flawless", "🌟 Flawless", "🥉🥈🥇 all three in a single run")
                         }
                     }
                 }

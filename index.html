@@ -1485,7 +1485,7 @@ function renderDailyCard(){
     if(sol.silver) parts.push(b('silver',c.silver.label,'🥈 Silver'));   // distinct only when Silver is certified
     if(sol.gold)   parts.push(b('gold',c.gold.label,'🥇 Gold'));
     // 🌟 the line the Flawless tier actually asks for: both objectives satisfied in ONE run.
-    if(sol.flawless) parts.push(b('flawless','Both objectives in one run','🌟 Flawless'));
+    if(sol.flawless) parts.push(b('flawless','🥉🥈🥇 all three in a single run','🌟 Flawless'));
     showBtn = `<div class="dshowlbl">Show me how to win:</div><div class="dshowrow">${parts.join('')}</div>`;
   }
   // ⏰ is earned by clearing the day on its own date — say so where the player decides to play,
