@@ -507,6 +507,27 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
   rendering, so deferred until reproduced on hardware (`ios/.../Views/ContentView.swift`
   `cardGesture`/`runOffset`/`tableauCard`).
 
+## QA loop 2026-08-30 round 1 — implementer follow-ups
+
+All 15 open auto-routed findings of `.qa-loop/briefs/round-1-impl-brief.json` were addressed
+(one commit per WF region, `ba6e773..b7edbde`). Left open deliberately:
+
+- **Deal-entry parity**: iOS *enforces* the 1–1,000,000 bound (Play disabled + a reason, per
+  ux/WF-9), while `index.html`'s deal modal and Wins field still `Math.max/min`-**clamp** an
+  out-of-range entry and silently deal a different deal — the bug ux/WF-7 fixed on iOS. Not in
+  the round-1 brief; needs its own finding.
+- **`WinsView.playEntered` is unguarded**: it re-deals over a live game with no confirmation,
+  exactly like the Deal # alert did before ux/WF-7. Same for the web's `winsPlay`. The reported
+  control was the Deal # alert, so scope was kept there.
+- **`⏰` grace forfeited from the Daily sheet**: the sheet's own confirm now names the loss
+  (WF-14), but the *no live game* path (`Play` with nothing in progress) still cannot warn,
+  because there is nothing to confirm. Only reachable when the graced attempt was already
+  abandoned.
+- **Stamp-less stats backups lose their daily half on import** (bug/WF-11). Intended: an
+  unstamped export cannot be told apart from a pre-recut one. If a pre-release tester has such
+  a file, the wins half still restores.
+
+
 ## Release checklist (App Store)
 - [ ] Enroll in the Apple Developer Program; create the App Store Connect record.
 - [ ] Confirm the app **name** is available; set final display name.
