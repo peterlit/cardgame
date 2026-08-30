@@ -1889,12 +1889,17 @@ document.getElementById("winsDealInput").addEventListener("keydown",e=>{ if(e.ke
 function refreshAutoplayBtn(){
   document.getElementById("autoplayBtn").textContent = "Auto-play: " + (autoplayOn?"On":"Off");
 }
+// Turning Auto-play ON takes effect from the player's NEXT move (commitMove -> runAutoplay); the
+// toggle itself never moves a card. It is presented as a preference, but tapping it used to play
+// the board immediately — two cards, +2 on the move counter, on a scored daily run, with no
+// confirmation and nothing on the pill warning that flipping a setting spends moves against a
+// move-count objective (ux/WF-8:autoplay-toggle-mutates-scored-game). Turning it OFF still stops a
+// running chain at once: that direction only ever prevents moves.
 document.getElementById("autoplayBtn").onclick=()=>{
   autoplayOn=!autoplayOn;
   lsSet("causeway.autoplay", autoplayOn?"on":"off");
   refreshAutoplayBtn();
-  if(autoplayOn) runAutoplay();        // immediately sweep what's now safe
-  else stopAutoplay();
+  if(!autoplayOn) stopAutoplay();
 };
 refreshAutoplayBtn();
 document.getElementById("seedBtn").onclick=openDeal;

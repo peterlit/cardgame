@@ -65,8 +65,18 @@ final class Game: ObservableObject {
 
     /// Elapsed clock, isolated so its 1 Hz tick doesn't re-render the board (see GameClock).
     let clock = GameClock()
+    /// Turning this ON takes effect from the player's NEXT move (commit() -> runAutoplay); the
+    /// toggle itself never moves a card. It is presented as a preference, but tapping it used to
+    /// play the board on the spot — two cards, 92 -> 94 on the move counter, on a scored daily run,
+    /// with no confirmation and nothing on the pill warning that flipping a setting spends moves
+    /// against a move-count objective (ux/WF-8:autoplay-toggle-mutates-scored-game). Turning it OFF
+    /// still stops a running chain immediately (matching the web's stopAutoplay): that direction
+    /// only ever prevents moves.
     @Published var autoplayOn = true {
-        didSet { UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay"); if autoplayOn { runAutoplay() } }
+        didSet {
+            UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay")
+            if !autoplayOn { stopAutoplayPending() }
+        }
     }
     /// How reaching a finishable board is handled: `.ask` (default) prompts, `.on` finishes
     /// automatically, `.off` waits for the Finish button.

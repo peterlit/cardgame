@@ -480,3 +480,27 @@ test('auto-play and auto-finish refuse (never reorder) when a live tier is at st
   assert.ok(game.includes(norm('if sent { continue }')), 'iOS simulateAutoFinish left sendOneHome\'s order');
   assert.ok(html.includes(norm('if(sent) continue;')), 'web simulateAutoFinish left sendOneHome\'s order');
 });
+
+// ---- the Auto-play pill is a preference, not a move (ux/WF-8:autoplay-toggle-mutates-scored-game) ----
+// Tapping it mid-game instantly played two cards and advanced the move counter 92 -> 94 on a scored
+// daily run. Causeway scores move counts (par, "within your first N moves" objectives, Wins
+// best-moves), so a settings tap must not spend them: turning it ON now takes effect from the
+// player's next move. Turning it OFF still halts a running chain at once — that direction only ever
+// prevents moves.
+test('turning Auto-play on does not move cards (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const game = read('Model/Game.swift');
+  assert.ok(game.includes(norm(`didSet {
+            UserDefaults.standard.set(autoplayOn, forKey: "causeway.autoplay")
+            if !autoplayOn { stopAutoplayPending() }
+        }`)), 'the iOS Auto-play setter is back to firing a sweep (or stopped halting one)');
+  assert.ok(html.includes(norm(`autoplayOn=!autoplayOn;
+  lsSet("causeway.autoplay", autoplayOn?"on":"off");
+  refreshAutoplayBtn();
+  if(!autoplayOn) stopAutoplay();`)), 'the web Auto-play toggle is back to firing a sweep');
+  // autoplay must still be armed by real play — the setting is not simply dead.
+  assert.ok(game.includes(norm('if !finishing && !promptAutoFinish { runAutoplay() }')),
+    'iOS commit() no longer arms auto-play after a player move');
+  assert.ok(html.includes(norm('if(!finishing && !finishPromptOpen) runAutoplay();')),
+    'web commitMove no longer arms auto-play after a player move');
+});
