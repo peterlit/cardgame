@@ -299,3 +299,40 @@ test('the Daily calendar names the day it will play and answers a locked tap (no
   assert.ok(html.includes(norm('unlocks on the day itself — come back then.')),
     'web lost the "unlocks on the day itself" message for a locked cell');
 });
+
+// ---- the board's destructive pills confirm before discarding a live game ----
+// ux/WF-3:board-reset-pills-no-confirm — `New game` and `Replay` sit 91 pt and 87 pt from `Undo`
+// and used to reset the board (dropping a live daily attempt, its HUD and its whole undo history)
+// in one unconfirmed tap, while the Daily sheet guarded the identical destruction with a dialog.
+// The guard MUST stay state-gated (`hasLiveGame`), or the common one-tap reset on an untouched
+// board grows a tap; and the daily-only promise ("you can replay the challenge afterwards") must
+// never be shown for a casual game, whose loss really is final.
+test('board reset controls confirm only when there is a live game to lose (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const content = read('Views/ContentView.swift');
+  // iOS: both pills (portrait toolbar + landscape rail) route through requestReset, which is the
+  // only place the state gate lives.
+  assert.ok(content.includes(norm('pill("New game", primary: true) { requestReset(.newGame) }')),
+    'portrait New game pill no longer routes through requestReset');
+  assert.ok(content.includes(norm('pill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
+    'portrait Replay pill no longer routes through requestReset');
+  assert.ok(content.includes(norm('railPill("New game", primary: true) { requestReset(.newGame) }')),
+    'landscape New game pill no longer routes through requestReset');
+  assert.ok(content.includes(norm('railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
+    'landscape Replay pill no longer routes through requestReset');
+  assert.ok(content.includes(norm('if game.hasLiveGame { pendingReset = action } else { performReset(action) }')),
+    'iOS reset confirmation is no longer gated on hasLiveGame (an untouched board must stay one tap)');
+  // web: same gate, same two-branch copy.
+  assert.ok(html.includes(norm('function hasLiveGame(){ return moveCount>0 && !isWon() && !demoing; }')),
+    'web lost its hasLiveGame gate');
+  assert.ok(html.includes(norm('if(!hasLiveGame()) return true;')), 'web confirmReset is no longer state-gated');
+  assert.ok(html.includes(norm('document.getElementById("replayBtn").onclick=()=>{ if(!confirmReset()) return; restartDeal(); };')),
+    'web Replay no longer confirms');
+  assert.ok(html.includes(norm('document.getElementById("newBtn").onclick=()=>{ if(!confirmReset()) return; stopDemo(); deal(randomSeed()); };')),
+    'web New game no longer confirms');
+  // the casual branch must NOT inherit the challenge-only promise.
+  for (const [name, src] of [['index.html', html], ['ContentView.swift', content]]) {
+    assert.ok(src.includes(norm('This game is not a challenge, so there is no way back to it.')),
+      `${name}: the casual reset copy lost its "no way back" warning`);
+  }
+});

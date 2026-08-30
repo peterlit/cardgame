@@ -50,6 +50,22 @@ struct ContentView: View {
     @State private var showDaily = false
     @State private var dealText = ""
 
+    /// A board-replacing request from the BOARD's own controls, parked behind a confirmation
+    /// (nil = nothing pending).
+    ///
+    /// The Daily sheet has guarded exactly this destruction since round 0 ("End your daily
+    /// attempt?" / "Discard the game in progress?"), but the board's own `New game` and `Replay`
+    /// pills called through to the model directly — so the most reachable controls on the screen
+    /// were the unguarded ones, sitting 91 pt and 87 pt from `Undo`, the pill a player taps
+    /// constantly (ux/WF-3:board-reset-pills-no-confirm). Gated on `game.hasLiveGame`, so the
+    /// common one-tap New game / Replay on an untouched or finished board stays exactly one tap.
+    private enum PendingReset: Equatable {
+        case newGame
+        case replay
+        case deal(Int)
+    }
+    @State private var pendingReset: PendingReset?
+
     // Manual drag-and-drop (see cardGesture): source+offset while dragging, and the live
     // frames of every drop target in the "board" coordinate space for hit-testing on drop.
     @State private var drag: DragInfo?
@@ -267,6 +283,57 @@ struct ContentView: View {
             Button("Finish") { withAnimation { game.runAutoFinish() } }
             Button("Not yet", role: .cancel) { game.deferAutoFinish() }
         } message: { Text("Every remaining card can go home. Send them all now?") }
+        // The board's own destructive controls, confirmed with the same care the Daily sheet
+        // already took (ux/WF-3:board-reset-pills-no-confirm).
+        .alert(resetConfirmTitle, isPresented: Binding(
+            get: { pendingReset != nil },
+            set: { if !$0 { pendingReset = nil } })
+        ) {
+            Button(resetConfirmVerb, role: .destructive) {
+                if let action = pendingReset { pendingReset = nil; performReset(action) }
+            }
+            Button("Keep playing", role: .cancel) { pendingReset = nil }
+        } message: {
+            Text(resetConfirmMessage)
+        }
+    }
+
+    // MARK: destructive board controls (confirm before throwing a live game away)
+
+    /// Route a board-replacing control through the confirmation — but only when there is something
+    /// to lose. `hasLiveGame` is false on an untouched board, a won board and mid-demo, so the
+    /// one-tap cases stay one tap.
+    private func requestReset(_ action: PendingReset) {
+        if game.hasLiveGame { pendingReset = action } else { performReset(action) }
+    }
+    private func performReset(_ action: PendingReset) {
+        withAnimation {
+            switch action {
+            case .newGame:     game.newRandomGame()
+            case .replay:      game.restartDeal()
+            case .deal(let n): game.deal(seed: n)
+            }
+        }
+    }
+    private var resetConfirmTitle: String {
+        game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
+    }
+    private var resetConfirmVerb: String {
+        switch pendingReset {
+        case .newGame: return "New game"
+        case .replay:  return "Replay"
+        case .deal:    return "Play that deal"
+        case .none:    return "Continue"
+        }
+    }
+    private var resetConfirmMessage: String {
+        let cost = "Your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded."
+        // A daily attempt is replayable, a casual game is not — the daily-specific promise must
+        // never be reused for a casual game, whose loss really is final. (Same split as
+        // DailyView's confirmation copy.)
+        return game.challengeDay != nil
+            ? cost + " You can replay the challenge afterwards."
+            : cost + " This game is not a challenge, so there is no way back to it."
     }
 
     /// Landscape LEFT rail — the toolbar controls as a narrow vertical column of full-width pills,
@@ -289,12 +356,12 @@ struct ContentView: View {
                 VStack(spacing: 6) {
                     // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
                     // hierarchies exists at a time, so UI tests address either orientation uniformly.
-                    railPill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+                    railPill("New game", primary: true) { requestReset(.newGame) }
                         .accessibilityIdentifier("toolbar.newgame")
                     railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
                         .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
                         .accessibilityIdentifier("toolbar.undo")
-                    railPill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+                    railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
                         .accessibilityIdentifier("toolbar.replay")
                     railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
                         .accessibilityIdentifier("toolbar.autoplay")
@@ -408,12 +475,12 @@ struct ContentView: View {
 
     private var toolbar: some View {
         FlowLayout(spacing: 8) {
-            pill("New game", primary: true) { withAnimation { game.newRandomGame() } }
+            pill("New game", primary: true) { requestReset(.newGame) }
                 .accessibilityIdentifier("toolbar.newgame")
             pill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
                 .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
                 .accessibilityIdentifier("toolbar.undo")
-            pill("Replay", systemImage: "arrow.clockwise") { withAnimation { game.restartDeal() } }
+            pill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
                 .accessibilityIdentifier("toolbar.replay")
             pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
                 .accessibilityIdentifier("toolbar.autoplay")
