@@ -588,6 +588,14 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
   streak, a calendar pip, a day-card line and a win-overlay callout. No timestamps are stored, so
   the flag can never be reconstructed after the fact — a later feature would have started from zero,
   which is why it shipped in the same release as the history wipe.
+- **The ⏰ grace is day-granular, and that is a product decision, not a bug** (review-loop closeout,
+  2026-08-30). `isOnTime` compares day INDICES, so an attempt begun on day D earns ⏰ if it is won
+  any time on D+1 — not only just after midnight. A tight window would need a start *timestamp*,
+  which §2 of `docs/daily-challenges.md` deliberately rules out ("no timestamps are stored"). The
+  docs and both platforms' comments now say what the rule actually is, and the day card offers a
+  "resume your attempt today and it still counts" line while the window is open. Open only if we
+  ever decide the one-day-lag pattern (start D, finish on D+1, forever) devalues the streak: the fix
+  is a stored start timestamp plus a schema bump, i.e. a privacy/schema trade, not a one-liner.
 - Open, not done: the App Store listing copy (`store/app-store-listing.md`) still says nothing about
   Daily Challenges, streaks, or the demo — it predates the whole feature.
 
