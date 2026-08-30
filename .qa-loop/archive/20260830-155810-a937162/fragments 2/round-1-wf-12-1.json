@@ -1,0 +1,84 @@
+{
+  "findings": [
+    {
+      "id": "ux/WF-12:rail-hides-howtoplay",
+      "claim": "In landscape, whenever the 50pt daily-HUD chip bar or the demo bar is on screen the left rail's ScrollView shrinks to 248pt while its pill stack is 285pt tall, so the last pill ('How to play') is rendered 100% below the viewport with no partial pill, no fade and no resting scroll indicator — the rail's visible bottom edge lands exactly on a pill boundary after 'Wins', so a novice playing the daily in landscape sees no evidence the rules are still reachable.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-dailyhud-rail-howtoplay-absent.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-rail-zoom-ends-at-wins.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-rail-after-scroll-howtoplay-visible.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-demobar-rail-howtoplay-absent.png",
+          ".qa-loop/evidence/round-1/wf-12-1/measure-hierarchy-dailyhud.txt"
+        ],
+        "repro": [
+          "rotate the device to landscape (XCUIDevice orientation; see HARNESS_NOTES 'wf-12-1')",
+          "launch Causeway",
+          "tap the rail's 'Daily' pill",
+          "scroll the sheet down and tap 'Play' (today's deal #10011)",
+          "look at the bottom of the left rail: the last pill is 'Wins'; 'How to play' is not drawn at all",
+          "swipe up inside the rail (landscape (127,330) -> (127,200)) — 'How to play' appears and 'New game' scrolls off"
+        ],
+        "measurements": {
+          "rail_scrollview_frame_with_hud": "{68,97,118x248}",
+          "rail_content_height": 285,
+          "howtoplay_pill_frame": "{68,355.7,118x26.3}",
+          "howtoplay_visible_fraction": 0.0,
+          "wins_pill_clipped_pt": 4.6,
+          "rail_scrollview_frame_no_hud": "{68,57.7,118x310}",
+          "a11y_scrollbar_label_with_hud": "Vertical scroll bar, 2 pages",
+          "same_state_in_portrait": "all 9 pills visible in a 3-row toolbar, nothing clipped"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [{ "round": 1, "status": "open" }],
+      "current_status": "open",
+      "note": "Arithmetic (not observed live): with the HUD AND a 'Finish' pill the stack is 317.3pt in the same 248pt viewport, so 'Wins' would join 'How to play' below the fold. Cheap fixes that stay inside the current design: keep the rail's content inset so the next pill always half-peeks, or add a persistent bottom fade/chevron. Do not fix by shrinking pills below the 26.3pt hit target."
+    },
+    {
+      "id": "ux/WF-12:landscape-cards-smaller-than-portrait",
+      "claim": "Rotating to landscape makes the cards SMALLER, not bigger: on the same fresh deal the card is 45.0x75.3pt in landscape vs 49x75 in portrait, and the tallest column bottoms out at y=289 of the 381pt usable height, leaving ~24% of the board height as empty background. Width binds (12 card-widths + the 118pt rail across 756pt), so landscape buys the player nothing over portrait.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.3",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-12-1/tc121-landscape-board-deal10011.png",
+          ".qa-loop/evidence/round-1/wf-12-1/measure-hierarchy-nohud.txt"
+        ],
+        "repro": [
+          "rotate to landscape, launch Causeway, tap the rail 'Deal #' pill and play deal 10011",
+          "compare the card size and the empty band under the tableau with the same deal in portrait"
+        ],
+        "measurements": {
+          "card_w_h_landscape_fresh": "45.0 x 75.3",
+          "card_w_h_portrait_fresh": "49 x 75",
+          "card_w_h_landscape_daily_hud": "43.0 x 72.0",
+          "tableau_fan_pitch_landscape": 26.0,
+          "tallest_column_bottom_edge": 289.0,
+          "usable_board_bottom": 381.0,
+          "unused_height_fraction": 0.24,
+          "tableau_right_edge": 786.0,
+          "usable_width_right": 815.0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [{ "round": 1, "status": "open" }],
+      "current_status": "open",
+      "note": "Structural — the human decides. The layout is internally consistent (uniform shrink verified: a 13-card column takes the WHOLE board to 36.0x60.3 with pitch 20 and no clipping, floor 30 never hit), so this is a question of whether landscape should reserve a 118pt rail and a 4-wide foundation block across the top row at all."
+    }
+  ]
+}

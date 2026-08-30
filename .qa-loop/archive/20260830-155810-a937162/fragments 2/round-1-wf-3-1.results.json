@@ -1,0 +1,13 @@
+{
+  "results": [
+    { "tc": "TC-3.1", "persona": "novice", "status": "passed", "reason": "One tap on New game; Deal # changed 113138 -> 910172, Moves 0, Time 0:00, board reshuffled (77k px board diff)." },
+    { "tc": "TC-3.1", "persona": "power",  "status": "passed", "reason": "One tap, new random seed each time (113138 -> 910172 -> 110714); clock and move counter reset." },
+    { "tc": "TC-3.2", "persona": "novice", "status": "passed", "reason": "One tap on Replay after 3 moves; same Deal #910172, Moves 0, Time 0:00, board pixel-identical to the deal's initial layout (only a sub-point card-border AA shift)." },
+    { "tc": "TC-3.2", "persona": "power",  "status": "passed", "reason": "Same as novice; Undo correctly disabled after Replay (history cleared)." },
+    { "tc": "TC-3.3", "persona": "novice", "status": "passed", "reason": "One move -> Moves 1 and Undo pill visibly enabled; one tap on Undo -> Moves 0, board pixel-identical to pre-move state, Undo greys back out." },
+    { "tc": "TC-3.3", "persona": "power",  "status": "passed", "reason": "Same; Undo is a single tap in toolbar row 1. Note: the elapsed clock is NOT rewound by Undo (0:19 at Moves 0) - judged correct, not filed." },
+    { "tc": "TC-3.4", "persona": "novice", "status": "passed", "reason": "At Moves 0 the Undo pill is rendered at ~40% opacity, clearly distinct from the enabled pills; tapping it left the screen pixel-identical apart from the status-bar clock." },
+    { "tc": "TC-3.4", "persona": "power",  "status": "passed", "reason": "Disabled Undo is inert; no error, no state change." },
+    { "tc": "TC-3.5", "persona": "power",  "status": "passed", "reason": "5 moves (incl. a K-to-down-foundation move), then 5 Undo taps: each intermediate board was pixel-identical to the matching forward state (diffs 0-64 subpixel, 0 significant), final state pixel-identical to the initial deal (diff 0), Undo then disabled; a 6th tap changed nothing (no over-undo)." }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "results": [
+    { "tc": "TC-8.1", "persona": "power", "status": "passed", "reason": "Fresh install launches Auto-play: On; pill flips On->Off->On immediately; Off survives terminate+launch." },
+    { "tc": "TC-8.2", "persona": "power", "status": "passed", "reason": "Crafted 52-card save (save82) with a provably-safe 3S top and a foundation-legal-but-unsafe 6H top. Auto-play Off: Moves stayed 20, nothing moved. Toggling On: 3S alone flew home (Moves 21, spade up 2->3), 6H stayed — safe-only, no burying." },
+    { "tc": "TC-8.3", "persona": "power", "status": "passed", "reason": "Ask -> Off -> On -> Ask, one tap each, label updates immediately; On persists across terminate+launch. Ask->Off is exactly one tap and never transits On." },
+    { "tc": "TC-8.4", "persona": "power", "status": "passed", "reason": "Fixture substituted: the TC's gen2.mjs/deal #10169 recipe is gone from /private/tmp, so used the save-injection recipe (deal #10011 restored at move 69, then one real drag to move 70). All four assertions held: Ask prompted by itself, Not yet left Moves 70 + Finish pill, one tap gave Off with zero board change, next tap gave On and cascaded to the win overlay (Moves 93, Won 1, Deal pill checked). Filed ux/WF-8:autofinish-off-to-ask-forces-destructive-on for the Off->Ask navigation trap this same behaviour creates." }
+  ]
+}

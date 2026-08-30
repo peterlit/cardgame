@@ -1,0 +1,6 @@
+{
+  "results": [
+    { "tc": "TC-1.1", "persona": "novice", "status": "passed", "reason": "Header subtitle 'build each suit from both ends' present; How to play covers Goal/The catch/Tableau/Free cells/Controls (tap AND drag) legibly; tapping the exposed AD sent it to the diamond up-foundation, Moves 0->1, Undo enabled, clock started at the move (verified: 40s idle after Replay kept Time 0:00). 3 taps, well inside the 1-min bar. One minor discoverability gap filed: ux/WF-1:foundation-rows-unlabelled." },
+    { "tc": "TC-1.2", "persona": "novice", "status": "passed", "reason": "On deal #10011 the bottom card 4C (no foundation step, no alternating-colour neighbour) tapped straight into free cell 1 (Moves 1) - last-resort parking works and How to play's Controls text documents it. Also probed the harsher case: with all 3 cells full, tapping the truly stuck 3S did nothing (Moves stayed 5); the card plays a ~100ms lift/scale animation so the tap is visibly registered, but there is no explanation of why the move was impossible. Not filed - the lift confirms the hit and the game is full-information, so a message is a matter of taste rather than a defect." }
+  ]
+}

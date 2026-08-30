@@ -1,0 +1,44 @@
+{
+  "findings": [
+    {
+      "id": "ux/WF-6:done-hands-back-casual-board",
+      "claim": "The completed-demo banner says \"That's a winning line — tap Done to try it yourself\", but Done (and Stop) re-deal the day's seed as a CASUAL board with no objectives HUD and no challenge binding, so the novice who accepts that invitation plays the whole daily deal for zero daily credit — no Bronze/Silver/Gold tier, no streak — with nothing on screen to warn them. Daily -> Play on the identical deal shows the 3-line objectives HUD; demo -> Done shows none.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.4",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-6-1/tc64-completion-banner.png",
+          ".qa-loop/evidence/round-1/wf-6-1/tc64-after-done-casual-board.png",
+          ".qa-loop/evidence/round-1/wf-6-1/wf6-daily-play-board-has-hud.png",
+          ".qa-loop/evidence/round-1/wf-6-1/tc63-after-stop-fresh-board.png"
+        ],
+        "repro": [
+          "fresh install, cold launch (2026-08-22 -> dayIndex 10 -> deal #10,011)",
+          "tap Daily (280,176)",
+          "tap the demo pill 'Clear' (114,565)",
+          "tap Start (297,263); wait ~25 s for the line to reach 98/98",
+          "read the banner: 'That's a winning line - tap Done to try it yourself.'",
+          "tap Done (356,265)",
+          "observe: fresh deal #10011, Moves 0, Time 0:00, and NO objectives HUD",
+          "for contrast: tap Daily (280,176) then Play (201,490) - same deal, HUD present"
+        ],
+        "measurements": {
+          "demo_exit_board_has_objectives_hud": false,
+          "daily_play_board_has_objectives_hud": true,
+          "deal_both_cases": 10011
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [{ "round": 1, "status": "open" }],
+      "current_status": "open",
+      "fix_risk": "metric-integrity",
+      "note": "TRAP: the obvious fix - have Stop/Done re-arm challengeDay for the day just demoed - changes what can be scored, and must not let the demo's own moves/telemetry survive into the scored attempt (Game.showSolution already clears telem via deal(); Game.restartDeal restores challengeDay only if it was set). The cheap alternative is wording-only: stop promising 'try it yourself' and say the board is practice / point at Daily -> Play. Scoring consequence verified by inspection (Game.swift recordChallengeResult guards on challengeDay, which showSolution clears), not by playing a full deal to a win."
+    }
+  ]
+}

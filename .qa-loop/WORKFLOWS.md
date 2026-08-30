@@ -40,13 +40,16 @@ Each has a stable ID and a reasonable-effort expectation.
   overlay reports the result (incl. any daily tiers) and is dismissible.
   paths(WF-4): ios/Causeway/Causeway/Model/Game.swift, ios/Causeway/Causeway/Views/ContentView.swift, ios/Causeway/Causeway/Model/WinStore.swift, ios/Causeway/Causeway/Model/GameClock.swift
 - **WF-5 — Daily Challenge: read objectives, play, read stats (both).** Open Daily;
-  understand Today's Bronze/Silver/Gold objectives and the four streak cards (streak /
-  N total / best); start the challenge with Play. Expectation: objectives are legible;
+  understand Today's Bronze/Silver/Gold objectives and the **five** streak cards (🔥 Play,
+  ⏰ Same-day, 🥈 Silver, 🥇 Gold, 🌟 Flawless — each showing streak / N total / best); start the
+  challenge with Play. *(Updated 2026-08-30: it was four cards before ⏰ shipped.)* Expectation: objectives are legible;
   streak vs total vs best is not confusing; Play is one tap and hands off to the board
   with the live objectives HUD.
-  paths(WF-5): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/DailyStore.swift, ios/Causeway/Causeway/Causeway/daily-pool.json, data/daily-pool.json
-- **WF-6 — "Show me how to win" demo (novice).** From the Daily card, use Clear/Silver/
-  Gold "show me how to win", including step (Next) and Stop. Expectation: the demo is
+  paths(WF-5): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/DailyStore.swift, ios/Causeway/Causeway/daily-pool.json, data/daily-pool.json
+- **WF-6 — "Show me how to win" demo (novice).** From the Daily card, use the how-to-win pills —
+  **🥉 Clear / 🥈 Silver / 🥇 Gold / 🌟 Flawless, laid out as a two-column grid** *(updated
+  2026-08-30: 🌟 Flawless was added and the row became a grid; the 🌟 pill itself is WF-15)* —
+  including step (Next) and Stop. Expectation: the demo is
   discoverable, starts paused/ready (doesn't auto-run), and steps clearly. **Intended
   exit behavior (changed 2026-08-15):** BOTH mid-demo Stop and post-line Done re-deal
   the same seed to a fresh board — a demo-touched board is never left playable, cards
@@ -79,72 +82,112 @@ Each has a stable ID and a reasonable-effort expectation.
 - **WF-12 — Landscape play (both).** Rotate to landscape and play. Expectation: the
   board reflows to the rail + foundations + tableau layout, all controls remain reachable
   (rail scrolls if needed), cards are comfortably large, and dragging still works.
-  paths(WF-12): ios/Causeway/Causeway/Views/ContentView.swift, ios/Causeway/Causeway/Views/CardView.swift, ios/Causeway/Causeway/Views/Theme.swift
-- **WF-13 — Sandbox days & the new objective families (both).** *(added 2026-08-22)* From the
-  Daily screen's month calendar, tap a **pre-epoch sandbox day** (Aug 5-11 2026 = dayIndex
-  -7…-1; `calCell` deliberately makes `idx < 0` playable) and read its objectives, then Play
-  it. These days are the only place the six objective types added in 31b4198 appear:
-  `split-even`, `down-heavy`, `no-down-foundation`, `no-up-foundation`, `no-supermoves`,
-  `one-big-move`. Expectation: a selected past/sandbox day shows its own objectives and par,
-  its labels are legible and unambiguous to a novice, Play hands off to a board whose HUD
-  tracks that day's objectives, and `one-big-move` shows its green check the moment a 5+
-  card run is relocated. **Corrected round 1:** that check is NOT irreversible — Undo
-  restores `telem.maxRunMoved`, which is deliberate (the field is shared with the
-  opposite-polarity `no-supermoves` objective, and the tier awarded at win time reads
-  the same rolled-back field), so a check that reverts on Undo is the HUD telling the
-  truth.
-  **Corrected 2026-08-22 (round-0 exploration):** the constraint objectives are EVALUATIVE,
-  not gating — like the older `no-cells` / `no-undo`, a disallowed move is allowed and the
-  HUD chip flips to a red ✗ (a hard refusal would make Bronze unreachable on some deals).
-  The bar is therefore: the violation must be reflected immediately and legibly in the HUD,
-  and the tier must be correctly withheld at win time. A sandbox day that shows today's
-  objectives, an objective that never registers, a violation that leaves its chip looking
-  earnable, or a secured check that can be un-earned, is a bug.
-  paths(WF-13): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/Game.swift, ios/Causeway/Causeway/Causeway/daily-pool.json, data/daily-pool.json
+  paths(WF-12): ios/Causeway/Causeway/Views/ContentView.swift, ios/Causeway/Causeway/Views/CardView.swift, ios/Causeway/Causeway/Theme.swift
+- **WF-13 — Past days & the objective-family inventory (both).** *(rewritten 2026-08-30: the
+  pre-epoch sandbox is GONE — `dailyChallenge(-1, pool)` now returns null and the calendar
+  starts at Aug 1. Past days inside the seeded range replace it as the deterministic fixture.)*
+  From the Daily screen's month calendar, tap a **past day** (dayIndex 0…28 = Aug 1-29 2026) and
+  read its objectives, then Play it. Expectation: a selected past day shows ITS OWN objectives and
+  par (not today's), labels are legible and unambiguous to a novice, Play hands off to a board whose
+  HUD tracks that day's objectives, and the HUD reflects a violation immediately.
+  The thirteen families now in the pool are `moves`, `no-undo`, `cells-le`, `max-run`, `big-move`,
+  `split-at`, `end-bias`, `ends-first`, `before-ace`, `suit-top-first`, `suit-sprint`, `rank-rush`,
+  `suit-balance` — see the Fixture policy table for a day that exercises each.
+  **Constraint objectives are EVALUATIVE, not gating** (unchanged, still true): a disallowed move is
+  ALLOWED and the HUD chip flips to a red ✗ — a hard refusal would make Bronze unreachable on some
+  deals. The bar is: the violation is reflected immediately and legibly in the HUD, and the tier is
+  correctly withheld at win time. A past day that shows today's objectives, an objective that never
+  registers, a violation that leaves its chip looking earnable, or a secured check that can be
+  un-earned, is a bug. (Telemetry rollback on Undo is deliberate — the HUD telling the truth.)
+  paths(WF-13): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/Game.swift, ios/Causeway/Causeway/daily-pool.json, data/daily-pool.json
+- **WF-14 — ⏰ Same-day recognition (both).** *(new 2026-08-30, commit 0b090d9 + review-loop
+  5b8c4e5.)* ⏰ is a fifth strict streak: the day was cleared **on its own date**. It is orthogonal
+  to the medals — a bare Bronze earned on the day counts; a Flawless replay of a past day does not.
+  Surfaces to exercise: the **⏰ Same-day streak card** (5 cards now: 🔥 Play, ⏰ Same-day, 🥈 Silver,
+  🥇 Gold, 🌟 Flawless); the **day-card ⏰ line**, which has FOUR branches (earned → "⏰ Cleared on the
+  day"; today, unplayed → "⏰ Win today to start/keep your N-day same-day streak"; a live grace →
+  "⏰ Resume your attempt today and it still counts"; a past day → "⏰ Same-day is earned on the day
+  itself"); the **calendar corner pip** on ⏰ days; and the **win-overlay** same-day callout.
+  Expectation: the right branch shows in each state, the streak card agrees with the calendar pips,
+  and replaying a past day never mints ⏰.
+  **Known-open trap (review loop, `ux/index.html:gracelive-play-button-forfeits`):** while the grace
+  line is up, the day card's only button re-deals and DESTROYS the grace. iOS shows a confirm dialog
+  whose text ("You can replay the challenge afterwards") is false in that state. Judge the UX here;
+  do not file the underlying behavior as new.
+  **The grace is day-granular by design** (BACKLOG, 2026-08-30): begun on day D, won any time on D+1
+  earns ⏰. That is a recorded product decision, not a bug — but copy that promises a *midnight*
+  grace is a bug.
+  paths(WF-14): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Views/ContentView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/Game.swift, ios/Causeway/Causeway/Model/DailyStore.swift
+- **WF-15 — 🌟 Flawless: the tier, the streak, and "how to win flawless" (both).** *(new
+  2026-08-30.)* Flawless = 🥉🥈🥇 all three earned in **one single run** of that day's deal (harder
+  than banking them across retries), and it is **sticky** once any single attempt aces all three.
+  Surfaces: the 🌟 Flawless streak card; the "🌟 Flawless — Both objectives in one run" how-to-win
+  pill on the day card, gated by `game.hasFlawlessLine(c.seed)`; the 🌟 calendar marker (which
+  replaces the tier dots, since flawless implies all three); and the 🌟 line on the win overlay.
+  Every one of the 61 seeded days has a certified flawless line, so the pill must appear on every day
+  the calendar actually EXPOSES — **today that is dayIndex 0-29 only**; Sep days are future and not
+  selectable, so "all 61" is a data claim, not something you can walk in-app. A reachable day whose
+  pill is missing is a gate bug, and a pill that plays a line which does NOT end flawless is worse.
+  Expectation: the pill is discoverable and its demo is watchable; the 🌟 marker does not jitter the
+  calendar date; a flawless win lights the tier, the streak card, and the calendar in agreement.
+  paths(WF-15): ios/Causeway/Causeway/Views/DailyView.swift, ios/Causeway/Causeway/Model/Daily.swift, ios/Causeway/Causeway/Model/Game.swift, data/daily-solutions.json
+
 ## Fixture policy
 
-*(re-verified 2026-08-22 against build f949d82 — the previous version predated the
-pre-epoch playtest sandbox and the six new objective types.)*
+*(fully re-verified 2026-08-30 against build 5b8c4e5. The previous version described a
+`seeds`/`preSeeds` pool with a pre-epoch sandbox; the pool was rebuilt to schema **v4** in
+f42c632 and NONE of those values survive. Everything below was recomputed from
+`data/daily-pool.json` and `tests/daily.mjs` today.)*
 
-The app still exposes **no launch arguments, debug pickers, or seed overrides**. Its
-randomness levers are the deal number, the wall-clock date, and — new — the calendar's
-pre-epoch sandbox days. Pin them like this:
+The app still exposes **no launch arguments, debug pickers, or seed overrides**. Its randomness
+levers are the deal number, the wall-clock date, and the calendar's playable past days.
 
-- **Deterministic start:** the app is uninstalled and reinstalled each round, so every
-  pass begins with zero stats, zero wins, and no daily records. Never test on leftover
-  state.
-- **Today's daily (date-derived, NOT pinnable):** `dayIndex = daysSince(2026-08-12)`,
-  challenge = `daily-pool.json.seeds[dayIndex]`. **Derive it at test time from the
-  device's date** — do not hard-code. Reference for this loop: **2026-08-22 → dayIndex 10
-  → deal #10,011, par 98, silver `no-undo`, gold `suits-top-down`.** Recompute with
-  `node -e "import('./tests/daily.mjs').then(async m=>{const p=JSON.parse((await import('fs')).readFileSync('data/daily-pool.json','utf8'));console.log(m.dailyChallenge(<dayIndex>,p))})"`.
-- **Sandbox days (PINNABLE — use these for objective testing).** `preSeeds[i]` is day
-  `-(i+1)`, i.e. Aug 11 2026 = -1 … Aug 5 2026 = -7, all reachable from the calendar this
-  month and all frozen:
+- **Deterministic start:** the app is uninstalled and reinstalled each round, so every pass begins
+  with zero stats, zero wins, and no daily records. Never test on leftover state.
+- **Pool schema (changed):** `data/daily-pool.json` is **version 4**, `epoch = 2026-08-01`
+  (= dayIndex 0), `days[0…60]` covering **Aug 1 – Sep 30 2026**, seeds in [500001, 1000000].
+  There is no `seeds` array and no `preSeeds` array any more. **The pre-epoch sandbox is gone** —
+  `dailyChallenge(-1, pool)` returns `null` and the calendar starts at Aug 1.
+- **Today's daily (date-derived, NOT pinnable):** `dayIndex = daysFromCivil(y,m,d) - daysFromCivil(2026,8,1)`.
+  Derive it at test time; do not hard-code. Reference for this loop:
+  **2026-08-30 → dayIndex 29 → seed 551879, par 84, silver `rank-rush` ("Get all four Kings home
+  within your first 9 moves"), gold `split-at` ("Split every suit exactly at the Eight — A-8 up,
+  9-K down").** Recompute with:
+  `node -e "Promise.all([import('./tests/daily.mjs'),import('fs')]).then(([m,fs])=>console.log(m.dailyChallenge(m.dayIndexFor(2026,8,30),JSON.parse(fs.readFileSync('data/daily-pool.json','utf8')))))"`
+- **Past days (PINNABLE — these replace the old sandbox).** dayIndex 0…28 (Aug 1-29 2026) are all
+  playable from the calendar and all frozen. Use them for objective testing. One day per family:
 
   | Date | dayIndex | seed | par | silver | gold |
   |---|---:|---:|---:|---|---|
-  | Aug 11 | -1 | 872465152 | 70 | no-undo | no-cells |
-  | Aug 10 | -2 | 561325499 | 91 | cells-le-2 | kings-first |
-  | Aug 9  | -3 | 339664220 | 84 | (moves) | aces-first |
-  | Aug 8  | -4 | 186441603 | 80 | moves ≤ 96 | **one-big-move** |
-  | Aug 7  | -5 | 942660922 | 91 | **no-supermoves** | **no-up-foundation** |
-  | Aug 6  | -6 | 699587523 | 88 | **down-heavy** | **no-down-foundation** |
-  | Aug 5  | -7 | 191924978 | 106 | moves ≤ 127 | **split-even** |
+  | Aug 1 | 0 | 691039 | 85 | `rank-rush` Queens ≤29 moves | `split-at` at the Three |
+  | Aug 2 | 1 | 665641 | 109 | `end-bias` ≥7 from the Ace end | `big-move` run of 7+ |
+  | Aug 3 | 2 | 539885 | 86 | `max-run` never move >3 | `suit-sprint` finish one suit first |
+  | Aug 29 | 28 | 750496 | 72 | `end-bias` ≥9 from the King end | `ends-first` Kings+Queens home first |
 
-  Bold = an objective type that exists nowhere else in the app. This closes the old
-  "daily behaviour cannot be tested deterministically" gap for objectives; it does **not**
-  close it for streak/day-boundary behaviour, which is still wall-clock-driven.
-- **Free play (pinnable):** for a repeatable board, use **Deal #…** with an explicit
-  number rather than New Game's random deal. Default to **the current day's daily deal
-  number** (#10,011 today) so free-play and daily testing share one board unless a test
-  case names another.
-- **Midnight hazard:** a run started late in the evening can cross the day boundary
-  mid-pass — the Daily card, its objectives, and the demo lines all flip. If that happens
-  mid-test-case, note it in the result rather than filing the flip as a bug.
-- **Remaining gap:** daily streak/tier behaviour across day boundaries still cannot be
-  tested deterministically (no date override). A proposal-routed finding recommending a
-  debug date override remains in scope.
+  The remaining families — `moves`, `no-undo`, `cells-le`, `before-ace`, `suit-top-first`,
+  `suit-balance` — also appear across days 0…28; enumerate with the node one-liner above rather
+  than guessing. Family frequencies in the 61-day pool: `end-bias` 17, `suit-balance` 13,
+  `cells-le` 12, `rank-rush`/`split-at`/`max-run`/`moves`/`ends-first`/`before-ace`/`suit-top-first` 9
+  each, `no-undo` 7, `big-move` 6, `suit-sprint` 4.
+- **Solution lines (corrected by the round-0 audit).** `data/daily-solutions.json` keys **bronze /
+  silver / gold / flawless**. **All 61 days carry bronze, gold and flawless** — so the 🥉, 🥇 and 🌟
+  how-to-win pills appear on every day. **`silver` is present on 45 of 61 days only**: it is absent
+  exactly on the 16 days whose Silver objective is a "universal" family (`moves` / `no-undo`), where
+  `solutionLine` falls back to bronze and `hasSilverLine` is false, so `DailyView.swift:203` does not
+  render the 🥈 pill at all. **A missing Silver pill on one of those days is CORRECT, not a bug.**
+  In the reachable past-day range those days are **Aug 5, 6, 10, 16, 21, 23 and 26**. On the other 45
+  days the Silver line is distinct and must actually satisfy that day's Silver objective.
+- **Free play (pinnable):** for a repeatable board use **Deal #…** with an explicit number rather
+  than New Game's random deal. Default to the current day's daily deal number so free-play and daily
+  testing share one board unless a test case names another.
+- **Midnight hazard:** a run started late in the evening can cross the day boundary mid-pass — the
+  Daily card, its objectives, the ⏰ branches and the demo lines all flip. If that happens mid-test-
+  case, note it in the result rather than filing the flip as a bug. **This matters more now:** the ⏰
+  branch logic is entirely date-driven.
+- **Remaining gap:** daily streak / day-boundary / ⏰ behaviour still cannot be tested
+  deterministically (no date override), and ⏰ specifically needs a *two-day* sequence to exercise the
+  grace branch. A proposal-routed finding recommending a debug date override remains in scope and is
+  now more valuable than it was.
 
 ## Notes for the tester
 - Landscape **is** testable, but how depends on your tools. With the simulator MCP control
@@ -161,9 +204,12 @@ pre-epoch sandbox days. Pin them like this:
   bottom card is a bug; a one-time uniform shrink at a new tallest-column maximum is
   the design.
 - The `CausewayUITests` target now exists in `project.pbxproj` (added 2026-08-21) and the
-  scheme's testable reference resolves. `xcodebuild ... test` runs six XCUITests; all pass.
-- The six objective types added 2026-08-21 (`split-even`, `down-heavy`,
-  `no-down-foundation`, `no-up-foundation`, `no-supermoves`, `one-big-move`) appear only on
-  sandbox days — see WF-13 and the Fixture policy table. `no-supermoves` is enforced through
-  `constraint.maxRun` in `legalMoves`, and `one-big-move` through a `maxRunMoved` telemetry
-  field that must survive undo, both multi-card move paths, and a save/restore cycle.
+  scheme's testable reference resolves. `xcodebuild ... test` runs seven XCUITests; all pass.
+- **The six objective types from 2026-08-21 (`split-even`, `down-heavy`, `no-down-foundation`,
+  `no-up-foundation`, `no-supermoves`, `one-big-move`) NO LONGER EXIST.** The pool was rebuilt in
+  f42c632 under a flawless-certification gate and now carries thirteen different families; see
+  WF-13 and the Fixture policy. Do not look for the old ones.
+- **Daily history was wiped again** (store v2 → v3, both platforms) — in `0b090d9`, the ⏰ commit,
+  not in the `f42c632` calendar rebuild. A fresh
+  install therefore has no records at all, which is what this loop wants — but it also means any
+  stats-restore test (WF-11) is exercising a v3 store against v3 exports only.

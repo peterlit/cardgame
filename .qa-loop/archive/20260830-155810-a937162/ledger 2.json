@@ -1,0 +1,1344 @@
+{
+  "round": 2,
+  "build_sha": "369c365",
+  "max_rounds": 3,
+  "parallel_testers": 2,
+  "emit_regression_tests": true,
+  "token_budget": null,
+  "implemented_rounds": [
+    1
+  ],
+  "findings": [
+    {
+      "id": "ux/WF-4:clock-pauses-in-background",
+      "claim": "The scored elapsed clock stops while the app is backgrounded, so any recorded best time / daily time can be gamed by simply switching apps to think for as long as you like \u2014 measured 3:32 -> 3:38 (+6 s) across 64 s of wall clock with 60 s of that backgrounded, same process (pid unchanged). The same app treats its OWN modal alerts the opposite way: the clock keeps ticking under the Deal # and 'Ready to finish' dialogs, so 'the player is not playing' is scored two contradictory ways.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "P-C",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/perf-l3/bgclock-t0-time-3m32s.png",
+          ".qa-loop/evidence/round-1/perf-l3/bgclock-t64s-wall-time-3m38s.png",
+          ".qa-loop/evidence/round-1/perf-l3/measurements.txt"
+        ],
+        "repro": [
+          "Inject or reach any in-progress board with started=true (any deal; the clock must be running).",
+          "Read the header Time value and note the host wall-clock second.",
+          "Background the app WITHOUT killing it: `xcrun simctl launch <udid> com.apple.mobilesafari` (or press HOME).",
+          "Wait 60 s.",
+          "Foreground it again: `xcrun simctl launch <udid> com.whimsicaldistractions.Causeway` (same pid \u2014 verify with pgrep).",
+          "Read the header Time value again: it has advanced only by the ~4 s spent in the foreground, not by 64 s."
+        ],
+        "measurements": {
+          "wall_seconds": 64,
+          "backgrounded_seconds": 60,
+          "foreground_seconds_est": 4,
+          "clock_before": "3:32",
+          "clock_after": "3:38",
+          "clock_delta_seconds": 6,
+          "pid_before": 36342,
+          "pid_after": 36342,
+          "second_run_mcp_home": "clock 2:32 -> 2:59 (+27 s) over 78 s wall with 45 s backgrounded"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP \u2014 do not 'fix' by counting background time: that punishes a player who takes a phone call, and it would retroactively invalidate nothing while making every future time worse than an already-banked one. The honest options are (a) accept the background pause and make the in-app alerts pause too (consistent, but then any sheet becomes a pause button \u2014 see ux/WF-4:clock-runs-during-finish-prompt, whose naive fix has the mirror-image risk), or (b) show the pause explicitly (e.g. mark a resumed game's time as paused) so the recorded number keeps its meaning. Either way this is a scoring-semantics decision for the human, not an unattended fix. fix_risk: metric-integrity.",
+      "fix_risk": "metric-integrity"
+    },
+    {
+      "id": "ux/WF-1:foundation-rows-unlabelled",
+      "claim": "The two foundation rows are visually identical empty suit slots under one 'FOUNDATIONS' heading, and neither the board nor How to play says which row is the up pile (A,2,3...) and which is the down pile (K,Q,J...). A novice who drags an Ace to the lower row gets a silent snap-back with no message, no highlight and no hint that the row was the wrong end - the app's central twist is the one thing the board never labels.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-1",
+      "test_case": "TC-1.1",
+      "build_sha": "369c365",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-06-foundation-rows-identical-zoom.png",
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-01-cold-launch.png",
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-02-howtoplay-top.png",
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-04-ace-dragged-to-down-row-refused.png",
+          ".qa-loop/evidence/round-1/wf-1-1/tc11-05-ace-drag-to-up-row-accepted.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-01-foundation-labels-fixed.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-02-howtoplay-row-clause.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-04-ace-drag-to-K-row-refused.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-05-ace-drag-to-A-row-accepted.png"
+        ],
+        "repro": [
+          "Fresh install, cold launch",
+          "Tap 'Deal #<n>' pill (row 2, ~x=196 y=175); backspace the prefilled value 6x at (333,775); type 1,0,0,1,1; tap Play at (276,392) -> deal #10011",
+          "Tap 'How to play' (55,214): the Goal section names an up pile and a down pile but never says which screen row is which. Tap Done (359,103)",
+          "Tap col2 bottom 8D at (126,650) -> it builds onto 9S, exposing AS",
+          "DRAG AS from (126,620) to the LOWER spade foundation slot (28,374): card snaps back, Moves stays 6, no message (screenshot tc11-04)",
+          "Control: DRAG the same AS from (126,620) to the UPPER spade slot (28,296): it is accepted (screenshot tc11-05) - so the refusal above is a rule refusal, not a failed pickup",
+          "Fresh install (uninstall+install), cold launch",
+          "Board now reads 'FOUNDATIONS \u00b7 A\u2191 / K\u2193'; every EMPTY up-row slot carries a faint 'A' + suit pip and every empty down-row slot a faint 'K' + pip (tc11-01)",
+          "Tap 'How to play' (55,214): Goal now says 'On the board the TOP foundation row is the up pile and the row beneath it is the down pile: empty slots show a faint A or K to say which card starts there.' (tc11-02)",
+          "Round-1 repro replayed on deal #10011: tap col3 bottom 8\u2666 (126,640) -> builds onto 9\u2660, exposing A\u2660; DRAG A\u2660 (126,600) to the LOWER spade slot (28,374) -> still a rule refusal / snap-back, Moves unchanged (tc11-04); DRAG the same A\u2660 to the UPPER spade slot (28,296) -> accepted, Moves 4 (tc11-05)"
+        ],
+        "measurements": {
+          "board_cues_distinguishing_up_row_from_down_row": 3,
+          "howtoplay_mentions_row_order": true,
+          "feedback_on_refused_drop": "still a silent snap-back, but the destination slot now shows 'K' so the refusal is self-explanatory"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Verified on 369c365: group label + per-slot A/K ghosts + the How to play clause all present, and the ghosts appear on EMPTY slots only (the occupied A\u2666 and A\u2660 render as normal cards with no extra glyph \u2014 tc11-03/tc11-05), which was the constraint in the round-1 note. The refused drop is still silent, but that was the consequence of the missing labels, not a separate defect; not refiled."
+    },
+    {
+      "id": "ux/WF-10:automation-undocumented",
+      "claim": "The board ships two automation pills that are active by default \u2014 'Auto-play: On' and 'Auto-finish: Ask' \u2014 but the app's only help surface, 'How to play', never mentions either (0 occurrences of 'auto' in RulesView; the sheet fits on one screen, so nothing is hidden below the fold). A novice cannot learn what the app will do on its own, nor what toggling those two pills changes; Auto-finish: Ask will later raise a mid-game prompt the player was never told about.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-10",
+      "test_case": "TC-10.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-10-1/tc10-1-00-board-toolbar.png",
+          ".qa-loop/evidence/round-1/wf-10-1/tc10-1-01-rules-full.png"
+        ],
+        "repro": [
+          "uninstall + reinstall Causeway, cold launch",
+          "observe toolbar row 2: 'Auto-finish: Ask' and row 1: 'Auto-play: On'",
+          "tap 'How to play' (55,214)",
+          "read the whole sheet: Goal / The catch / Tableau / Free cells / Controls / About \u2014 swipe up on the body confirms there is no further content",
+          "no text anywhere describes auto-play or auto-finish"
+        ],
+        "measurements": {
+          "rules_sections": 5,
+          "mentions_of_auto_play": 0,
+          "mentions_of_auto_finish": 0,
+          "scroll_needed_to_see_all_rules": false
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Text-only fix on an existing screen. The core novice content (both-ended foundations, tap-vs-drag, free cells) IS present and correct, which is why this is minor and not major. The Daily screen self-documents its objectives in plain English, so the gap is specific to the two automation pills."
+    },
+    {
+      "id": "bug/WF-11:import-drops-out-of-range-stats",
+      "claim": "Import permanently drops stats that Export itself wrote: DailyView.importStats keeps only wins whose seed is in 1...Game.maxSeed (1,000,000) and only daily records whose dayIndex is in 0...todayIndex()+2, while StatsBackup.make exports every entry. Restoring the app's own untouched backup onto a fresh install silently lost a real win on deal #872,465,152 and the whole Bronze+Silver+Gold+Flawless record for the Aug 11 sandbox day (dayIndex -1) - both of them earned through normal play of the shipped pre-epoch sandbox days - and reported them as 'Skipped 2 invalid entries', directly contradicting the section's own promise 'Importing merges - it never erases progress.'",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "blocker",
+      "confidence": "confirmed",
+      "region": "WF-11",
+      "test_case": "TC-11.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-11-1/tc11-2-import-own-export-skipped2.png",
+          ".qa-loop/evidence/round-1/wf-11-1/restore-before-fresh-install.png",
+          ".qa-loop/evidence/round-1/wf-11-1/restore-after-import-losses.png",
+          ".qa-loop/evidence/round-1/wf-11-1/exported-backup.json"
+        ],
+        "repro": [
+          "Fresh install. Win the Aug 11 sandbox day (Daily > calendar > Aug 11 > Play; its deal is #872,465,152, i.e. > maxSeed) and win today's daily (deal #10,011). [Wins were reached here by injecting a near-complete board into UserDefaults key causeway.game with challengeDay -1 / 10 and letting Auto-finish complete it, so the app's own recordWin()/recordChallengeResult() wrote the stores - see .qa-loop/scratch/qa-worker-2/mkwin2.py + inject2.sh]",
+          "Daily > scroll to BACKUP > Export > Save. Note reads 'Stats exported.'; the file contains daily keys -1 and 10 and wins 777, 10011, 872465152 (attached exported-backup.json).",
+          "Tap Import and pick that same file: note reads 'Imported - merged 1 day (0 new) and 2 deals (0 new). Skipped 2 invalid entries.' on the SAME device with nothing hand-edited.",
+          "xcrun simctl uninstall + install (simulates a new device / reinstall), launch, Daily > BACKUP > Import > pick Causeway-Stats-2026-08-22.json.",
+          "Note reads 'Imported - merged 1 day (1 new) and 2 deals (2 new). Skipped 2 invalid entries.' Calendar cell Aug 11 has no medal/star; UserDefaults causeway.wins = {777, 10011} only and causeway.daily = {10} only. The sandbox day's four tiers and the #872,465,152 win are gone with no way to get them back."
+        ],
+        "measurements": {
+          "exported_daily_keys": [
+            -1,
+            10
+          ],
+          "exported_win_seeds": [
+            777,
+            10011,
+            872465152
+          ],
+          "restored_daily_keys": [
+            10
+          ],
+          "restored_win_seeds": [
+            777,
+            10011
+          ],
+          "entries_lost": 2,
+          "wins_filter": "1...1000000",
+          "daily_filter": "0...todayIndex()+2"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: those two range checks are the sanitizer that makes TC-11.4 pass (a hand-edited backup with seeds 0/1000001, day -3/9999 and zero moves/secs was correctly skipped, and no best score was poisoned). Do not simply delete them - widen them to what the app can legitimately produce (sandbox dayIndex >= -preSeeds.count, and win seeds up to the sandbox seed range / any seed the Deal # alert accepts) while keeping the moves>0 / secs>0 checks. Secondary, same fix site: the note calls the user's own untouched export 'invalid entries' and never says which entries were dropped."
+    },
+    {
+      "id": "ux/WF-12:rail-hides-howtoplay",
+      "claim": "In landscape, whenever the 50pt daily-HUD chip bar or the demo bar is on screen the left rail's ScrollView shrinks to 248pt while its pill stack is 285pt tall, so the last pill ('How to play') is rendered 100% below the viewport with no partial pill, no fade and no resting scroll indicator \u2014 the rail's visible bottom edge lands exactly on a pill boundary after 'Wins', so a novice playing the daily in landscape sees no evidence the rules are still reachable.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-dailyhud-rail-howtoplay-absent.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-rail-zoom-ends-at-wins.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-rail-after-scroll-howtoplay-visible.png",
+          ".qa-loop/evidence/round-1/wf-12-1/tc122-demobar-rail-howtoplay-absent.png",
+          ".qa-loop/evidence/round-1/wf-12-1/measure-hierarchy-dailyhud.txt"
+        ],
+        "repro": [
+          "rotate the device to landscape (XCUIDevice orientation; see HARNESS_NOTES 'wf-12-1')",
+          "launch Causeway",
+          "tap the rail's 'Daily' pill",
+          "scroll the sheet down and tap 'Play' (today's deal #10011)",
+          "look at the bottom of the left rail: the last pill is 'Wins'; 'How to play' is not drawn at all",
+          "swipe up inside the rail (landscape (127,330) -> (127,200)) \u2014 'How to play' appears and 'New game' scrolls off"
+        ],
+        "measurements": {
+          "rail_scrollview_frame_with_hud": "{68,97,118x248}",
+          "rail_content_height": 285,
+          "howtoplay_pill_frame": "{68,355.7,118x26.3}",
+          "howtoplay_visible_fraction": 0.0,
+          "wins_pill_clipped_pt": 4.6,
+          "rail_scrollview_frame_no_hud": "{68,57.7,118x310}",
+          "a11y_scrollbar_label_with_hud": "Vertical scroll bar, 2 pages",
+          "same_state_in_portrait": "all 9 pills visible in a 3-row toolbar, nothing clipped"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Arithmetic (not observed live): with the HUD AND a 'Finish' pill the stack is 317.3pt in the same 248pt viewport, so 'Wins' would join 'How to play' below the fold. Cheap fixes that stay inside the current design: keep the rail's content inset so the next pill always half-peeks, or add a persistent bottom fade/chevron. Do not fix by shrinking pills below the 26.3pt hit target."
+    },
+    {
+      "id": "ux/WF-12:landscape-cards-smaller-than-portrait",
+      "claim": "Rotating to landscape makes the cards SMALLER, not bigger: on the same fresh deal the card is 45.0x75.3pt in landscape vs 49x75 in portrait, and the tallest column bottoms out at y=289 of the 381pt usable height, leaving ~24% of the board height as empty background. Width binds (12 card-widths + the 118pt rail across 756pt), so landscape buys the player nothing over portrait.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-12",
+      "test_case": "TC-12.3",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-12-1/tc121-landscape-board-deal10011.png",
+          ".qa-loop/evidence/round-1/wf-12-1/measure-hierarchy-nohud.txt"
+        ],
+        "repro": [
+          "rotate to landscape, launch Causeway, tap the rail 'Deal #' pill and play deal 10011",
+          "compare the card size and the empty band under the tableau with the same deal in portrait"
+        ],
+        "measurements": {
+          "card_w_h_landscape_fresh": "45.0 x 75.3",
+          "card_w_h_portrait_fresh": "49 x 75",
+          "card_w_h_landscape_daily_hud": "43.0 x 72.0",
+          "tableau_fan_pitch_landscape": 26.0,
+          "tallest_column_bottom_edge": 289.0,
+          "usable_board_bottom": 381.0,
+          "unused_height_fraction": 0.24,
+          "tableau_right_edge": 786.0,
+          "usable_width_right": 815.0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Structural \u2014 the human decides. The layout is internally consistent (uniform shrink verified: a 13-card column takes the WHOLE board to 36.0x60.3 with pitch 20 and no clipping, floor 30 never hit), so this is a question of whether landscape should reserve a 118pt rail and a 4-wide foundation block across the top row at all."
+    },
+    {
+      "id": "bug/WF-13:one-big-move-check-lost-on-undo",
+      "claim": "On the Aug 8 sandbox day (deal #186,441,603, gold = one-big-move) the Gold HUD chip flips to a green check the instant a 6-card run is relocated, but a single tap of Undo un-earns it: the chip drops back to '\u00b7'. Game.swift's undo() restores telem.maxRunMoved from the move snapshot, so the objective WORKFLOWS.md WF-13 and Daily.swift:426 both call 'positive + irreversible: locked in the moment it happens' is in fact reversible, while telem.undos (the negative no-undo objective) is deliberately never rolled back \u2014 an inconsistency that can silently cost a player the Gold medal.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.4",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-1/tc13.4-before-bigrun-moves19.png",
+          ".qa-loop/evidence/round-1/wf-13-1/tc13.4-after-bigrun-gold-check.png",
+          ".qa-loop/evidence/round-1/wf-13-1/tc13.4-after-undo-gold-check-lost.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily (279,175)",
+          "tap calendar day 8 (361,723)",
+          "tap Play (200,490)  -> Deal #186441603, HUD shows Clear/96 moves/Move a run of 5+",
+          "tap Auto-play pill (335,135) to set Auto-play: Off (keeps the board deterministic)",
+          "run the 19 setup drags in .qa-loop/scratch/qa-worker-2/search5.mjs output (node .qa-loop/scratch/qa-worker-2/search5.mjs 186441603) to reach Moves 19",
+          "drag (224,602) -> (28,650): moves the 6-card run 7C 6H 5C 4H 3C 2H from col4 onto 8H at col0 -> Moves 20, Gold chip turns green with a checkmark",
+          "tap Undo (142,135) -> Moves 19 and the Gold chip reverts to '\u00b7'"
+        ],
+        "measurements": {
+          "run_length_moved": 6,
+          "moves_at_secure": 20,
+          "moves_after_undo": 19,
+          "gold_chip_before_undo": "green check",
+          "gold_chip_after_undo": "dot (unearned)"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
+        }
+      ],
+      "current_status": "partial",
+      "note": "WONTFIX ARGUMENT HOLDS ON THE CODE, BUT THE DISPOSITION IS INCOMPLETE (round 1). Verified: telem.maxRunMoved is genuinely read by two opposite-polarity objectives (Daily.swift:150/149, index.html:1179-1180); making it a one-way ratchet to satisfy one-big-move would itself be a NEW metric-integrity exploit -- a player could do one 5+ card supermove, immediately Undo it, and keep Gold credit forever even though the actual winning line never contained that move, i.e. exactly the 'peek and score' trap the finding's own note warned against. The HUD chip and the win-time checker (oneBigMove) read the identical field, so the live preview never lies about the eventual grade, and every other objSecured case (jacks-down-first, down-openers-20, suit-sprint, etc.) already un-secures on undo the same way, since they read up/down arrays that undo genuinely rewinds. index.html carries the identical rollback and comment fix, keeping web/iOS parity (verified via `npm test`, 71/71, including the ios-parity suite). So the decline itself is the right call, not a rubber stamp.  HOWEVER: .qa-loop/TESTCASES.md TC-13.4 (lines 696-711) was NOT updated and still asserts the opposite as the canonical, testable expectation: 'After Undo (step 3), the chip **stays green** (maxRunMoved is telemetry that is never rolled back -- the objective is \"positive and irreversible\" per WORKFLOWS.md WF-13)' with an explicit Fail condition '...reverts to \u00b7/\u2717 after Undo ... is a HUD/telemetry bug.' That is the precise, literal behavior the implementer just re-confirmed is CORRECT and by design. The implementer rewrote TC-7.3/TC-7.4/TC-11.4 to match its other fixes in this same commit but left this one contradicting test case stale, so the next round's tester, following TC-13.4 to the letter, will re-observe the chip reverting on Undo, invoke the test's own 'Fail condition', and refile this exact finding -- an avoidable repeat loop. Action needed before this can close: rewrite TC-13.4's Expected/Fail-condition (and its WORKFLOWS.md WF-13 citation) to state that the chip correctly reverts on Undo and that this is intended, matching the corrected comments in Daily.swift/index.html.",
+      "fix_risk": "metric-integrity"
+    },
+    {
+      "id": "ux/WF-13:daily-play-discards-live-attempt-silently",
+      "claim": "Tapping the Daily card's gold `Play` while a daily attempt is already in progress re-deals the board and throws the attempt away with no confirmation and no hint on the card that one is live \u2014 even when it is the SAME day you are playing. The identical loss via a 'Show me how to win' pill IS gated by an 'End your daily attempt?' alert, so the app protects the rarer path and not the common one.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.5",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-1/tc13.5-daily-card-play-during-live-attempt.png",
+          ".qa-loop/evidence/round-1/wf-13-1/tc13.5-aug7-both-violations-marked.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily, tap calendar day 7 (307,723), tap Play (200,490) -> Deal #942660922, HUD up",
+          "make 4 real moves (drag (28,715)->(126,650); drag (126,692)->(77,650); drag (272,685)->(276,370); drag (272,655)->(28,370)) -> Moves 4, Silver and Gold chips show red x, clock running",
+          "tap Undo (142,135) -> Moves 3",
+          "tap Daily (315,175) -> the sheet opens on TODAY's card, with no sign that an Aug 7 attempt is live",
+          "tap calendar day 7 (307,723) -> Aug 7 card, plain gold `Play` (no 'resume'/'in progress' state)",
+          "tap Play (200,490) -> board re-deals: Moves 0, Time 0:00, Undo disabled, HUD chips reset. No alert, no undo path back."
+        ],
+        "measurements": {
+          "moves_lost": 3,
+          "elapsed_lost_sec": 104,
+          "confirm_dialogs_shown": 0,
+          "confirm_dialogs_on_equivalent_demo_path": 1
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Also seen across days: an Aug 8 attempt at Moves 19 / 7:51 was discarded the same way by picking Aug 7 -> Play. Minimal fix is to reuse the existing 'End your daily attempt?' alert (challengeDay != nil && moveCount > 0) on the day-card Play path; the alternative ('Play' resumes the live attempt, or the card shows 'Resume') is a design call for the human. TRAP: whichever is chosen must not create a way to restart a daily for a better time while keeping the earlier attempt's banked telemetry.",
+      "fix_risk": "behavior-change"
+    },
+    {
+      "id": "ux/WF-13:objective-labels-ignore-text-size",
+      "claim": "The objective labels a player must read while playing are hard-coded to 10 pt (`DailyView.swift:453`, `Text(label).font(.system(size: 10))`) and do not respond to the system text-size setting at all: with iOS text size at accessibility-extra-large the board's daily HUD renders byte-for-byte identically to the default size, so a large-text user still reads Aug 5's Gold objective 'Split every suit exactly down the middle - A-7 up, 8-K down' at 10 pt - the smallest text on the board, below Apple's 11 pt floor. On the Daily card the same setting DOES enlarge the tier status circles while the label text stays put, so the app is partly Dynamic-Type-aware and the labels look like an oversight rather than a deliberate whole-app opt-out.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.6",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-hud-stacked-full-label.png",
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-hud-accessibility-xl-unchanged.png",
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-card-accessibility-xl.png"
+        ],
+        "repro": [
+          "xcrun simctl uninstall <udid> com.whimsicaldistractions.Causeway; install the Debug .app; launch",
+          "tap Daily (279,175)",
+          "tap the Aug 5 calendar cell (200,722)  [sandbox dayIndex -7, deal #191,924,978, gold = split-even]",
+          "tap Play (200,490) -> board with the stacked daily HUD; screenshot the HUD (crop 0,245-402,320)",
+          "xcrun simctl ui <udid> content_size accessibility-extra-large",
+          "screenshot the same HUD crop -> md5 identical to the default-size crop (eea6f3c2d681fba350883d2fc287cf0d both times)",
+          "tap Daily, tap Aug 5 again -> on the card the red tier circles are visibly larger, the Gold label text is unchanged and merely re-wraps"
+        ],
+        "measurements": {
+          "hud_label_font_pt": 10,
+          "apple_min_recommended_pt": 11,
+          "content_sizes_tested": [
+            "large (default)",
+            "accessibility-extra-large"
+          ],
+          "hud_crop_md5_default": "eea6f3c2d681fba350883d2fc287cf0d",
+          "hud_crop_md5_ax_xl": "eea6f3c2d681fba350883d2fc287cf0d",
+          "fixed_size_font_calls_in_Views": 45,
+          "semantic_font_calls_in_Views": 9,
+          "gold_label_chars": 51
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the naive fix (swap the 45 fixed-size fonts for semantic ones) reflows the whole board - the stacked daily HUD already costs +80 pt of board height, and at AX sizes an enlarged HUD plus toolbar would push the tableau off-screen and invalidate every geometry note in HARNESS_NOTES.md. A bounded scale (e.g. scaledValue capped) or a tap-to-expand objective readout is likelier right; that is a design call, hence proposal routing. Scope note: the fixed-size pattern is app-wide, not WF-13-specific - filed here because TC-13.6 is where it bites hardest (the HUD label is the smallest text on the board and the only in-play statement of what Gold requires)."
+    },
+    {
+      "id": "ux/WF-13:demo-headline-emdash-collides-with-label",
+      "claim": "The demo bar builds its headline as \"<label> \u2014 <progress>\" (ContentView.swift:665), but three objective labels already contain an em dash of their own. On Aug 5 the Gold demo bar reads \"\ud83e\udd47 Gold: Split every suit exactly down the middle \u2014 A-7 up, 8-K down \u2014 0 / 106\", so the move counter is punctuated exactly like the second half of the objective and reads as more objective text rather than as progress.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.6",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-demo-headline-emdash.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily (279,175)",
+          "tap the Aug 5 calendar cell (200,722)",
+          "tap the \ud83e\udd47 Gold demo pill under \"Show me how to win\" (287,566)",
+          "read the demo bar headline (crop 0,220-402,300)"
+        ],
+        "measurements": {
+          "labels_containing_em_dash": 3,
+          "labels_total": 18,
+          "affected_ids": [
+            "split-even",
+            "no-supermoves",
+            "no-up-foundation"
+          ],
+          "headline_lines_wrapped": 3
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Cheap fix: use a different separator (\u00b7 or a bullet) or render the progress as its own Text/pill. Only affects the three labels that embed an em dash, all of them on the new sandbox-day objective families."
+    },
+    {
+      "id": "ux/WF-2:drop-gutter-dead-zone",
+      "claim": "Tableau column drop frames are only as wide as the cards, so the ~5 pt gutter between two columns belongs to no column: a legal drag released there is silently refused (card snaps back, Moves unchanged) even though the dragged card is rendered centred on the finger and visibly overlaps the intended column by ~45% of its width.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-2",
+      "test_case": "TC-2.3",
+      "build_sha": "369c365",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-middrag.png",
+          ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-refused-x52.png",
+          ".qa-loop/evidence/round-1/wf-2-1/wf2-gutter-lands-x48.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x52-lands-col0.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x53-lands-col0.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x54-lands-col1.png"
+        ],
+        "repro": [
+          "fresh install + launch (no daily HUD, portrait)",
+          "tap Deal # (196,175), clear the field, enter 10004, tap Play",
+          "drag (321,612) -> (28,700)   [10H onto JC, col0 = 8 cards, Moves 1]",
+          "drag (28,620) -> (224,700)   [JC+10H run to col4, col0 bottom is now 4D, Moves 2]",
+          "drag (175,642) -> (274,296)  [8S to free cell 1, exposing 5S at col3 bottom, Moves 3]",
+          "drag (175,612) -> (52,700)   [release 5S in the gap between col0 and col1: card snaps back, Moves STAYS 3]",
+          "drag (175,612) -> (48,700)   [same drag released 4 pt further left: 5S lands on 4D in col0, Moves 4]",
+          "fresh install + launch, Deal # -> 10004 -> Play",
+          "drag (321,612)->(28,700); drag (28,620)->(224,700); drag (175,642)->(274,296)  [Moves 3, 5S exposed at col3 bottom]",
+          "drag (175,612)->(52,700)  [round-1 refusal point: 5S NOW LANDS on col0, Moves 4]",
+          "Undo, then drag (126,650)->(53,690)  [6H lands on col0, Moves 6]",
+          "drag (321,590)->(54,690)  [JD, legal only on col1, LANDS on col1]",
+          "drag (321,590)->(53,690)  [JD refused - x=53 resolves to col0 where JD is illegal; correct nearest-centre behaviour, not a dead zone]",
+          "steal checks: drag (273,620)->(28,380) [7C over the down-foundation slot above col0: refused, column did NOT steal it]; drag (273,620)->(323,296) [7C lands in free cell 2]"
+        ],
+        "measurements": {
+          "col0_card_span_pt": "6.0-50.3",
+          "col1_card_span_pt": "55.0-99.3",
+          "gutter_width_pt": 4.7,
+          "resolution_boundary_pt": "between 53 and 54 (geometric midpoint of the two column centres = 52.65)",
+          "dead_x_values_found": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Verified fixed. Column drop zones now tile: every x across the gutter resolves to the nearer column centre, boundary measured between x=53 and x=54 vs the predicted 52.65. Round-1's exact refusal point x=52 now lands. No residual dead x. Collateral checks passed: a release over the foundation row (28,380) is still refused rather than stolen by col0's zone (column zones start at the tableau top y=425, well below the foundation rows), and free-cell drops still land."
+    },
+    {
+      "id": "ux/WF-3:new-game-discards-in-progress-deal",
+      "claim": "Tapping `New game` mid-deal instantly destroys the in-progress game with no confirmation, no toast and no recovery path: Undo is cleared and greyed out, `Replay` from then on restarts the NEW deal, and the abandoned deal number is not surfaced anywhere in the UI, so a player who mis-taps the largest/gold/top-left pill cannot return to the deal they were solving (verified: Deal #910,172 at Moves 3 / 7:15 -> Deal #110,714 at Moves 0 / 0:00 in one tap).",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-3",
+      "test_case": "TC-3.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-3-1/ux-newgame-before-3moves-deal910172.png",
+          ".qa-loop/evidence/round-1/wf-3-1/ux-newgame-after-discarded-deal110714.png"
+        ],
+        "repro": [
+          "fresh install, cold launch (Deal #113,138)",
+          "tap New game (51,135) -> Deal #910,172",
+          "tap tableau col5 bottom (273,620)  [Moves 1]",
+          "tap tableau col6 bottom (321,620)  [Moves 2]",
+          "tap tableau col3 bottom (175,650)  [Moves 3, Time 7:15, Undo enabled]",
+          "tap New game (51,135)",
+          "observe: Deal #110,714, Moves 0, Time 0:00, Undo disabled; #910,172 appears nowhere and Replay now replays #110,714"
+        ],
+        "measurements": {
+          "taps_to_destroy": 1,
+          "confirmation_steps": 0,
+          "recovery_affordances": 0,
+          "moves_lost": 3,
+          "elapsed_lost_mmss": "7:15"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "behavior-change",
+      "note": "TRAP: the obvious fix (a confirm dialog on New game) directly contradicts WORKFLOWS.md WF-3's stated 'each is one tap' expectation and would also hit Replay. Non-breaking alternatives exist (an undoable 'Deal #N abandoned - Undo' toast, or keeping the previous deal number visible/one-tap-restorable), but which - if any - to adopt is a human call. Replay has the same no-confirm behaviour; it is less severe because the deal number survives on screen."
+    },
+    {
+      "id": "ux/WF-4:clock-runs-during-finish-prompt",
+      "claim": "The game clock keeps running while the app's own modal \"Ready to finish\" alert blocks all input, and that dead time lands in the result the win overlay reports (and in the stored best time): with the alert up and no input possible the header clock advanced 3:42 -> 4:28 over a 45 s wall-clock window.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "TC-4.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-4-1/clock-during-prompt-t0.png",
+          ".qa-loop/evidence/round-1/wf-4-1/clock-during-prompt-t45.png",
+          ".qa-loop/evidence/round-1/wf-4-1/tc41-ask-prompt.png"
+        ],
+        "repro": [
+          "inject the pinned fixture save (.qa-loop/evidence/round-1/wf-4-1/save69.json, deal #10011 at move 69) with .qa-loop/evidence/round-1/wf-4-1/inject.sh",
+          "launch the app (Auto-finish: Ask)",
+          "tap the 9-of-spades run head at (224,590) -> board becomes finishable, 'Ready to finish' alert appears",
+          "do nothing for 45 s; read the header Time behind the alert"
+        ],
+        "measurements": {
+          "clock_before": "3:42",
+          "clock_after": "4:28",
+          "wall_window_s": 45,
+          "input_possible_during_window": false
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the naive fix (pause GameClock while a modal is up) turns any sheet \u2014 Daily, Wins, How to play \u2014 into a pause button and corrupts recorded best times. If anything is done here, scope it to the app-initiated auto-finish alert only (e.g. subtract the alert's dwell), and leave user-opened sheets alone.",
+      "fix_risk": "metric-integrity"
+    },
+    {
+      "id": "bug/WF-4:autofinish-defer-not-persisted",
+      "claim": "'Not yet' stops the auto-finish prompt only for the life of the process: the app re-offers 'Ready to finish' the moment the very same game is restored after an app kill/cold relaunch (same deal, same move count, same clock), so the promise that it will not nag again this game is broken by any process restart.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "TC-4.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-4-1/tc42-deferred-before-relaunch.png",
+          ".qa-loop/evidence/round-1/wf-4-1/tc42-prompt-returns-after-relaunch.png"
+        ],
+        "repro": [
+          "inject save69.json (deal #10011, move 69) and launch with Auto-finish: Ask",
+          "tap (224,590) -> 'Ready to finish' alert",
+          "tap 'Not yet' (128,497) -> alert gone, gold Finish pill present, Moves 70",
+          "xcrun simctl terminate <udid> com.whimsicaldistractions.Causeway; xcrun simctl launch ... (same game restores: Deal #10011, Moves 70)",
+          "the 'Ready to finish' alert is on screen again"
+        ],
+        "measurements": {
+          "moves_before_kill": 70,
+          "moves_after_relaunch": 70,
+          "prompt_reappeared": true
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "autoFinishDeferred is not part of Game.SavedGame and restore() resets it to false before calling maybeAutoFinish(). Fix is an optional field on the persisted save \u2014 decode defensively so old saves still load (fix_risk: state-migration).",
+      "fix_risk": "state-migration"
+    },
+    {
+      "id": "ux/WF-4:undo-after-win-reopens-solved-deal",
+      "claim": "After a win, tapping Close and then Undo un-wins the completed deal: the last card comes back out of the foundation, the game clock resumes on a deal that is already banked, the Finish pill reappears, and tapping it fires a second 'You solved it!' overlay for the same deal with a worse time (98 moves 3:07 -> 98 moves 3:45). The loop can be repeated indefinitely.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-4",
+      "test_case": "TC-4.3",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-4-1/tc44-manual-finish-overlay.png",
+          ".qa-loop/evidence/round-1/wf-4-1/undo-after-win-unwins-board.png",
+          ".qa-loop/evidence/round-1/wf-4-1/undo-after-win-second-overlay.png"
+        ],
+        "repro": [
+          "inject save95.json (deal #10011, move 95, 3 cards left) with inject.sh; prefs causeway.autoplay=false, causeway.autofinishmode=off",
+          "launch; tap (126,500), (126,470), (77,470) to send the last three cards home -> win overlay 'Deal #10,011 - 98 moves - 3:07'",
+          "tap Close (314,488) -> solved board, Undo is ENABLED",
+          "tap Undo (142,135) -> Moves 97, 8-of-diamonds is back in the tableau, clock running again, Finish pill back",
+          "tap Finish (167,175) -> a second 'You solved it!' overlay, 'Deal #10,011 - 98 moves - 3:45'"
+        ],
+        "measurements": {
+          "first_overlay": "98 moves / 3:07",
+          "second_overlay": "98 moves / 3:45",
+          "won_counter": 1,
+          "repeatable": true
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "metric-integrity",
+      "note": "No data corruption observed: WinStore keeps min(moves,secs) per deal and the Won counter (distinct deals) stays 1, so the repeat overlays cannot improve or damage a record. TRAP: disabling Undo once a deal is complete is a behaviour change and also touches the daily-attempt path (an undo after a recorded daily win bumps telem.undos) \u2014 human call, and worth checking DailyStore before changing anything."
+    },
+    {
+      "id": "ux/WF-5:streak-card-headline-unlabelled",
+      "claim": "Each of the four streak cards shows THREE numbers but labels only two of them: the large serif headline number (the current streak) has no label at all, and the word \"streak\" appears nowhere on the Daily sheet. A novice reading \"\ud83d\udd25 1 / Play / 1 total / best 1\" cannot tell which number is the current streak, which is the lifetime total, and which is the record.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-5-1/tc51-streak-cards-fresh.png",
+          ".qa-loop/evidence/round-1/wf-5-1/tc53-daily-after-bronze.png"
+        ],
+        "repro": [
+          "xcrun simctl uninstall <udid> com.whimsicaldistractions.Causeway; reinstall (fresh state)",
+          "launch Causeway",
+          "tap Daily (270,169)",
+          "read the four cards at the top of the sheet"
+        ],
+        "measurements": {
+          "numbers_per_card": 3,
+          "labelled_numbers_per_card": 2,
+          "occurrences_of_the_word_streak_in_the_sheet": 1,
+          "note_on_that_one_occurrence": "only in the BACKUP footnote 'Save your streaks & solved deals to a file', far below the cards"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "WF-5's stated bar is 'streak vs total vs best is not confusing'. Cheapest correct fix: label the headline (e.g. a 'streak' caption under it, or an accessibility/visible label), and define 'Flawless' somewhere. The card title doubles as the streak's name ('Play'), which also collides with the gold Play button below it."
+    },
+    {
+      "id": "ux/WF-5:unattempted-objective-shows-red",
+      "claim": "On a never-played day every objective row shows a RED empty circle (Theme.red), identical to the marker shown for an objective that was attempted and missed. On a fresh install the Daily card therefore reads as 'you already failed all three of today's objectives' before the user has made a single move.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-5-1/tc51-objective-circles-fresh.png",
+          ".qa-loop/evidence/round-1/wf-5-1/tc51-objective-circles-after-attempt.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily (270,169) -> all three tier rows show a red empty circle, nothing has been played",
+          "complete today's daily earning Bronze+Silver but not Gold",
+          "tap Daily again -> Gold's marker is the SAME red empty circle as in step 2"
+        ],
+        "measurements": {
+          "unattempted_marker": "circle, Theme.red",
+          "attempted_and_missed_marker": "circle, Theme.red (identical)",
+          "earned_marker": "checkmark.circle.fill, green"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "DailyView.tierRow: `let color: Color = done ? .green : (future ? .secondary : Theme.red)`. A future day already gets neutral .secondary; a never-attempted past/today row should too (red only when a recorded attempt exists and missed the tier)."
+    },
+    {
+      "id": "ux/WF-5:board-hud-omits-challenge-day",
+      "claim": "When a catch-up day is played from the calendar, nothing on the board says WHICH day is in progress, and re-opening Daily resets the card to Today. Playing Aug 12 (deal #10,001) and then tapping Daily shows the Today card for deal #10,011 with its Bronze/Silver green checks, so the user is looking at the earned state of a different challenge than the one on their board.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-5.4",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-5-1/hud-no-day-board-aug12.png",
+          ".qa-loop/evidence/round-1/wf-5-1/hud-no-day-sheet-shows-today.png"
+        ],
+        "repro": [
+          "win today's daily once so Today shows Bronze/Silver checks",
+          "tap Daily, scroll to the calendar, tap 12, tap Play",
+          "board is deal #10011 with Aug 12's objectives in the HUD, but no date anywhere",
+          "tap Daily again -> the card is titled 'Today', Deal #10,011, Bronze checked, Silver checked"
+        ],
+        "measurements": {
+          "day_identifiers_on_board": 0,
+          "sheet_day_on_reopen": "Today (todayIndex), not the in-progress challengeDay"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Smallest correct fix is a day label on the DailyHUD (e.g. a leading 'Aug 12' when challengeDay != todayIndex). Making the sheet's `dayView` default to the in-progress challengeDay is a behaviour change - if the implementer prefers that route it should be proposal-routed, not done unattended."
+    },
+    {
+      "id": "ux/WF-6:done-hands-back-casual-board",
+      "claim": "The completed-demo banner says \"That's a winning line \u2014 tap Done to try it yourself\", but Done (and Stop) re-deal the day's seed as a CASUAL board with no objectives HUD and no challenge binding, so the novice who accepts that invitation plays the whole daily deal for zero daily credit \u2014 no Bronze/Silver/Gold tier, no streak \u2014 with nothing on screen to warn them. Daily -> Play on the identical deal shows the 3-line objectives HUD; demo -> Done shows none.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.4",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-6-1/tc64-completion-banner.png",
+          ".qa-loop/evidence/round-1/wf-6-1/tc64-after-done-casual-board.png",
+          ".qa-loop/evidence/round-1/wf-6-1/wf6-daily-play-board-has-hud.png",
+          ".qa-loop/evidence/round-1/wf-6-1/tc63-after-stop-fresh-board.png"
+        ],
+        "repro": [
+          "fresh install, cold launch (2026-08-22 -> dayIndex 10 -> deal #10,011)",
+          "tap Daily (280,176)",
+          "tap the demo pill 'Clear' (114,565)",
+          "tap Start (297,263); wait ~25 s for the line to reach 98/98",
+          "read the banner: 'That's a winning line - tap Done to try it yourself.'",
+          "tap Done (356,265)",
+          "observe: fresh deal #10011, Moves 0, Time 0:00, and NO objectives HUD",
+          "for contrast: tap Daily (280,176) then Play (201,490) - same deal, HUD present"
+        ],
+        "measurements": {
+          "demo_exit_board_has_objectives_hud": false,
+          "daily_play_board_has_objectives_hud": true,
+          "deal_both_cases": 10011
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "metric-integrity",
+      "note": "TRAP: the obvious fix - have Stop/Done re-arm challengeDay for the day just demoed - changes what can be scored, and must not let the demo's own moves/telemetry survive into the scored attempt (Game.showSolution already clears telem via deal(); Game.restartDeal restores challengeDay only if it was set). The cheap alternative is wording-only: stop promising 'try it yourself' and say the board is practice / point at Daily -> Play. Scoring consequence verified by inspection (Game.swift recordChallengeResult guards on challengeDay, which showSolution clears), not by playing a full deal to a win."
+    },
+    {
+      "id": "ux/WF-6:demo-pill-discards-casual-game",
+      "claim": "With a free-play game in progress, tapping a \"Show me how to win\" pill instantly replaces the board with the demo (on a different deal) and destroys that game with no confirmation and no recovery - Undo is disabled afterwards and the Deal # has changed - even though the app deliberately puts an \"End your daily attempt?\" confirm in front of exactly the same loss when the in-progress game is a daily attempt.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-6",
+      "test_case": "TC-6.7",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-6-2/tc67-casual-in-progress.png",
+          ".qa-loop/evidence/round-1/wf-6-2/tc67-casual-destroyed-no-warning.png"
+        ],
+        "repro": [
+          "fresh install (uninstall+install), cold launch - casual random deal (#784301 this run)",
+          "tap three bottom tableau cards, e.g. (28,650) (273,620) (370,620) - header reads Moves 3, Time 0:22, Undo ENABLED",
+          "tap Daily (287,174)",
+          "tap the 'Clear' pill under 'Show me how to win:' (126,566)",
+          "NO alert appears: the sheet dismisses straight to the demo bar 'Winning line - 0 / 98' on Deal #10011. The 3-move game on #784301 is gone, Undo is disabled, and Stop/Done re-deal #10011 - there is no path back to the discarded game"
+        ],
+        "measurements": {
+          "moves_lost": 3,
+          "elapsed_lost_s": 22,
+          "deal_before": 784301,
+          "deal_after": 10011,
+          "confirm_shown": false,
+          "confirm_shown_for_daily_attempt": true
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the existing alert copy is daily-specific ('your current attempt ... you can replay the challenge afterwards') and must not be reused verbatim for a casual game; and the guard must stay off when moveCount == 0, or the normal 'open a demo from a fresh board' path (TC-6.1) grows a pointless prompt.",
+      "fix_risk": "behavior-change"
+    },
+    {
+      "id": "ux/WF-5:daily-play-restarts-attempt-without-warning",
+      "claim": "On the Daily sheet the primary Play button silently RESTARTS a daily challenge that is already in progress - Moves 1 -> 0, Time 0:00, board re-dealt, Undo disabled - with no confirmation and no way back, while the demo pills one row below it confirm that exact same loss. Found while validating the TC-6.7 confirm gate: the gate is the only guarded path into the loss it guards.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-5",
+      "test_case": "TC-6.7",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-6-2/wf5-play-before-moves1.png",
+          ".qa-loop/evidence/round-1/wf-6-2/wf5-play-after-restart.png"
+        ],
+        "repro": [
+          "fresh install, cold launch",
+          "tap Daily (276,175), tap Play (201,490)",
+          "tap a bottom tableau card (126,728) - header reads Moves 1, Time 0:09, Undo enabled",
+          "tap Daily (271,175) - the button still reads 'Play', not 'Resume'",
+          "tap Play (201,490)",
+          "the attempt is silently discarded: Moves 0, Time 0:00, tableau re-dealt, Undo disabled"
+        ],
+        "measurements": {
+          "moves_before": 1,
+          "moves_after": 0,
+          "elapsed_before_s": 9,
+          "elapsed_after_s": 0,
+          "confirm_shown": false
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Cheapest consistent fix is to route this button through the same confirm the demo pills use (and/or label it 'Resume' when a live attempt exists on that day). TRAP: 'Play' MUST still restart when the user confirms - the alert's own promise 'you can replay the challenge afterwards' depends on it - so do not turn it into a pure resume.",
+      "fix_risk": "behavior-change"
+    },
+    {
+      "id": "bug/WF-7:deal-entry-range-not-enforced",
+      "claim": "The Deal # alert's field advertises the range \"1\u20131,000,000\" but does not enforce it: typing 9999999 plays and displays Deal #9999999 (a real deal outside the advertised range), and typing 5000000000 silently loads Deal #4294967295 \u2014 a different deal from the one typed, with no message. Only the lower bound is enforced (0 correctly becomes 1).",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-7",
+      "test_case": "TC-7.4",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-7-1/tc74-typed-9999999.png",
+          ".qa-loop/evidence/round-1/wf-7-1/tc74-loaded-deal-9999999.png",
+          ".qa-loop/evidence/round-1/wf-7-1/tc74-typed-5000000000.png",
+          ".qa-loop/evidence/round-1/wf-7-1/tc74-clamped-to-4294967295.png",
+          ".qa-loop/evidence/round-1/wf-7-1/tc74-zero-clamps-to-1.png"
+        ],
+        "repro": [
+          "uninstall + install Causeway.app, cold launch",
+          "tap the Deal # pill (196,175)",
+          "long-press backspace (331,772) ~3 s to clear the prefilled seed",
+          "tap 9 (331,720) seven times -> field reads 9999999",
+          "tap Play (274,389)",
+          "observe the toolbar pill reads 'Deal #9999999' and the dealt board matches tests/engine.mjs deal(9999999) exactly (top row 10S QC 5H 7S 9D 7H 2C 5D)",
+          "repeat with 5000000000 -> pill reads 'Deal #4294967295', toolbar reflows to three rows",
+          "repeat with 0 -> pill reads 'Deal #1' (lower bound IS enforced)"
+        ],
+        "measurements": {
+          "advertised_range": "1-1,000,000",
+          "typed_9999999_loaded": 9999999,
+          "typed_5000000000_loaded": 4294967295,
+          "typed_0_loaded": 1,
+          "testcase_expected_9999999_loaded": 1000000
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "behavior-change",
+      "note": "TRAP: do NOT fix this by restoring a clamp inside Game.deal(seed:). Game.swift:47-51 deliberately widened that clamp to maxValidSeed = 4,294,967,295 because the daily/sandbox challenge pools use seeds > 10,000,000, and clamping there would deal boards that differ from the web build. The guard belongs in ContentView.swift:241 (the alert's Play action, currently a bare `if let n = Int(dealText) { game.deal(seed: n) }`) and in WinsView.playEntered, whose own comment 'Game.deal clamps to 1...maxSeed' is now false. SECOND-ORDER (inferred from source, not reproduced live): StatsBackup import filters wins with `(1...Game.maxSeed).contains($0.key)` (DailyView.swift:282) while export writes every win unfiltered, so a win banked on a deal > 1,000,000 \u2014 which this alert lets you play \u2014 is silently discarded on restore and counted only in the 'Skipped N invalid entries' line. Whichever bound is chosen, decide what happens to already-persisted wins above it. TESTCASES.md TC-7.4 records the OLD behaviour ('9999999 -> Deal #1000000, verified on build 5447237'); that expectation is stale on f949d82 and should be rewritten with the fix."
+    },
+    {
+      "id": "ux/WF-7:deal-entry-tap-cost",
+      "claim": "WORKFLOWS.md budgets <=3 taps to open, type and play a specific deal; the real cost is 13 (1 open + 6 backspaces to erase the prefilled current seed + 5 digits + 1 Play), because the alert prefills the current seed with the caret at the end and never selects it, so the first digit typed appends to the old seed instead of replacing it.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-7",
+      "test_case": "TC-7.1",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-7-1/tc71-prefilled-cursor-at-end.png",
+          ".qa-loop/evidence/round-1/wf-7-1/tc71-deal-10003-loaded.png"
+        ],
+        "repro": [
+          "uninstall + install Causeway.app, cold launch (landed on random Deal #139505)",
+          "tap the Deal # pill (196,175) -> alert opens, pad already up, field prefilled '139505', caret at end, nothing selected",
+          "tap backspace (331,772) x6 to empty the field",
+          "tap 1,0,0,0,3 -> field reads 10003",
+          "tap Play (274,389) -> Deal #10003, Moves 0"
+        ],
+        "measurements": {
+          "taps": 13,
+          "expected_taps": 3,
+          "chrome_taps": 2,
+          "backspaces_wasted": 6
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Routed proposal on purpose: round-0 exploration already ruled this 'within the bar' by redefining the budget as chrome taps only (TESTCASES.md TC-7.1), which contradicts WORKFLOWS.md's WF-7 line. A human should settle which bar applies before anyone edits code. Two cheap options if it is accepted: select the prefilled seed when the alert opens (standard iOS field behaviour, first digit replaces), or open the field empty since the placeholder '1-1,000,000' already states the range. TRADE-OFF: select-all makes 'nudge the current seed by one' harder, which is why this is a taste call rather than an obvious defect."
+    },
+    {
+      "id": "ux/WF-7:clock-runs-during-deal-alert",
+      "claim": "The elapsed-time clock keeps ticking while the modal Deal # alert is up, so time spent in a dialog where no card can be touched is banked into the deal's recorded time; opening the alert and cancelling took Moves 1 / Time 0:07 to Moves 1 / Time 1:01.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-7",
+      "test_case": "TC-7.5",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-7-1/tc75-cancel-state-intact-time-1m01.png"
+        ],
+        "repro": [
+          "play Deal #10003, tap col2's bottom card (126,650) to make one real move -> Moves 1, Time 0:07",
+          "tap the Deal # pill (196,175) to open the alert and leave it open",
+          "tap Cancel (129,389) -> Moves still 1, Deal #10003 intact, board pixel-identical, Time now 1:01"
+        ],
+        "measurements": {
+          "time_before_alert_s": 7,
+          "time_after_cancel_s": 61,
+          "moves_delta": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "fix_risk": "metric-integrity",
+      "note": "TRAP: the naive fix (stop GameClock whenever a modal is presented) turns the Deal alert \u2014 and every sheet: Daily, Wins, How to play \u2014 into a free pause button, which corrupts WinStore best-times and daily best-times. GameClock has no pause concept today and there is no scenePhase pause either (ContentView.swift:208 only persists), so this is a policy decision, not a bug: either accept wall-clock timing everywhere or design a single, non-exploitable pause rule. Elapsed here is inflated by harness latency, but the mechanism \u2014 clock advancing with a modal up and no play possible \u2014 is what the finding is about, not the exact 54 s. Other lanes may observe the same behaviour behind their own sheets; this is one issue, not several."
+    },
+    {
+      "id": "ux/WF-8:autofinish-off-to-ask-forces-destructive-on",
+      "claim": "The Auto-finish pill is a forward-only 3-state cycle (Ask -> Off -> On -> Ask), so a user sitting in `Off` on a finishable board cannot get back to `Ask` without passing through `On` \u2014 and merely landing on `On` instantly auto-finishes the game. One tap intended as a settings change banked a permanent win (Moves 70 -> 93, Won 0 -> 1, Deal pill gained a check), with no confirmation, no long-press menu offering the states directly, no reverse cycle, and no mention of Auto-finish anywhere in `How to play`. Undo rewinds the board (Moves 92, Finish pill returns) but Won stays 1 and the deal stays marked solved, so the accidental win cannot be retracted.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-8",
+      "test_case": "TC-8.4",
+      "build_sha": "f949d82",
+      "fix_risk": "metric-integrity",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-8-1/tc84-not-yet-finish-pill.png",
+          ".qa-loop/evidence/round-1/wf-8-1/tc84-off-nothing-happens.png",
+          ".qa-loop/evidence/round-1/wf-8-1/tc84-on-cascades-win.png",
+          ".qa-loop/evidence/round-1/wf-8-1/tc84-longpress-no-menu-cycles-on-to-ask.png",
+          ".qa-loop/evidence/round-1/wf-8-1/tc84-undo-does-not-retract-win.png"
+        ],
+        "repro": [
+          "Reach a finishable board with Auto-finish: Ask. Deterministic fixture: inject .qa-loop/evidence/round-1/wf-8-1/save69-deal10011-move69.json into UserDefaults key causeway.game with .qa-loop/evidence/round-1/wf-8-1/inj.sh save69-deal10011-move69.json ask autoplayFalse (deal #10011 at move 69), then swipe (224,590) -> (370,495) to play the 70th move (col4 idx5 -> col7).",
+          "The 'Ready to finish' alert appears by itself; tap 'Not yet' (127,497). Finish pill appears, Moves 70, Won 0.",
+          "Tap 'Auto-finish: Ask' (68,175) once -> label becomes 'Auto-finish: Off'; board correctly untouched (Moves 70, Won 0, Finish pill still offered).",
+          "Now try to return to 'Ask' \u2014 the only available gesture is another tap on the same pill (long-press opens no menu, it just advances the cycle). Tap (62,175).",
+          "The label becomes 'On' AND the board immediately cascades: win overlay 'You solved it! Deal #10,011 - 93 moves - 4:23', Moves 93, Won 1, Deal pill gains a check.",
+          "Tap Close (313,488) then Undo (142,135): Moves drops to 92 and the Finish pill returns, but Won is still 1 and the Deal pill still shows the check \u2014 the win is permanent."
+        ],
+        "measurements": {
+          "taps_needed_off_to_ask": 2,
+          "destructive_states_transited": 1,
+          "moves_before_settings_tap": 70,
+          "moves_after_settings_tap": 93,
+          "won_before": 0,
+          "won_after": 1,
+          "won_after_undo": 1,
+          "help_sheet_mentions_autofinish": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the naive fixes are both costly. Making `On` apply only to future boards, or adding a confirmation, breaks the deliberate 'Off -> On is the finish shortcut' documented on AutoFinishMode.next; making the pill reversible/long-pressable changes when wins and best-times are written to WinStore. Distinct from ux/WF-4:undo-after-win-reopens-solved-deal (that is about re-winning; this is about a settings control banking a win the user never asked for). TC-8.3's Ask->Off ordering guard still holds \u2014 the 2026-08-16 fix protected only that one direction."
+    },
+    {
+      "id": "bug/WinsView:row-text-contrast",
+      "claim": "In the Wins range detail list every row is a Button, so SwiftUI tints the whole label with the gold accent: the per-deal stats (\"122 moves \u00b7 4:14 \u00b7 Aug 22\"), coded as .foregroundStyle(.secondary), render as RGB(236,214,170) on white = 1.42:1 contrast (deal title 2.09:1), i.e. the only content the screen exists to show is effectively unreadable.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-9",
+      "test_case": "TC-9.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-range-drilldown.png",
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-row-contrast-closeup.png"
+        ],
+        "repro": [
+          "fresh install",
+          "win >=1 deal",
+          "tap Wins pill",
+          "tap a range chip (e.g. 100\u2013102)",
+          "read the right-hand stats column of any row"
+        ],
+        "measurements": {
+          "meta_text_rgb": "236,214,170",
+          "meta_contrast_vs_white": 1.42,
+          "deal_title_rgb": "217,173,85",
+          "deal_title_contrast_vs_white": 2.09,
+          "wcag_aa_min": 4.5
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "WinsView.rangeDetail wraps the HStack in a Button inside a List; the accent tint overrides .secondary. Likely one-line fix (.buttonStyle(.plain) or explicit foregroundStyle). Colours sampled from the native 1206x2622 PNG; ratios are WCAG relative luminance.",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "ux/WF-9:row-tap-discards-game",
+      "claim": "Tapping a deal row in Wins (or Play in the deal field) immediately deals that seed over the game in progress \u2014 no confirmation, no undo, and returning to the abandoned deal starts it from scratch: a mid-game player who browses their wins and taps a row loses the whole attempt.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-9",
+      "test_case": "TC-9.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-before-switch-moves1.png",
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-row-tap-discards-progress.png",
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-after-return-moves0.png"
+        ],
+        "repro": [
+          "load deal #561325499",
+          "tap a tableau card to make 1 move (header shows Moves 1)",
+          "tap Wins",
+          "tap chip 777",
+          "tap row Deal #777",
+          "board is now #777, Moves 0, Undo greyed out",
+          "tap Wins",
+          "tap chip 561325499",
+          "tap row Deal #561,325,499",
+          "board is #561325499 at Moves 0 \u2014 the earlier attempt is gone"
+        ],
+        "measurements": {
+          "moves_before_switch": 1,
+          "moves_after_returning": 0,
+          "confirmations_shown": 0
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "fix_risk": "behavior-change",
+      "note": "TRAP: the obvious fix (confirm dialog before deal-switch) also has to decide whether New game / Deal # / Daily get the same gate, and an always-on prompt would add a tap to the intended browse-and-replay flow. Human call: warn only when moveCount > 0, or none at all.",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "bug/WinsView:deal-entry-range-not-enforced",
+      "claim": "The Wins \"Play a deal\" field advertises \"Number 1\u20131,000,000\" (and WinsView's own comment claims Game.deal clamps to maxSeed) but typing 2000000 and tapping Play loads Deal #2000000 \u2014 Game.deal clamps to maxValidSeed 4,294,967,295, so the promised range is not enforced anywhere.",
+      "type": "bug",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-9",
+      "test_case": "TC-9.3",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-9-1/tc93-deal-2000000-not-clamped.png"
+        ],
+        "repro": [
+          "tap Wins",
+          "tap the deal field",
+          "type 2000000",
+          "tap Play",
+          "board pill reads Deal #2000000"
+        ],
+        "measurements": {
+          "typed": 2000000,
+          "advertised_max": 1000000,
+          "loaded_deal": 2000000,
+          "actual_clamp": 4294967295
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "fix_risk": "behavior-change",
+      "note": "TRAP: do NOT fix by clamping to 1,000,000. Daily/sandbox seeds legitimately exceed it (verified: a win on seed 561325499 appears in this very list and its row loads fine), so clamping would make won daily deals unreplayable. Reword the placeholder / stale comment instead.",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "ux/WinsView:seed-format-inconsistent",
+      "claim": "The same deal number is formatted two ways on one screen: the range chip and navigation title render \"561325499\" (String interpolation) while the row underneath renders \"Deal #561,325,499\" (LocalizedStringKey grouping), which reads as two different deals.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-9",
+      "test_case": "TC-9.2",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-9-1/tc92-seed-format-inconsistent.png"
+        ],
+        "repro": [
+          "tap Wins with a win recorded on a seed > 9999",
+          "tap that seed's chip",
+          "compare the title with the row label"
+        ],
+        "measurements": {
+          "title": "561325499",
+          "row": "Deal #561,325,499"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "DealFormat.rangeLabel vs Text(\"Deal #\\(seed)\"). The board pill is ungrouped too, so grouping in the row is the odd one out.",
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "ux/WF-2:no-drop-target-highlight",
+      "claim": "Nothing on the board indicates where a dragged card will land: no column, free cell or foundation is highlighted at any point during a drag, and a refused release is silently identical to a release over dead space (card returns to origin, Moves unchanged). Now that the round-1 gutter fix resolves a gutter release to the nearer column centre, an invisible 1 pt boundary decides the outcome - releasing J\u2666 at x=53 snaps back (resolved to col0, illegal) while x=54 lands on col1 - and a novice has no way to see which column is armed.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-2",
+      "test_case": "TC-2.3",
+      "build_sha": "369c365",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-middrag-no-target-highlight.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x53-jd-refused-snapback.png",
+          ".qa-loop/evidence/round-2/wf-2-1/wf2-gutter-x54-lands-col1.png"
+        ],
+        "repro": [
+          "fresh install + launch, Deal # -> 10011 -> Play; tap (321,620) [A\u2666 to foundation, Moves 1]",
+          "touch_path [(28,650),(50,670),(77,700),(77,700) dt_ms 4000] - Q\u2665 held for 4 s directly over col1, a LEGAL target: filmed at ~4 fps, no frame shows any highlight/outline/tint on col1 or on any other zone; only the lifted card moves",
+          "contrast: on deal 10004 drag (321,590)->(53,690) [J\u2666 snaps back] vs ->(54,690) [J\u2666 lands on col1]. Both look identical up to the release."
+        ],
+        "measurements": {
+          "held_drag_duration_s": 4,
+          "frames_filmed_during_hold": 28,
+          "frames_showing_a_target_highlight": 0,
+          "resolution_boundary_pt": "between x=53 and x=54",
+          "boundary_width_pt": 1
+        }
+      },
+      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Not introduced by the gutter fix - the highlight was already absent in round 1 - but the fix makes it matter more, because which of two neighbouring columns receives a gutter release is now decided by an invisible midpoint. The app already invests in touch feedback elsewhere (the 0.3 s wiggle for an unliftable card, ux/WF-2:unmovable-card-no-feedback), so a silent snap-back is inconsistent with its own feedback vocabulary. Cheap fix: tint/outline the zone that dropTarget(at:) currently resolves to while the drag is live."
+    }
+  ],
+  "round_shas": {
+    "1": "f949d82",
+    "2": "369c365"
+  },
+  "usage": {
+    "1": {
+      "ux-tester": 1929240
+    }
+  }
+}

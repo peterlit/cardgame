@@ -1,0 +1,9 @@
+{
+  "results": [
+    { "tc": "TC-13.1", "persona": "novice", "status": "passed", "reason": "Aug 8 card: 'Aug 8' + Deal #186,441,603, Silver 'Win in 96 moves or fewer', Gold 'Move a run of 5 or more cards in a single move', two pills (Clear + Gold), no truncation, no leftover Today text." },
+    { "tc": "TC-13.2", "persona": "novice", "status": "passed", "reason": "Aug 7 (#942,660,922, no-supermoves / no-up-foundation, 3 pills) then Aug 6 (#699,587,523, down-heavy wraps 2 lines / no-down-foundation, 3 pills); full swap, no stale text." },
+    { "tc": "TC-13.3", "persona": "power", "status": "passed", "reason": "2 taps (day 8 + Play): Deal #186441603, stacked HUD reads the same three Aug 8 strings, Moves 0, Time 0:00." },
+    { "tc": "TC-13.4", "persona": "power", "status": "failed", "reason": "Gold check fires immediately on the 6-card run move (good) but a single Undo un-earns it: chip reverts to '.' — bug/WF-13:one-big-move-check-lost-on-undo." },
+    { "tc": "TC-13.5", "persona": "power", "status": "passed", "reason": "Against the CORRECTED (evaluative, not gating) bar: the 2-card supermove and the Ace-to-up-foundation were both allowed, and both flipped their chip to a red x immediately and legibly. CC-4 dismissed as a gating claim. The 'tier withheld at win time' half was NOT verified (winning the deal was out of budget). Filed a separate finding for the silent attempt discard seen on this path." }
+  ]
+}

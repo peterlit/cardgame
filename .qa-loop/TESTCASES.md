@@ -644,117 +644,362 @@ branch (`geo.size.width > geo.size.height`) and any harness screenshot.
 
 ---
 
-## WF-13 — Sandbox days & the new objective families (Both)
+## WF-13 — Past days & the objective-family inventory (Both)
 
-*Fixture: use the pinned pre-epoch sandbox days from WORKFLOWS.md's Fixture policy table
-(Aug 5-11 2026, dayIndex -7…-1). All seeds/pars/labels below were confirmed live against
-build f949d82 (deals may re-derive if the pool changes; the table is authoritative).
-Calendar geometry (Daily sheet, unscrolled, no prior HUD): row "2 3 4 5 6 7 8" sits at
-device y≈720; column x ≈ 42 + 52.8·(weekday index 0=S…6=S), so Aug 5(W)=200, Aug 6(Th)=253,
-Aug 7(F)=306, Aug 8(Sa)=362. The selected day's `Play` button is at ≈(200,495).*
+*(The six cases here were DELETED 2026-08-30: they tested the pre-epoch sandbox days
+(Aug 5-11 2026, dayIndex -7…-1) and the objective families `split-even`, `down-heavy`,
+`no-down-foundation`, `no-up-foundation`, `no-supermoves`, `one-big-move` — none of which
+exist any more. The pool was rebuilt to schema v4 in f42c632; `dailyChallenge(-1, pool)`
+now returns null. Round-0 exploration re-writes this section against playable PAST days
+(dayIndex 0-28) and the thirteen current families.)*
 
-**TC-13.1 [novice] [smoke] (Novice) — Discover a sandbox day and read its own objectives.**
-1. Cold launch (fresh install). Tap `Daily`.
-2. Scroll to the August calendar. Tap `8` (a Saturday inside the shaded/enabled range,
-   left of today's outlined `22`).
-- **Expected:** the card retitles from "Today" to **"Aug 8"**; `Deal #186,441,603`;
-  Bronze "Clear the deal", Silver **"Win in 96 moves or fewer"**, Gold **"Move a run of
-  5 or more cards in a single move"** — all three legible, no truncation, no "Today"
-  text left over anywhere on the card. "Show me how to win:" shows exactly two pills,
-  `🥉 Clear` and `🥇 Gold` (no `Silver` pill — Aug 8's silver line is identical to
-  bronze's, so the house rule "a Silver pill only if there's a distinct silver line"
-  correctly suppresses it).
-- **Novice bar:** a first-time player must be able to tell, from the card alone, that
-  Gold here means "relocate a big stack in one move" — not "clear it fast" — without
-  opening How to play.
+*(Round-0 exploration, 2026-08-30, build f0680ef. All coordinates below are DEVICE POINTS
+on an iPhone 17 Pro portrait (402x874) and were measured live this round — the old geometry
+note in this file was for a different month layout and a different "today".)*
 
-**TC-13.2 [novice] (Novice) — A sandbox day is never confused with Today, and a
-day with THREE distinct tiers shows three demo pills.**
-1. From Daily (Today card showing), tap `7` (Friday) in the calendar.
-2. Tap `6` (Thursday) in the calendar.
-- **Expected step 1 (Aug 7):** `Deal #942,660,922`; Silver **"Move one card at a time —
-  never move a run"**; Gold **"Win without ever using an up foundation — every suit K
-  down to A"**; three demo pills `Clear`/`Silver`/`Gold` (Aug 7 has a distinct silver
-  line, unlike Aug 8).
-- **Expected step 2 (Aug 6):** the card swaps fully to `Deal #699,587,523`; Silver
-  **"Take at least 8 of every suit from the King end"** (wraps 2 lines); Gold **"Win
-  without ever using a down foundation"**; three demo pills again. No stale Aug 7 text
-  is left visible anywhere (medal circles, labels, or Deal #) after the swap.
-- **Fail condition:** any leftover "Today"/`Deal #10,011` text, or Aug 7's labels
-  bleeding into the Aug 6 card.
+**Fixture / geometry for every case below (measured, reproducible):**
+- `python3 .qa-loop/tools/derive_daily.py <YYYY-MM-DD|dayIndex>` prints the expected card
+  (deal, par, Silver/Gold label + family id, the exact pill set, and the calendar cell
+  coordinate). **The tool was rewritten this round** — the old one crashed with
+  `KeyError: 'seeds'` on pool v4. It shells out to `tests/daily.mjs`, so its labels are the
+  shipped strings; never hand-type an expectation.
+- Toolbar (3 rows on a fresh install): `Daily` = **(290, 176)**, `Undo` = (142, 135),
+  `New game` = (51, 135). These do NOT move when the daily HUD appears.
+- Daily sheet: opens scrolled to the TOP and the month calendar is **entirely below the
+  fold**. **One** swipe `(200,700) → (200,300)` pins it at the bottom of its scroll; from
+  there the layout is identical for every day (verified across Today, Aug 1, 3, 4, 5, 6).
+- **Calendar cell (bottom-scrolled), August 2026:** `x = 40 + 53.5·((D+5) mod 7)`,
+  `y = 471 + 44·((D+5) div 7)`. So Aug 1 (361,471); Aug 2 (40,515), Aug 3 (94,515),
+  Aug 4 (147,515), Aug 5 (201,515), Aug 6 (254,515), Aug 7 (307,515), Aug 8 (361,515);
+  Aug 29 (361,647); Aug 30 = today (40,691); Aug 31 = future (94,691).
+- **Day card (bottom-scrolled): `Play` = (200, 243)** for every day. Scroll back up with
+  `(200,300) → (200,640)` to read the card header (date + `Deal #`), which is hidden behind
+  the nav bar at the bottom scroll position.
+- **Board with the 3-line stacked daily HUD: every board y is +88 pt** vs the no-HUD
+  baseline in HARNESS_NOTES (measured, not the ~40/80 quoted there). Free cells
+  (275,384)/(324,384)/(373,384); foundations up-row y=384, down-row y=462;
+  tableau bottom-card tap y = `425 + 30·idx + 88 + 45`, x = 28/77/126/175/224/273/321/370.
 
-**TC-13.3 [power] (Power) — Play hands off to a board whose live HUD tracks THAT
-day's objectives, not Today's.**
-1. Daily → calendar → tap `8` → `Play`.
-- **Expected:** one tap from the day card; sheet dismisses; `Deal #186441603` pill;
-  the objectives HUD (stacked box under the toolbar, since portrait can't one-line
-  three items) reads exactly `Clear the deal` / `Win in 96 moves or fewer` / `Move a
-  run of 5 or more cards in a single move` — the SAME three strings as the day card,
-  not Today's `no-undo`/`suits-top-down` pair. Moves 0, Time 0:00.
-- **Effort bar:** <= 2 taps total from the Daily sheet root (calendar tap + Play).
+**TC-13.1 [novice] [smoke] (Novice) — Find a past day in the calendar and read ITS OWN objectives.**
+1. Cold launch (fresh install). Tap `Daily` (290,176).
+2. Swipe `(200,700) → (200,300)` to bring the month calendar on-screen.
+3. Tap **Aug 3** at (94,515).
+4. Swipe `(200,300) → (200,640)` to scroll the card header back into view.
+- **Expected (all strings exact; cross-check `derive_daily.py 2026-08-03`):** the card
+  header reads **`Aug 3`** (not "Today") with **`Deal #539,885`** on the right; Bronze
+  "Clear the deal"; Silver **"Never move more than 3 cards in a single move"**; Gold
+  **"Finish one whole suit before any other suit is started"**; the ⏰ line reads
+  **"Same-day is earned on the day itself"**; a gold **`Play`** button; "Show me how to
+  win:" with a 2x2 grid of **🥉 Clear / 🥈 Silver / 🥇 Gold / 🌟 Flawless**.
+  **Today's objectives must appear nowhere** — a card still showing "Get all four Kings
+  home within your first 9 moves" / "Split every suit exactly at the Eight" or
+  `Deal #551,879` is the headline bug this workflow exists to catch.
+  The Aug 3 calendar cell is tinted gold-ish (selected); Aug 30 keeps its gold ring (today).
+- **Effort bar (novice):** the only affordance for a past day is the calendar itself, and
+  it is below the fold. Record whether the tester finds it without being told, and how many
+  scroll/tap attempts it took.
 
-**TC-13.4 [power] (Power) — `one-big-move` shows its green check the instant a
-5+ card run is relocated, and the check tracks Undo.**
-1. Daily → calendar → `8` → `Play` (deal #186,441,603, gold = one-big-move).
-2. Build a tableau run of 5+ cards (any legal sequence of taps/drags that produces
-   an alternating-colour, rank-consecutive run of 5 or more cards at a column's tail)
-   and relocate that whole run in ONE move (tap the run's head card, or drag it, onto
-   a compatible destination or an empty column).
-3. Immediately re-open the HUD/read the Gold chip. Then tap `Undo`.
-- **Expected:** the instant the 5+ card run lands, the Gold chip flips to green `✓`
-  (`objSecured`: `maxRunMoved >= 5`) — no need to finish or win the deal first. After
-  `Undo` (step 3), the chip correctly reverts to `·`: `Game.undo()` restores
-  `telem.maxRunMoved` from the snapshot, and the authoritative grade at win time reads
-  that same field, so a reverted chip is the HUD telling the truth about what the
-  final line will contain. **Corrected round 1 (2026-08-22):** an earlier version of
-  this case asserted the check "survives Undo" on the strength of a
-  "positive and irreversible" code comment. The comment was wrong and has been fixed
-  on both platforms; `maxRunMoved` is shared with the opposite-polarity
-  `no-supermoves` objective, so a one-way counter would permanently fail Silver on an
-  undone 2-card slip, and would also award Gold for a move absent from the winning
-  line. Every other `objSecured` case un-secures on undo for the same reason.
-- **Fail condition:** the check appears only after winning, needs a second move to
-  show, or the chip and the tier actually awarded at win time disagree — any of these
-  is a HUD/telemetry bug. A green check that reverts on Undo is NOT a bug.
-- **Note:** an empty-column move also counts toward `maxRunMoved` (`Game.swift:579`);
-  either move path is acceptable evidence.
+**TC-13.2 [novice] (Novice) — A future day is inert, and today is distinguishable.**
+1. Cold launch → `Daily` (290,176) → swipe `(200,700) → (200,300)`.
+2. Tap **Aug 3** (94,515)  — the card now shows Aug 3 (see TC-13.1).
+3. Tap **Aug 31** (94,691) — a future day (dayIndex 30 > today's 29).
+- **Expected:** the tap is a no-op — the day card **still shows Aug 3 / Deal #539,885**,
+  the Aug 3 cell stays selected and Aug 31 stays dim-grey with no selection tint.
+  Aug 30 (today) is the only cell with a gold *ring*.
+- **Watch for (novice reading):** the app gives NO feedback at all for the future-day tap —
+  no toast, no "Unlocks Aug 31" text (that `playButton` branch only renders when
+  `dayView > todayIndex`, which the calendar can never set). Judge whether a first-timer
+  can tell "not yet" from "broken". See candidate concern CC-13-B.
+- **Also check:** every cell Aug 1…Aug 30 IS selectable (spot-check Aug 1 at (361,471) →
+  header `Aug 1`, `Deal #691,039`, Silver "Get all four Queens home within your first
+  29 moves", Gold "Split every suit exactly at the Three — A-3 up, 4-K down").
 
-**TC-13.5 [power] (Power) — Do the constraint objectives (`no-supermoves`,
-`no-up-foundation`) actually refuse the disallowed move, or only mark it failed
-after the fact?**
-1. Daily → calendar → `7` → `Play` (deal #942,660,922; silver = no-supermoves, gold =
-   no-up-foundation).
-2. Build (or find) a legal 2+ card run at a column's tail (e.g. tap a card to smart-
-   move it onto an adjacent-rank, opposite-colour bottom card, creating a run), then
-   tap the run's HEAD card so the smart-move relocates the whole run together.
-3. Separately (fresh board), expose an Ace (park a blocking card in a free cell if
-   needed) and tap it once it is the sole occupant of its column-tail.
-- **Expected per WORKFLOWS.md WF-13's stated bar** ("the constraint objectives
-  actually gate play... must refuse a run move... must refuse the disallowed end"):
-  the app should REFUSE the 2-card run move in step 2, and REFUSE sending the Ace to
-  the up foundation in step 3, or at minimum warn before doing either.
-- **What actually happens (confirmed live, build f949d82, evidence below):** BOTH
-  moves are silently ALLOWED — `Moves` increments, the run/Ace relocates normally —
-  and the ONLY feedback is the Silver/Gold HUD chip flipping to a red `✗` after the
-  fact. There is no confirmation, no refusal, no visual distinction from a completely
-  safe move at the moment of the tap. This is the WF-13 gating claim; see Candidate
-  concerns below — reproduce and mint a finding in TEST mode, do not just cite this
-  test case.
-- **Evidence:** `evidence/round-0-explore-l3/wf13-aug7-constraints-not-gated.png`
-  (both Silver and Gold already show red ✗ after a 2-card supermove onto col 0 and an
-  Ace sent to the spades up-foundation — 4 moves total from a fresh Aug 7 board).
+**TC-13.3 [power] [smoke] (Power) — Play a past day; the board HUD carries THAT day's objectives.**
+1. Cold launch. Tap `Daily` (290,176) → swipe `(200,700)→(200,300)` → tap **Aug 4**
+   (147,515) → tap `Play` (200,243).
+- **Expected:** the sheet dismisses; the `Deal #` pill reads **`Deal #625648`**;
+  Moves 0, Time 0:00. The daily HUD is the 3-line stacked box directly under the toolbar
+  and is **titled `Aug 4` in gold** (`hud.day`), then three bullets, **untruncated, no "…"**:
+  `🥉 · Clear the deal` / `🥈 · Never let one suit get more than 4 cards ahead of another` /
+  `🥇 · Win without ever using a free cell`. All three markers are the neutral `·`.
+- **Effort bar:** 3 taps + 1 swipe from the board. WF-13 gives no explicit budget; flag if
+  it exceeds this. Note the calendar is the ONLY route — there is no "yesterday" shortcut.
+- **Then, still mid-attempt, tap `Daily` (290,176) again.** Expected/observed this round:
+  the sheet **resets to the `Today` card** (Deal #551,879, today's objectives) with no mark
+  anywhere saying the live attempt is Aug 4, and the visible `Play` button would start
+  *today's* deal. Record what a power user has to do to get back to Aug 4 (swipe + tap day
+  + tap Play, and Play *restarts* — it never resumes). See CC-13-D.
 
-**TC-13.6 [novice] [power] (Both) — `split-even`'s label is legible and distinct
-from the ordinary "aces/kings first" gold family.**
-1. Daily → calendar → `5` (Wednesday) → read the card (do not need to Play).
-- **Expected:** `Deal #191,924,978`; Silver "Win in 127 moves or fewer"; Gold reads
-  **"Split every suit exactly down the middle — A-7 up, 8-K down"** (`Daily.swift`
-  label for `split-even`) — legible on first read, not confusable with `aces-first`/
-  `kings-first`/`suits-top-down` (the ordinary gold objectives seen on Today's card
-  and non-sandbox days). Demo pills present per whatever distinct lines
-  `daily-solutions.json` has for this seed (verify live; not confirmed in this pass).
+**TC-13.4 [power] [smoke] (Power) — A constraint violation is ALLOWED, shows instantly, and Undo rolls it back.**
+*(Aug 4's Gold is `cells-le` N=0 — "Win without ever using a free cell" — the cheapest
+one-move violation in the pool.)*
+1. Set up the Aug 4 board exactly as TC-13.3.
+2. Drag the bottom card of column 0 — `3♦` — from **(28,738)** to the first free cell
+   **(275,384)** (`touch_path`, ~6 points, 500-600 ms total; a plain tap smart-moves it
+   elsewhere and will not exercise the cell).
+- **Expected:** the move is **NOT refused** — no alert, no snap-back; `3♦` sits in the free
+  cell and Moves = 1. Within the same frame the HUD's **🥇 marker flips from `·` to a red
+  `✗`** while its label text is unchanged; 🥉 and 🥈 stay `·`.
+  A hard refusal, or a 🥇 chip that still looks earnable, is the bug.
+3. Tap `Undo` (142,135).
+- **Expected:** `3♦` returns to column 0 and the **🥇 chip returns to `·`** — the
+  free-cell counter is rolled back with the board. (This telemetry rollback is deliberate;
+  do NOT file it.) Evidence from exploration:
+  `evidence/round-0-explore-wf13/wf13-aug4-cell-violation-hud.png` and
+  `wf13-aug4-after-undo-hud.png`.
 
----
+**TC-13.5 [power] (Power) — `no-undo` is permanently failed by Undo while achievement chips roll back.**
+*(Aug 6 = dayIndex 5: Silver `no-undo`, Gold `before-ace` rank 10.)*
+1. Cold launch → `Daily` (290,176) → swipe `(200,700)→(200,300)` → tap **Aug 6** (254,515)
+   → `Play` (200,243). Expect `Deal #983175` and the HUD titled `Aug 6` with
+   `🥈 · Win without using undo` / `🥇 · Get every Ten onto the King-end foundation before
+   any Ace goes home`.
+2. Tap the bottom card of column 2 — `A♠` — at **(126,738)**. It smart-moves to the Ace
+   foundation.
+- **Expected:** move allowed; **🥇 flips to red `✗`** (an Ace went home before the Tens);
+  🥈 still `·`.
+3. Tap `Undo` (142,135).
+- **Expected:** **🥇 returns to `·`** (foundation order rewound) **and 🥈 flips to red `✗`**
+  and STAYS `✗`.
+4. Make any further legal move.
+- **Expected:** 🥈 is still `✗` — an undo can never be un-undone. Only `Replay` (or
+  re-entering from the Daily card) clears it, and doing so restarts the attempt.
+  Evidence: `wf13-aug6-gold-violated-hud.png`, `wf13-aug6-noundo-permanent-hud.png`.
+
+**TC-13.6 [novice] [power] (Both) — The how-to-win pill set is exactly right per day (3 pills on a universal-Silver day).**
+1. Cold launch → `Daily` → swipe to the calendar.
+2. Tap **Aug 5** (201,515), scroll up, count the pills. Then repeat for **Aug 6** (254,515),
+   **Aug 3** (94,515) and **Aug 4** (147,515).
+- **Expected:**
+  - **Aug 5** (`Deal #850,804`, Silver "Win in 115 moves or fewer", Gold "Send all four Aces
+    home before any other card") and **Aug 6** (`Deal #983175`, Silver "Win without using
+    undo") show **exactly three** pills: `🥉 Clear`, `🥇 Gold`, `🌟 Flawless`.
+    **The missing 🥈 Silver pill is CORRECT** — those days' Silver family is universal
+    (`moves` / `no-undo`) so `daily-solutions.json` carries no distinct silver line and
+    `hasSilverLine` is false. In the reachable range this holds for **Aug 5, 6, 10, 16, 21,
+    23, 26** and nowhere else. **Do not file it.** The Silver *tier row* (medal + label +
+    empty circle) must still be present in the objectives list on those days.
+  - **Aug 3** and **Aug 4** show **all four** pills in a 2x2 grid.
+  - A *reachable* day missing the 🥉, 🥇 or 🌟 pill IS a bug (all 61 days carry those lines).
+- Cross-check every count with `derive_daily.py <date>`, whose `pills` line is authoritative.
+
+**TC-13.7 [power] (Power) — Objective-family inventory sweep: all thirteen families in one pass.**
+*(Aug 1-7 happens to cover all 13 current families, so one row of the calendar is the whole
+inventory. Aug 1 is at (361,471); Aug 2…Aug 7 are at y=515, x = 40/94/147/201/254/307.)*
+For each day: tap its cell, swipe `(200,300)→(200,640)`, read the card, swipe back down.
+Compare every string **exactly** to `python3 .qa-loop/tools/derive_daily.py <date>`.
+- **Expected cards:**
+  | Day | Deal # | Silver (family) | Gold (family) |
+  |---|---|---|---|
+  | Aug 1 | 691,039 | Get all four Queens home within your first 29 moves (`rank-rush`) | Split every suit exactly at the Three — A-3 up, 4-K down (`split-at`) |
+  | Aug 2 | 665,641 | Take at least 7 of every suit from the Ace end (`end-bias`) | Move a run of 7 or more cards in a single move (`big-move`) |
+  | Aug 3 | 539,885 | Never move more than 3 cards in a single move (`max-run`) | Finish one whole suit before any other suit is started (`suit-sprint`) |
+  | Aug 4 | 625,648 | Never let one suit get more than 4 cards ahead of another (`suit-balance`) | Win without ever using a free cell (`cells-le`) |
+  | Aug 5 | 850,804 | Win in 115 moves or fewer (`moves`) | Send all four Aces home before any other card (`ends-first`) |
+  | Aug 6 | 983,175 | Win without using undo (`no-undo`) | Get every Ten onto the King-end foundation before any Ace goes home (`before-ace`) |
+  | Aug 7 | 902,614 | Win using free cells at most once (`cells-le`) | For every suit, send its Jack home from the King end before its Ace (`suit-top-first`) |
+- **Also assert:** no label is truncated or clipped on the day card (long Gold labels wrap
+  to 2-3 lines); each day's deal number changes with the day; the ⏰ line is
+  "Same-day is earned on the day itself" on all seven; selecting a new day never leaves the
+  previous day's Silver/Gold text on screen (a stale-label bug would be a blocker here).
+- **Effort bar (power):** 7 days x (1 tap + 2 swipes). Flag if reading a past day's full card
+  needs more than one scroll round-trip.
+
+
+## WF-14 — ⏰ Same-day recognition (Both)
+
+*(Round-0 exploration, 2026-08-30 16:30-16:45 local, build f0680ef, iPhone 17 Pro portrait,
+device points. Every string and coordinate below was observed live this round unless a case says
+otherwise.)*
+
+**Fixture / harness for every WF-14 and WF-15 case:**
+- ⏰ and 🌟 only appear at WIN time, and no reachable board is winnable by hand in a test pass.
+  Two NEW tools make win-time states reachable in ~3 taps (see HARNESS_NOTES "Chunk wf14-15"):
+  `node .qa-loop/tools/make_save.mjs --day <dayIndex> --tier <bronze|silver|gold|flawless>
+   --challengeDay <d|none> --startDay <d|none>` prints a SavedGame parked at the first position
+  where the app's own Finish cascade wins AND still earns that tier; pipe it into
+  `python3 .qa-loop/tools/inject_save.py <udid>` and relaunch. The board restores, Auto-finish:Ask
+  fires "Ready to finish" immediately, and **Finish (275,497) / Not yet (127,497)**.
+  The lines are the app's OWN certified lines from `data/daily-solutions.json` — no illegal state.
+- `--startDay` is what makes ⏰ testable without a date override: `--challengeDay 29 --startDay 29`
+  = today's attempt begun today (earns ⏰); `--challengeDay 26 --startDay 29` = a past-day replay
+  begun today (must NOT earn ⏰); `--challengeDay 28 --startDay 28` = **yesterday's attempt begun
+  yesterday**, i.e. the live grace, the one branch that otherwise needs a two-day sequence.
+- Fresh install = zero records. To reset records only, delete key `causeway.daily` from the app's
+  Preferences plist (`inject_save.py --clear` wipes only the saved game).
+- Geometry, Daily sheet **unscrolled** (it opens at the top and shows all 5 streak cards + the whole
+  Today card; only the calendar is below the fold): streak cards 🔥(75,199) ⏰(201,199) 🥈(327,199)
+  🥇(75,310) 🌟(201,310); Today card header y=450; ⏰ line y=632; Play (200,672);
+  pills 🥉(115,747) 🥈(287,747) 🥇(115,786) 🌟(287,786). `Done` (349,100).
+- Geometry, **bottom-scrolled** (one swipe (200,700)→(200,300)): day-card ⏰ line y≈203,
+  `Play` (200,243); calendar cell `x = 40 + 53.5·((D+5) mod 7)`, `y = 471 + 44·((D+5) div 7)` →
+  Aug 27 (254,647), Aug 29 (361,647), Aug 30 (40,691).
+- **Toolbar trap:** on a finishable board the `Finish` pill inserts into row 2 and `Daily` moves
+  from (290,176) to **(359,175)**; after a win the `Deal #` pill gains ` ✓` and `Daily` sits at
+  (302,175). Re-read the row from a screenshot before tapping Daily, or you will open the
+  Deal-number alert instead (this cost this dispatch three taps).
+
+**TC-14.1 [novice] [smoke] (Novice) — Five streak cards, and today's unplayed ⏰ invitation.**
+1. Fresh install (no records). Launch → tap `Daily` (290,176). Do not scroll.
+- **Expected (exact):** a 3+2 grid of FIVE cards — `🔥 Play`, `⏰ Same-day`, `🥈 Silver`,
+  `🥇 Gold`, `🌟 Flawless` — each reading `0` / `day streak` / `0 total` / `best 0`, no label
+  truncated; then the legend paragraph **"A streak counts consecutive days holding that medal.
+  Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal. Same-day = the deal cleared
+  on its own date — replaying a past day never earns it."**
+  The Today card (Deal #551,879) shows the ⏰ line **"⏰ Win today to start a same-day streak"**
+  in secondary grey directly above the gold `Play`.
+- **Novice bar:** the ONLY explanation of ⏰ and 🌟 is that one 10 pt legend paragraph. Record
+  whether a first-timer can say what "Same-day" means from the card alone. Evidence baseline:
+  `evidence/round-0-explore-wf14-15/wf14-today-unplayed-branch.png`.
+
+**TC-14.2 [novice] (Novice) — A past day tells you ⏰ is out of reach; the calendar pip is unlabelled.**
+1. Fresh install. `Daily` (290,176) → swipe (200,700)→(200,300) → tap **Aug 27** (254,647).
+- **Expected:** the day card's ⏰ line reads **"⏰ Same-day is earned on the day itself"**
+  (dimmer than the other three branches: 12 pt, secondary at 70% opacity) and the `Play` button is
+  unchanged. Nothing claims the day can still earn ⏰.
+2. Read the calendar's legend row (right of "August 2026").
+- **Expected/observed:** it lists **🥉 🥈 🥇 🌟 Flawless** and says NOTHING about the ⏰ corner pip
+  that ⏰ days carry (a 5 pt gold dot, top-right of the cell). Judge whether a novice can decode a
+  bare gold dot. See CC-14-A.
+
+**TC-14.3 [power] [smoke] (Power) — Winning TODAY mints ⏰ across all four surfaces at once.**
+1. Fresh install. `node .qa-loop/tools/make_save.mjs --day 29 --tier flawless --challengeDay 29
+   --startDay 29 | python3 .qa-loop/tools/inject_save.py <udid>`; relaunch.
+   *(Expect the console line `stop at move 92/96`; deal #551879, HUD untitled = today.)*
+2. Tap `Finish` (275,497) on the "Ready to finish" prompt; wait ~6 s for the cascade.
+- **Expected — win overlay:** `Deal #551,879 · 96 moves`, then the gold line
+  **"🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."**
+  (⏰ rides after the tier line; buttons sit at y≈512 because that line wraps to two rows).
+3. `Close` (318,512) → `Daily` (302,175).
+- **Expected — sheet:** all five streak cards read `1` / `1 total` / `best 1`; the Today card
+  header is **`Today  🌟 Flawless`**, all three tier circles are green ✓, and the ⏰ line has
+  switched to **"⏰ Cleared on the day"** in gold; the button is now **`Replay to improve ↻`**
+  (grey, not gold).
+4. Swipe (200,700)→(200,300).
+- **Expected — calendar:** Aug 30 carries its gold today-ring, a **🌟 under the date** (the tier
+  dots are replaced) and a **5 pt gold pip in the top-right corner** (⏰). No other day is marked.
+  Evidence: `wf15-win-overlay-flawless-ontime.png`, `wf14-crop-aug30-pip.png`.
+
+**TC-14.4 [power] [smoke] (Power) — Replaying a past day never mints ⏰, however well you play it.**
+*(Runs on top of TC-14.3's state so the streak numbers are diagnostic.)*
+1. `node .qa-loop/tools/make_save.mjs --day 26 --tier flawless --challengeDay 26 --startDay 29
+   | python3 .qa-loop/tools/inject_save.py <udid>`; relaunch. The HUD must be titled **`Aug 27`**
+   and the deal `#937619`.
+2. `Finish` (275,497).
+- **Expected — win overlay:** **"🌟 Flawless! 🥉🥈🥇 all in a single run."** and **NO ⏰ clause at
+  all** — this is the orthogonality bar. Any "On time" text here is a blocker-grade scoring bug.
+3. `Close` → `Daily`.
+- **Expected:** `⏰ Same-day` still reads **1 day streak / 1 total** while 🔥 Play, 🥈, 🥇 and 🌟 all
+  advance to **2 total**; the calendar shows **Aug 27 with a 🌟 and NO corner pip**, Aug 30 with
+  both. Evidence: `wf14-crop-pastday-no-ontime.png`, `wf14-crop-sameday-total-1.png`,
+  `wf15-crop-star-vs-pip.png`.
+
+**TC-14.5 [power] (Power) — The day-granular grace: yesterday's attempt, finished today, earns ⏰.**
+*(This is the fourth ⏰ branch. It is reachable ONLY as a two-day sequence or via the save
+injector — there is no date override in the app. The injected save is honest: `challengeDay 28,
+startDay 28` is exactly "began Aug 29's challenge on Aug 29". If the injector is unavailable, mark
+this case **blocked — needs a date override**; do not infer it from code.)*
+1. Records wiped for Aug 29. `node .qa-loop/tools/make_save.mjs --day 28 --tier flawless
+   --challengeDay 28 --startDay 28 | python3 .qa-loop/tools/inject_save.py <udid>`; relaunch;
+   `Not yet` (127,497) on the finish prompt.
+2. `Daily` (**359,175** — the Finish pill is present) → swipe (200,700)→(200,300) → tap **Aug 29**
+   (361,647).
+- **Expected:** the ⏰ line reads **"⏰ Resume your attempt today and it still counts"**
+  (secondary grey), NOT "Same-day is earned on the day itself".
+3. `Done` (349,100) → `Finish` (170,175 — the toolbar's Finish pill) and wait for the cascade.
+- **Expected:** the win overlay reads **"🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time —
+  2-day same-day streak."** — the grace paid out for a day that is not today, and Aug 29 + Aug 30
+  are consecutive so the streak is 2. The calendar must then show a corner pip on **Aug 29**.
+  Evidence: `wf14-crop-grace-line.png`, `wf14-crop-grace-win.png`.
+- **Do NOT file the day-granularity itself** (win any time on D+1 counts) — recorded product
+  decision. Copy that promises a *midnight* deadline WOULD be a bug; none was seen this round.
+
+**TC-14.6 [power] [novice] (Both) — Two one-tap ways to destroy a live grace, one of them silent.**
+*(Set up the grace exactly as TC-14.5 steps 1-2 and stop with the Aug 29 card on screen.)*
+1. **Path A (known-open `ux/index.html:gracelive-play-button-forfeits`):** with the grace line
+   showing, tap the card's only button, `Play` (200,243).
+- **Expected/observed copy:** an alert titled **"End your daily attempt?"** whose body is
+  **"Starting this challenge re-deals the board, so your 85 moves and your time will be discarded.
+  You can replay the challenge afterwards."** with `Keep playing` / `Start over`. Judge that last
+  sentence against the state: replaying is possible, but the ⏰ the line just promised is gone for
+  good, and the alert never says so. Tap `Keep playing` (127,517) and confirm the card is unchanged.
+2. **Path B (no dialog at all):** `Done` (349,100) → tap the board's `Replay` pill (229,135).
+3. Re-open `Daily` (304,175) → swipe → tap **Aug 29** (361,647).
+- **Expected/observed:** the ⏰ line has silently fallen back to **"⏰ Same-day is earned on the day
+  itself"** — one unconfirmed tap on a pill that costs nothing on a same-day attempt permanently
+  forfeited the grace, with no warning before or after. Evidence:
+  `wf14-crop-confirm-copy.png`, `wf14-crop-after-replay-line.png`. See CC-14-B / CC-14-C.
+
+## WF-15 — 🌟 Flawless: the tier, the streak, and "how to win flawless" (Both)
+
+**TC-15.1 [novice] [smoke] (Novice) — The 🌟 pill is on every reachable day, and its demo runs.**
+1. Fresh install. `Daily` (290,176). On the Today card, count the "Show me how to win:" pills.
+- **Expected:** a 2x2 grid — `🥉 Clear` (115,747), `🥈 Silver` (287,747), `🥇 Gold` (115,786),
+  `🌟 Flawless` (287,786). Cross-check with `python3 .qa-loop/tools/derive_daily.py <date>`
+  (`pills` line is authoritative).
+2. Tap `🌟 Flawless` (287,786).
+- **Expected:** the sheet dismisses, the board re-deals #551879 and the demo bar reads
+  **"🌟 Flawless: Both objectives in one run · 0 / 96"**, paused/ready — it must NOT auto-run.
+  The headline wraps to **three** lines here, so the pills sit at **Next (237,273) / Start (297,273)
+  / Stop (357,273)** (one line lower than the two-line variant in HARNESS_NOTES).
+3. Tap `Next` once → progress must read `1 / 96`. Tap `Stop` (357,266 once the headline re-wraps).
+- **Expected:** per WF-6, Stop re-deals a fresh board of the same seed (no demo residue, no Finish
+  pill until a real move). Evidence: `wf15-crop-demo-bar.png`.
+- **Novice bar:** the pill's own words are "Both objectives in one run" while the definition
+  everywhere else is 🥉🥈🥇 (three). Note whether that reads as a contradiction. See CC-15-A.
+
+**TC-15.2 [novice] [power] (Both) — The 🌟 pill is present on every day the calendar exposes, including universal-Silver days.**
+1. `Daily` → swipe (200,700)→(200,300). Tap in turn **Aug 5** (201,515), **Aug 6** (254,515),
+   **Aug 26** (201,647), **Aug 3** (94,515), **Aug 29** (361,647), **Aug 30** (40,691).
+- **Expected:** every one of those days shows a `🌟 Flawless` pill. Aug 5, 6 and 26 show exactly
+  **three** pills (🥉/🥇/🌟) — **the missing 🥈 is CORRECT** on the universal-Silver days
+  (Aug 5, 6, 10, 16, 21, 23, 26 in the reachable range); the rest show four.
+  A reachable day with NO 🌟 pill is a gate bug in `game.hasFlawlessLine(c.seed)` —
+  all 61 seeded days carry a certified flawless line (verified in `data/daily-solutions.json`
+  and by `tests/solutions.test.mjs`).
+- **Also:** a future day (Aug 31, (94,691)) is not selectable at all, so it can show no pills.
+
+**TC-15.3 [power] [smoke] (Power) — A single-run flawless win lights tier row, header, streak card and calendar in agreement.**
+1. Fresh install. Inject and finish today's flawless line exactly as **TC-14.3** steps 1-2.
+- **Expected — overlay:** `🌟 Flawless! 🥉🥈🥇 all in a single run.` (+ the ⏰ clause, TC-14.3).
+- **Expected — Daily sheet:** `🌟 Flawless` streak card = `1 / 1 total / best 1`; card header
+  `Today  🌟 Flawless` in gold at 12 pt; **all three** tier circles green.
+- **Expected — calendar:** the Aug 30 cell shows a **🌟 in the marker slot, replacing the three
+  tier dots**, and **the date does not shift** — compare the baseline of the "30" against
+  "23"-"29" in the row above (the ⭐ is drawn in a `frame(height: 6)` slot identical to the dot
+  row). Any vertical jitter of the date is the bug this case exists to catch.
+  Evidence: `wf14-crop-aug30-pip.png` (30 with ⭐ + pip), `wf15-crop-star-vs-pip.png`.
+
+**TC-15.4 [power] (Power) — Banking 🥈 and 🥇 across two separate runs must NOT mint 🌟.**
+*(The definitional case. Aug 27 / dayIndex 26 / deal #937619 is the fixture: its silver line earns
+Silver-not-Gold and its gold line earns Gold-not-Silver, verified offline.)*
+1. Fresh install (or wipe `causeway.daily`).
+   `node .qa-loop/tools/make_save.mjs --day 26 --tier silver --challengeDay 26 --startDay 29
+    | python3 .qa-loop/tools/inject_save.py <udid>`; relaunch; `Finish` (275,497).
+- **Expected:** overlay reads **"Daily challenge: 🥉 🥈 earned."** — no 🥇, no 🌟, no ⏰.
+2. `node .qa-loop/tools/make_save.mjs --day 26 --tier gold --challengeDay 26 --startDay 29
+   | python3 .qa-loop/tools/inject_save.py <udid>`; relaunch; `Finish` (275,497).
+- **Expected:** overlay reads **"Daily challenge: 🥉 🥇 earned."**
+3. `Close` (318,512) → `Daily` (302,175); read the streak cards, then swipe to the calendar.
+- **Expected:** `🔥 Play`, `🥈 Silver`, `🥇 Gold` each show **1 total**; **`🌟 Flawless` shows 0
+  streak / 0 total / best 0**; the **Aug 27 cell shows three tier dots, NOT a 🌟**; and the Aug 27
+  day card has all three tier circles green with **no `🌟 Flawless` in its header**.
+  A 🌟 appearing anywhere after this sequence would mean flawless is being OR-ed across attempts —
+  a scoring bug (and a devalued streak). Evidence: `wf15-crop-bank-silver.png`,
+  `wf15-crop-bank-gold.png`, `wf15-crop-flawless-0-total.png`, `wf15-crop-aug27-dots.png`.
+
+**TC-15.5 [power] (Power) — 🌟 is sticky: a later worse run never takes it away.**
+1. Run **TC-15.3** (today is flawless; header shows `Today 🌟 Flawless`).
+2. From the Daily card tap **`Replay to improve ↻`** (200,672) → confirm if prompted, then on the
+   board tap `Undo`-free but deliberately break Gold (today's Gold is `split-at` at the Eight —
+   tap any card that goes home to the wrong end), then abandon: `Daily` → `Play` today again.
+3. Re-open `Daily`.
+- **Expected:** the header still reads `Today  🌟 Flawless`, the 🌟 streak card still reads 1, and
+  the calendar cell still shows 🌟 — `mergeTiers` ORs flawless and never clears it. A lost 🌟 after
+  a worse replay is a data-loss bug.
+- *(Not walked this round — the injector fixture covers steps 1 and 3; step 2's manual break was
+  not executed. Treat the expectation as the model's stated contract, and record what you see.)*
+
 
 ## Cross-cutting probes
 
@@ -832,3 +1077,144 @@ LEDGER fragment.*
   anything, and consider a confirm-dialog (like WF-6's daily-attempt guard) instead
   of an outright refusal.** Evidence:
   `evidence/round-0-explore-l3/wf13-aug7-constraints-not-gated.png`.
+
+- **CC-13-A (WF-13, DailyView.swift `calendar`, ~L421-425) — the month calendar renders ONLY
+  the current calendar month and has no prev/next control, so at every month rollover the
+  still-playable past days become unreachable in-app.** `let now = Calendar.current
+  .dateComponents([.year,.month], from: Date())` and the grid is built from that single
+  `(y,m)`; there is no ‹ › affordance anywhere on the sheet (confirmed visually: the header
+  row is just "August 2026" + the medal legend). Today this is benign — every playable day
+  (dayIndex 0-29 = Aug 1-30) is in August. Hypothesis: **on 2026-09-01 the sheet renders
+  September, and all 31 August days — the entire catch-up backlog, including any day the
+  player never cleared — become impossible to select or play**, permanently, even though
+  `dailyChallenge(idx, pool)` still returns them. Evidence that would settle it: set the
+  host/simulator clock to 2026-09-01, cold-launch, open Daily and try to reach Aug 12.
+  Structural (navigation shape) → if confirmed this is **proposal**-routed, not auto.
+
+- **CC-13-B (WF-13, novice; DailyView.swift `calCell` vs `playButton`) — tapping a future day
+  does absolutely nothing and the "Unlocks <date>" affordance is unreachable dead code.**
+  Repro seen: Daily → scroll → tap Aug 3 (94,515) → tap Aug 31 (94,691): the card stays on
+  Aug 3, Aug 31 shows no press feedback, no tint, no message. `calCell`'s tap gesture is
+  `if avail { dayView = idx }` and `avail` requires `idx <= todayIndex()`, so `playButton`'s
+  `if day > ti { Text("Unlocks \(dayLabel(day))") }` branch can never render. Hypothesis: a
+  novice reads the dim cell + silent tap as "the calendar is broken" rather than "not yet",
+  and the app already contains the copy that would fix it. Small-scope ux-design → **auto**.
+  Evidence: `evidence/round-0-explore-wf13/wf13-aug31-future-not-selectable.png`,
+  `wf13-aug31-inert-card-unchanged.png`.
+
+- **CC-13-C (WF-13, novice discoverability) — past days are only reachable through a calendar
+  that is entirely below the fold, and nothing on screen says a day is tappable.** On the
+  402x874 portrait sheet the first screen is 5 streak cards + the Today card; the calendar
+  needs a deliberate scroll, and once you scroll to it the day card's header (the date and
+  `Deal #`) is hidden behind the nav bar — after tapping Aug 4 the only confirmation of what
+  you selected is a pale tint on a 40 pt cell, and you must scroll back up to see "Aug 4".
+  Hypothesis: a first-time user never discovers past days at all, and a user who does cannot
+  confirm which day they are about to Play without a second scroll. Evidence that would
+  settle it: a clean novice run of TC-13.1 with the tester forbidden to scroll on a hint;
+  count attempts. Compare `wf13-calendar-geometry.png` (first screen has no calendar) with
+  `wf13-aug4-hud-fresh.png`.
+
+- **CC-13-D (WF-13 x WF-5, DailyView.swift L82 `.onAppear { dayView = clampedToday }`) — the
+  Daily sheet always snaps back to Today, even while a PAST-day attempt is in progress, and
+  nothing marks the live day.** Repro seen: play Aug 4 from the calendar (HUD correctly reads
+  "Aug 4"), then tap `Daily` again — the card is "Today", `Deal #551,879`, today's Silver/Gold,
+  and the big gold `Play` button now starts *today's* deal. Neither the card nor the calendar
+  marks Aug 4 as in-progress. Hypothesis: a power user mid-Aug-4 taps that Play expecting
+  "resume/replay my challenge" and silently swaps deals (the confirm alert's "You can replay
+  the challenge afterwards" is technically true but names no day). Note the sheet is also the
+  only route back to Aug 4, and its Play *restarts* rather than resumes. Evidence:
+  `wf13-daily-resets-to-today-midattempt.png`, `wf13-daily-resets-to-today-card.png`.
+  **fix_risk note:** any "remember the last viewed day" fix must not make the sheet open on a
+  stale day after midnight (WF-14's ⏰ branches are all date-driven).
+
+- **CC-13-E (WF-13, doc-vs-app) — `par` is parsed but never displayed anywhere, on either
+  platform, while WF-13's expectation says a selected past day "shows ITS OWN objectives and
+  par".** `PoolDay.par`/`Challenge.par` exist (`Daily.swift:290,301,482`) and every day has one
+  (Aug 3 = 86, today = 84), but grepping the Swift views finds no render site, and `index.html`
+  only carries it through `dailyChallenge`. Hypothesis: this is a **WORKFLOWS.md wording error,
+  not an app gap** — par is a pool-generation/certification field. Do NOT mint a bug from it;
+  settle it by a human decision, either surface par on the day card (it is genuinely useful:
+  "target 86 moves") or strike "and par" from WF-13. Routing if pursued: **proposal**.
+
+- **CC-14-A (WF-14, novice; DailyView.swift `calendar` legend vs `calCell` pip) — the ⏰ calendar
+  pip is an unlabelled 5 pt gold dot; the legend explains 🥉🥈🥇 and 🌟 but not it.** Observed: after
+  a same-day win the Aug 30 cell gains a plain gold circle in its top-right corner, while the
+  legend row right of "August 2026" reads only `🥉 🥈 🥇 🌟 Flawless`. The pip's colour
+  (`Theme.gold`) is also within a hair of the gold TIER dot (`0xD9AD55`) drawn in the same cell at
+  the same 5 pt size, so on a non-flawless ⏰ day the two golds appear together with different
+  meanings. Hypothesis: a novice reads the corner dot as noise or as a fourth medal. Evidence that
+  would settle it: a novice pass on TC-14.2 asking "what does the dot on the 30th mean?".
+  Small-scope ux-design (add `⏰` to the legend row) → **auto**. Evidence:
+  `evidence/round-0-explore-wf14-15/wf14-crop-aug30-pip.png`, `wf15-crop-aug27-dots.png`.
+
+- **CC-14-B (WF-14, power; ContentView `Replay` pill → `Game.restartDeal`) — the board's `Replay`
+  pill silently and permanently forfeits a live ⏰ grace, with no confirmation and no notice.**
+  `restartDeal()` preserves `challengeDay` but re-stamps `challengeStartDay = todayIndex()`, and
+  the pill has no alert (`pill("Replay") { game.restartDeal() }`, ContentView:416). Live repro
+  this round (grace injected for Aug 29, `challengeDay 28 / startDay 28`): the Aug 29 card read
+  "⏰ Resume your attempt today and it still counts"; one tap of `Replay` (229,135), no dialog; the
+  same card then read **"⏰ Same-day is earned on the day itself"** — the grace was gone and Aug 29
+  can never earn ⏰ again. On a same-day attempt Replay costs nothing, so the asymmetry is
+  invisible. This is a DIFFERENT surface from the known-open `ux/index.html:gracelive-play-button-
+  forfeits` (that one is the Daily card's Play + its false "You can replay the challenge
+  afterwards" line, which this round also reproduced verbatim — see `wf14-crop-confirm-copy.png`).
+  Hypothesis: worth a confirm (or a "this ends your ⏰ grace" note) ONLY while `graceLive`.
+  **fix_risk: metric-integrity** — the naive fix (keep `challengeStartDay` across Replay) would let
+  a player start a fresh, full run on D+1 and still bank ⏰, which is exactly what "same-day" is
+  supposed to exclude; the safe fix is a warning, not a semantics change. Evidence:
+  `wf14-crop-grace-line.png`, `wf14-after-replay-board.png`, `wf14-crop-after-replay-line.png`.
+
+- **CC-14-C (WF-14, both; DailyView.swift L82 `.onAppear { dayView = clampedToday }`) — a live ⏰
+  grace is invisible unless you already know to go looking for yesterday's cell.** The Daily sheet
+  always opens on Today, whose ⏰ line reads "Win today to start a same-day streak"; the calendar
+  puts no in-progress mark on Aug 29; and the grace line exists ONLY on the Aug 29 day card, two
+  gestures away (swipe + tap the right cell). The only other hint anywhere is the board HUD's
+  small gold `Aug 29` title. Hypothesis: the branch the copy was written for — "you can still save
+  yesterday's streak" — is reachable mostly by accident, so the feature under-delivers on the day
+  it matters. Related to CC-13-D (same `onAppear` snap-back) but distinct in cost: here the
+  player loses a streak, not just context. Structural (where the state is surfaced) →
+  **proposal**. Evidence that would settle it: a power pass on TC-14.5 stopping after step 1 —
+  can the tester find the grace from the sheet's first screen? Evidence: `wf14-crop-grace-line.png`.
+
+- **CC-14-D (WF-14, novice copy) — the win overlay's ⏰ clause reports the streak but never names
+  the day, so a grace win reads as if today were cleared.** Observed on the grace win: "🌟
+  Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 2-day same-day streak." for a deal that was
+  **Aug 29's**, finished on Aug 30, while Aug 30 itself was still unplayed. Nothing in the overlay
+  says "Aug 29" (the Deal # is the only clue), and "2-day same-day streak" invites the reading
+  "including today". Hypothesis: low-severity but genuinely misleading — a player may skip today's
+  challenge believing it is done. Cheap fix: name the day in the daily line for any
+  `challengeDay != todayIndex()` win. Small-scope ux-design → **auto**, minor. Evidence:
+  `wf14-crop-grace-win.png`, `wf14-crop-pastday-no-ontime.png` (same anonymity on a past-day win).
+
+- **CC-15-A (WF-15, novice copy) — the 🌟 pill and its demo bar say "Both objectives in one run"
+  while every other surface defines Flawless as 🥉🥈🥇 (three).** `DailyView.swift:206` hard-codes
+  the label; the demo bar renders "🌟 Flawless: Both objectives in one run · 0 / 96", the streak
+  legend says "Flawless = 🥉🥈🥇 all three earned in a single run", and the win overlay says "all in
+  a single run". Hypothesis: "Both" (silver+gold, excluding the clear itself) vs "all three" is a
+  small but real contradiction on the one screen a novice uses to learn what 🌟 costs. Cheap,
+  clearly-correct fix (one string). Small-scope ux-design → **auto**, minor. Evidence:
+  `wf15-crop-demo-bar.png`, `wf14-today-unplayed-branch.png` (legend paragraph).
+
+- **CC-15-B (WF-15/WF-5, both; DailyView `streaksRow`) — five streak cards in a 3-column grid
+  leave a conspicuous empty sixth slot, and all five numbers move together on almost every win.**
+  Observed after the flawless same-day win: 🔥/⏰/🥈/🥇/🌟 all read exactly `1 / 1 total / best 1`,
+  five identical cards over one blank cell. Hypothesis (weak, needs a novice to settle it): the
+  five-card wall is now more numbers than signal — 🌟 strictly implies 🥈/🥇/🥉, so three of the
+  five cards are redundant whenever a player plays flawlessly, while the one card carrying
+  genuinely independent information (⏰) is the one with no legend on the calendar (CC-14-A).
+  Only worth pursuing if a novice pass reports the row as noise; structural if pursued →
+  **proposal**. Evidence: `wf14-streaks-after-pastday.png`, `wf15-crop-flawless-0-total.png`.
+
+- **CC-15-C (WF-15, testability; data/daily-solutions.json + Game.runAutoFinish) — some baked
+  flawless lines cannot be finished by the app's own auto-finish cascade without losing Gold.**
+  Not a user-visible bug, a fixture finding: building "one tap from a flawless win" saves this
+  round, dayIndexes **21, 24 and 27** had NO truncation of their flawless line where the greedy
+  `sendOneHome` cascade preserves the day's Gold (ordering objectives like `ends-first` /
+  `split-at` conflict with greedy sends), while 20, 22, 23, 25, 26, 28 and 29 all did. Hypothesis:
+  a player who plays a perfect line and then accepts "Ready to finish" can be denied Gold **by the
+  app's own auto-finish**, on those days, at the last moment. Evidence that would settle it: replay
+  day 21's flawless line to its first finishable position in `tests/`, run the cascade, and
+  evaluate Gold (the harness in `.qa-loop/tools/make_save.mjs` already does exactly this) — then
+  reproduce in-app and check whether the win overlay drops 🥇. If it reproduces in-app this is a
+  **bug**, routing auto, and its fix_risk is **metric-integrity** (making auto-finish
+  objective-aware changes scored outcomes).

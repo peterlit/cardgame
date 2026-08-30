@@ -1,0 +1,6 @@
+{ "results": [
+  { "tc": "TC-4.1", "persona": "power", "status": "passed", "reason": "Ask mode: board became finishable on a real move -> 'Ready to finish' alert; Finish cascaded to the win overlay 'Deal #10,011 - 93 moves - 2:58' with Play deal #10012 / Random / Close." },
+  { "tc": "TC-4.2", "persona": "power", "status": "passed", "reason": "'Not yet' dismissed the prompt, gold Finish pill appeared and stuck across a further move with no re-nag; Finish pill completed the deal. (Deferral does not survive an app kill - filed as a separate minor finding.)" },
+  { "tc": "TC-4.3", "persona": "power", "status": "passed", "reason": "Close -> solved board (relaunch gives a fresh deal, win kept); Play deal #10012 -> deal 10012; Random -> deal #806927; Won 0->1 on the first genuine win and Deal #10011 gained a check mark. Repeat wins of the same deal do not bump Won - by design, WinStore counts distinct deals." },
+  { "tc": "TC-4.4", "persona": "power", "status": "passed", "reason": "Auto-finish Off: board became finishable with no prompt and the Finish pill appeared; Finish completed it, and manual play of the last 3 cards also produced the win overlay." }
+] }

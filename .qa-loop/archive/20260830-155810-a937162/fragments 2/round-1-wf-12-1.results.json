@@ -1,0 +1,16 @@
+{
+  "results": [
+    { "tc": "TC-12.1", "persona": "novice", "status": "passed",
+      "reason": "Live rotation (XCUITest actuator) — landscape reflows to a 118pt left rail (ScrollView), a foundations column at x=196 with up/down rows and FREE CELLS beneath, tableau from x=398, header retained, portrait toolbar gone. Rotating mid-game preserved the board, Moves 69 and the clock; the Daily sheet survived rotation; landscapeRight is the mirror image with no clipping." },
+    { "tc": "TC-12.1", "persona": "power", "status": "passed",
+      "reason": "Same as novice pass, plus: win overlay, Wins sheet, How-to-play sheet (scrolls to About) and the deal-number alert + keypad all render inside bounds in landscape." },
+    { "tc": "TC-12.2", "persona": "novice", "status": "failed",
+      "reason": "ux/WF-12:rail-hides-howtoplay — with the daily HUD (or the demo bar) the rail viewport is 248pt for 285pt of pills, so 'How to play' is 100% below the fold with no partial pill, fade or resting indicator; the rail's cut lands exactly on a pill boundary." },
+    { "tc": "TC-12.2", "persona": "power", "status": "failed",
+      "reason": "Same clipping; a power user recovers with one swipe inside the rail (verified), so it costs 1 extra gesture rather than access — but 'never clip' in the case's expectation is not met (Wins is also clipped 4.6pt)." },
+    { "tc": "TC-12.3", "persona": "novice", "status": "passed",
+      "reason": "Drag works in landscape (swipe J-spades onto Q-hearts moved it, Moves 0->1) and tap-to-move works (4 of spades tapped home, Moves 69->70, landscapeRight). cardW 45.0 fresh / 43.0 with HUD / 36.0 with an injected 13-card column — uniform across the whole board, never at the 30pt floor, nothing clipped." },
+    { "tc": "TC-12.3", "persona": "power", "status": "passed",
+      "reason": "13-card-column stress (injected save) shrank foundations, free cells and tableau to one shared 36.0x60.3 size with pitch 20 and bottom edge 358 < 381 — no second card size, no scrolling board. Minor deviation from the case's 'a fresh deal nearly fills height' clause filed as ux/WF-12:landscape-cards-smaller-than-portrait (proposal)." }
+  ]
+}

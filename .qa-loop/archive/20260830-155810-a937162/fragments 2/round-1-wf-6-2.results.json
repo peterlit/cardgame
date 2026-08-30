@@ -1,0 +1,22 @@
+{
+  "results": [
+    {
+      "tc": "TC-6.7",
+      "persona": "novice",
+      "status": "passed",
+      "reason": "Confirm gate fires with the exact expected copy and buttons; 'Keep playing' left the attempt byte-identical (Moves 1, clock running, Undo enabled, HUD up); 'Show demo' opened 'Winning line - 0 / 98' on a re-dealt #10011. Two findings filed for the UNGUARDED sibling paths (casual game destroyed by a demo pill; Daily Play restarts an attempt in progress)."
+    },
+    {
+      "tc": "TC-6.7",
+      "persona": "power",
+      "status": "passed",
+      "reason": "Same gate fires from the Gold pill; pixel diff after 'Keep playing' showed changes only in the status-bar clock band (y 27-103), board untouched at Moves 2; 'Show demo' then opened the GOLD line (0/105), i.e. the alert remembers which pill was tapped."
+    },
+    {
+      "tc": "TC-6.6",
+      "persona": "novice",
+      "status": "passed",
+      "reason": "Gold on #10011: 'Gold: For every suit, send its King home before its Ace - 0 / 105' (= gold line length). Silver needed a day with a distinct silver line (none in the pool head): Aug 10 sandbox #561,325,499 showed 3 pills and 'Silver: Win using free cells at most twice - 0 / 91' (= silver line length). Next advanced 0->1; Stop re-dealt - the post-Stop frame was pixel-identical to a known fresh board except the status-bar clock. Aug 17 Silver line run to the end banners 'That's a Silver line' and Done re-deals with nothing banked (Won 0, all four streak cards 0, Aug 17 tier circles empty). Future days are inert so no demo pills are reachable for them."
+    }
+  ]
+}

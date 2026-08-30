@@ -1,0 +1,97 @@
+{
+  "findings": [
+    {
+      "id": "ux/WF-13:objective-labels-ignore-text-size",
+      "claim": "The objective labels a player must read while playing are hard-coded to 10 pt (`DailyView.swift:453`, `Text(label).font(.system(size: 10))`) and do not respond to the system text-size setting at all: with iOS text size at accessibility-extra-large the board's daily HUD renders byte-for-byte identically to the default size, so a large-text user still reads Aug 5's Gold objective 'Split every suit exactly down the middle - A-7 up, 8-K down' at 10 pt - the smallest text on the board, below Apple's 11 pt floor. On the Daily card the same setting DOES enlarge the tier status circles while the label text stays put, so the app is partly Dynamic-Type-aware and the labels look like an oversight rather than a deliberate whole-app opt-out.",
+      "type": "ux-design",
+      "routing": "proposal",
+      "severity": "major",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.6",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-hud-stacked-full-label.png",
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-hud-accessibility-xl-unchanged.png",
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-card-accessibility-xl.png"
+        ],
+        "repro": [
+          "xcrun simctl uninstall <udid> com.whimsicaldistractions.Causeway; install the Debug .app; launch",
+          "tap Daily (279,175)",
+          "tap the Aug 5 calendar cell (200,722)  [sandbox dayIndex -7, deal #191,924,978, gold = split-even]",
+          "tap Play (200,490) -> board with the stacked daily HUD; screenshot the HUD (crop 0,245-402,320)",
+          "xcrun simctl ui <udid> content_size accessibility-extra-large",
+          "screenshot the same HUD crop -> md5 identical to the default-size crop (eea6f3c2d681fba350883d2fc287cf0d both times)",
+          "tap Daily, tap Aug 5 again -> on the card the red tier circles are visibly larger, the Gold label text is unchanged and merely re-wraps"
+        ],
+        "measurements": {
+          "hud_label_font_pt": 10,
+          "apple_min_recommended_pt": 11,
+          "content_sizes_tested": [
+            "large (default)",
+            "accessibility-extra-large"
+          ],
+          "hud_crop_md5_default": "eea6f3c2d681fba350883d2fc287cf0d",
+          "hud_crop_md5_ax_xl": "eea6f3c2d681fba350883d2fc287cf0d",
+          "fixed_size_font_calls_in_Views": 45,
+          "semantic_font_calls_in_Views": 9,
+          "gold_label_chars": 51
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "TRAP: the naive fix (swap the 45 fixed-size fonts for semantic ones) reflows the whole board - the stacked daily HUD already costs +80 pt of board height, and at AX sizes an enlarged HUD plus toolbar would push the tableau off-screen and invalidate every geometry note in HARNESS_NOTES.md. A bounded scale (e.g. scaledValue capped) or a tap-to-expand objective readout is likelier right; that is a design call, hence proposal routing. Scope note: the fixed-size pattern is app-wide, not WF-13-specific - filed here because TC-13.6 is where it bites hardest (the HUD label is the smallest text on the board and the only in-play statement of what Gold requires)."
+    },
+    {
+      "id": "ux/WF-13:demo-headline-emdash-collides-with-label",
+      "claim": "The demo bar builds its headline as \"<label> — <progress>\" (ContentView.swift:665), but three objective labels already contain an em dash of their own. On Aug 5 the Gold demo bar reads \"🥇 Gold: Split every suit exactly down the middle — A-7 up, 8-K down — 0 / 106\", so the move counter is punctuated exactly like the second half of the objective and reads as more objective text rather than as progress.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-13",
+      "test_case": "TC-13.6",
+      "build_sha": "f949d82",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-1/wf-13-2/tc136-demo-headline-emdash.png"
+        ],
+        "repro": [
+          "fresh install, launch",
+          "tap Daily (279,175)",
+          "tap the Aug 5 calendar cell (200,722)",
+          "tap the 🥇 Gold demo pill under \"Show me how to win\" (287,566)",
+          "read the demo bar headline (crop 0,220-402,300)"
+        ],
+        "measurements": {
+          "labels_containing_em_dash": 3,
+          "labels_total": 18,
+          "affected_ids": [
+            "split-even",
+            "no-supermoves",
+            "no-up-foundation"
+          ],
+          "headline_lines_wrapped": 3
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ],
+      "current_status": "open",
+      "note": "Cheap fix: use a different separator (· or a bullet) or render the progress as its own Text/pill. Only affects the three labels that embed an em dash, all of them on the new sandbox-day objective families."
+    }
+  ]
+}

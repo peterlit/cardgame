@@ -1,0 +1,7 @@
+{ "results": [
+  { "tc": "TC-7.1", "persona": "power", "status": "passed", "reason": "Deal #10003 loaded (board matches engine deal(10003)), Moves 0; tap cost 13 vs WORKFLOWS' 3 filed separately as ux/WF-7:deal-entry-tap-cost" },
+  { "tc": "TC-7.2", "persona": "power", "status": "passed", "reason": "Exactly two actions, Cancel (129,389) left and Play (274,389) right, pad up and field prefilled+focused; no Random anywhere in the alert; New game pill still one-tap random (#10003 -> #445149)" },
+  { "tc": "TC-7.3", "persona": "power", "status": "passed", "reason": "Blank field + Play: alert dismissed, Deal #445149 unchanged, board pixel-identical, app still running" },
+  { "tc": "TC-7.4", "persona": "power", "status": "failed", "reason": "9999999 is NOT clamped to 1,000,000 — it loads and displays Deal #9999999; 5000000000 silently loads Deal #4294967295. Only 0 -> 1 behaves as documented. See bug/WF-7:deal-entry-range-not-enforced" },
+  { "tc": "TC-7.5", "persona": "power", "status": "passed", "reason": "Cancel after editing the field to '99' left Deal #10003, Moves 1, Undo enabled and the board pixel-identical (diff confined to status bar + Time label)" }
+] }

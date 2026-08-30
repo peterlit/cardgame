@@ -1,0 +1,42 @@
+{
+  "findings": [
+    {
+      "id": "ux/WF-1:foundation-rows-unlabelled",
+      "claim": "The two foundation rows are visually identical empty suit slots under one 'FOUNDATIONS' heading, and neither the board nor How to play says which row is the up pile (A,2,3...) and which is the down pile (K,Q,J...). A novice who drags an Ace to the lower row gets a silent snap-back with no message, no highlight and no hint that the row was the wrong end - the app's central twist is the one thing the board never labels.",
+      "type": "ux-design",
+      "routing": "auto",
+      "severity": "minor",
+      "confidence": "confirmed",
+      "region": "WF-1",
+      "test_case": "TC-1.1",
+      "build_sha": "369c365",
+      "evidence": {
+        "screenshots": [
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-01-foundation-labels-fixed.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-02-howtoplay-row-clause.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-04-ace-drag-to-K-row-refused.png",
+          ".qa-loop/evidence/round-2/wf-1-1/tc11-05-ace-drag-to-A-row-accepted.png"
+        ],
+        "repro": [
+          "Fresh install (uninstall+install), cold launch",
+          "Board now reads 'FOUNDATIONS · A↑ / K↓'; every EMPTY up-row slot carries a faint 'A' + suit pip and every empty down-row slot a faint 'K' + pip (tc11-01)",
+          "Tap 'How to play' (55,214): Goal now says 'On the board the TOP foundation row is the up pile and the row beneath it is the down pile: empty slots show a faint A or K to say which card starts there.' (tc11-02)",
+          "Round-1 repro replayed on deal #10011: tap col3 bottom 8♦ (126,640) -> builds onto 9♠, exposing A♠; DRAG A♠ (126,600) to the LOWER spade slot (28,374) -> still a rule refusal / snap-back, Moves unchanged (tc11-04); DRAG the same A♠ to the UPPER spade slot (28,296) -> accepted, Moves 4 (tc11-05)"
+        ],
+        "measurements": {
+          "board_cues_distinguishing_up_row_from_down_row": 3,
+          "howtoplay_mentions_row_order": true,
+          "feedback_on_refused_drop": "still a silent snap-back, but the destination slot now shows 'K' so the refusal is self-explanatory"
+        }
+      },
+      "first_seen_round": 1,
+      "introduced_by_fix": false,
+      "status_history": [
+        { "round": 1, "status": "open" },
+        { "round": 2, "status": "fixed" }
+      ],
+      "current_status": "fixed",
+      "note": "Verified on 369c365: group label + per-slot A/K ghosts + the How to play clause all present, and the ghosts appear on EMPTY slots only (the occupied A♦ and A♠ render as normal cards with no extra glyph — tc11-03/tc11-05), which was the constraint in the round-1 note. The refused drop is still silent, but that was the consequence of the missing labels, not a separate defect; not refiled."
+    }
+  ]
+}

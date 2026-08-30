@@ -1,0 +1,12 @@
+{
+  "results": [
+    { "tc": "TC-5.1", "persona": "novice", "status": "failed", "reason": "Structure/labels/objective text all match the derived day (deal #10,011, silver 'Win without using undo', gold 'For every suit, send its King home before its Ace', pills Clear+Gold), but the effort bar fails: the streak cards' headline number is unlabelled (ux/WF-5:streak-card-headline-unlabelled) and every unattempted objective shows a red circle (ux/WF-5:unattempted-objective-shows-red)." },
+    { "tc": "TC-5.1", "persona": "power", "status": "passed", "reason": "Deal number, par-tier labels and demo pills all match derive_daily.py; Done dismisses; BACKUP section present." },
+    { "tc": "TC-5.2", "persona": "novice", "status": "passed", "reason": "One tap; sheet dismissed; Deal #10011, Moves 0, Time 0:00; portrait DailyHUD is the 3-line stacked box with fully wrapped labels and no ellipsis." },
+    { "tc": "TC-5.2", "persona": "power", "status": "passed", "reason": "Board-to-playing-the-daily is 2 taps (Daily, Play); HUD chips all show the '.' pending state." },
+    { "tc": "TC-5.3", "persona": "novice", "status": "passed", "reason": "After a bronze+silver win: Play button becomes grey 'Replay to improve <-', Play/Silver streaks go 1 / 1 total / best 1, Bronze+Silver show green checks, Gold correctly withheld (the bronze line sends A before K for suits 0 and 3), and the calendar cell for the 22nd gains bronze+silver dots." },
+    { "tc": "TC-5.3", "persona": "power", "status": "passed", "reason": "'Replay to improve' re-deals #10011 with Moves 0 and today's HUD; DailyStore.mergeTiers OR-accumulates so a worse replay cannot downgrade an earned tier." },
+    { "tc": "TC-5.4", "persona": "novice", "status": "passed", "reason": "Aug 12 retitles the card and swaps in deal #10,001 / 'Win in 100 moves or fewer' / 'Send all four Aces home before any other card' (matches derive_daily.py 0); 12 gets the filled tint, 22 keeps the gold outline; tapping the 23rd changes nothing; tapping 22 restores 'Today'." },
+    { "tc": "TC-5.4", "persona": "power", "status": "failed", "reason": "Catch-up Play works and is scored (Aug 12 board carries Aug 12's HUD), but no day identifier exists on the board and re-opening Daily snaps back to Today's card with its earned checks - ux/WF-5:board-hud-omits-challenge-day. The 'Unlocks <Mon D>' branch was not observable because future cells are inert." }
+  ]
+}
