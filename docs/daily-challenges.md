@@ -392,6 +392,14 @@ A new screen (its own entry; the toolbar is already crowded), containing:
 - 🌟 **Flawless** — a fourth tier for earning Bronze + Silver + Gold in a *single* attempt, rather
   than banking them across free retries. It gets its own streak, a calendar star, and a win-overlay
   callout.
+  > ⚠ **Not certified.** The pool certifies the day's Silver and Gold *independently* — nothing
+  > proves one line satisfies both, so a day's Flawless can be unattainable and its streak breaks
+  > with no way for the player to know why. Measured on the shipped month (2026-08-30): 24 of 31
+  > days are flawless-certifiable at the default budget, **3 are provably impossible** — Aug 1 and
+  > Aug 26 pair `suit-sprint` with a Silver it contradicts, Aug 30 asks for a run of 5+ under
+  > "never move more than 2" — and 3 more went uncertified. Gating the generator on joint
+  > feasibility costs **no variety at all** (still 13 families / 52 distinct challenges over 31
+  > days, 29 of the 31 seeds unchanged); see [`solver.md`](solver.md) §7.7.
 - **"Show me how to win"** — a baked, replayable winning line per tier
   (`data/daily-solutions.json`), animated as an assisted, pausable, single-steppable demo that is
   never scored. See [`solver.md`](solver.md) § Solutions.

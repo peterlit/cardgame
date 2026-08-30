@@ -196,6 +196,25 @@ Documented per "proceed, but write down the questions." Implementation proceeded
 6. **Performance.** Certification is a batch job (~10–15 s/seed). If we need a large pool quickly,
    parallelizing across worker processes is straightforward (each seed is independent).
 
+7. **Silver and Gold are certified independently — 🌟 Flawless is not certified at all.** `certify()`
+   proves a winning line exists for each `(family, parameter)` *separately*; the month builder then
+   pairs a Gold and a Silver on one seed with nothing checking that a *single* line can satisfy
+   both. Since Flawless = all three tiers in one attempt, a day can ship whose Flawless star is
+   unreachable. Measured over the shipped August month (joint search, budget 120k, then 600k on the
+   failures): **24/31 certifiable, 3 provably impossible, 4 uncertified within budget**. The three
+   impossibilities are structural, not solver weakness:
+   `big-move{5}` × `max-run{2}` (Aug 30) is contradictory on `maxRunMoved`; `suit-sprint` ×
+   `suit-balance{4}` (Aug 26) breaks the moment the first suit runs 5 cards ahead; `suit-sprint` ×
+   `rank-rush{rank 1, N 20}` (Aug 1) needs 3 whole suits home (≥39 moves) before the fourth Ace.
+   A gate is cheap and costs no variety — a joint-certified re-run of the same greedy fill produced
+   31 days, 13 families, 52 distinct challenges (identical to the shipped month) keeping 29 of its
+   31 seeds, at 111 extra joint solves (~5 min, 44 accepted / 66 budget-limited / 1 proven
+   impossible). Implementation sketch: compose the two constraint gates (∧ of `allowFoundation`,
+   min of `cellBudget`/`maxRun`, ∨ of the existential goals), add a `g > moveCap` prune so a
+   `moves` Silver is searched rather than checked after the fact, verify each greedy pick and
+   blacklist the pair on failure. A static contradiction table would reject the three structural
+   cases instantly, without search.
+
 None of these block Phase 1 (the app-side feature), which consumes the baked pool as data.
 
 ## Solutions ("Show me how to win")

@@ -670,3 +670,17 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     throwaway-clone command that hides the answer key, the must-find/credit split, the
     false-positive traps (the ones that read like bugs and are not), and an inverted rubric for the
     control. Write-up in `causeway-reviewer-evaluation-examples.md`.
+
+80. Consider requiring that every challenge deal be solvable *flawlessly* — one line that satisfies
+    both the Silver and the Gold — and say how much variety that would cost. Measured it rather than
+    argued it: composed the two objective gates into a joint constraint (∧ of `allowFoundation`, min
+    of the cell/run budgets, ∨ of the existential goals, plus a move-cap prune so a `moves` Silver is
+    searched instead of checked afterwards) and ran it over the shipped month — 24 of 31 days
+    certify, 3 are *provably* impossible (`suit-sprint` × `suit-balance`, `suit-sprint` ×
+    `rank-rush`, `big-move{5}` × `max-run{2}` — including today's, Aug 30), 4 more went uncertified
+    within budget. Then re-ran the month generator with the gate wired into the greedy pick: 31 days,
+    13 families, 52 distinct challenges — *identical* variety to the shipped month, 29 of its 31
+    seeds kept — for 111 extra joint solves. Also checked the cheap repair: every impossible day has
+    3-8 alternative Silvers on the same seed and Gold. Wrote the finding up in `docs/solver.md` §7.7
+    and `docs/daily-challenges.md` §12; no code change, because enforcing it regenerates the month
+    and rewrites daily history.

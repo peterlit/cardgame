@@ -557,3 +557,18 @@ Full report: `.review-loop/REPORT.md`. Four minors were open at convergence; all
 - Ideas certified but not currently offered anywhere: `end-bias` at `min` 7-8 (very common, low
   value as a Gold), and mid-rank `rank-rush`, which is unreachable by construction and is excluded
   from the matrix on purpose.
+
+### Flawless feasibility — measured, not enforced (2026-08-30)
+- The pool certifies each day's **Silver and Gold independently**; nothing proves a *single* line
+  satisfies both, so 🌟 Flawless — which requires all three tiers in one attempt — can be
+  unattainable on a shipped day. Measured on August 2026: **24/31 flawless-certifiable, 3 provably
+  impossible** (Aug 1 & 26 pair `suit-sprint` with a Silver that contradicts it; Aug 30 asks for a
+  5-card run under "never move more than 2"), 4 uncertified within budget.
+- **Adding the constraint costs no variety.** Re-running the same greedy fill with a joint
+  feasibility gate produced 31 days / 13 families / 52 distinct challenges — identical to the
+  shipped month — keeping 29 of its 31 seeds; the failures are repaired by swapping the *Silver*,
+  not the deal (each bad day had 3-8 jointly-feasible alternative Silvers on the same seed+Gold).
+  Cost: ~111 extra joint solves (~5 min) per month.
+- **Not implemented** — enforcing it means regenerating the month, which rewrites daily history
+  again. Cheapest path: land the gate in `build-month.mjs` and let the *next* month be the first
+  certified one. Details and an implementation sketch in `docs/solver.md` §7.7.
