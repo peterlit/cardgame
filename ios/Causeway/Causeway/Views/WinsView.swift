@@ -52,7 +52,24 @@ struct WinsView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(enteredSeed == nil)
             }
+            // Say WHY Play is dead. The only statement of the legal range is the field's
+            // placeholder, which the typed text replaces — so an out-of-range entry left a greyed
+            // button, no message, and nothing on screen naming the bound
+            // (ux/WF-9:deal-entry-out-of-range-silent). Shown only once something has been typed,
+            // so the empty field (Play legitimately disabled, nothing wrong yet) stays quiet.
+            if let problem = entryProblem {
+                Text(problem)
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.red)
+                    .accessibilityIdentifier("wins.dealentry.problem")
+            }
         }
+    }
+
+    /// Why the typed deal number can't be played (nil = nothing typed, or it's fine).
+    private var entryProblem: String? {
+        let typed = dealText.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty, enteredSeed == nil else { return nil }
+        return "Deal numbers run \(DealFormat.seedRangeHint)."
     }
 
     /// The typed deal number, or nil when it is empty / not a number / out of range. The field
