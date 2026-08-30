@@ -653,3 +653,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     greedily for maximum variety — the choice is baked per day, so `dailyChallenge` is now a table
     lookup. Moved the epoch to 2026-08-01, deleted the pre-epoch sandbox, and collapsed
     `maxValidSeed` back into a single `maxSeed` now that no challenge seed exceeds it.
+
+79. Build a corpus for evaluating AI reviewer agents across models: suggest a few real diffs from
+    this repo and write down what a good review verdict looks like for each. Picked five commits
+    whose answer keys are *verifiable from later history* rather than from my own judgement:
+    `b50087a` (the `objSecured` suit-sprint false positive, fixed in `f96c06b`), `ebd31df` (stats
+    Import with no range validation, hardened in `0874c5c`), `5b237b4` (the clock-pause-in-sheets
+    exploit, reverted wholesale in `2796867`), `6a49b75` (the pre-epoch sandbox, whose two blockers
+    live in files the diff never touches), and `8a6bcd6` as a near-clean control that scores
+    restraint instead of recall. Re-derived every finding from the diffs rather than trusting the
+    commit prose, and confirmed one still-unfixed bug in the process: at `6a49b75` the web
+    `playChallenge` widened its guard to admit negative day indices but still read
+    `dailyPool[day].seed`, so every sandbox day threw a `TypeError` on web while working on iOS —
+    under a commit message that says "Verified on web and on device". It was never fixed, only
+    obsoleted when the August-2026 recut deleted the sandbox. Each case carries base/head SHAs, a
+    throwaway-clone command that hides the answer key, the must-find/credit split, the
+    false-positive traps (the ones that read like bugs and are not), and an inverted rubric for the
+    control. Write-up in `causeway-reviewer-evaluation-examples.md`.
