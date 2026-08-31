@@ -675,7 +675,9 @@ VoiceOver).
 `ux/WF-13:daily-sheet-resets-to-today-midattempt` (behavior-change) and
 `ux/Main:clock-runs-during-modal-sheets` (metric-integrity — the clock ticks under the app's own
 auto-raised modal, measured at 1 Hz). Also: `ux/WF-13:calendar-month-locked-no-nav`,
-`ux/WF-13:par-never-surfaced`, `ux/WF-14:grace-invisible-from-daily-sheet`,
+`ux/WF-13:par-never-surfaced` (now HALF answered — the day card's new clear line prints par beside
+your best moves, but only on a day you have already solved; whether an *unsolved* day should show
+its target up front is still your call), `ux/WF-14:grace-invisible-from-daily-sheet`,
 `ux/WF-11:import-has-no-confirm-or-undo`.
 
 **Action required from you:** the eight new XCUITest files in `ios/Causeway/CausewayUITests/`

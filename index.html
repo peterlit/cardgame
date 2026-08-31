@@ -219,6 +219,8 @@
   .dstreak .ic{ font-size:16px; } .dstreak .cur{ font-family:Georgia,serif; font-size:22px; font-weight:700; color:var(--gold); line-height:1.1; }
   .dstar{ font-size:12px; color:var(--gold); font-weight:700; letter-spacing:.02em; }
   .dontime{ font-size:11.5px; margin-top:8px; font-weight:600; opacity:.9; }
+  .dclears{ font-size:11.5px; margin-top:8px; font-weight:600; opacity:.9; }
+  .dclrow{ font-weight:500; opacity:.7; margin-top:2px; }
   .dontime.earned{ color:var(--gold); }
   .dontime.muted{ opacity:.55; font-weight:500; }
   .dstar-c{ font-size:11px; line-height:1; }
@@ -1330,14 +1332,34 @@ function evaluateChallenge(challenge,telemetry,onTime){
   const silver=bronze&&evaluate(challenge.silver,telemetry);
   const gold=bronze&&evaluate(challenge.gold,telemetry);
   const result={bronze,silver,gold,flawless:!!(bronze&&silver&&gold),onTime:bronze&&!!onTime};
-  if(bronze){result.moves=telemetry.moves;result.elapsed=telemetry.elapsed;}
+  // A win also logs itself as ONE run: moves/elapsed stay the day's best-of, `runs` is the per-clear
+  // history behind that best (the day card lists it back).
+  if(bronze){result.moves=telemetry.moves;result.elapsed=telemetry.elapsed;result.runs=[{moves:telemetry.moves,elapsed:telemetry.elapsed}];}
   return result;
+}
+// How many clears one day keeps (oldest trimmed first). The BEST moves/time live in moves/elapsed
+// and are never trimmed, so the cap only ever costs a heavy replayer the middle of their history.
+const RUN_LOG_MAX=20;
+// Concatenate two run logs in play order, drop exact duplicates, keep the most recent RUN_LOG_MAX.
+// A run is identified by (moves, elapsed) because the record stores no timestamp — and mergeTiers is
+// the same door a re-imported stats backup comes through, so re-importing your own file must not
+// inflate the log. Two distinct clears with the same moves AND the same whole second collapse; the
+// log is a keepsake, not a ledger.
+function mergeRuns(a,b){
+  const out=[],seen=new Set();
+  for(const r of [...(a||[]),...(b||[])]){
+    if(r==null||r.moves==null) continue;
+    const k=`${r.moves}:${r.elapsed}`; if(seen.has(k)) continue;
+    seen.add(k); out.push({moves:r.moves,elapsed:r.elapsed});
+  }
+  return out.slice(-RUN_LOG_MAX);
 }
 function mergeTiers(prev,attempt){
   const p=prev||{bronze:false,silver:false,gold:false,flawless:false,onTime:false,moves:Infinity,elapsed:Infinity};
   return{bronze:!!p.bronze||!!attempt.bronze,silver:!!p.silver||!!attempt.silver,gold:!!p.gold||!!attempt.gold,
     flawless:!!p.flawless||!!attempt.flawless,onTime:!!p.onTime||!!attempt.onTime,
-    moves:Math.min(p.moves??Infinity,attempt.moves??Infinity),elapsed:Math.min(p.elapsed??Infinity,attempt.elapsed??Infinity)};
+    moves:Math.min(p.moves??Infinity,attempt.moves??Infinity),elapsed:Math.min(p.elapsed??Infinity,attempt.elapsed??Infinity),
+    runs:mergeRuns(p.runs,attempt.runs)};   // every clear, oldest first (a loss contributes none)
 }
 function streaks(records,todayIndex){
   const has=(i,tier)=>records[i]&&records[i][tier]; const played=i=>!!records[i];
@@ -1594,9 +1616,23 @@ function renderDailyCard(){
       : graceLive
         ? `<div class="dontime">⏰ Resume your attempt today and it still counts</div>`
         : `<div class="dontime muted">⏰ Same-day is earned on the day itself</div>`;
+  // What the day has cost you so far. Every clear is logged (mergeRuns), so a solved day can show
+  // its best against the solver's par plus the shape of the attempts behind it. A record saved
+  // before the log existed has no `runs` and simply shows its banked best.
+  const runs=rec.runs||[];
+  let clearsLine='';
+  if(rec.bronze){
+    const parts=[runs.length>1?`Cleared ${runs.length}×`:'Cleared'];
+    if(Number.isFinite(rec.moves)) parts.push(`best ${rec.moves} moves`+(Number.isFinite(rec.elapsed)?` in ${fmtTime(rec.elapsed)}`:''));
+    parts.push(`par ${c.par}`);
+    clearsLine=`<div class="dclears">${parts.join(' · ')}`
+      +(runs.length>1?`<div class="dclrow">Moves each run: ${runs.map(r=>r.moves).join(' · ')}</div>`:'')
+      +`</div>`;
+  }
   document.getElementById("dailyCard").innerHTML=
     `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
+     ${clearsLine}
      ${onTimeLine}
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
      ${btn}${showBtn}`;

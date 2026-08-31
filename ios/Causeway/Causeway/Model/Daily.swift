@@ -304,6 +304,34 @@ func dailyChallenge(_ dayIndex: Int, _ pool: [PoolDay]) -> Challenge? {
 
 // MARK: - Grading, accumulation, streaks
 
+/// One clear of a day's deal: what it cost. Every win logs one (the day's `moves`/`elapsed` stay
+/// the best-of), so a solved day can show the attempts behind its best, not just the best.
+struct RunLog: Codable, Equatable {
+    var moves: Int
+    var elapsed: Int
+}
+
+/// How many clears one day keeps, oldest trimmed first. The day's BEST moves/time live in
+/// `moves`/`elapsed` and are never trimmed, so the cap only ever costs a heavy replayer the middle
+/// of their own history. Mirrors RUN_LOG_MAX in tests/daily.mjs.
+let runLogMax = 20
+
+/// Concatenate two run logs in play order, drop exact duplicates, keep the most recent `runLogMax`.
+/// A run is identified by its (moves, elapsed) pair because the record stores no timestamp — and
+/// `mergeTiers` is the same door a re-imported stats backup comes through, so re-importing your own
+/// file must not inflate the log. The cost is that two distinct clears with the same move count AND
+/// the same whole second collapse into one; the log is a keepsake, not a ledger.
+func mergeRuns(_ a: [RunLog], _ b: [RunLog]) -> [RunLog] {
+    var out: [RunLog] = [], seen = Set<String>()
+    for r in a + b {
+        let k = "\(r.moves):\(r.elapsed)"
+        if seen.contains(k) { continue }
+        seen.insert(k)
+        out.append(r)
+    }
+    return out.count > runLogMax ? Array(out.suffix(runLogMax)) : out
+}
+
 /// A day's standing (also the shape of one graded attempt). moves/elapsed are nil on a loss.
 struct TierResult: Codable, Equatable {
     var bronze = false
@@ -314,12 +342,14 @@ struct TierResult: Codable, Equatable {
     var onTime = false
     var moves: Int? = nil
     var elapsed: Int? = nil
+    /// Every clear of this day, oldest first (a loss logs none). See `mergeRuns`.
+    var runs: [RunLog] = []
 
     init(bronze: Bool = false, silver: Bool = false, gold: Bool = false, flawless: Bool = false,
-         onTime: Bool = false, moves: Int? = nil, elapsed: Int? = nil) {
+         onTime: Bool = false, moves: Int? = nil, elapsed: Int? = nil, runs: [RunLog] = []) {
         self.bronze = bronze; self.silver = silver; self.gold = gold; self.flawless = flawless
         self.onTime = onTime
-        self.moves = moves; self.elapsed = elapsed
+        self.moves = moves; self.elapsed = elapsed; self.runs = runs
     }
     // Tolerate old/partial records (e.g. a pre-Flawless day map) — decode missing keys as defaults.
     init(from decoder: Decoder) throws {
@@ -331,6 +361,7 @@ struct TierResult: Codable, Equatable {
         onTime = try c.decodeIfPresent(Bool.self, forKey: .onTime) ?? false
         moves = try c.decodeIfPresent(Int.self, forKey: .moves)
         elapsed = try c.decodeIfPresent(Int.self, forKey: .elapsed)
+        runs = try c.decodeIfPresent([RunLog].self, forKey: .runs) ?? []   // pre-log records: no history, just their banked best
     }
 }
 
@@ -357,7 +388,12 @@ func evaluateChallenge(_ challenge: Challenge, _ t: Attempt, onTime: Bool = fals
     let gold = bronze && evaluate(challenge.gold, t)
     var result = TierResult(bronze: bronze, silver: silver, gold: gold, flawless: bronze && silver && gold,
                             onTime: bronze && onTime)
-    if bronze { result.moves = t.moves; result.elapsed = t.elapsed }
+    // A win also logs itself as ONE run; moves/elapsed stay the day's best-of.
+    if bronze {
+        result.moves = t.moves
+        result.elapsed = t.elapsed
+        result.runs = [RunLog(moves: t.moves, elapsed: t.elapsed)]
+    }
     return result
 }
 
@@ -381,7 +417,8 @@ func mergeTiers(_ prev: TierResult?, _ attempt: TierResult) -> TierResult {
         flawless: p.flawless || attempt.flawless,   // sticky once any single attempt aces all three
         onTime: p.onTime || attempt.onTime,         // sticky once the day was cleared on its own date
         moves: minOpt(p.moves, attempt.moves),
-        elapsed: minOpt(p.elapsed, attempt.elapsed))
+        elapsed: minOpt(p.elapsed, attempt.elapsed),
+        runs: mergeRuns(p.runs, attempt.runs))   // every clear, oldest first (a loss contributes none)
 }
 
 struct StreakRun: Equatable { let current: Int; let best: Int; let total: Int }

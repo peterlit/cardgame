@@ -294,8 +294,37 @@ export function evaluateChallenge(challenge, telemetry, onTime = false) {
   // `onTime` is orthogonal to all of them: it records WHEN, not how well — a bare Bronze earned on
   // the day counts, and a Flawless replay of a past day does not.
   const result = { bronze, silver, gold, flawless: !!(bronze && silver && gold), onTime: bronze && !!onTime };
-  if (bronze) { result.moves = telemetry.moves; result.elapsed = telemetry.elapsed; }
+  // A win also logs itself as ONE run. `moves`/`elapsed` above stay the day's best-of; `runs` is the
+  // per-clear history behind that best (see mergeRuns).
+  if (bronze) {
+    result.moves = telemetry.moves;
+    result.elapsed = telemetry.elapsed;
+    result.runs = [{ moves: telemetry.moves, elapsed: telemetry.elapsed }];
+  }
   return result;
+}
+
+// ---- the per-day run log: what every clear of that day's deal cost ----------------------------
+// How many clears a day keeps, oldest trimmed first. The day's BEST moves/time live in
+// `moves`/`elapsed` and are never trimmed, so the cap only ever costs a heavy replayer the middle
+// of their own history.
+export const RUN_LOG_MAX = 20;
+
+// Concatenate two run logs in play order, drop exact duplicates, keep the most recent RUN_LOG_MAX.
+// A run is identified by its (moves, elapsed) pair because the record stores no timestamp — and
+// mergeTiers is the same door a re-imported stats backup comes through, so re-importing your own
+// file must not inflate the log. The cost is that two genuinely distinct clears that took the same
+// number of moves AND the same whole second collapse into one; the log is a keepsake, not a ledger.
+export function mergeRuns(a = [], b = []) {
+  const out = [], seen = new Set();
+  for (const r of [...a, ...b]) {
+    if (r == null || r.moves == null) continue;
+    const k = `${r.moves}:${r.elapsed}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ moves: r.moves, elapsed: r.elapsed });
+  }
+  return out.slice(-RUN_LOG_MAX);
 }
 
 // Accumulate a day's tiers across attempts: each tier is best-of (OR), and we keep the best moves
@@ -313,6 +342,7 @@ export function mergeTiers(prev, attempt) {
     onTime: !!p.onTime || !!attempt.onTime,         // sticky once the day was cleared on its own date
     moves: Math.min(p.moves ?? Infinity, attempt.moves ?? Infinity),
     elapsed: Math.min(p.elapsed ?? Infinity, attempt.elapsed ?? Infinity),
+    runs: mergeRuns(p.runs, attempt.runs),   // every clear, oldest first (a loss contributes none)
   };
 }
 

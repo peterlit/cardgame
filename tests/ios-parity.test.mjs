@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { RUN_LOG_MAX } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const norm = s => s.replace(/\s+/g, ' ').trim();
@@ -74,6 +75,41 @@ pin('Model/Daily.swift', 'ordering checkers (strict prefix, loose prefix, per-su
   'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',   // suitSprintOK
   'for e in t.foundationOrder where e.rank == rank && !seen[e.suit] {',           // rushCompleted
 ]);
+// ---- the per-day run log: every clear, on both platforms, with the same cap and the same key ----
+// tests/daily.mjs mergeRuns is the canonical copy (behaviour-tested there). A mirror that appended
+// without the (moves, elapsed) dedupe would double a player's history the first time they
+// re-imported their own stats backup; one that dropped the cap would grow the record without bound;
+// one that logged on a LOSS would report clears that never happened.
+test('every win logs one run and mergeTiers unions the logs on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const swift = read('Model/Daily.swift');
+  // the win — and only the win — logs exactly one run
+  assert.ok(swift.includes(norm('result.runs = [RunLog(moves: t.moves, elapsed: t.elapsed)]')),
+    'iOS evaluateChallenge no longer logs the winning run');
+  assert.ok(html.includes(norm('result.runs=[{moves:telemetry.moves,elapsed:telemetry.elapsed}]')),
+    'web evaluateChallenge no longer logs the winning run');
+  // the day accumulates them through mergeRuns
+  assert.ok(swift.includes(norm('runs: mergeRuns(p.runs, attempt.runs)')), 'iOS mergeTiers no longer unions the run logs');
+  assert.ok(html.includes(norm('runs:mergeRuns(p.runs,attempt.runs)')), 'web mergeTiers no longer unions the run logs');
+  // ...deduped on (moves, elapsed), so a re-imported backup can't inflate the history
+  assert.ok(swift.includes(norm('let k = "\\(r.moves):\\(r.elapsed)"')), 'iOS mergeRuns lost its (moves, elapsed) dedupe key');
+  assert.ok(html.includes(norm('const k=`${r.moves}:${r.elapsed}`')), 'web mergeRuns lost its (moves, elapsed) dedupe key');
+  // ...and capped at the canonical length on both platforms
+  assert.ok(swift.includes(norm(`let runLogMax = ${RUN_LOG_MAX}`)), `iOS run-log cap drifted from RUN_LOG_MAX (${RUN_LOG_MAX})`);
+  assert.ok(html.includes(norm(`const RUN_LOG_MAX=${RUN_LOG_MAX}`)), `web run-log cap drifted from RUN_LOG_MAX (${RUN_LOG_MAX})`);
+});
+
+// ---- ...and a solved day says what it cost, on both platforms ----
+test('a solved day card reports its clears, best moves and par (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const daily = read('Views/DailyView.swift');
+  assert.ok(daily.includes(norm('parts.append("par \\(par)")')), 'iOS day card stopped showing the deal\'s par');
+  assert.ok(html.includes(norm('parts.push(`par ${c.par}`)')), 'web day card stopped showing the deal\'s par');
+  for (const [name, src] of [['index.html', html], ['DailyView.swift', daily]])
+    assert.ok(src.includes(norm('Moves each run:')), `${name}: the solved day card no longer lists the moves of each clear`);
+  assert.ok(daily.includes(norm('.accessibilityIdentifier("daily.clears")')), 'iOS clears line lost its accessibility identifier');
+});
+
 // ---- the live HUD hint: end-bias is LOCKED IN once every suit holds `min` from the named end ----
 // A suit's count from one end never shrinks, so this tier is decided long before the win — but both
 // copies of objSecured used to drop it into `default: false`, so a player who had already banked

@@ -204,6 +204,9 @@ struct DailyView: View {
                     tierRow("Silver", "silver", c.silver.label, rec, future: dayView > ti)
                     tierRow("Gold", "gold", c.gold.label, rec, future: dayView > ti)
                 }
+                // What the day has cost so far — the banked best against the solver's par, and the
+                // moves of every clear behind it.
+                clearsLine(rec, par: c.par)
                 // ⏰ is earned by clearing the day on its own date — said plainly where the player
                 // decides to play, so a past-day replay can't silently fail to earn it.
                 onTimeLine(rec: rec, day: dayView, ti: ti)
@@ -257,6 +260,39 @@ struct DailyView: View {
             Spacer()
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(color)
+        }
+    }
+
+    /// "Cleared 3× · best 96 moves in 5:41 · par 72" — the day's banked best, put next to the
+    /// solver's par so the move count means something, with the clear count that produced it.
+    /// Built as a plain String on purpose: `Text("... \(m) moves")` interpolates through
+    /// LocalizedStringKey and would GROUP the digits, the same trap the deal number fell into
+    /// (bug/WF-13:daily-card-seed-grouped).
+    private func clearsSummary(_ r: TierResult, par: Int) -> String {
+        var parts = [r.runs.count > 1 ? "Cleared \(r.runs.count)×" : "Cleared"]
+        if let m = r.moves {
+            parts.append(r.elapsed.map { "best \(m) moves in " + DealFormat.time($0) } ?? "best \(m) moves")
+        }
+        parts.append("par \(par)")
+        return parts.joined(separator: " · ")
+    }
+
+    /// The per-day clear log. Only a WIN writes a record (dailyStore.record() runs at the win), so
+    /// `rec != nil && bronze` is exactly "this day has been solved". A record banked before the run
+    /// log existed decodes with `runs == []` and simply shows its best — never a "Cleared 0×".
+    @ViewBuilder private func clearsLine(_ rec: TierResult?, par: Int) -> some View {
+        if let r = rec, r.bronze {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(clearsSummary(r, par: par))
+                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                if r.runs.count > 1 {
+                    Text("Moves each run: " + r.runs.map { String($0.moves) }.joined(separator: " · "))
+                        .font(.system(size: 12)).foregroundStyle(.secondary).monospacedDigit()
+                        .fixedSize(horizontal: false, vertical: true)   // wrap a long history, never truncate
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("daily.clears")
         }
     }
 

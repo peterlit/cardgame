@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks,
-  OBJECTIVES, gradeOf, labelOf, isOnTime, objViolated, objSecured,
+  OBJECTIVES, gradeOf, labelOf, isOnTime, objViolated, objSecured, mergeRuns, RUN_LOG_MAX,
 } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -287,7 +287,7 @@ test('mergeTiers OR-accumulates tiers and keeps best moves/time across attempts'
   const silverAttempt = { bronze: true, silver: true, gold: false, moves: 95, elapsed: 200 };
   const goldAttempt   = { bronze: true, silver: false, gold: true, moves: 110, elapsed: 150 };
   const day = mergeTiers(mergeTiers(undefined, silverAttempt), goldAttempt);
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 95, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 95, elapsed: 150, runs: [] });
 });
 
 test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, best moves/time)', () => {
@@ -302,17 +302,61 @@ test('end-to-end: mergeTiers folds real evaluateChallenge results (OR tiers, bes
   assert.equal(rB.silver, true);  assert.equal(rB.gold, true);
   const day = mergeTiers(mergeTiers(undefined, rA), rB);
   // OR of tiers, and best (min) of each metric across the two attempts.
-  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150 });
+  assert.deepEqual(day, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150,
+    runs: [{ moves: 90, elapsed: 240 }, { moves: 96, elapsed: 150 }] });   // both clears logged, in play order
   // A subsequent lost attempt must not clobber the recorded best moves/time.
   const held = mergeTiers(day, evaluateChallenge(challenge, base({ won: false, moves: 5, elapsed: 5 })));
-  assert.deepEqual(held, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150 });
+  assert.deepEqual(held, { bronze: true, silver: true, gold: true, flawless: true, onTime: false, moves: 90, elapsed: 150,
+    runs: [{ moves: 90, elapsed: 240 }, { moves: 96, elapsed: 150 }] });   // ...and a loss logs no run
+});
+
+/* ---------- the per-day run log (every clear, not just the best one) ---------- */
+test('every win logs one run; the day keeps them all, oldest first', () => {
+  const ch = dailyChallenge(2, POOL);   // silver moves{N:96}, gold cells-le{N:0}
+  const win = (moves, elapsed) => evaluateChallenge(ch, base({ won: true, moves, elapsed }));
+  assert.deepEqual(win(118, 400).runs, [{ moves: 118, elapsed: 400 }]);
+  const day = [win(118, 400), win(102, 330), win(96, 290)].reduce((acc, r) => mergeTiers(acc, r), undefined);
+  assert.deepEqual(day.runs, [{ moves: 118, elapsed: 400 }, { moves: 102, elapsed: 330 }, { moves: 96, elapsed: 290 }]);
+  // The best-of fields still summarise the log (and are what the day card leads with).
+  assert.equal(day.moves, 96);
+  assert.equal(day.elapsed, 290);
+  assert.equal(day.runs.length, 3);
+  // A loss adds nothing to the log.
+  assert.deepEqual(mergeTiers(day, evaluateChallenge(ch, base({ won: false, moves: 7, elapsed: 7 }))).runs, day.runs);
+});
+
+test('the run log survives a re-imported backup without inflating (dedupe by moves+elapsed)', () => {
+  const day = mergeRuns([], [{ moves: 118, elapsed: 400 }, { moves: 96, elapsed: 290 }]);
+  assert.deepEqual(mergeRuns(day, day), day, 'importing the same records twice doubled the log');
+  // ...but a genuinely different clear is still appended.
+  assert.deepEqual(mergeRuns(day, [{ moves: 96, elapsed: 288 }]),
+    [{ moves: 118, elapsed: 400 }, { moves: 96, elapsed: 290 }, { moves: 96, elapsed: 288 }]);
+});
+
+test(`the run log keeps the most recent ${RUN_LOG_MAX} clears and drops nothing else`, () => {
+  const many = Array.from({ length: RUN_LOG_MAX + 5 }, (_, i) => ({ moves: 100 + i, elapsed: 200 + i }));
+  const log = many.reduce((acc, r) => mergeRuns(acc, [r]), []);
+  assert.equal(log.length, RUN_LOG_MAX);
+  assert.deepEqual(log[0], many[5]);                       // the five oldest were trimmed...
+  assert.deepEqual(log[log.length - 1], many[many.length - 1]);
+  // ...and the day's BEST is unaffected by the trim, because mergeTiers keeps it separately.
+  const day = many.reduce((acc, r) => mergeTiers(acc, { bronze: true, moves: r.moves, elapsed: r.elapsed, runs: [r] }), undefined);
+  assert.equal(day.moves, 100);
+  assert.equal(day.elapsed, 200);
+  assert.equal(day.runs.length, RUN_LOG_MAX);
+});
+
+test('mergeRuns ignores junk rows rather than logging holes', () => {
+  assert.deepEqual(mergeRuns([null, { moves: null, elapsed: 5 }], [{ moves: 90, elapsed: 100 }]),
+    [{ moves: 90, elapsed: 100 }]);
+  assert.deepEqual(mergeRuns(undefined, undefined), []);
 });
 
 test('mergeTiers never loses a tier already earned on a later worse attempt', () => {
   const prev = { bronze: true, silver: true, gold: true, moves: 80, elapsed: 100 };
   const worse = { bronze: true, silver: false, gold: false, moves: 200, elapsed: 300 };
   const merged = mergeTiers(prev, worse);
-  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 80, elapsed: 100 });
+  assert.deepEqual(merged, { bronze: true, silver: true, gold: true, flawless: false, onTime: false, moves: 80, elapsed: 100, runs: [] });
 });
 
 /* ---------- flawless (all three tiers in one attempt) ---------- */

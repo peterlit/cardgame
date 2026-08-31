@@ -699,3 +699,17 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Play stays catch-up-repairable, ⏰ cannot be), and no countdown timer; and argued for shipping it
     in the same release, because the record schema was being wiped anyway and no `onTime` flag can
     ever be reconstructed for days played before it exists.
+
+82. Why did the 🥈 chip stay `·` on Aug 29 when 4-K was already home in all four down foundations,
+    and (mid-task) start tracking the moves of every win and show them on the challenge screen.
+    The chip: `end-bias` fell through `objSecured`'s `default: false`, so a tier that a monotone
+    counter had already locked in never went green until the win awarded it anyway — cosmetic, but
+    it made the day's Silver look unearned for the whole endgame. Fixed in both mirrors, and
+    `objViolated`/`objSecured` (which had lived ONLY in index.html and Daily.swift, untested) were
+    ported into `tests/daily.mjs` as the canonical copy so the behaviour is covered and both mirrors
+    are pinned to it. The enhancement: every win now logs one `{moves, elapsed}` run into the day's
+    record (`mergeRuns` — dedupes on the pair so a re-imported backup can't inflate the log, keeps
+    the most recent 20, while the day's best-of moves/time stay separate and untrimmed), and a
+    solved day card reads "Cleared 3× · best 96 moves in 5:52 · par 84" over "Moves each run:
+    118 · 106 · 96". Par reaches the UI for the first time here. Records banked before the log
+    decode with an empty one and simply show their best.
