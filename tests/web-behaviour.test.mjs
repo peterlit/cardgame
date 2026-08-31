@@ -139,3 +139,62 @@ test('index.html objSecured: end-bias secures from live board state, and a viola
   assert.equal(web.objSecured(obj, up, down, blown), false,
     'web objSecured secures a tier objViolated already killed — objViolated is no longer its first gate');
 });
+
+// ---- the shipped reset gate, RUN: hasLiveGame + graceLiveNow together ----
+// bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves — the gate was a bare `moveCount>0`,
+// so a challenge OPENED yesterday and not yet moved in (both platforms persist that attempt) was
+// thrown away by `New game` / `Replay` / the deal modal with no dialog, and day D's ⏰ Same-day —
+// the one loss no replay can undo — was gone for good. String pins cannot see a wrong predicate;
+// this runs it.
+const liveGate = g => new Function(`
+  "use strict";
+  let moveCount = ${g.moveCount}, demoing = ${!!g.demoing};
+  let challengeDay = ${JSON.stringify(g.challengeDay ?? null)};
+  let challengeStartDay = ${JSON.stringify(g.challengeStartDay ?? null)};
+  const isWon = () => ${!!g.won};
+  const todayIndex = () => ${g.today};
+  ${extractDecl('graceLiveNow')}
+  ${extractDecl('hasLiveGame')}
+  return hasLiveGame();`)();
+
+test('index.html hasLiveGame: a zero-move attempt still carrying a live ⏰ grace is NOT free to discard', () => {
+  // opened day 5 on day 5, playing on day 6, no moves yet: ⏰ is still winnable today and a
+  // re-deal spends it forever → must confirm.
+  assert.equal(liveGate({ moveCount: 0, challengeDay: 5, challengeStartDay: 5, today: 6 }), true,
+    'a zero-move attempt begun yesterday forfeits its ⏰ Same-day with no confirmation');
+  // ...and the one-tap cases stay one tap.
+  assert.equal(liveGate({ moveCount: 0, challengeDay: null, challengeStartDay: null, today: 6 }), false,
+    'an untouched casual board grew a pointless confirmation');
+  assert.equal(liveGate({ moveCount: 0, challengeDay: 6, challengeStartDay: 6, today: 6 }), false,
+    "today's untouched challenge grew a confirmation — there is no grace to lose on the day itself");
+  assert.equal(liveGate({ moveCount: 0, challengeDay: 5, challengeStartDay: 5, today: 7 }), false,
+    'the grace window is D+1 only — a two-day-old attempt has no ⏰ left to protect');
+  assert.equal(liveGate({ moveCount: 3, challengeDay: null, challengeStartDay: null, today: 6 }), true,
+    'a played casual board is no longer guarded');
+  assert.equal(liveGate({ moveCount: 3, challengeDay: 5, challengeStartDay: 5, today: 6, won: true }), false,
+    'a WON board still asks — the win is already banked');
+  assert.equal(liveGate({ moveCount: 3, challengeDay: 5, challengeStartDay: 5, today: 6, demoing: true }), false,
+    'a demo line still asks — those moves are the app\'s, not the player\'s');
+});
+
+// ---- the deal number entry REFUSES what it cannot deal (parity/index.html:deal-entry-clamps-silently) ----
+// It used to clamp: typing 5000000 dealt #1000000, a different board from the one asked for, with
+// no message, while iOS (ContentView.enteredSeed) refused and named the range.
+const parseDealNumber = new Function(`
+  "use strict";
+  ${extractDecl('DEAL_MIN')}
+  ${extractDecl('parseDealNumber')}
+  return parseDealNumber;`)();
+
+test('index.html parseDealNumber: out-of-range entries are refused, never clamped to another board', () => {
+  assert.equal(parseDealNumber('5000000'), null, 'an above-range deal number is still clamped to a DIFFERENT board');
+  assert.equal(parseDealNumber('0'), null, 'a below-range deal number is still clamped to a DIFFERENT board');
+  assert.equal(parseDealNumber('-4'), null);
+  assert.equal(parseDealNumber(''), null);
+  assert.equal(parseDealNumber('  '), null);
+  assert.equal(parseDealNumber('abc'), null);
+  assert.equal(parseDealNumber('1'), 1, 'the range ends are playable');
+  assert.equal(parseDealNumber('1000000'), 1000000, 'the range ends are playable');
+  assert.equal(parseDealNumber(' 42 '), 42);
+  assert.equal(parseDealNumber('42.7'), 42, 'a fractional entry floors to a playable deal, as it always has');
+});

@@ -699,3 +699,37 @@ this order: `RegressionDemoExitRebindsDayTests` (metric-integrity) → `Regressi
 toolset (four routes exhausted; see `.qa-loop/REPORT.md`), so the landscape rail call sites of the
 new WF-3/WF-7 confirms were never exercised. A debug date override remains the highest-value
 testability change available; the ⏰ grace needs a two-day sequence to test honestly.
+
+### review-loop closeout (2026-08-31) — declined here, still open
+
+The closeout pass fixed all five carried minors (grace-at-zero-moves on both platforms, the two
+green-by-skip calendar tripwires, the web deal-entry clamp, and both self-inflicted pin findings).
+What it deliberately did NOT do, with enough detail to pick up cold:
+
+- **`winsPlay` refuses out of range, but says nothing.** `index.html`'s wins overlay has a second
+  deal-number box (`#winsDealInput`). It shared the silent clamp that
+  `parity/index.html:deal-entry-clamps-silently` reported against `goDeal`, and now shares
+  `parseDealNumber()` — so it no longer deals a board you did not ask for, but on a refusal it
+  simply does nothing (as it already did for an empty/NaN entry). The deal modal got an explained
+  refusal because its panel has a prose line (`#dealHint`) to reuse; the wins panel has no text slot
+  that isn't the results summary. Sketch: add a `<p id="winsDealErr" class="deal-err">` under
+  `.wins-deal`, reuse `setDealHint`-style toggling, and pin the copy in `tests/ios-parity.test.mjs`
+  next to the `goDeal` pin. Small, but it is new markup + CSS, which is why it was not done in a
+  no-iteration pass.
+- **`swiftFunc`'s scanner still understands only plain `"…"` literals.** The whole-body pin's
+  comment stripper is now nesting-aware for `/* … */`, but a `"""multi-line"""` or `#"raw"#` literal
+  inside a pinned body would still be mis-scanned. Rather than write a full Swift lexer, `swiftFunc`
+  now ASSERTS that no such literal appears in the body it pinned, so the failure is loud and named
+  instead of a bogus "a statement was added". If a pinned body ever needs one of those literals,
+  teach the scanner then.
+- **The two calendar XCUITests still skip on a DATE.** `testTappingALockedFutureDayExplainsWhy`
+  skips on the last day of the month and `testPlayButtonNamesTheSelectedDay` on the 1st, because the
+  grid draws the current month only. That is now the *only* permitted kind of skip in that file (see
+  its SKIP POLICY header) — no skip may be keyed on a locator a fix introduces. The real cure is the
+  already-filed `bug/DailyView:calendar-cells-have-no-identifier` plus a debug date override, which
+  would let these run on any date against a fixed calendar.
+- **Both grace fixes are unverified on a device.** `hasLiveGame` now ORs in the ⏰ grace on iOS and
+  web; the web predicate is *run* by `tests/web-behaviour.test.mjs`
+  ("a zero-move attempt still carrying a live ⏰ grace"), the iOS one only string-pinned, and the
+  dialog itself needs a two-day sequence (open a challenge, roll the clock a day, tap `New game`)
+  that this toolset cannot stage. Same environment gap as the rest of the ⏰ work.

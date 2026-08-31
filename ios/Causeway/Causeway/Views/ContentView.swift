@@ -367,20 +367,25 @@ struct ContentView: View {
         }
     }
     private var resetConfirmMessage: String {
-        let cost = "Your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded."
+        // A zero-move board reaches this dialog only through a live ⏰ grace (Game.hasLiveGame):
+        // there are no moves and no clock to spend, so "Your 0 moves ... will be discarded" would
+        // be both false and alarming. Drop the sentence instead of printing a zero.
+        let cost = game.moveCount == 0 ? nil
+            : "Your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded."
         // The ⏰ case is NOT covered by "you can replay the challenge afterwards": the tiers come
         // back, the same-day award never does. Say exactly what is unrecoverable.
         if game.graceLive, let day = game.challengeDay {
             let d = dayLabel(day)
-            return "You began \(d)'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. "
-                 + "Starting over makes it an attempt begun today, and \(d) can never earn ⏰ again. " + cost
+            return ["You began \(d)'s challenge on the day itself, so finishing it today still earns ⏰ Same-day."
+                    + " Starting over makes it an attempt begun today, and \(d) can never earn ⏰ again.",
+                    cost].compactMap { $0 }.joined(separator: " ")
         }
         // A daily attempt is replayable, a casual game is not — the daily-specific promise must
         // never be reused for a casual game, whose loss really is final. (Same split as
         // DailyView's confirmation copy.)
-        return game.challengeDay != nil
-            ? cost + " You can replay the challenge afterwards."
-            : cost + " This game is not a challenge, so there is no way back to it."
+        return [cost, game.challengeDay != nil
+                ? "You can replay the challenge afterwards."
+                : "This game is not a challenge, so there is no way back to it."].compactMap { $0 }.joined(separator: " ")
     }
 
     /// Landscape LEFT rail — the toolbar controls as a narrow vertical column of full-width pills,

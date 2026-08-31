@@ -152,22 +152,11 @@ test('iOS objViolated handles every objective family the generator can emit (no 
       `iOS objViolated has no branch for '${id}' — it falls through to \`default: false\`, so that tier's chip can never go ✗ and neither auto-play refusal will ever protect it`);
   for (const dead of ['aces-first', 'split-even', 'cells-le-1'])
     assert.ok(!body.includes(`case "${dead}"`), `iOS objViolated is back on the retired id '${dead}'`);
-  // Bodies, family for family, against tests/daily.mjs objViolated (behaviour-tested in daily.test.mjs).
-  for (const snippet of [
-    'case "moves":    return t.moves > (p.N ?? 0)',
-    'case "no-undo":  return t.undos > 0',
-    'case "cells-le": return t.cellUses > (p.N ?? 0)',
-    'case "max-run":  return t.maxRunMoved > (p.N ?? 1)',
-    'case "big-move": return false',
-    'let r = p.R ?? 7, x = upDown(t) return x.u.contains { $0 > r } || x.d.contains { $0 > 13 - r }',
-    'let m = p.min ?? 0, x = upDown(t) return (p.end == "up" ? x.d : x.u).contains { $0 > 13 - m }',
-    'case "ends-first":     return !endsFirstOK(t, p)',
-    'case "before-ace":     return !beforeAceOK(t, p)',
-    'case "suit-top-first": return !suitTopFirstOK(t, p)',
-    'case "suit-sprint":    return !suitSprintOK(t)',
-    'let n = p.N ?? 0 if let at = rushCompleted(t, p.rank ?? 1) { return at > n } return t.moves > n',
-    'case "suit-balance":   return maxSpread(t) > (p.N ?? 13)',
-  ]) assert.ok(body.includes(norm(snippet)), `iOS objViolated drifted from the canonical rule: ${snippet}`);
+  // No per-branch substring pins here: every one of them was a substring of the WHOLE-BODY
+  // equality pin below (IOS_BODIES['Model/Daily.swift objViolated']), so a canonical-rule
+  // change had to be transcribed twice in this one file and the weaker copy could only ever
+  // fail where the stronger one already did. The coverage checks above are NOT redundant:
+  // they are driven by the generator's own OBJECTIVES table, which the pinned text is not.
 });
 
 // ---- ...and no line may be SPLICED INTO the three functions that carry the iOS refusals ----
@@ -187,7 +176,17 @@ const stripSwiftComments = src => {
   while (i < src.length) {
     const c = src[i], n = src[i + 1];
     if (c === '/' && n === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; continue; }
-    if (c === '/' && n === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; out += ' '; continue; }
+    if (c === '/' && n === '*') {                     // Swift block comments NEST: /* a /* b */ still open */
+      let depth = 1; i += 2;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '/' && src[i + 1] === '*') { depth++; i += 2; continue; }
+        if (src[i] === '*' && src[i + 1] === '/') { depth--; i += 2; continue; }
+        i++;
+      }
+      out += ' '; continue;
+    }
+    // Only plain "..." literals are understood. A multi-line ("""…""") or raw (#"…"#) literal
+    // inside a pinned body would be mis-scanned, so swiftFunc asserts that none appears.
     if (c === '"') {                                  // string literal: copied through verbatim
       out += c; i++;
       while (i < src.length) {
@@ -219,8 +218,25 @@ function swiftFunc(file, decl) {
     i++;
   }
   assert.ok(opened && depth === 0, `${file}: unterminated body for \`${decl}\``);
-  return norm(src.slice(0, i));
+  const body = src.slice(0, i);
+  // The scanner understands only plain "..." literals; a multi-line or raw literal in the body
+  // would be mis-read (its contents scanned as code), so fail loudly rather than pin garbage.
+  assert.ok(!/"""|#"/.test(body),
+    `${file}: \`${decl}\` contains a multi-line or raw string literal — this pin's scanner cannot read those`);
+  return norm(body);
 }
+
+// The pins above promise that a COMMENT edit is free. That promise is only as good as the
+// stripper, and Swift's block comments nest — a `/* … /* … */ … */` inside a pinned body used to
+// end at the FIRST `*/`, leaking the outer comment's tail (braces included) into the brace matcher
+// and truncating the body, so a pure comment edit failed the pin with "a statement was added".
+test('the whole-body pin\'s comment stripper is nesting-aware (a comment edit stays free)', () => {
+  assert.equal(norm(stripSwiftComments('func f() { /* a /* b */ still comment } */ return 1 }')),
+    'func f() { return 1 }');
+  assert.equal(norm(stripSwiftComments('func f() { // } not code\n return 1 }')), 'func f() { return 1 }');
+  // ...and comment markers INSIDE a string literal are still code.
+  assert.equal(norm(stripSwiftComments('let s = "a /* b */ c" // x')), 'let s = "a /* b */ c"');
+});
 
 const IOS_BODIES = {
   'Model/Daily.swift objViolated': ['Model/Daily.swift', 'func objViolated(',
@@ -539,7 +555,7 @@ test('board reset controls confirm only when there is a live game to lose (no we
   assert.ok(content.includes(norm('if game.hasLiveGame { pendingReset = action } else { performReset(action) }')),
     'iOS reset confirmation is no longer gated on hasLiveGame (an untouched board must stay one tap)');
   // web: same gate, same two-branch copy.
-  assert.ok(html.includes(norm('function hasLiveGame(){ return moveCount>0 && !isWon() && !demoing; }')),
+  assert.ok(html.includes(norm('function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !demoing; }')),
     'web lost its hasLiveGame gate');
   assert.ok(html.includes(norm('if(!hasLiveGame()) return true;')), 'web confirmReset is no longer state-gated');
   assert.ok(html.includes(norm('document.getElementById("replayBtn").onclick=()=>{ if(!confirmReset()) return; restartDeal(); };')),
@@ -551,6 +567,19 @@ test('board reset controls confirm only when there is a live game to lose (no we
     assert.ok(src.includes(norm('This game is not a challenge, so there is no way back to it.')),
       `${name}: the casual reset copy lost its "no way back" warning`);
   }
+  // ...and the gate is NOT a bare move count: a challenge opened yesterday and not yet moved in
+  // (moveCount == 0) still has day D's ⏰ riding on it, and a re-deal spends it forever
+  // (bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves). Both platforms OR in the grace.
+  assert.ok(read('Model/Game.swift').includes(
+    norm('var hasLiveGame: Bool { (moveCount > 0 || graceLive) && !won && !demoing && !boardComplete }')),
+    'iOS hasLiveGame is back on a bare move count — a zero-move attempt begun yesterday forfeits its ⏰ with no dialog');
+  // and neither dialog may then say "your 0 moves ... will be discarded".
+  assert.ok(content.includes(norm('let cost = game.moveCount == 0 ? nil')),
+    'ContentView reset copy no longer drops the cost sentence at zero moves');
+  assert.ok(read('Views/DailyView.swift').includes(norm('let lead = game.moveCount == 0 ? cause')),
+    'DailyView reset copy no longer drops the cost sentence at zero moves');
+  assert.ok(html.includes(norm("const cost = moveCount===0 ? '' :")),
+    'web reset copy no longer drops the cost sentence at zero moves');
 });
 
 // ---- the Deal # alert's `Play` is destructive and must say so ----

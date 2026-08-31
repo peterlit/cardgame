@@ -36,6 +36,11 @@
 //     "daily.cal.<dayIndex>" (+ .accessibilityElement(children: .combine)) filed
 //     in .qa-loop/fragments/round-2-regression.json.
 //   - The legend row is plain Text; queried by its verbatim "⏰ Same-day".
+//   - SKIP POLICY: a skip in this file may only be keyed on the CALENDAR
+//     DATE — which days this month's grid can possibly draw. It may NEVER be
+//     keyed on a locator the fix introduces (e.g. "locked until that date"):
+//     such a tripwire goes GREEN-BY-SKIP the moment the fix is deleted
+//     (tests/RegressionDailyCalendarTests.swift:skip-instead-of-fail).
 //
 import XCTest
 
@@ -49,26 +54,46 @@ final class RegressionDailyCalendarTests: XCTestCase {
     /// answer the tap with a dated explanation instead of swallowing it.
     func testTappingALockedFutureDayExplainsWhy() throws {
 
+        // The precondition is decided by the DATE, never by the fix's own locator. This used to
+        // skip when no element was labelled "…locked until that date" — the label the fix adds —
+        // so deleting the fix turned the test green-by-skip. The grid draws the current month
+        // only, so a future cell exists exactly when today is not the last day of the month.
+        let cal = Calendar(identifier: .gregorian)
+        let now = Date()
+        guard let tomorrow = cal.date(byAdding: .day, value: 1, to: now),
+              cal.component(.month, from: tomorrow) == cal.component(.month, from: now) else {
+            throw XCTSkip("today is the last day of the month — the grid shows this month only, so it holds no future cell")
+        }
+        let fmt = DateFormatter(); fmt.dateFormat = "MMM d"    // Daily.dayLabel's wording
+        let dayName = fmt.string(from: tomorrow)
+
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         openDailyCalendar(app)
 
-        // Locked cells announce themselves — no date arithmetic needed.
-        let locked = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label ENDSWITH %@", "locked until that date"))
-            .firstMatch
-        try XCTSkipUnless(locked.waitForExistence(timeout: 5),
-                          "no future in-pool day on screen (calendar past the end of the pool?)")
+        _ = app.staticTexts["⏰ Same-day"].waitForExistence(timeout: 5)   // let the grid render
+
+        // Tomorrow's cell. A SEEDED future day is labelled "<day>, locked until that date"; a day
+        // past the end of the pool keeps the plain "<day>". Either way the tap must be answered,
+        // so match both and assert — a missing cell is a failure, not a skip. The day card carries
+        // the same wording, so take the shortest match (cells are 40 pt tall).
+        let cells = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", dayName, dayName + ","))
+            .allElementsBoundByIndex
+            .filter { $0.frame.height > 0 }
+            .sorted { $0.frame.height < $1.frame.height }
+        XCTAssertFalse(cells.isEmpty,
+                       "no calendar cell for \(dayName) — the month grid, or the accessibility labels on its cells, is gone")
 
         XCTAssertFalse(app.staticTexts["daily.lockednote"].exists,
                        "the locked note must appear in ANSWER to a tap, not stand permanently")
-        locked.tap()
+        cells[0].tap()
 
         let note = app.staticTexts["daily.lockednote"]
         XCTAssertTrue(note.waitForExistence(timeout: 3),
                       "a tap on a future day was swallowed with zero feedback — the round-1 bug is back")
-        XCTAssertTrue(note.label.contains("unlocks on the day itself"),
+        XCTAssertTrue(note.label.contains("unlocks on the day itself") || note.label.contains("No challenge on"),
                       "the note must say WHY the day cannot be opened, got: \(note.label)")
     }
 
@@ -102,7 +127,13 @@ final class RegressionDailyCalendarTests: XCTestCase {
             .allElementsBoundByIndex
             .filter { $0.frame.height > 0 }
             .sorted { $0.frame.height < $1.frame.height }
-        try XCTSkipUnless(!candidates.isEmpty, "no calendar cell for \(dayName) on screen")
+        // Yesterday is in THIS month's grid unless today is the 1st — again a date decision, so a
+        // calendar that lost its cells (or their labels) fails here instead of skipping.
+        if cal.component(.day, from: Date()) == 1 {
+            try XCTSkipIf(candidates.isEmpty, "today is the 1st — yesterday belongs to last month, which the grid does not draw")
+        }
+        XCTAssertFalse(candidates.isEmpty,
+                       "no calendar cell for \(dayName) — the month grid, or the accessibility labels on its cells, is gone")
         candidates[0].tap()
 
         XCTAssertTrue(play.label.contains(dayName),

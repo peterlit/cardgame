@@ -387,7 +387,7 @@
 <div class="overlay" id="dealOverlay">
   <div class="panel">
     <h2>Play a deal</h2>
-    <p>Enter a deal number (1–1,000,000).</p>
+    <p id="dealHint">Enter a deal number (1–1,000,000).</p>
     <input id="dealInput" class="deal-input" type="number" min="1" max="1000000" inputmode="numeric" />
     <div class="deal-actions">
       <button class="btn primary" id="dealGo">Play</button>
@@ -1805,24 +1805,44 @@ function openWinsDetail(a,b){
   back.onclick=openWins;
 }
 function closeWins(){ document.getElementById("winsOverlay").classList.remove("show"); }
+// The engine deals 1–1,000,000 and nothing else. Both entry points used to CLAMP, so typing
+// 5000000 silently dealt #1000000 — a different board from the one asked for, with no message
+// (parity/index.html:deal-entry-clamps-silently). The iOS twin (ContentView.enteredSeed) refuses
+// and names the range; this returns null for anything unplayable so the callers can do the same.
+const DEAL_MIN = 1, DEAL_MAX = 1000000;
+const DEAL_HINT = "Enter a deal number (1–1,000,000).";
+function parseDealNumber(v){
+  const t=String(v).trim();
+  if(t==="" || isNaN(+t)) return null;
+  const n=Math.floor(+t);
+  return (n>=DEAL_MIN && n<=DEAL_MAX) ? n : null;
+}
+// The deal modal's one line of prose doubles as its error line: the refusal has to be legible
+// right where the number was typed, and the panel has no other text slot.
+function setDealHint(msg, bad){
+  const p=document.getElementById("dealHint");
+  p.textContent=msg;
+  p.style.color = bad ? "#d9534f" : "";
+}
 function winsPlay(){
-  const v=document.getElementById("winsDealInput").value.trim();
-  if(v==="" || isNaN(+v)) return;
-  const n=Math.max(1, Math.min(1000000, Math.floor(+v)));
+  // No hint line in the wins panel: refuse (leaving the entry on screen to correct) rather than
+  // deal a board the player did not ask for.
+  const n=parseDealNumber(document.getElementById("winsDealInput").value);
+  if(n===null) return;
   closeWins(); deal(n);
 }
 
 function openDeal(){
   const inp=document.getElementById("dealInput");
   inp.value=seed;
+  setDealHint(DEAL_HINT, false);
   document.getElementById("dealOverlay").classList.add("show");
   setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 }
 function closeDeal(){ document.getElementById("dealOverlay").classList.remove("show"); }
 function goDeal(){
-  const v=document.getElementById("dealInput").value.trim();
-  if(v==="" || isNaN(+v)) return;
-  const n=Math.max(1, Math.min(1000000, Math.floor(+v)));
+  const n=parseDealNumber(document.getElementById("dealInput").value);
+  if(n===null){ setDealHint("Deal numbers run 1–1,000,000 — that entry is not one of them.", true); return; }
   // The field is pre-filled with the CURRENT deal, so `Play` reads as the harmless "play this
   // deal" while it actually re-deals and destroys whatever is in progress — including a live
   // daily attempt (ux/WF-7:deal-play-discards-live-game-no-confirm). Same state gate as the
@@ -1834,7 +1854,10 @@ function goDeal(){
 /* ---------- wiring ---------- */
 // Is there a real, unfinished game a re-deal would destroy? (iOS twin: Game.hasLiveGame.)
 // False on an untouched board, a solved board and mid-demo, so the one-tap cases stay one tap.
-function hasLiveGame(){ return moveCount>0 && !isWon() && !demoing; }
+// `graceLiveNow()` is the exception to the move count: a challenge OPENED yesterday and not yet
+// moved in still has something a re-deal destroys forever — day D's ⏰ Same-day, which any restart
+// re-stamps to today (bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves).
+function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !demoing; }
 // The board's own destructive controls confirm before throwing a live game away — the Daily sheet
 // has guarded exactly this destruction since round 0, while `New game` / `Replay`, the most
 // reachable controls on the screen, went straight through (ux/WF-3:board-reset-pills-no-confirm).
@@ -1842,18 +1865,20 @@ function hasLiveGame(){ return moveCount>0 && !isWon() && !demoing; }
 // that does not exist.
 function confirmReset(){
   if(!hasLiveGame()) return true;
-  const cost = `Your ${moveCount} move${moveCount===1?'':'s'} and your time will be discarded.`;
+  // A zero-move board reaches this dialog only through a live ⏰ grace (hasLiveGame): there are no
+  // moves and no clock to spend, so "Your 0 moves…" would be both false and alarming.
+  const cost = moveCount===0 ? '' : ` Your ${moveCount} move${moveCount===1?'':'s'} and your time will be discarded.`;
   // The ⏰ grace is the one loss "you can replay the challenge afterwards" does not cover: the
   // tiers come back, the same-day award never does, because every re-deal re-stamps the start day
   // to today (ux/WF-14:replay-forfeits-grace-silently). Preserving challengeStartDay across the
   // restart would be the WRONG fix — it would let a fresh run begun on D+1 bank ⏰.
   if(graceLiveNow()){
     const d = fmtDayLabel(challengeDay);
-    return confirm(`Give up ⏰ Same-day for ${d}? You began ${d}'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. Starting over makes it an attempt begun today, and ${d} can never earn ⏰ again. ${cost}`);
+    return confirm(`Give up ⏰ Same-day for ${d}? You began ${d}'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. Starting over makes it an attempt begun today, and ${d} can never earn ⏰ again.${cost}`);
   }
   return confirm(challengeDay!=null
-    ? `End your daily attempt? ${cost} You can replay the challenge afterwards.`
-    : `Discard the game in progress? ${cost} This game is not a challenge, so there is no way back to it.`);
+    ? `End your daily attempt?${cost} You can replay the challenge afterwards.`
+    : `Discard the game in progress?${cost} This game is not a challenge, so there is no way back to it.`);
 }
 // Is a ⏰ same-day GRACE riding on the current attempt? Exactly isOnTime's grace window: begun on
 // day D, still unfinished, being played on D+1. (iOS twin: Game.graceLive.)

@@ -429,7 +429,11 @@ final class Game: ObservableObject {
     ///   with a non-zero move count.
     /// - `demoing` keeps it off an auto-played demo line: those moves are the app's, not the
     ///   player's, and Stop/Done re-deals it anyway.
-    var hasLiveGame: Bool { moveCount > 0 && !won && !demoing && !boardComplete }
+    /// - `graceLive` is the exception to the move count: a challenge OPENED yesterday and not yet
+    ///   moved in still has something a re-deal destroys forever — day D's ⏰ Same-day, which any
+    ///   restart re-stamps to today (bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves).
+    ///   It cannot fire on a finished attempt: recordChallengeResult clears challengeDay at the win.
+    var hasLiveGame: Bool { (moveCount > 0 || graceLive) && !won && !demoing && !boardComplete }
 
     /// Dismiss the win overlay through the model. The finished game was already cleared from
     /// storage by onWin(); we just drop the banner and leave the solved board on screen.

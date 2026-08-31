@@ -55,17 +55,21 @@ struct DailyView: View {
         case .play:  cause = "Starting this challenge re-deals the board"
         case .none:  cause = "This re-deals the board"
         }
-        let cost = "your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded"
+        // A zero-move board reaches this dialog only through a live ⏰ grace (Game.hasLiveGame):
+        // nothing has been played, so the clause naming the cost is dropped rather than printing
+        // "your 0 moves" (bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves).
+        let lead = game.moveCount == 0 ? cause
+            : "\(cause), so your \(game.moveCount) move\(game.moveCount == 1 ? "" : "s") and your time will be discarded"
         // The ⏰ grace is the one loss "you can replay the challenge afterwards" does not cover:
         // the tiers come back, the same-day award never does (ux/WF-14:replay-forfeits-grace-silently).
         if game.graceLive, let day = game.challengeDay {
             let d = dayLabel(day)
-            return "\(cause), so \(cost). You began \(d)'s challenge on the day itself — starting over "
+            return "\(lead). You began \(d)'s challenge on the day itself — starting over "
                  + "makes it an attempt begun today, and \(d) can never earn ⏰ Same-day again."
         }
         return game.challengeDay != nil
-            ? "\(cause), so \(cost). You can replay the challenge afterwards."
-            : "\(cause), so \(cost). This game is not a challenge, so there is no way back to it."
+            ? "\(lead). You can replay the challenge afterwards."
+            : "\(lead). This game is not a challenge, so there is no way back to it."
     }
     private var confirmVerb: String {
         if case .demo = pending { return "Show demo" }
