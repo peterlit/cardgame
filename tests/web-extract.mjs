@@ -72,13 +72,26 @@ function scanTo(src, i, stopAtSemicolon) {
 
 /// Lift the top-level `function NAME(...)` / `const NAME = ...` / `let NAME = ...` declaration.
 /// A multi-declarator statement (`const a=..., b=...;`) comes back whole — ask for one of its names.
-export function extractDecl(name) {
-  const re = new RegExp(`^[ \\t]*(function|const|let)[ \\t]+${name}\\b`, 'm');
-  const m = re.exec(htmlSource);
-  if (!m) throw new Error(`index.html: no top-level declaration of \`${name}\` — was it renamed or deleted?`);
-  const start = m.index + (m[0].length - m[0].trimStart().length);
-  const end = scanTo(htmlSource, start, m[1] !== 'function');
-  return htmlSource.slice(start, end);
+///
+/// ANCHORED AT COLUMN 0, and ambiguity is an error, not a silent pick. index.html writes every
+/// top-level declaration flush left and indents everything nested, so column 0 is what "top level"
+/// means in this file. The earlier `^[ \t]*` version accepted an INDENTED declaration of the same
+/// name — a local `const objViolated = ...` inside some handler — and, taking the first match, could
+/// hand the behavioural tests a copy the app never calls while reporting success. Everything else in
+/// this file is built on "we ran the shipped code", so a wrong-declaration pick is the one failure
+/// that must never be quiet. Two flush-left declarations of one name is likewise a hard error: JS
+/// would let `function` redeclare, and we would have no way to say which one the page ends up using.
+export function extractDecl(name, src = htmlSource) {
+  const re = new RegExp(`^(function|const|let)[ \\t]+${name}\\b`, 'gm');
+  const hits = [...src.matchAll(re)];
+  if (!hits.length) throw new Error(`index.html: no top-level (column-0) declaration of \`${name}\` — was it renamed, deleted, or indented into a nested scope?`);
+  if (hits.length > 1) {
+    const lines = hits.map(h => src.slice(0, h.index).split('\n').length);
+    throw new Error(`index.html: \`${name}\` is declared ${hits.length} times at top level (lines ${lines.join(', ')}) — extraction would silently pick one; remove the duplicate`);
+  }
+  const m = hits[0];
+  const end = scanTo(src, m.index, m[1] !== 'function');
+  return src.slice(m.index, end);
 }
 
 // Dependency order matters only for `const` (TDZ); functions hoist. Kept explicit so a reader can
@@ -98,7 +111,7 @@ const EXPORTS = NAMES.filter(n => n === n.toLowerCase() || /^[a-z]/.test(n));
 /// Build a fresh sandbox holding the shipped web functions. `g` seeds the page globals; the
 /// returned object exposes the functions plus a `set(globals)` to move the board between cases.
 export function loadWeb(g = {}) {
-  const body = NAMES.map(extractDecl).join('\n');
+  const body = NAMES.map(n => extractDecl(n)).join('\n');   // not point-free: map's index arg would land in `src`
   const src = `
     "use strict";
     const NCELLS = 4, NCOLS = 8;

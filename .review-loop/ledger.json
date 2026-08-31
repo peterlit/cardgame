@@ -1,178 +1,238 @@
 {
-  "round": 1,
-  "round_start_sha": "a65bb3bee66e9aeccd71cb6f94285939840c1dd7",
+  "round": 2,
+  "round_start_sha": "ee4e78a8a16a8e2164d338b38211c93a4d04a0d4",
   "max_rounds": 2,
   "token_budget": null,
   "findings": [
     {
       "id": "persistence/DailyView.swift:import-drops-run-log",
-      "claim": "The stats-backup importer rebuilds every imported day with TierResult(bronze:silver:gold:flawless:onTime:moves:elapsed:) and never passes `runs`, so the newly-added per-day clear log is silently discarded on import. On the feature's primary use case \u2014 restoring onto a new device \u2014 every solved day comes back with runs == [], and the new day card reports 'Cleared \u00b7 best 96 moves in 5:41 \u00b7 par 72' instead of 'Cleared 4x ... Moves each run: ...', permanently losing the history the backup file actually contained.",
-      "evidence": [
-        "ios/Causeway/Causeway/Views/DailyView.swift:467-474",
-        "ios/Causeway/Causeway/Model/Daily.swift:346 (TierResult.runs defaults to [])",
-        "ios/Causeway/Causeway/Model/DailyStore.swift:33-38 (merge -> mergeTiers(local, imported); mergeRuns([], local) keeps only local)",
-        "ios/Causeway/Causeway/Views/DailyView.swift:1547-1554 (clearsSummary keys the count off r.runs.count)"
-      ],
+      "claim": "The stats-backup importer rebuilt every imported day without `runs`, so restoring onto a new device silently returned every solved day with an empty clear log.",
+      "evidence": {},
       "severity": "major",
-      "region": "ios/Causeway/Causeway/Views/DailyView.swift:460-480",
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:467-482",
       "introduced_by_fix": false,
-      "current_status": "open",
-      "note": "StatsBackup encodes/decodes runs correctly (TierResult is Codable); only the sanitising re-construction at the import site drops it. Fix is one argument: runs: r.runs (optionally filtered to rows with moves > 0).",
+      "current_status": "fixed",
+      "note": "VERIFIED. DailyView.swift:480 now passes runs: Array(r.runs.filter { $0.moves > 0 && $0.elapsed > 0 }.suffix(runLogMax)); TierResult.init has the runs: parameter (Daily.swift:348-353) and runLogMax is a file-level let (Daily.swift:317). I ran the full xcodebuild for scheme Causeway against udid 4ED50A7D \u2014 BUILD SUCCEEDED, exit 0, so the implementer's build claim holds. Mutants ios-import-drops-run-log (runs: []) and my added x-ios-import-runs-cap-zero (.suffix(0)) both KILLED. Caveat, not a defect: the only guard is the ios-parity string pin (no Swift test target), so it pins the literal expression, not the behaviour.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
         }
       ]
     },
     {
       "id": "tests/autofinish-tiers.test.mjs:tautological-refusal-assert",
-      "claim": "The assertion that is supposed to prove auto-play refuses every tier-breaking send is a tautology: `refusals` and `unguardedBreaks` are both incremented inside the same `if (violated(after))` statement, so `assert.equal(refusals, unguardedBreaks)` can never fail for any implementation. The test named 'the look-ahead must refuse it' exercises no look-ahead code at all \u2014 it recomputes split-at's violation rule inline and compares it to itself.",
-      "evidence": [
-        "tests/autofinish-tiers.test.mjs:150 (let refusals = 0, unguardedBreaks = 0)",
-        "tests/autofinish-tiers.test.mjs:161 (if (violated(after)) { unguardedBreaks++; refusals++; })",
-        "tests/autofinish-tiers.test.mjs:166 (assert.equal(refusals, unguardedBreaks, 'every breaking send must be refused'))"
-      ],
+      "claim": "refusals and unguardedBreaks were incremented in the same statement, so assert.equal(refusals, unguardedBreaks) could not fail for any implementation.",
+      "evidence": {},
       "severity": "major",
-      "region": "tests/autofinish-tiers.test.mjs:140-170",
+      "region": "tests/autofinish-tiers.test.mjs:155-190",
       "introduced_by_fix": true,
-      "current_status": "open",
-      "note": "The only surviving real assertion in that test is unguardedBreaks > 0, i.e. 'the repro still exists'. Nothing checks that any shipped autoSendWouldBreakTier declines it.",
+      "current_status": "fixed",
+      "note": "VERIFIED. The counter is now driven by `const refused = web.autoSendWouldBreakTier(c, toUp)` \u2014 the SHIPPED index.html function lifted by web-extract \u2014 and the `allowed > 0` control rules out a blanket block. Mutation-confirmed both ways: web-autoSendWouldBreakTier-neutered KILLED, and my added x-web-autoSend-always-bail (make the function return false unconditionally) KILLED. See the new finding tests/autofinish-tiers.test.mjs:lookahead-attempt-fields-unpinned for what this test still does not constrain.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
         }
       ]
     },
     {
       "id": "tests/engine.mjs:sim-send-order-untested",
-      "claim": "MUTATION-PROVEN: deleting `if(sent) continue;` from simulateAutoFinish \u2014 the exact edit the diff says is 'what lets prediction and execution agree card-for-card', because a different order predicts a different SPLIT \u2014 survives the entire node suite (120 tests still pass), including the 'canon: days 21, 24, 27' test and the 21k-position differential test. The differential oracle only compares `won`, which the file itself documents as order-independent, so no test constrains the predicted send order that autoFinishTierCost's split prediction is built on. A future reorder of the cascade would ship a Finish-cost dialog that names the wrong tiers with a green suite.",
-      "evidence": [
-        "tests/engine.mjs:102 (`if(sent) continue;`) \u2014 mutant `canon-sim-order-restart` -> replacement ';' -> outcome SURVIVED",
-        "tests/autofinish-tiers.test.mjs:2795-2820 (sweepWouldWin oracle compares .won only)",
-        "tests/autofinish-tiers.test.mjs:2662-2679 (days 21/24/27 canon did not move under the mutant)"
-      ],
+      "claim": "Deleting `if(sent) continue;` from simulateAutoFinish changed the predicted send order and survived the whole suite, so nothing constrained the order autoFinishTierCost's split prediction is built on.",
+      "evidence": {},
       "severity": "major",
-      "region": "tests/engine.mjs:78-110",
+      "region": "tests/autofinish-tiers.test.mjs:293-371",
       "introduced_by_fix": true,
-      "current_status": "open",
-      "note": "mutate.py run had 0 errors; kill/survive outcomes are verified. Needed: an assertion that simulateAutoFinish().events equals the stream produced by looping the canonical sendOneHomeStep from the same position.",
+      "current_status": "fixed",
+      "note": "VERIFIED. stepwiseSends() is a genuinely independent oracle \u2014 it loops sendOneHomeStep (engine.mjs:122-135), which returns after every single send and therefore has no `if(sent) continue` analogue to co-mutate \u2014 and the test compares events/moves/won over the full ~22k-position corpus, plus the SHIPPED index.html simulateAutoFinish on a 1-in-7 sample. Mutants engine-sim-order-restart and web-sim-order-restart both KILLED. Suite still runs in 1.2s, so no runtime regression from the extra corpus walk.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
         }
       ]
     },
     {
       "id": "parity/index.html:objViolated-untested-on-both-shipped-copies",
-      "claim": "MUTATION-PROVEN: the rewritten fail-fast checker objViolated has zero behavioural coverage in either shipped copy. Mutating index.html's `case 'moves'` and `case 'end-bias'` bodies to `return false`, and iOS Daily.swift's `case \"end-bias\"` body to `return false`, all SURVIVE the full node suite. That is the same blind spot that let this function sit on a dead pre-parameterised id set ('aces-first', 'split-even', 'cells-le-1') for months with every objective falling through to `default: false` \u2014 the very regression this diff fixes. Only tests/daily.mjs's new canonical copy is tested (and only for end-bias and split-at); no parity test compares the shipped copies to it.",
-      "evidence": [
-        "index.html:1682 (`case 'moves': return t.moves>p.N;`) \u2014 mutant -> `return false;` -> SURVIVED",
-        "index.html:1689 (`case 'end-bias': ... .some(x=>x>13-p.min);`) \u2014 mutant -> `return false;` -> SURVIVED",
-        "ios/Causeway/Causeway/Model/Daily.swift:465-468 \u2014 mutant `return (p.end == \"up\" ? x.d : x.u).contains { $0 > 13 - m }` -> `return false` -> SURVIVED",
-        "tests/daily.test.mjs:183,186,194 \u2014 the only objViolated assertions in the suite (end-bias x2, split-at x1) and they exercise tests/daily.mjs only",
-        "control: the ios-parity text pin DOES kill an objSecured edit (mutant ios-objSecured-endbias-off-by-one -> KILLED), showing pins work where they exist and objViolated has none"
-      ],
+      "claim": "objViolated had zero behavioural coverage in either shipped copy; neutering case bodies to `return false` survived the suite.",
+      "evidence": {},
       "severity": "major",
-      "region": "index.html:1678-1700; ios/Causeway/Causeway/Model/Daily.swift:454-480",
+      "region": "index.html:1678-1701; ios/Causeway/Causeway/Model/Daily.swift:454-482",
       "introduced_by_fix": false,
-      "current_status": "open",
-      "note": "Cheapest fix: add objViolated to the ios-parity pin lists for both files (as objSecured already is), plus per-family behavioural cases in daily.test.mjs for the 11 uncovered ids.",
+      "current_status": "partial",
+      "note": "WEB HALF GENUINELY FIXED: web-behaviour.test.mjs runs the lifted index.html objViolated over every family with a violated AND a live row, and the registry-driven coverage assert makes an unlisted family fail. Mutation-confirmed beyond the implementer's own manifest: my x-web-objViolated-early-false (insert `return false;` at index.html:1679, before the switch) KILLED; x-web-splitat-off-by-one (x>p.R -> x>=p.R) KILLED; x-web-endbias-off-by-one KILLED. IOS HALF STILL UNCOVERED: the Swift guard is text-only, and text pins are blind to inserted lines \u2014 my x-ios-objViolated-early-false, which appends `; if 1 == 1 { return false }` to Daily.swift:455 and blacks out every iOS \u2717 chip plus both iOS auto-play refusals, SURVIVED the full suite. Actionable fix is in tests/ios-parity.test.mjs:pins-blind-to-inserted-lines.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
         }
       ]
     },
     {
       "id": "parity/index.html:web-tier-refusal-untested",
-      "claim": "MUTATION-PROVEN: both web halves of bug/WF-4 can be neutered without any test noticing. Replacing `const sLive=!objViolated(ch.silver,base), gLive=!objViolated(ch.gold,base);` with `const sLive=false, gLive=false;` in autoSendWouldBreakTier (index.html:698) and in autoFinishTierCost (index.html:991) both SURVIVE the full node suite. With that mutation auto-play resumes denying Gold and the auto-finish prompt resumes firing mid-flawless-line \u2014 exactly the shipped bugs \u2014 and the suite stays green. The ios-parity guards for this feature are string pins on other lines of the same functions, so they do not cover the live/lost comparison.",
-      "evidence": [
-        "index.html:698 \u2014 mutant `web-autoSendWouldBreakTier-neutered` -> SURVIVED",
-        "index.html:991 \u2014 mutant `web-autoFinishTierCost-neutered` -> SURVIVED",
-        "tests/ios-parity.test.mjs:509-554 (the WF-4 test asserts only that specific source strings are present)",
-        "tests/autofinish-tiers.test.mjs imports simulateAutoFinish/isSafeAutoplay from tests/engine.mjs \u2014 it never loads index.html or the Swift"
-      ],
+      "claim": "Both web halves of bug/WF-4 could be neutered (`const sLive=false, gLive=false`) without any test noticing.",
+      "evidence": {},
       "severity": "major",
-      "region": "index.html:683-712, index.html:985-1005",
+      "region": "index.html:693-703, index.html:988-1002; ios/Causeway/Causeway/Model/Game.swift:681-700",
       "introduced_by_fix": true,
-      "current_status": "open",
-      "note": "Same shape applies to iOS Game.autoSendWouldBreakTier/autoFinishTierCost, which have no XCTest at all (the UI test target has no unit tests for Game).",
+      "current_status": "partial",
+      "note": "WEB HALF FIXED: web-autoSendWouldBreakTier-neutered and web-autoFinishTierCost-neutered are both KILLED, and I re-ran the manifest myself (13/13 killed, 0 survived, errors 0 \u2014 kill counts verified, not taken on trust). The day-21 test really does assert autoFinishTierCost() == ['\ud83e\udd47 Gold'] against the lifted shipped function, with a casual-play and a free-finish control. IOS HALF STILL UNCOVERED: x-ios-autoSend-early-false, which appends `; if 1 == 1 { return false }` to Game.swift:683 and switches the iOS refusal off entirely (auto-play resumes denying Gold), SURVIVED the full suite \u2014 the new occurrence-count pin at ios-parity.test.mjs:576-580 only sees edits to the lines it names.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
         }
       ]
     },
     {
       "id": "bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves",
-      "claim": "The 'never forfeit the same-day grace silently' guard is gated on hasLiveGame, which requires moveCount > 0. A challenge started on day D with zero moves made (open the sheet, tap Play, background the app) restores on D+1 with challengeDay=D, challengeStartDay=D and moveCount=0, so graceLive is true but hasLiveGame is false: New game / Replay / Deal-Play reset with no dialog, restartDeal re-stamps challengeStartDay to D+1, and day D can never earn the on-time award again. Both platforms.",
-      "evidence": [
-        "ios/Causeway/Causeway/Model/Game.swift:432 (hasLiveGame requires moveCount > 0)",
-        "ios/Causeway/Causeway/Views/ContentView.swift:343 (requestReset gates the whole confirmation on hasLiveGame)",
-        "ios/Causeway/Causeway/Model/Game.swift:258 (challengeStartDay is persisted, so a 0-move attempt survives relaunch)",
-        "index.html:1841 (hasLiveGame) and index.html:1849 (confirmReset returns true immediately when !hasLiveGame())"
-      ],
+      "claim": "The same-day grace confirmation is gated on hasLiveGame (moveCount > 0), so a zero-move challenge attempt is reset with no dialog and day D can never earn its on-time award again.",
+      "evidence": {},
       "severity": "minor",
       "region": "ios/Causeway/Causeway/Model/Game.swift:428-436; index.html:1837-1860",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "Fix: OR graceLive into the gate (`hasLiveGame || graceLive`) so the grace dialog can fire at move 0.",
+      "note": "Not routed this round; untouched by the diff. Re-confirmed Game.swift:432 still reads `moveCount > 0 && !won && !demoing && !boardComplete`.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
           "status": "open"
         }
       ]
     },
     {
       "id": "tests/RegressionDailyCalendarTests.swift:skip-instead-of-fail",
-      "claim": "Two of the three calendar tripwires call XCTSkipUnless on the very locator the fix introduces, so removing the fix turns the test GREEN (skipped) rather than red. Deleting the `.accessibilityLabel(locked ? \"...locked until that date\" : ...)` added in this diff makes the locked-cell query find nothing and testTappingALockedFutureDayExplainsWhy skips; likewise the Play-names-the-day test skips whenever the cell-label query returns nothing. A regression tripwire that reports 'skipped' on the regression is not a tripwire.",
-      "evidence": [
-        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:61-62 (try XCTSkipUnless(locked.waitForExistence...))",
-        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:105 (try XCTSkipUnless(!candidates.isEmpty ...))",
-        "ios/Causeway/Causeway/Views/DailyView.swift:615 (the .accessibilityLabel these queries depend on, added in this diff)"
-      ],
+      "claim": "Two calendar tripwires call XCTSkipUnless on the locator the fix introduces, so deleting the fix turns the test green (skipped) rather than red.",
+      "evidence": {},
       "severity": "minor",
       "region": "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:50-110",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "The files themselves flag the calendar cells as 'the brittle part'; the fix is a stable identifier (daily.cal.<idx>) plus XCTAssertTrue rather than XCTSkipUnless once the pool is known to contain a future day.",
+      "note": "Not routed this round; untouched by the diff. Re-confirmed both XCTSkipUnless calls are still at :61 and :105.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
           "status": "open"
         }
       ]
     },
     {
       "id": "parity/index.html:deal-entry-clamps-silently",
-      "claim": "ux/WF-9 (deal entry out of range is silent) was fixed on iOS only. The web deal modal still clamps: goDeal() does Math.max(1, Math.min(1000000, ...)), so typing 5000000 deals #1000000 with no message \u2014 the player gets a different deal from the one they asked for, and after this diff that clamp now also runs behind a 'discard your game?' confirmation. iOS instead refuses the entry and says 'Deal numbers run 1-1,000,000.'",
-      "evidence": [
-        "index.html:1825 (const n=Math.max(1, Math.min(1000000, Math.floor(+v)));)",
-        "ios/Causeway/Causeway/Views/WinsView.swift:70-73 (entryProblem) and the enteredSeed nil-on-out-of-range rule",
-        "tests/ios-parity.test.mjs has no pin for the deal-entry range on either platform"
-      ],
+      "claim": "The web deal modal still clamps out-of-range deal numbers instead of refusing them, so typing 5000000 silently deals #1000000; iOS refuses and names the range.",
+      "evidence": {},
       "severity": "minor",
       "region": "index.html:1822-1832",
       "introduced_by_fix": false,
       "current_status": "open",
-      "note": "Cheap: reject and show the range in the web modal, matching WinsView.entryProblem.",
+      "note": "Not routed this round; untouched by the diff. Re-confirmed index.html:1825 still reads `const n=Math.max(1, Math.min(1000000, Math.floor(+v)));`.",
       "first_seen_round": 0,
       "status_history": [
         {
           "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/ios-parity.test.mjs:pins-blind-to-inserted-lines",
+      "claim": "Every new Swift guard this round is a `body.includes(...)` / occurrence-count string pin, which detects EDITS to the quoted lines but is structurally blind to an INSERTED line. Appending `; if 1 == 1 { return false }` to Daily.swift:455 (objViolated) or Game.swift:683 (autoSendWouldBreakTier) leaves every pin satisfied while disabling every iOS tier \u2717 chip and both iOS auto-play refusals \u2014 i.e. shipping bug/WF-4 back verbatim on iOS with a green suite.",
+      "evidence": [
+        "tests/ios-parity.test.mjs:144-176",
+        "tests/ios-parity.test.mjs:571-580",
+        "ios/Causeway/Causeway/Model/Daily.swift:454-456",
+        "ios/Causeway/Causeway/Model/Game.swift:681-687"
+      ],
+      "severity": "major",
+      "region": "tests/ios-parity.test.mjs:133-180",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "MUTATION-PROVEN this round: x-ios-objViolated-early-false SURVIVED, x-ios-autoSend-early-false SURVIVED (my manifest, 0 errors, so the survivals are real applies). Cheap insertion-proof fix without a Swift test target: for these two functions assert the NORMALISED WHOLE BODY equals an expected string (assert.equal, not includes) rather than asserting each snippet is present; or at minimum pin the head exactly, e.g. `func objViolated(_ obj: Objective, _ t: Attempt) -> Bool { let p = obj.param switch obj.id {` and `guard let ch = liveChallenge else { return false } var t = liveAttempt() let silverWasLive =`, so nothing can be spliced in front of the switch. The implementer's honest 'Swift has no test target' note explains the limit but does not remove it \u2014 the pin can be made insertion-proof for the same cost.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/autofinish-tiers.test.mjs:lookahead-attempt-fields-unpinned",
+      "claim": "The new behavioural guard on the shipped autoSendWouldBreakTier only exercises day 29, whose Gold is a split-at objective \u2014 it reads neither `moves` nor `moveIdx` of the projected attempt. So the look-ahead's projection depth is unconstrained: changing index.html:700 `moves:moveCount+1` to `moves:moveCount` survives the whole suite, and so does replacing index.html:701 `moveIdx:moveCount+1` with a constant. Concrete failure: on a day whose Silver/Gold is the 'moves' family with budget N, at moveCount == N the projected attempt reports N instead of N+1, objViolated returns false, and auto-play spends the budget-breaking move with zero player input \u2014 the exact bug/WF-4 shape, on a family the new tests never touch. `moveIdx` is what rank-rush and suit-sprint deadlines are read from, same story.",
+      "evidence": [
+        "tests/autofinish-tiers.test.mjs:155-190",
+        "index.html:700-701",
+        "index.html:1682",
+        "index.html:1694-1697"
+      ],
+      "severity": "major",
+      "region": "index.html:696-702; tests/autofinish-tiers.test.mjs:155-190",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "MUTATION-PROVEN: my mutants x-web-lookahead-depth-off (moves:moveCount+1 -> moves:moveCount) and x-web-lookahead-moveidx-off (moveIdx:moveCount+1 -> moveIdx:1) both SURVIVED the full suite (manifest ran with 0 errors). The whole objViolated table in web-behaviour.test.mjs does not help here \u2014 it calls objViolated directly with hand-built attempts, so it never sees which attempt autoSendWouldBreakTier builds. Cheapest fix: a direct unit case on web.autoSendWouldBreakTier with a synthetic 'moves' challenge at the exact budget boundary (moveCount == N must refuse, moveCount == N-2 must allow), and one rank-rush case that depends on moveIdx.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/web-extract.mjs:decl-regex-not-top-level",
+      "claim": "extractDecl's regex is `^[ \\t]*(function|const|let)[ \\t]+NAME\\b`, so it matches an INDENTED (nested) declaration anywhere in index.html, not the top-level one the docstring promises, and the first textual match wins. A future local helper with a colliding name silently swaps the code under test with no error, breaking the load-bearing 'we run the shipped code' property of the whole round.",
+      "evidence": [
+        "tests/web-extract.mjs:76",
+        "tests/web-extract.mjs:73-74",
+        "tests/web-extract.mjs:19-21"
+      ],
+      "severity": "minor",
+      "region": "tests/web-extract.mjs:73-82",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "CONFIRMED by experiment on a scratch copy of index.html: injecting `  const objViolated = () => false;` at line 100 (1578 lines above the real one at 1678) made loadWeb() succeed and return the decoy \u2014 web.objViolated({id:'moves',param:{N:1}}, {moves:99}) came back false, no throw. No live defect today: I checked all 29 NAMES and each has exactly one declaration, at column 0. The exposure is that several lifted names are exported but never called by any assertion (isSafeAutoplay, autoFinishWouldWin, evaluate, gradeOf, labelOf, makeObjective, foldHome), so a shadow on those would not be caught by a failing test either. One-character fix: drop `[ \\t]*` from the regex.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
           "status": "open"
         }
       ]
@@ -182,9 +242,14 @@
   "usage": {
     "0": {
       "reviewer": 165896
+    },
+    "1": {
+      "implementer": 94901,
+      "reviewer": 78083
     }
   },
   "round_shas": {
-    "1": "a65bb3bee66e9aeccd71cb6f94285939840c1dd7"
+    "1": "a65bb3bee66e9aeccd71cb6f94285939840c1dd7",
+    "2": "ee4e78a8a16a8e2164d338b38211c93a4d04a0d4"
   }
 }

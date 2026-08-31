@@ -15,9 +15,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { objViolated as canonViolated, objSecured as canonSecured, OBJECTIVES } from './daily.mjs';
-import { loadWeb, blankTelem } from './web-extract.mjs';
+import { loadWeb, blankTelem, extractDecl } from './web-extract.mjs';
 
 const web = loadWeb();
+
+
+// The extraction itself is load-bearing: every assertion in this file means "the SHIPPED code does
+// this" only if extractDecl really returned the shipped declaration. It used to accept an indented
+// match, so a nested local of the same name could be lifted instead of the top-level one the page
+// calls — and the tests would go green on the decoy. Anchored at column 0 now, with ambiguity fatal.
+test('extractDecl lifts the top-level declaration, never an indented decoy, and refuses ambiguity', () => {
+  const shipped = `function objViolated(obj, t){ return true; }\n`;
+  const decoy = `  const objViolated = (obj, t) => false;\n`;
+  assert.match(extractDecl('objViolated', decoy + shipped), /return true/,
+    'extractDecl picked an INDENTED declaration over the top-level one — the behavioural tests below would be running code the page never calls');
+  assert.match(extractDecl('objViolated', shipped + decoy), /return true/);
+  assert.throws(() => extractDecl('objViolated', decoy),
+    /no top-level \(column-0\) declaration/,
+    'extractDecl accepted a nested-only declaration as if it were shipped code');
+  assert.throws(() => extractDecl('objViolated', shipped + shipped),
+    /declared 2 times at top level/,
+    'two flush-left declarations of one name must be an error, not a silent pick of the first');
+  assert.throws(() => extractDecl('noSuchShippedFunction'), /noSuchShippedFunction/);
+});
 
 // One foundation event stream from a compact "suit rank end" spec; moveIdx is 1-based play order.
 const fo = (...evs) => evs.map(([suit, rank, end], i) => ({ suit, rank, end, moveIdx: i + 1 }));

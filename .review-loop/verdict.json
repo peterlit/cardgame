@@ -1,0 +1,16 @@
+{
+  "round": 1,
+  "blockers_open": 0,
+  "majors_open": 4,
+  "minors_open": 4,
+  "closed": 3,
+  "new": 3,
+  "reopened": 0,
+  "promoted": 0,
+  "demoted": 0,
+  "net": 0,
+  "tokens": 172984,
+  "cumulative_tokens": 338880,
+  "decision": "continue",
+  "reason": "progress continuing"
+}

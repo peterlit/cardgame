@@ -170,6 +170,96 @@ test('iOS objViolated handles every objective family the generator can emit (no 
   ]) assert.ok(body.includes(norm(snippet)), `iOS objViolated drifted from the canonical rule: ${snippet}`);
 });
 
+// ---- ...and no line may be SPLICED INTO the three functions that carry the iOS refusals ----
+// Every other iOS guard here is a substring pin. A substring pin sees an EDIT to the line it quotes
+// and is structurally blind to an INSERTED one: appending `; if 1 == 1 { return false }` after
+// `let p = obj.param` blacks out every iOS tier ✗ chip, and the same splice in
+// autoSendWouldBreakTier switches the auto-play refusal off (bug/WF-4, shipped back verbatim) —
+// with every pin above still satisfied. Both mutants survived a full suite run.
+//
+// So these three bodies — the fail-fast checker and the two refusals computed from it — are pinned
+// WHOLE, by equality, not by substring. Comments and formatting are stripped first, so re-wrapping
+// a line or rewriting a comment is free; adding, removing or reordering a STATEMENT is not. When a
+// body legitimately changes, re-derive the expected text (the failure prints the actual) after
+// re-checking the behaviour against tests/daily.mjs and the shipped web copy.
+const stripSwiftComments = src => {
+  let out = '', i = 0;
+  while (i < src.length) {
+    const c = src[i], n = src[i + 1];
+    if (c === '/' && n === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; continue; }
+    if (c === '/' && n === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 2; out += ' '; continue; }
+    if (c === '"') {                                  // string literal: copied through verbatim
+      out += c; i++;
+      while (i < src.length) {
+        if (src[i] === '\\') { out += src.slice(i, i + 2); i += 2; continue; }
+        out += src[i]; if (src[i] === '"') { i++; break; }
+        i++;
+      }
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
+};
+
+/// The whole text of a Swift func, from its declaration to the `}` that closes its body, with
+/// comments removed and whitespace collapsed. Brace-matched, so it is immune to line renumbering.
+function swiftFunc(file, decl) {
+  const raw = readFileSync(join(IOS, file), 'utf8');
+  const at = raw.indexOf(decl);
+  assert.ok(at >= 0, `${file}: no declaration \`${decl}\` — was it renamed or deleted?`);
+  assert.equal(raw.indexOf(decl, at + 1), -1, `${file}: \`${decl}\` is declared twice — this pin would be ambiguous`);
+  const src = stripSwiftComments(raw.slice(at));
+  let depth = 0, i = 0, opened = false;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"') { i++; while (i < src.length) { if (src[i] === '\\') { i += 2; continue; } if (src[i] === '"') { i++; break; } i++; } continue; }
+    if (c === '{') { depth++; opened = true; }
+    else if (c === '}') { depth--; if (depth === 0 && opened) { i++; break; } }
+    i++;
+  }
+  assert.ok(opened && depth === 0, `${file}: unterminated body for \`${decl}\``);
+  return norm(src.slice(0, i));
+}
+
+const IOS_BODIES = {
+  'Model/Daily.swift objViolated': ['Model/Daily.swift', 'func objViolated(',
+    'func objViolated(_ obj: Objective, _ t: Attempt) -> Bool { let p = obj.param switch obj.id { ' +
+    'case "moves": return t.moves > (p.N ?? 0) case "no-undo": return t.undos > 0 ' +
+    'case "cells-le": return t.cellUses > (p.N ?? 0) case "max-run": return t.maxRunMoved > (p.N ?? 1) ' +
+    'case "big-move": return false case "split-at": let r = p.R ?? 7, x = upDown(t) ' +
+    'return x.u.contains { $0 > r } || x.d.contains { $0 > 13 - r } case "end-bias": ' +
+    'let m = p.min ?? 0, x = upDown(t) return (p.end == "up" ? x.d : x.u).contains { $0 > 13 - m } ' +
+    'case "ends-first": return !endsFirstOK(t, p) case "before-ace": return !beforeAceOK(t, p) ' +
+    'case "suit-top-first": return !suitTopFirstOK(t, p) case "suit-sprint": return !suitSprintOK(t) ' +
+    'case "rank-rush": let n = p.N ?? 0 if let at = rushCompleted(t, p.rank ?? 1) { return at > n } ' +
+    'return t.moves > n case "suit-balance": return maxSpread(t) > (p.N ?? 13) default: return false } }'],
+  'Model/Game.swift autoSendWouldBreakTier': ['Model/Game.swift', 'private func autoSendWouldBreakTier(',
+    'private func autoSendWouldBreakTier(_ c: Card, toUp: Bool) -> Bool { ' +
+    'guard let ch = liveChallenge else { return false } var t = liveAttempt() ' +
+    'let silverWasLive = !objViolated(ch.silver, t) let goldWasLive = !objViolated(ch.gold, t) ' +
+    'guard silverWasLive || goldWasLive else { return false } t.moves = moveCount + 1 ' +
+    't.foundationOrder.append(FoundationEvent(suit: c.suit.rawValue, rank: c.rank, ' +
+    'end: toUp ? "up" : "down", moveIdx: t.moves)) ' +
+    'return (silverWasLive && objViolated(ch.silver, t)) || (goldWasLive && objViolated(ch.gold, t)) }'],
+  'Model/Game.swift autoFinishTierCost': ['Model/Game.swift', 'func autoFinishTierCost(',
+    'func autoFinishTierCost() -> [String] { guard let ch = liveChallenge else { return [] } ' +
+    'var t = liveAttempt() let silverWasLive = !objViolated(ch.silver, t) ' +
+    'let goldWasLive = !objViolated(ch.gold, t) guard silverWasLive || goldWasLive else { return [] } ' +
+    'let sim = simulateAutoFinish() guard sim.won else { return [] } t.won = true t.moves = sim.moves ' +
+    't.foundationOrder.append(contentsOf: sim.events) let after = evaluateChallenge(ch, t) ' +
+    'var lost: [String] = [] if silverWasLive && !after.silver { lost.append("🥈 Silver") } ' +
+    'if goldWasLive && !after.gold { lost.append("🥇 Gold") } return lost }'],
+};
+
+test('the iOS fail-fast checker and both refusals are pinned WHOLE — nothing can be spliced into them', () => {
+  for (const [label, [file, decl, expected]] of Object.entries(IOS_BODIES))
+    assert.equal(swiftFunc(file, decl), expected,
+      `${label} changed shape. A statement was added, removed or reordered in a function that decides ` +
+      `whether a tier chip goes ✗ and whether auto-play/auto-finish may spend a live tier. Re-verify the ` +
+      `behaviour against tests/daily.mjs and the shipped web copy, then update the expected text here.`);
+});
+
 // ---- a restored stats backup must bring the per-day clear log with it ----
 // The importer re-builds every imported TierResult field by field (to sanitise hand-edited files),
 // and left `runs` off the constructor — so restoring onto a NEW DEVICE, the feature's whole point,

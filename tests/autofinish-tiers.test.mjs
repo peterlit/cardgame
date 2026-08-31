@@ -369,3 +369,54 @@ test('the predicted cascade is the executed cascade, card for card (both shipped
   // The comparison must have real work to compare: mostly-empty event streams would prove nothing.
   assert.ok(withSends > 1000, `only ${withSends} positions have any cascade at all — the corpus stopped exercising the send order`);
 });
+
+// ---------------------------------------------------------------------------------------------
+// HOW FAR AHEAD the look-ahead looks. The day-29 case above is a `split-at` day: its checker reads
+// only the foundation ENDS, so it never touches the projected attempt's `moves` or `moveIdx`, and
+// both were therefore unconstrained by any test — changing index.html's `moves:moveCount+1` to
+// `moves:moveCount`, or its `moveIdx:moveCount+1` to a constant, survived the whole suite.
+//
+// The projection must be the position AFTER the send, because that is the position the send would
+// create: the app increments moveCount and only then calls recordHomed(), which stamps the event
+// with the incremented count (index.html:713/474-475, Game.autoplayOneStep/recordHomed). Off by one
+// here is a live bug, not a test detail: on a `moves` day with budget N, at moveCount == N the
+// projection would report N moves, objViolated would say "still live", and auto-play would spend
+// the budget-breaking move with no player input — bug/WF-4 exactly, on a family day 29 never has.
+//
+// A hand-built one-day pool is the point: it puts the boundary under the test's control instead of
+// waiting for the calendar to roll a moves-family day at exactly the wrong move count.
+const soloPool = (silver, gold = { id: 'big-move', param: { N: 5 } }) =>
+  [{ seed: 1, par: 40, silver, gold }];   // big-move Gold: a positive goal, never violated, so it
+                                          // keeps a tier "live" without contributing a refusal
+const telemOf = (foundationOrder = []) => ({ cellUses: 0, undos: 0, foundationOrder, maxRunMoved: 0 });
+
+test('the look-ahead projects the position AFTER the send: a moves budget refuses at its boundary', () => {
+  const N = 60;
+  const at = moveCount => {
+    web.set({ challengeDay: 0, dailyPool: soloPool({ id: 'moves', param: { N } }), moveCount, telem: telemOf() });
+    return web.autoSendWouldBreakTier({ suit: 0, rank: 1 }, true);
+  };
+  assert.equal(at(N), true,
+    `on a ${N}-move day, auto-play at move ${N} may not spend the move that blows the budget — the look-ahead must count the send it is about to make (moves: moveCount + 1)`);
+  assert.equal(at(N - 1), false,
+    'the look-ahead is projecting more than one move ahead — it refused the last send the budget actually affords');
+  assert.equal(at(1), false, 'the moves look-ahead has become a blanket block on a moves day');
+  // Budget already blown: the tier is lost, so it stops blocking anything and the sweep runs on.
+  assert.equal(at(N + 5), false,
+    'a moves objective already lost is still blocking auto-play — the endgame sweep would never run');
+});
+
+test('the look-ahead stamps the projected event with the move number it would really get (rank-rush deadline)', () => {
+  // Three aces are home on moves 1-3; the fourth would land on move 4. `rank-rush` reads the
+  // moveIdx of the fourth, so a constant/off-by-one stamp is only visible here.
+  const threeAces = [0, 1, 2].map(suit => ({ suit, rank: 1, end: 'up', moveIdx: suit + 1 }));
+  const fourth = { suit: 3, rank: 1 };
+  const at = N => {
+    web.set({ challengeDay: 0, dailyPool: soloPool({ id: 'rank-rush', param: { rank: 1, N } }), moveCount: 3, telem: telemOf(threeAces) });
+    return web.autoSendWouldBreakTier(fourth, true);
+  };
+  assert.equal(at(3), true,
+    'auto-play would send the fourth Ace on move 4 against a "within 3 moves" deadline and report the tier intact — the projected event\'s moveIdx is not the move it would land on');
+  assert.equal(at(4), false,
+    'the look-ahead refuses a fourth Ace that lands exactly on the deadline — its projected moveIdx is running ahead of the real move number');
+});
