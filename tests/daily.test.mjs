@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   dayIndexFor, dailyChallenge, evaluate, evaluateChallenge, mergeTiers, streaks,
-  OBJECTIVES, gradeOf, labelOf, isOnTime,
+  OBJECTIVES, gradeOf, labelOf, isOnTime, objViolated, objSecured,
 } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -137,6 +137,62 @@ test('end-bias counts how much of every suit came from the named end', () => {
   assert.equal(ev('end-bias', { end: 'up', min: 13 }, base({ foundationOrder: fullStream([13, 13, 13, 13]) })), true);
   assert.equal(ev('end-bias', { end: 'down', min: 13 }, base({ foundationOrder: fullStream([0, 0, 0, 0]) })), true);
   assert.equal(ev('end-bias', { end: 'down', min: 13 }, base({ foundationOrder: fullStream([1, 0, 0, 0]) })), false);
+});
+
+/* ---------- the live HUD hints (objViolated / objSecured) ---------- */
+// A mid-game stream: every suit has taken K down to `low[s]` from the King end, `hi[s]` up from the
+// Ace end, and the deal is NOT won. Returns the telemetry plus the live up/down foundation ranks the
+// board would show (up = highest rank home, 0 = empty; down = lowest rank home, 14 = empty).
+const midGame = (low, hi = [0, 0, 0, 0]) => {
+  const fo = [];
+  let i = 0;
+  for (let s = 0; s < 4; s++) for (let r = 1; r <= hi[s]; r++) fo.push(f(s, r, 'up', ++i));
+  for (let s = 0; s < 4; s++) for (let r = 13; r >= low[s]; r--) fo.push(f(s, r, 'down', ++i));
+  return { t: base({ won: false, foundationOrder: fo }), up: hi.slice(), down: low.map(r => (r > 13 ? 14 : r)) };
+};
+const secured = (obj, g) => objSecured(obj, g.up, g.down, g.t);
+
+// The bug this pins: Aug 29's Silver is end-bias{down, 9}. A player holding 4-K in all four down
+// foundations (10 from the King end) had already banked it, but the 🥈 chip stayed `·` to the last
+// move because end-bias fell through objSecured's default. The count from an end never shrinks, so
+// it IS securable the moment every suit reaches `min`.
+test('end-bias is secured as soon as every suit holds `min` from the named end', () => {
+  const obj = { id: 'end-bias', param: { end: 'down', min: 9 } };
+  assert.equal(secured(obj, midGame([4, 4, 4, 4])), true);    // 10 down per suit — Aug 29's case
+  assert.equal(secured(obj, midGame([5, 5, 5, 5])), true);    // exactly 9 down per suit
+  assert.equal(secured(obj, midGame([6, 6, 6, 6])), false);   // 8 down — one suit short of the bar
+  assert.equal(secured(obj, midGame([4, 4, 4, 6])), false);   // three suits there, the fourth isn't
+  assert.equal(secured(obj, midGame([14, 14, 14, 14])), false);   // untouched board
+  // ...and the Ace-end variant reads the other pile.
+  const upObj = { id: 'end-bias', param: { end: 'up', min: 9 } };
+  assert.equal(secured(upObj, midGame([14, 14, 14, 14], [9, 9, 9, 9])), true);
+  assert.equal(secured(upObj, midGame([14, 14, 14, 14], [9, 8, 9, 9])), false);
+});
+
+test('a secured end-bias is one the win-time checker really does award', () => {
+  const obj = { id: 'end-bias', param: { end: 'down', min: 9 } };
+  assert.equal(secured(obj, midGame([4, 4, 4, 4])), true);
+  // Finish that same line — the rest of every suit comes up — and the authoritative checker agrees.
+  assert.equal(ev('end-bias', obj.param, base({ foundationOrder: fullStream([3, 3, 3, 3]) })), true);
+});
+
+test('end-bias goes ✗ once the other end has taken too much, and is never both ✗ and ✓', () => {
+  const obj = { id: 'end-bias', param: { end: 'down', min: 9 } };
+  // min 9 from the King end caps the Ace end at 4; a fifth card up makes the tier impossible.
+  const blown = midGame([14, 14, 14, 14], [5, 0, 0, 0]);
+  assert.equal(objViolated(obj, blown.t), true);
+  assert.equal(secured(obj, blown), false);
+  const fine = midGame([14, 14, 14, 14], [4, 4, 4, 4]);
+  assert.equal(objViolated(obj, fine.t), false);
+  assert.equal(secured(obj, fine), false);   // still live: nothing from the King end yet
+});
+
+test('split-at stays unsecured mid-game — a later send can still break an exact split', () => {
+  // The neighbouring family end-bias is now secured early; split-at must NOT be, since its check is
+  // an equality the player can still overshoot.
+  const g = midGame([8, 8, 8, 8], [7, 7, 7, 7]);   // every suit already sitting on the R = 7 split
+  assert.equal(objViolated({ id: 'split-at', param: { R: 7 } }, g.t), false);
+  assert.equal(secured({ id: 'split-at', param: { R: 7 } }, g), false);
 });
 
 test('ends-first: the required cards come home first, and nothing else may jump the queue', () => {

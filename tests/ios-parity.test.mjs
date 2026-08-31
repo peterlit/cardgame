@@ -74,6 +74,26 @@ pin('Model/Daily.swift', 'ordering checkers (strict prefix, loose prefix, per-su
   'for T in 0..<4 where T != S && started[T] && home[T] < 13 { return false }',   // suitSprintOK
   'for e in t.foundationOrder where e.rank == rank && !seen[e.suit] {',           // rushCompleted
 ]);
+// ---- the live HUD hint: end-bias is LOCKED IN once every suit holds `min` from the named end ----
+// A suit's count from one end never shrinks, so this tier is decided long before the win — but both
+// copies of objSecured used to drop it into `default: false`, so a player who had already banked
+// (say) 10 from the King end against Aug 29's end-bias{down, 9} watched the 🥈 chip sit on `·` until
+// the win awarded it anyway. tests/daily.mjs objSecured is the canonical, behaviour-tested copy;
+// these pin the two shipped mirrors to it, and pin out the comment that licensed the old default.
+test('objSecured secures end-bias from live board state on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const swift = read('Model/Daily.swift');
+  assert.ok(swift.includes(norm(`case "end-bias":
+        let m = p.min ?? 0
+        return p.end == "up" ? up.allSatisfy { $0 >= m } : down.allSatisfy { 14 - $0 >= m }`)),
+    'iOS objSecured no longer secures end-bias from the live up/down foundations');
+  assert.ok(html.includes(norm(`case 'end-bias':       { const m=p.min; return p.end==='up' ? up.every(u=>u>=m) : down.every(d=>14-d>=m); }`)),
+    'web objSecured no longer secures end-bias from the live up/down foundations');
+  for (const [name, src] of [['index.html', html], ['Daily.swift', swift]])
+    assert.ok(!src.includes(norm('end-restrictions — not securable')),
+      `${name}: objSecured is back to treating end-bias as unsecurable until the win`);
+});
+
 pin('Model/Daily.swift', 'grades and labels derive from the parameter', [
   'case "cells-le":     return (p.N ?? 0) == 0 ? .gold : .silver',
   'case "end-bias":     return (p.min ?? 0) >= 10 ? .gold : .silver',

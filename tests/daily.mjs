@@ -196,6 +196,64 @@ export const OBJECTIVES = {
   },
 };
 
+// ---- the live HUD hints (UI-only; the checkers above stay authoritative at the win) ----------
+// The board chip answers two questions about an attempt IN PROGRESS: is this tier already
+// impossible (✗), and is it already guaranteed (✓)? Both are mirrored in index.html and
+// ios/.../Daily.swift; this is the canonical, tested copy the drift guards pin them to.
+
+// Has this objective already been made IMPOSSIBLE (fail-fast)? Mirrors each checker's violation
+// branch, family for family, with the SAME parameters the checkers read.
+export function objViolated(obj, t) {
+  const p = obj.param || {}, fo = t.foundationOrder;
+  const won = { ...t, won: true };   // the order-only half of each checker: they end with `return t.won`
+  switch (obj.id) {
+    case 'moves':          return t.moves > p.N;
+    case 'no-undo':        return t.undos > 0;
+    case 'cells-le':       return t.cellUses > p.N;
+    case 'max-run':        return (t.maxRunMoved ?? 0) > p.N;
+    case 'big-move':       return false;                       // positive goal — always still reachable
+    case 'split-at':       { const { u, d } = upDown(t); return u.some(x => x > p.R) || d.some(x => x > 13 - p.R); }
+    // Needing `min` of every suit from one end caps the OTHER pile at 13 - min.
+    case 'end-bias':       { const { u, d } = upDown(t); return (p.end === 'up' ? d : u).some(x => x > 13 - p.min); }
+    case 'ends-first':     return !endsFirst(won, p);
+    case 'before-ace':     return !beforeAce(won, p);
+    case 'suit-top-first': return !suitTopFirst(won, p);
+    case 'suit-sprint':    return !suitSprint(won);
+    case 'rank-rush':      { const seen = [false, false, false, false]; let n = 0;
+                             for (const e of fo) { if (e.rank !== p.rank || seen[e.suit]) continue; seen[e.suit] = true;
+                               if (++n === 4) return e.moveIdx > p.N; }
+                             return t.moves > p.N; }           // deadline blown with cards still out
+    case 'suit-balance':   return !suitBalance(won, p);
+    default:               return false;
+  }
+}
+
+// Is this objective already LOCKED IN — guaranteed to be earned on ANY completion (so the player is
+// "on track" just by clearing the deal)? Achievement objectives only; the move/undo/free-cell
+// budgets can still be blown, so they are never secured until the deal is actually done.
+// `up[s]` is that suit's highest rank home from the Ace end (0 = empty) and so IS its Ace-end count;
+// `down[s]` is its lowest rank home from the King end (14 = empty), so its King-end count is
+// 14 - down[s]. Both are live board state, so Undo un-secures a check exactly as it rewinds.
+export function objSecured(obj, up, down, t) {
+  if (objViolated(obj, t)) return false;
+  const p = obj.param || {};
+  switch (obj.id) {
+    case 'ends-first':     return up.every(u => u >= p.up) && down.every(d => d <= p.down);
+    case 'before-ace':
+    case 'suit-top-first': return down.every(d => d <= p.rank);
+    case 'suit-sprint':    return [0, 1, 2, 3].filter(s => down[s] === up[s] + 1).length >= 3;  // only one suit left to start
+    case 'rank-rush':      return [0, 1, 2, 3].every(s => up[s] >= p.rank || down[s] <= p.rank); // all four already home
+    // A suit's count from one end only ever grows, so once every suit holds `min` from the named
+    // end the tier is locked in whatever happens next — unlike split-at, whose exact split a later
+    // send can still break.
+    case 'end-bias':       { const m = p.min; return p.end === 'up' ? up.every(u => u >= m) : down.every(d => 14 - d >= m); }
+    // Secured relative to the CURRENT line (undo rewinds telem.maxRunMoved, like every case above);
+    // the win-time checker reads the same field, so the chip always predicts the grade.
+    case 'big-move':       return (t.maxRunMoved ?? 0) >= p.N;
+    default: return false;   // budgets and split points — not securable until the win
+  }
+}
+
 // A challenge's grade may depend on its parameter (e.g. cells-le{0} is Gold, cells-le{2} Silver).
 export function gradeOf(id, param) {
   const g = OBJECTIVES[id].grade;

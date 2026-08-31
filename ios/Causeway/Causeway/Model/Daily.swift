@@ -467,10 +467,18 @@ func objSecured(_ obj: Objective, _ t: Attempt, up: [Int], down: [Int]) -> Bool 
     case "rank-rush":
         let r = p.rank ?? 1
         return (0..<4).allSatisfy { up[$0] >= r || down[$0] <= r }    // all four already home
+    // A suit's count from one end only ever grows, so once every suit holds `min` from the named
+    // end the tier is locked in whatever happens next — unlike `split-at`, whose exact split a
+    // later send can still break. `up[s]` IS that suit's Ace-end count; its King-end count is
+    // 14 - down[s]. (Left unsecured, a 🥈 the player had already banked mid-game — e.g. K..4 down
+    // in every suit against `min: 9` — showed `·` on the HUD until the win awarded it anyway.)
+    case "end-bias":
+        let m = p.min ?? 0
+        return p.end == "up" ? up.allSatisfy { $0 >= m } : down.allSatisfy { 14 - $0 >= m }
     case "big-move":
         return t.maxRunMoved >= (p.N ?? 5)
     default:
-        return false   // budgets, split points and end-restrictions — not securable until the win
+        return false   // budgets and split points — not securable until the win
     }
 }
 

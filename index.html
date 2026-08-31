@@ -1675,10 +1675,14 @@ function objSecured(obj, up, down, t){
     case 'suit-top-first': return down.every(d=>d<=p.rank);
     case 'suit-sprint':    return [0,1,2,3].filter(s=>down[s]===up[s]+1).length>=3;  // only one suit left to start
     case 'rank-rush':      return [0,1,2,3].every(s=>up[s]>=p.rank||down[s]<=p.rank); // all four already home
+    // A suit's count from one end only ever grows, so once every suit holds `min` from the named end
+    // the tier is locked in whatever happens next — unlike split-at, whose exact split a later send
+    // can still break. up[s] IS that suit's Ace-end count; its King-end count is 14 - down[s].
+    case 'end-bias':       { const m=p.min; return p.end==='up' ? up.every(u=>u>=m) : down.every(d=>14-d>=m); }
     // Secured relative to the CURRENT line (undo rewinds telem.maxRunMoved, like every case above);
     // the win-time checker reads the same field, so the chip always predicts the grade.
     case 'big-move':       return (t.maxRunMoved??0)>=p.N;
-    default: return false;   // budgets, split points and end-restrictions — not securable until win
+    default: return false;   // budgets and split points — not securable until the win
   }
 }
 // Compact live objectives HUD shown over the board during a challenge attempt.
