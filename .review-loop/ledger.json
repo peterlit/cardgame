@@ -1,7 +1,7 @@
 {
   "round": 2,
   "round_start_sha": "ee4e78a8a16a8e2164d338b38211c93a4d04a0d4",
-  "max_rounds": 2,
+  "max_rounds": 5,
   "token_budget": null,
   "findings": [
     {
@@ -134,10 +134,10 @@
       "claim": "The same-day grace confirmation is gated on hasLiveGame (moveCount > 0), so a zero-move challenge attempt is reset with no dialog and day D can never earn its on-time award again.",
       "evidence": {},
       "severity": "minor",
-      "region": "ios/Causeway/Causeway/Model/Game.swift:425-440",
+      "region": "ios/Causeway/Causeway/Model/Game.swift:429-436",
       "introduced_by_fix": false,
-      "current_status": "open",
-      "note": "Not routed this round; untouched by the diff. Status carried unchanged.",
+      "current_status": "partial",
+      "note": "PREDICATE FIXED, COVERAGE INCOMPLETE. Verified: Game.swift:436 is `(moveCount > 0 || graceLive) && !won && !demoing && !boardComplete`; index.html:1860 is the twin. I enumerated every hasLiveGame reader on both platforms \u2014 iOS ContentView:291 (deal alert), ContentView:344 (requestReset), DailyView:313 (daily Play), DailyView:375 (demo pill); web confirmReset only, called from newBtn:1886, replayBtn:1920, goDeal:1850. All are confirm gates, none is a resume banner / autosave / stats path, so no unintended user-visible change (RegressionDiscardConfirmTests both PASS on udid 5329250C, so no collateral). Zero-move copy verified reachable-only-via-grace, so the dropped cost sentence cannot print 'your 0 moves'. RESIDUAL: the grace is still silently forfeited through the re-deal entry points that never consulted hasLiveGame \u2014 see ux/index.html:daily-play-and-wins-bypass-hasLiveGame. Also note the closeout mutant c-ios-hasLiveGame-bare-movecount is killed only by the SOURCE-TEXT pin at tests/ios-parity.test.mjs:573-575; there is no behavioural test of the iOS predicate (the web one at tests/web-behaviour.test.mjs:160 is genuinely executed).",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -151,6 +151,10 @@
         {
           "round": 2,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "partial"
         }
       ]
     },
@@ -159,10 +163,10 @@
       "claim": "Two calendar tripwires call XCTSkipUnless on the locator the fix introduces, so deleting the fix turns the test green (skipped) rather than red.",
       "evidence": {},
       "severity": "minor",
-      "region": "RegressionDailyCalendarTests.swift:55-110",
+      "region": "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:55-141",
       "introduced_by_fix": false,
-      "current_status": "open",
-      "note": "Not routed this round; untouched by the diff. Status carried unchanged.",
+      "current_status": "disputed",
+      "note": "The skips ARE now date-keyed (last-day-of-month at :63-66, the 1st at :132-133) and the SKIP POLICY header is in place \u2014 that half is right, and a mid-month clock does exercise both tests rather than silently pass. But the replacement is not green: converting the skip to XCTAssertFalse exposed that the locator never matched, and the class is now RED on the shipping tree. Marked disputed rather than fixed because the delivered state is a failing test. See tests/RegressionDailyCalendarTests.swift:cell-locator-never-matched for the run output and root cause.",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -176,6 +180,10 @@
         {
           "round": 2,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "disputed"
         }
       ]
     },
@@ -184,10 +192,10 @@
       "claim": "The web deal modal still clamps out-of-range deal numbers instead of refusing them, so typing 5000000 silently deals #1000000; iOS refuses and names the range.",
       "evidence": {},
       "severity": "minor",
-      "region": "index.html:1820-1830",
+      "region": "index.html:1808-1852",
       "introduced_by_fix": false,
-      "current_status": "open",
-      "note": "Not routed this round; untouched by the diff. Status carried unchanged.",
+      "current_status": "fixed",
+      "note": "VERIFIED. parseDealNumber (index.html:1815) returns null outside 1...1000000; goDeal refuses and writes the range into #dealHint; winsPlay shares the parser and refuses. Bounds match iOS (Game.maxSeed = 1_000_000, Game.swift:49). Behavioural test at tests/web-behaviour.test.mjs:429-441 covers 0/-4/''/'  '/'abc'/5000000/1/1000000/42.7 and is genuinely executed; mutant c-web-deal-clamps-again killed (manifest re-run by me: 5/5 killed, 0 survived, 0 errors). Two cosmetic residuals, not worth a round: the red #dealHint persists until openDeal re-runs (retyping a valid number does not clear it), and winsPlay refuses with no message at all because the wins panel has no hint slot \u2014 both documented in the source comments.",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -201,6 +209,10 @@
         {
           "round": 2,
           "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
         }
       ]
     },
@@ -291,17 +303,60 @@
     },
     {
       "id": "tests/ios-parity.test.mjs:whole-body-pin-false-positives",
-      "claim": "The whole-body equality pin fails on edits that cannot change behaviour, so the suite goes red on innocent work and a maintainer will delete or rubber-stamp the pin. Rewriting `let silverWasLive = !objViolated(ch.silver, t)` as `... == false` (Game.swift:684) is behaviour-identical and turns the suite red; the same is true of renaming any local. The pinned text also duplicates the substring pins at ios-parity.test.mjs:160-176, so every legitimate body change now has to be transcribed in two places in one file.",
-      "evidence": [
-        "tests/ios-parity.test.mjs:225-262",
-        "tests/ios-parity.test.mjs:160-176",
-        "ios/Causeway/Causeway/Model/Game.swift:684"
-      ],
+      "claim": "The whole-body equality pin fails on edits that cannot change behaviour, and the pinned text duplicated the substring pins at ios-parity.test.mjs:160-176, so every legitimate body change had to be transcribed twice in one file.",
+      "evidence": {},
       "severity": "minor",
-      "region": "tests/ios-parity.test.mjs:225-262",
+      "region": "tests/ios-parity.test.mjs:150-160",
+      "introduced_by_fix": false,
+      "current_status": "partial",
+      "note": "DELETION VERIFIED LOSSLESS, not taken on trust: I extracted all 13 removed snippets from `git show 627fea0:tests/ios-parity.test.mjs` and checked each norm()'d snippet against the norm()'d IOS_BODIES['Model/Daily.swift objViolated'] string \u2014 13/13 are strict substrings, 0 misses, so nothing that used to be caught is now uncaught. Round-1 (13/13) and round-2 (9/9) manifests re-run by me: 0 survived, 0 errors, so the six corrected Swift line numbers did not weaken any mutant into a no-op. The generator-driven coverage assertions above the deleted block are retained and are not redundant. PARTIAL as declared: the false-positive half stands by design \u2014 a behaviour-identical rewrite (`!objViolated(...)` -> `objViolated(...) == false`, or renaming a local) still reddens the suite.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "partial"
+        }
+      ]
+    },
+    {
+      "id": "tests/ios-parity.test.mjs:comment-stripper-not-nesting-aware",
+      "claim": "stripSwiftComments ended a /* block at the FIRST */, but Swift block comments nest, so a nested comment inside a pinned body leaked the outer comment's tail (braces included) into the brace matcher and a pure comment edit failed the pin with 'a statement was added'.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tests/ios-parity.test.mjs:174-239",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "VERIFIED. The depth counter at :180-185 matches Swift's lexer (nesting tracked on /* and */ only, strings not special inside a comment \u2014 same as Swift). Self-test at :233-239 covers nesting, // with a brace, and a comment marker inside a string literal; mutant c-pin-stripper-not-nesting-aware killed (5/5, 0 errors, manifest re-run by me). I also checked the new fail-loud guard at :224 is actually reachable: for both `\"\"\"` and `#\"` the opening delimiter necessarily precedes any `}` inside the literal, so a body truncated by a mis-scanned literal still contains the delimiter and the assertion fires rather than pinning garbage.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/RegressionDailyCalendarTests.swift:cell-locator-never-matched",
+      "claim": "The calendar-cell locator these tripwires depend on has never matched anything: calCell applies .accessibilityLabel(\"Aug 30\") to a bare ZStack that is not an accessibility element (no .accessibilityElement(children:.combine), no button trait), so XCUITest sees only the child staticText \"30\". Round 3 replaced the XCTSkipUnless that was hiding this with a hard XCTAssertFalse, so the class is now RED on the shipping tree: testPlayButtonNamesTheSelectedDay fails at RegressionDailyCalendarTests.swift:135 with 'no calendar cell for Aug 30'. testTappingALockedFutureDayExplainsWhy uses the identical query shape and only escaped because 2026-08-31 is the last day of the month (date-keyed skip); it goes red on 2026-09-01. The same missing accessibility element is a shipping VoiceOver defect: every calendar cell announces as the bare number, with no month, no earned tiers, no lock state, and no button trait.",
+      "evidence": [
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:125-137",
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:81-87",
+        "ios/Causeway/Causeway/Views/DailyView.swift:587-627",
+        "ios/Causeway/Causeway/Views/DailyView.swift:626"
+      ],
+      "severity": "blocker",
+      "region": "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:55-141",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "PROVEN: mutant y-ios-harmless-rewrite (`!objViolated(...)` -> `objViolated(...) == false`) was KILLED, i.e. a false positive, alongside the two real survivors above. I am NOT asking for the pin to be removed \u2014 with no Swift unit-test target it is the only insertion-proof option, and the re-derivation procedure is documented in the header. The cheap part is dropping the now-redundant substring pins at :160-176 for the same three bodies so there is one place to update, not two.",
+      "note": "VERIFIED BY RUNNING on udid 5329250C (xcodebuild test-without-building -scheme Causeway -parallel-testing-enabled NO -only-testing:CausewayUITests/RegressionDailyCalendarTests): 3 tests, 1 skipped, 1 FAILURE. testCalendarLegendNamesTheSameDayPip passed; testPlayButtonNamesTheSelectedDay FAILED at :135; testTappingALockedFutureDayExplainsWhy skipped via the new last-day-of-month guard. The implementer only ran `build-for-testing`, and verify_cmd is node-only, so nothing in the loop executes this target \u2014 the red shipped unseen. The APP behaviour is fine: I drove the simulator by hand (Daily -> scroll -> tap the Aug 30 cell) and the button correctly reads 'Play Aug 30'. So this is a test/accessibility defect, not a product regression. FIX: add `.accessibilityElement(children: .combine)` (or .ignore) next to the existing .accessibilityLabel at DailyView.swift:626, and give the cell `.accessibilityAddTraits(.isButton)` + `.accessibilityIdentifier(\"daily.cal.<idx>\")` as the round-2 fragment already proposed; then re-run BOTH calendar tests, not just build-for-testing.",
       "first_seen_round": 2,
       "status_history": [
         {
@@ -311,17 +366,46 @@
       ]
     },
     {
-      "id": "tests/ios-parity.test.mjs:comment-stripper-not-nesting-aware",
-      "claim": "stripSwiftComments ends a `/*` block at the FIRST `*/`, but Swift permits nested block comments; a nested comment inside one of the three pinned bodies leaves `*/` and any braces from the outer comment in the stripped text, so the brace matcher can truncate the body and the pin fails with 'a statement was added, removed or reordered' after a pure comment edit \u2014 contradicting the header's promise that comment edits are free.",
+      "id": "ux/index.html:daily-play-and-wins-bypass-hasLiveGame",
+      "claim": "Three re-deal entry points never consult hasLiveGame, so they still destroy a live game \u2014 and a live \u23f0 grace \u2014 with no dialog, defeating the closeout's parity claim. On the web, the Daily sheet's Play/Replay button calls playChallenge(day) straight from its onclick (index.html:1587-1588) and 'Show me how to win' guards on its own weaker `challengeDay!=null && moveCount>0` (index.html:1522); the iOS twins of both DO route through hasLiveGame (DailyView.swift:313, :375). On BOTH platforms the Wins sheet deals a seed with no gate at all (WinsView.swift:87 playEntered, WinsView.swift:108 the solved-deal row; web winsPlay at index.html:1826). A player mid-attempt on yesterday's challenge who opens Wins and taps a past deal loses that day's \u23f0 Same-day forever with no warning. The comment at index.html:1863 asserting 'the Daily sheet has guarded exactly this destruction since round 0' is false for playChallenge.",
       "evidence": [
-        "tests/ios-parity.test.mjs:185-203",
-        "tests/ios-parity.test.mjs:207-224"
+        "index.html:1587-1588",
+        "index.html:1522-1523",
+        "index.html:1826-1832",
+        "index.html:1863",
+        "ios/Causeway/Causeway/Views/WinsView.swift:85-89",
+        "ios/Causeway/Causeway/Views/WinsView.swift:105-110",
+        "ios/Causeway/Causeway/Views/DailyView.swift:313",
+        "ios/Causeway/Causeway/Views/DailyView.swift:375"
+      ],
+      "severity": "major",
+      "region": "index.html:1512-1600",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "Pre-existing, surfaced by auditing this closeout's shipping predicate. Confirmed by reading every caller of playChallenge/showSolution/deal on both platforms (grep of `game.deal(`/`game.playChallenge(`/`game.showSolution(` under ios/Causeway/Causeway/Views and of `confirmReset()`/`playChallenge(` in index.html). ContentView.swift:913-914 is the WIN overlay, where hasLiveGame is false by construction \u2014 not part of this. FIX SHAPE: route web playChallenge's two onclick buttons and showSolution through confirmReset()/hasLiveGame(), and gate WinsView.playEntered + the solved-deal row on game.hasLiveGame the same way ContentView.requestReset does.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/RegressionDailyCalendarTests.swift:pool-end-timebomb",
+      "claim": "testPlayButtonNamesTheSelectedDay guards only the pool's START (yesterday >= 2026-08-01) and not its END. daily-pool.json seeds 61 days, i.e. 2026-08-01..2026-09-30, so from 2026-10-02 the yesterday cell is unavailable: tapping it sets lockedDay instead of selecting the day, play.label never names it, and the test hard-fails with a message that blames the calendar grid. Separately, round 3 widened the locked-note assertion to `contains(\"unlocks on the day itself\") || contains(\"No challenge on\")`, so after 2026-09-30 testTappingALockedFutureDayExplainsWhy passes through the out-of-pool branch and no longer exercises the locked-seeded-day path (ux/WF-13) it was written for.",
+      "evidence": [
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:110-115",
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:96-97",
+        "ios/Causeway/Causeway/Views/DailyView.swift:582-585",
+        "ios/Causeway/Causeway/Views/DailyView.swift:622-624",
+        "ios/Causeway/Causeway/daily-pool.json"
       ],
       "severity": "minor",
-      "region": "tests/ios-parity.test.mjs:185-224",
-      "introduced_by_fix": true,
+      "region": "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:102-141",
+      "introduced_by_fix": false,
       "current_status": "open",
-      "note": "Read, not run \u2014 I did not mutate a nested comment into Daily.swift. Same class: the stripper handles only `\"` strings, not Swift's `\"\"\"` multi-line or `#\"raw\"#` literals. Cheap fix is a depth counter on `/* */`; only worth doing if the pin stays.",
+      "note": "Pool size read from ios/Causeway/Causeway/daily-pool.json: epoch 2026-08-01, 61 days. Survives fixing the locator, so file it separately. FIX: add an upper bound to the date guard (skip when the target day index is outside 0...poolCount-1) and keep the two lockedNote branches as distinct assertions rather than an OR.",
       "first_seen_round": 2,
       "status_history": [
         {
@@ -341,8 +425,8 @@
       "reviewer": 78083
     },
     "2": {
-      "implementer": 64903,
-      "reviewer": 59198
+      "implementer": 167365,
+      "reviewer": 170276
     }
   },
   "round_shas": {

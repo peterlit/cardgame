@@ -713,3 +713,26 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     solved day card reads "Cleared 3× · best 96 moves in 5:52 · par 84" over "Moves each run:
     118 · 106 · 96". Par reaches the UI for the first time here. Records banked before the log
     decode with an empty one and simply show their best.
+
+83. Run the review loop over everything the QA loop shipped, and collect token-usage data and
+    feedback for the loop itself. Scope `b2ce1a4..HEAD` — 12 QA-loop fix commits, 8 XCUITests and
+    the two features on top, 3,493 lines. Seed + 2 rounds + closeout, 7 dispatches, 17 findings
+    (1 blocker, 9 major, 7 minor), stopped at `thrashing_soft` by my call rather than converging.
+    What it bought: one real data-loss bug (the backup importer rebuilt every `TierResult` without
+    `runs`, silently discarding the whole per-day clear log on restore), and mutation proof that
+    four of the QA loop's headline fixes were deletable with a green suite — the cascade's send
+    order, both web tier-refusal functions and `objViolated` on BOTH shipped copies. The cure was
+    structural: `tests/web-extract.mjs` now lifts declarations out of `index.html` by name and RUNS
+    the shipped code instead of string-matching it (the reviewer defeated its first version with an
+    indented decoy; round 2 anchored it to column 0 and made ambiguity throw). It stopped because
+    all four open majors were one fact — `ios/Causeway` has no Swift unit-test target, so every
+    Swift guard is a string pin and each round pinned the functions the reviewer named while the
+    reviewer found new ones. The closeout then changed `hasLiveGame` on both platforms and shipped
+    a RED UI test target, which its own reviewer caught by running it: the calendar cell's
+    `.accessibilityLabel` sits on a bare `ZStack`, so the locator never matched and VoiceOver reads
+    every day as a bare number. Measured at 4.32M effective tokens (`tools/loop-usage.py`, whose
+    per-agent attribution I fixed first — read the `agent-<id>.meta.json` sidecar) — 254K per
+    finding, reported→effective 5.4×, and the closeout is now 40% of subagent spend. Written up in
+    `docs/review-loop-0.8.1-feedback.md`: all four v0.7.1 gaps are fixed, and the new ones are the
+    closeout's build-is-not-a-test blind spot, a closeout blocker with nowhere to go, and
+    `thrashing_soft` asking for "one more round" at the backstop.

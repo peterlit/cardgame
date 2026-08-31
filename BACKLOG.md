@@ -733,3 +733,42 @@ What it deliberately did NOT do, with enough detail to pick up cold:
   ("a zero-move attempt still carrying a live ⏰ grace"), the iOS one only string-pinned, and the
   dialog itself needs a two-day sequence (open a challenge, roll the clock a day, tap `New game`)
   that this toolset cannot stage. Same environment gap as the rest of the ⏰ work.
+
+## Review loop v0.8.1 (2026-08-31) — what it left open
+
+Report: `.review-loop/REPORT.md` (stopped at `thrashing_soft` after round 2; a human chose abort +
+closeout). Full state is versioned under `.review-loop/`. Four items outlive the loop.
+
+- **BLOCKER — the UI test target is RED on `main`, and the cause is a shipping VoiceOver defect.**
+  `RegressionDailyCalendarTests.testPlayButtonNamesTheSelectedDay` fails at
+  `RegressionDailyCalendarTests.swift:135` ("no calendar cell for Aug 30"), verified by running the
+  target, not by reading it. `DailyView.swift:626` applies `.accessibilityLabel` to a bare `ZStack`
+  with no `.accessibilityElement(children: .combine)` and no button trait, so XCUITest sees only the
+  child `staticText` and VoiceOver announces every day as a bare number — no month, no earned tiers,
+  no lock state, no button trait. The closeout replaced the `XCTSkipUnless` that had been hiding
+  this; `testTappingALockedFutureDayExplainsWhy` uses the same query and escaped only because the
+  run was on the last day of the month — it goes red 2026-09-01. **Fix:** add
+  `.accessibilityElement(children: .combine)` + `.accessibilityAddTraits(.isButton)` +
+  `.accessibilityIdentifier("daily.cal.<idx>")` at `DailyView.swift:626`, then run BOTH calendar
+  tests (not `build-for-testing`). This is the same work as the already-filed
+  `bug/DailyView:calendar-cells-have-no-identifier`.
+- **The loop's structural stopper: `ios/Causeway` has no Swift unit-test target.** Every guard on
+  Swift is a string comparison performed by `tests/ios-parity.test.mjs`. Two rounds of pinning the
+  functions the reviewer named ended with the reviewer finding new ones — mutants
+  `y-ios-endsFirstOK-early-true` (`Daily.swift:128`) and `y-ios-liveAttempt-zero-moves`
+  (`Game.swift:967`) both survive the full suite today, i.e. the iOS tier ✗ chips and the iOS
+  moves-family refusal can be disabled with everything green. Pinning function-by-function will not
+  converge. The decision is a real test target vs. accepting text pins and documenting the limit.
+- **Three re-deal entry points bypass `hasLiveGame`**, so the ⏰ grace the closeout protected is
+  still forfeitable: web daily-sheet Play/Replay (`index.html:1587-1588`, straight from `onclick`),
+  `showSolution` (`index.html:1522`, its own weaker `challengeDay!=null && moveCount>0`), and the
+  Wins sheet on both platforms (`WinsView.swift:87,108`; web `winsPlay`). The comment at
+  `index.html:1863` claiming the Daily sheet has guarded this "since round 0" is false. Fix shape:
+  route those through `confirmReset()`/`hasLiveGame()` the way `ContentView.requestReset` does.
+- **`RegressionDailyCalendarTests` pool-end time bomb.** `testPlayButtonNamesTheSelectedDay` guards
+  the pool's start (`yesterday >= 2026-08-01`) but not its end; `daily-pool.json` seeds 61 days
+  (2026-08-01..09-30), so from 2026-10-02 the yesterday cell is unavailable and the test hard-fails
+  blaming the calendar grid. Round 3 also widened the locked-note assertion to an OR, so after
+  2026-09-30 `testTappingALockedFutureDayExplainsWhy` passes through the out-of-pool branch and no
+  longer exercises the ux/WF-13 path it was written for. Fix: bound the date guard by pool size and
+  keep the two lockedNote branches as distinct assertions.

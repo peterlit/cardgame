@@ -174,8 +174,16 @@ Together these plausibly take the QA loop from ~40 M to ~15 M without reducing c
 
 ## 4. Reproducing these numbers
 
-The analysis scripts are in this session's scratchpad (`usage.py`, `usage2.py`, `usage3.py`,
-`orch.py`, `absorb2.py`, `files.py`). The method:
+The measurement script now lives in the repo: **`tools/loop-usage.py`** (the scratchpad scripts this
+document was first written from did not survive their session). Run it with the loop's start time:
+
+```
+python3 tools/loop-usage.py --since $(date -v-3H +%s)
+```
+
+Each row is one transcript. `sidechain: true` marks a subagent; `agent` names its type and `label`
+its dispatch description, both read from the `agent-<id>.meta.json` sidecar — sum the sidechain rows
+for a loop's subagent cost, and group by `agent` for the implementer/reviewer split. The method:
 
 1. Parse each `*.jsonl`; dedupe assistant records by `requestId`; sum `message.usage`.
 2. Match subagent transcripts to their `subagent_type` by normalizing the `Agent` tool's `prompt`
@@ -183,3 +191,25 @@ The analysis scripts are in this session's scratchpad (`usage.py`, `usage2.py`, 
 3. For context-carry attribution, walk the transcript in order and charge each added block
    `size × requests_remaining × 0.1`.
 4. Count `type: "image"` blocks at a flat rate; never measure them by base64 length.
+
+---
+
+## 5. Run log — measured runs of the plugin
+
+Per-run detail lives in the `docs/*-feedback.md` files; this is the comparable series.
+
+| Run | Plugin | Scope | Stop | Findings | Subagent eff. | Orch. eff. | **Total** | Per finding |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| 2026-08-30 15:13 | review-loop 0.7.1 | one feature diff | converged R2 | 11 | 1.63 M | 0.53 M | **2.16 M** | 197 K |
+| 2026-08-30 23:19 | review-loop 0.8.1 | a whole QA loop's output | thrashing_soft R2 | 17 | 3.63 M | 0.69 M | **4.32 M** | 254 K |
+
+Both ran in fresh sessions, which is why the orchestrator share fell from the 22-round baseline's
+profile to 24.6 % and then 16.0 %. Two things the second run changed in the picture above:
+
+- **The reported→effective multiplier is not a constant ~4×.** Measured 5.4× overall and 7.2× on the
+  longest single dispatch. It tracks turns-per-dispatch, so `token_budget` set on the reported scale
+  under-counts by five-fold or more on long runs.
+- **The closeout is now the most expensive phase**, not a mop-up: 1.45 M across two dispatches, 40 %
+  of subagent spend, more than either real round. Recommendation 9 above ("route minors straight to
+  BACKLOG") is only half right — deferring every minor to one no-iteration pass is what makes that
+  phase both expensive and risky. Minors that touch shipping code belong in a round.

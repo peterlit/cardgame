@@ -13,8 +13,9 @@ or dropped on its own `timestamp`. A long session touched five minutes ago there
 only the requests made inside the window. A record with no parsable timestamp is COUNTED (dropping
 it would silently under-report) and tallied in the row's `undated` key, with a note on stderr.
 
-Each row is one transcript: `sidechain: true` marks a subagent, and `agent` names its type
-where the transcript records it. Sum the sidechain rows for a loop's subagent cost.
+Each row is one transcript: `sidechain: true` marks a subagent, `agent` names its type (read
+from the `agent-<id>.meta.json` sidecar) and `label` its dispatch description. Sum the sidechain
+rows for a loop's subagent cost.
 
 Effective tokens weight the billed classes by relative cost:
     input x1 + cache_read x0.1 + cache_write x2 + output x5
@@ -57,7 +58,34 @@ def eff(u):
             + 5*u.get('output_tokens',0))
 
 def agent_type_of(path):
-    """A subagent transcript records its own type; fall back to the sidechain's first prompt."""
+    """A subagent's type, from its sidecar first — the transcript itself rarely carries it.
+
+    `agent-<id>.jsonl` is written next to `agent-<id>.meta.json`, and the sidecar holds
+    {"agentType": ..., "description": ...}. Reading it is what makes the sidechain rows
+    attributable to implementer vs reviewer; the in-transcript scans below almost never
+    hit and are kept only as a fallback for older/foreign transcripts.
+    """
+    meta = path[:-6] + '.meta.json' if path.endswith('.jsonl') else path + '.meta.json'
+    try:
+        with open(meta) as f:
+            m = json.load(f)
+            if m.get('agentType'): return m['agentType']
+    except Exception:
+        pass
+    try:
+        with open(path) as f:
+            for line in f:
+                try: r = json.loads(line)
+                except Exception: continue
+                if r.get('attributionAgent'): return r['attributionAgent']
+                break
+    except Exception:
+        pass
+    if not os.path.basename(path).startswith('agent-'):
+        # A MAIN-session transcript is not an agent. Without this guard the scan below finds the
+        # orchestrator's own `Agent` tool_use blocks and labels the orchestrator row with whatever
+        # it dispatched last — the one row that must stay unattributed.
+        return None
     try:
         with open(path) as f:
             for line in f:
@@ -73,6 +101,15 @@ def agent_type_of(path):
     except Exception:
         pass
     return None
+
+def agent_label_of(path):
+    """The dispatch description from the sidecar, so rows read as round-1 implementer etc."""
+    meta = path[:-6] + '.meta.json' if path.endswith('.jsonl') else path + '.meta.json'
+    try:
+        with open(meta) as f:
+            return json.load(f).get('description')
+    except Exception:
+        return None
 
 rows = []
 for path in glob.glob(os.path.join(PROJ, '**', '*.jsonl'), recursive=True):
@@ -122,7 +159,8 @@ for path in glob.glob(os.path.join(PROJ, '**', '*.jsonl'), recursive=True):
     rows.append({'path': path, 'file': os.path.basename(path), 'mtime': st.st_mtime,
                  'sidechain': sidechain, 'requests': n_req, 'images': n_img,
                  'undated': n_undated,
-                 'agent': agent_type_of(path), **{k: int(v) for k, v in tot.items()}})
+                 'agent': agent_type_of(path), 'label': agent_label_of(path),
+                 **{k: int(v) for k, v in tot.items()}})
 
 rows.sort(key=lambda r: -r['effective'])
 undated = sum(r['undated'] for r in rows)
