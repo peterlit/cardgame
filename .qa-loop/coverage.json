@@ -435,6 +435,164 @@
           "reason": "cold launch cmd -> painted board 0.89 s; smart-move tap on A-clubs (321,642) produced its first changed frame 267 ms after the last quiet frame (Moves 0->1 + clock start). Calibration against an instantaneous control (Auto-play toggle) put the card tap 244 ms = one film frame behind a pure state flip, so no >1 s dead time exists."
         }
       }
+    },
+    "2": {
+      "TC-1.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "How to play states both-ended foundations, tap-to-move and drag; tapping A-diamond (175,650) on deal #915806 sent it to the up foundation, Moves 1, clock running, Undo enabled."
+        }
+      },
+      "TC-3.1": {
+        "power": {
+          "status": "passed",
+          "reason": "One tap on an untouched board (#721394 -> #915806, no dialog) and one tap after a win (#191548). On a live board the new confirm adds the intended second tap."
+        }
+      },
+      "TC-5.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Sheet correct against the CURRENT spec: FIVE streak cards (Play/Same-day/Silver/Gold/Flawless, all 0 / 0 total / best 0), Today card 'Deal #551879' UNGROUPED, Bronze/Silver/Gold text exactly matching derive_daily.py, four how-to-win pills, Play one tap. NOTE: the TESTCASES.md wording for this case is stale \u2014 it still expects four cards and a grouped 'Deal #10,005'; the app now matches WORKFLOWS.md WF-5 and the round-1 seed-format fix instead."
+        }
+      },
+      "TC-10.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Goal (52 cards, dual up/down foundations meeting in the middle), The catch, Tableau, Free cells, Controls (tap=smart-move/run, drag=specific) all present; no collateral damage from the eleven fix commits."
+        }
+      },
+      "TC-15.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "2x2 pill grid (Clear/Silver/Gold/Flawless); \ud83c\udf1f demo bar reads '\ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0/96', paused; Next -> 1/96; Stop re-deals clean with the challenge still bound."
+        }
+      },
+      "TC-15.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; all five streak cards 1/1 total/best 1; header 'Today \ud83c\udf1f Flawless'; three green circles; Aug 30 cell shows \u2b50 + \u23f0 pip with ZERO date jitter (digit top pitch measured 132 px for every calendar row incl. the 30 row)."
+        }
+      },
+      "TC-15.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Aug 27 silver run then gold run: overlays 'Aug 27: Daily challenge: \ud83e\udd49\ud83e\udd48 earned' / '\ud83e\udd49\ud83e\udd47 earned'; Play/Silver/Gold 1 total each, \ud83c\udf1f Flawless 0 streak / 0 total / best 0; Aug 27 cell shows three tier dots (no \u2b50); Aug 27 card three green circles, no \ud83c\udf1f in header. Flawless is not OR-ed across attempts. (Coverage gap from round 1 now closed.)"
+        }
+      },
+      "TC-15.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Ran a STRONGER variant than the written step 2: after the flawless win I injected and finished a real bronze-only run of the same day (day 29, --tier bronze --challengeDay 29). \ud83c\udf1f survived \u2014 header still 'Today \ud83c\udf1f Flawless', Flawless card still 1/1/best 1, Aug 30 cell still \u2b50, all three circles green. The manual mid-run Gold break was not walked (today's split-at Gold cannot be broken from the opening position \u2014 only Aces/Kings can go home). (Coverage gap from round 1 now closed.)"
+        }
+      },
+      "TC-13.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 3 card correct: header 'Aug 3', Deal #539885 (now UNGROUPED \u2014 expectation text in TESTCASES still says 539,885 and needs updating), Silver max-run, Gold suit-sprint, \u23f0 'Same-day is earned on the day itself', 4 pills, button 'Play Aug 3'. No trace of today's objectives."
+        }
+      },
+      "TC-13.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 31 tap is a no-op on selection (card stays Aug 3) but is no longer silent: standing \ud83d\udd12 on the cell plus tint/border and '\ud83d\udd12 Aug 31 unlocks on the day itself \u2014 come back then.' under the grid. Aug 30 keeps the gold ring; Aug 1 spot-check selectable and correct."
+        }
+      },
+      "TC-13.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Play Aug 4 \u2192 board pill Deal #625648, HUD titled 'Aug 4' in gold with all three objectives untruncated and neutral \u00b7 markers; 3 taps + 1 swipe as budgeted. Re-opening Daily mid-attempt still snaps to the Today card (known proposal ux/WF-13:daily-sheet-resets-to-today-midattempt, not re-filed)."
+        }
+      },
+      "TC-13.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Free-cell drag was ALLOWED (3\u2666 sits in cell 1, no alert/snap-back) and \ud83e\udd47 flipped to red \u2717 in the same frame with \ud83e\udd49/\ud83e\udd48 unchanged; Undo restored the card and returned \ud83e\udd47 to \u00b7. Auto-play was set Off first."
+        }
+      },
+      "TC-13.7": {
+        "power": {
+          "status": "skipped",
+          "reason": "turn budget \u2014 5 of 7 days verified string-exact against derive_daily.py (Aug 1 rank-rush/split-at, Aug 2 end-bias/big-move, Aug 3 max-run/suit-sprint, Aug 4 suit-balance/cells-le, plus Aug 7 cells-le/suit-top-first = 5 days). No truncation, no stale labels across selections, \u23f0 line right on all. Aug 5 (moves/ends-first) and Aug 6 (no-undo/before-ace) not read; deal numbers were legible only for Aug 3/Aug 4 at the scroll position used."
+        }
+      },
+      "TC-14.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Five streak cards in a 3+2 grid, all 0/0 total/best 0, legend paragraph present; Today card shows '\u23f0 Win today to start a same-day streak'."
+        }
+      },
+      "TC-14.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 27 card reads '\u23f0 Same-day is earned on the day itself'; the calendar legend now names the pip with a gold dot + '\u23f0 Same-day' (prior finding fixed)."
+        }
+      },
+      "TC-14.3": {
+        "power": {
+          "status": "skipped",
+          "reason": "turn budget"
+        }
+      },
+      "TC-14.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Past-day replay (Aug 27, startDay=today) won flawless: overlay 'Aug 27: \ud83c\udf1f Flawless!...' with NO \u23f0 clause. Streak-card/calendar sub-step of step 3 not re-read (turn budget)."
+        }
+      },
+      "TC-14.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Grace attempt (challengeDay 28/startDay 28) shows '\u23f0 Resume your attempt today and it still counts' and pays out on today's win: 'Aug 29: \ud83c\udf1f Flawless! ... \u23f0 On time \u2014 1-day same-day streak.' (1-day, not 2, because TC-14.3's Aug 30 win was not run first.)"
+        }
+      },
+      "TC-2.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "one tap on the exposed A\u2666 sent it to the diamonds UP foundation, Moves 0->1, no confirmation, Undo enabled"
+        }
+      },
+      "TC-4.1": {
+        "power": {
+          "status": "passed",
+          "reason": "'Ready to finish' prompt fired on the day-29 restore; Finish ran the cascade to the win overlay (Deal #551,879 \u00b7 96 moves \u00b7 3:18 + tier lines + Play/Random/Close)"
+        }
+      },
+      "TC-6.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "line ran to 91/91, banner + single Done pill, Done re-dealt fresh AND re-bound the day (HUD up, Moves 0, 0:00, empty telemetry, survives a kill)"
+        }
+      },
+      "TC-8.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Auto-play Off made no automatic moves; On declined the unsafe exposed A\u2665 and the tier-breaking 8\u2660 but made the safe 6\u2660 send; the toggle itself no longer spends moves"
+        }
+      },
+      "TC-7.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #->Select All->10003->Play loads Deal #10003, Moves 0; no confirm on an untouched board"
+        }
+      },
+      "TC-7.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Cancel dismissed with Deal #10003 and Moves 1 intact; live-game Play confirm verified, but a double-tap on Play defeats it (new finding)"
+        }
+      },
+      "TC-9.3": {
+        "power": {
+          "status": "passed",
+          "reason": "out-of-range shows the reason and stays disabled; 777 loads and dismisses"
+        }
+      },
+      "TC-11.2": {
+        "power": {
+          "status": "passed",
+          "reason": "round-trip merged 3 days (0 skipped) with flawless+onTime; legacy map refused with a stated reason; merge non-destructive and sticky"
+        }
+      }
     }
   }
 }

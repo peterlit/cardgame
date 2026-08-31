@@ -1,22 +1,24 @@
 {
- "round": 1,
- "build_sha": "b2ce1a4",
+ "round": 2,
+ "build_sha": "4f02d1d",
  "max_rounds": 2,
  "parallel_testers": 2,
  "emit_regression_tests": true,
  "token_budget": 3000000,
- "implemented_rounds": [],
+ "implemented_rounds": [
+  1
+ ],
  "findings": [
   {
    "id": "ux/WF-6:demo-exit-drops-challenge-binding",
-   "claim": "Every exit from a how-to-win demo lands the player on a CASUAL fresh deal of today's daily seed (no objectives HUD, challengeDay nil), so the play the banner invites - \"That's a winning line - tap Done to try it yourself\" - banks no tier, no streak and no same-day credit unless the player independently reopens Daily and taps Play. Corroborated here for BOTH mid-demo Stop and post-line Done, and on a day with NO attempt in progress (so it is not merely an attempt-discard side effect).",
+   "claim": "Every demo exit used to land the player on a CASUAL deal of the day's seed, so the play the banner invites banked no tier. On 4f02d1d Done re-binds the day: the objectives HUD is up, and the attempt starts from zero with none of the demo's progress.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-6",
    "test_case": "TC-6.4",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      "evidence/round-1/wf-1-6/tc6.7-attempt-1-move.png",
@@ -27,7 +29,11 @@
      ".qa-loop/evidence/round-1/wf-6/tc63-after-stop-small.png",
      ".qa-loop/evidence/round-1/wf-6/tc64-bar-done.png",
      ".qa-loop/evidence/round-1/wf-6/tc64-after-done-small.png",
-     ".qa-loop/evidence/round-1/wf-6/tc64-daily-small.png"
+     ".qa-loop/evidence/round-1/wf-6/tc64-daily-small.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop13.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop17.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop18.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop19.png"
     ],
     "repro": [
      "cold launch (fresh install, 2026-08-30, dayIndex 29, deal #551879)",
@@ -45,71 +51,98 @@
      "tap Start (297,264) and let the 91-move line run to the end",
      "banner reads \"That's a winning line - tap Done to try it yourself\"; tap Done (356,266)",
      "board: Deal #551879, Moves 0, Time 0:00, but the 3-line daily objectives HUD is ABSENT - this is a casual game",
-     "same result via mid-demo Stop (357,266) at 64/91"
+     "same result via mid-demo Stop (357,266) at 64/91",
+     "delete key causeway.daily from the app's Preferences plist (fresh daily records), launch",
+     "tap Daily (279,175) -> all five streak cards 0, Today (deal #551879) unplayed, three empty tier circles",
+     "tap the '\ud83e\udd49 Clear' how-to-win pill (115,747) -> demo bar 'Winning line \u00b7 0 / 91', paused",
+     "tap Start (298,264), wait ~30 s -> banner \"That's a winning line \u2014 tap Done to try it yourself\" + single Done pill",
+     "tap Done (357,266) -> fresh full board, objectives HUD present with all three chips pending, Moves 0, Time 0:00, Undo disabled",
+     "terminate + relaunch (hard kill) -> HUD still present: the re-bind is durable, not just in-memory",
+     "tap A\u2665 (224,693) -> persisted save reads challengeDay 29, challengeStartDay 29, moveCount 1, telem.foundationOrder = [A\u2665 up @ moveIdx 1]"
     ],
     "measurements": {
-     "demo_line_moves": 91,
-     "hud_present_after_exit": false,
-     "extra_taps_to_get_back_into_the_scored_challenge": 2
+     "moves_after_done": 0,
+     "clock_after_done": "0:00",
+     "demo_moves_played": 91,
+     "moves_after_first_real_move": 1,
+     "telemetry_events_after_done": 0
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
+   "current_status": "fixed",
    "fix_risk": "metric-integrity",
-   "note": "Corroborating evidence only - do not treat as a new finding. SCOPE IS WIDER than 'after Stop/Done of an in-progress attempt': it also fires on the pure novice path (open Daily on an unplayed day -> tap a how-to-win pill -> watch -> Done), which is the exact moment the UI tells the player to try it themselves. TRAP: the naive fix (re-arm challengeDay on demo exit) must not let a player watch the app's own line and then bank a tier/best-time on it - the fresh re-deal itself is correct and must stay.",
+   "note": "The 'can never be banked' half is the part I hunted and it holds: after Done the board is a full fresh deal and the persisted attempt carries zero moves, zero telemetry and a fresh clock, so the demo's 91 moves cannot be inherited; the first real move records as move 1. A full 90-move win on the re-bound attempt was not played (cost), but the crediting path was exercised in the same session on a challengeDay-29 save, which produced the correct '\ud83c\udf1f Flawless \u2026 \u23f0 On time \u2014 1-day same-day streak' overlay. NOTE FOR THE PLANNER: TC-6.4's expected text in TESTCASES.md is now stale \u2014 it still asserts the post-Done board has no objectives HUD.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "bug/WF-11:legacy-backup-defeats-daily-v3-wipe",
-   "claim": "StatsBackup exports a hard-coded \"version\": 1 with no daily-pool generation stamp, and importStats() validates only `format`, so a backup taken before the Aug-30 pool recut imports with ZERO entries skipped and credits medals for challenges that were never played \u2014 silently undoing the deliberate v2->v3 history wipe that DailyStore.load() performs on the local store for exactly this reason.",
+   "claim": "Exports now stamp version 2 / dailyVersion 3 / poolEpoch 20666 / poolDays 61, and the importer drops a daily map it cannot prove came from this calendar. Verified on device: this build's own backup round-trips with zero entries skipped (flawless + onTime intact), the round-1 legacy file's 10 fabricated medal days are refused, its wins still import, the user is told exactly what was dropped and why, and the merge remains non-destructive and sticky.",
    "type": "bug",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-11",
    "test_case": "TC-11.2",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "fix_risk": "state-migration",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-11/07-streaks-before-legacy.png",
      ".qa-loop/evidence/round-1/wf-11/08-legacy-import-note.png",
      ".qa-loop/evidence/round-1/wf-11/11-streaks-after-legacy.png",
-     ".qa-loop/evidence/round-1/wf-11/stats-after-legacy.json"
+     ".qa-loop/evidence/round-1/wf-11/stats-after-legacy.json",
+     ".qa-loop/evidence/round-2/wf-7-9-11/exported-by-4f02d1d.json",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf11-streaks-before-export.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf11-roundtrip-import-note.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf11-streakcards-after-roundtrip.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf11-legacy-import-note.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf11-downgrade-merge.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/store-after-merges.json"
     ],
     "repro": [
      "Craft a pre-recut-shaped export (what an older build produced): {\"format\":\"causeway-stats\",\"version\":1,\"exportedAt\":\"2026-07-02T09:00:00Z\",\"daily\":{\"10\"..\"19\": {bronze,silver,gold all true, NO flawless/onTime keys}},\"wins\":{\"555\":{...}}} and drop it in the simulator's File Provider Storage as qa2-legacy-v2.json (copy kept at .qa-loop/scratch/qa-worker-2/, contents reproduced in evidence/stats-after-legacy.json)",
      "Launch Causeway, tap Daily (279,175)",
      "swipe (200,750)->(200,150) x3 to reach BACKUP",
      "tap Import (296,772); in the Files sheet tap Browse (285,819) then qa2-legacy-v2.json (331,258)",
-     "Read the note under the buttons, then scroll up to the streak cards"
+     "Read the note under the buttons, then scroll up to the streak cards",
+     "FIXTURE: stats_state.py load with daily days 26/27/28 all bronze+silver+gold+flawless+onTime, wins 12345",
+     "(a) ROUND-TRIP: Daily (278,175) -> scroll to BACKUP -> Export (162,773) -> Save (355,108). File on disk carries \"version\":2, \"dailyVersion\":3, \"poolEpoch\":20666, \"poolDays\":61 and keeps flawless/onTime on all three days. Then stats_state.py clear + relaunch (calendar empty) -> Import (308,773) -> pick Causeway-Stats-2026-08-30.json -> note 'Imported - merged 3 days (3 new) and 1 deal (1 new).' (0 skipped); calendar 27/28/29 relit with the star AND the same-day corner pip; all five streak cards read 3 day streak / 3 total / best 3, including Same-day and Flawless.",
+     "(b) LEGACY: import qa1-legacy-v1.json (round-1 shape: version 1, no stamps, daily 10..19 all bronze+silver+gold, win 555) -> note 'Imported - merged 0 days (0 new) and 1 deal (1 new). Skipped 10 days of challenge history from an older challenge calendar - those dates hold different deals now. Your solved deals came across.' Store dump after: daily days still exactly [26,27,28]; NO Aug 11-20 medals; Gold total still 3 (round 1: 1 -> 11).",
+     "(c) The wins half survived: store wins = 12345 and 555.",
+     "(d) STICKY/NON-DESTRUCTIVE: import qa1-downgrade-v2.json (correctly stamped, day 27 downgraded to bronze-only with 200 moves, new day 25 bronze+silver+onTime, win 12345 worsened to 150 moves) -> note 'Imported - merged 2 days (1 new) and 1 deal (0 new).' Store dump: day 27 still {bronze,silver,gold,flawless,onTime}=true with moves 84 (not 200); day 25 added; win 12345 still 100 moves / 250 s. Nothing un-earned, no best poisoned."
     ],
     "measurements": {
-     "note_shown": "Imported \u2014 merged 10 days (10 new) and 1 deal (1 new).",
-     "entries_skipped": 0,
-     "gold_streak_total_before": 1,
-     "gold_streak_total_after": 11,
-     "gold_streak_best_before": 1,
-     "gold_streak_best_after": 10,
-     "silver_total_before": 3,
-     "silver_total_after": 13,
-     "calendar_days_lit": "Aug 11-20 2026 each gained bronze+silver+gold dots"
+     "legacy_days_offered": 10,
+     "legacy_days_merged": 0,
+     "legacy_deals_merged": 1,
+     "gold_total_after_legacy": 3,
+     "roundtrip_days_skipped": 0,
+     "roundtrip_streak_cards": "Play 3/3/3, Same-day 3/3/3, Silver 3/3/3, Gold 3/3/3, Flawless 3/3/3",
+     "export_stamps": "version 2, dailyVersion 3, poolEpoch 20666, poolDays 61"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "TRAP (state-migration): the naive fix \u2014 reject any backup that lacks a pool/store-generation stamp \u2014 would reject every backup THIS build has already written, because the exporter still emits version 1 with no stamp. The exporter has to start stamping (pool version + epoch + daily-store version) before the importer can enforce it, and stamp-less files need an explicit degraded path (import the wins map, which is pool-independent, and either drop or clearly warn about the daily map). Two supporting facts: (a) DailyStore already treats a pre-v3 day map as poison and stashes it rather than loading it, so the import path is the only remaining door; (b) TierResult gained `flawless`/`onTime` in the same commit and both decodeIfPresent-default to false, so a legacy file also cannot be told apart from a current one by shape. Aggravating: the merge is instant and irreversible (see ux/WF-11:import-has-no-confirm-or-undo).",
+   "current_status": "fixed",
+   "note": "All four legs verified on device. Accepted cost (documented in be67947): a stamp-less export written by an older build loses its daily half on restore - the note says so out loud, so this is not a silent discard. Not re-filed.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
@@ -194,77 +227,101 @@
   },
   {
    "id": "ux/WF-13:future-day-tap-no-feedback",
-   "claim": "Tapping a future calendar day (Aug 31) produces zero feedback -- no press highlight, no tint, no message, no toast -- so a first-timer cannot tell 'not yet unlocked' from 'the calendar is broken'; the app already ships the copy that would say it ('Unlocks <date>' in playButton) but that branch is unreachable dead code.",
+   "claim": "A tap on a future calendar cell used to be swallowed with zero feedback, indistinguishable from a broken calendar. Future in-pool cells now carry a standing lock glyph and a tap tints the cell and prints a dated explanation under the grid.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-13",
    "test_case": "TC-13.2",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
-     ".qa-loop/evidence/round-1/wf-13/tc13-2-aug31-tap-inert.png"
+     ".qa-loop/evidence/round-1/wf-13/tc13-2-aug31-tap-inert.png",
+     "evidence/round-2/wf-13/tc131-aug3-bottom.png",
+     "evidence/round-2/wf-13/tc132-aug31-locked.png",
+     "evidence/round-2/wf-13/tc132-lockednote-crop.png"
     ],
     "repro": [
      "cold launch",
      "tap Daily (290,175)",
      "swipe (200,700)->(200,300)",
      "tap Aug 3 (94,515) -- card and cell tint update",
-     "tap Aug 31 (94,691) -- nothing changes at all: the card still shows Aug 3's Gold text, Aug 3 stays tinted, Aug 31 shows no tint and no message"
+     "tap Aug 31 (94,691) -- nothing changes at all: the card still shows Aug 3's Gold text, Aug 3 stays tinted, Aug 31 shows no tint and no message",
+     "launch",
+     "tap Daily (290,176)",
+     "observe the 31 cell before tapping",
+     "tap Aug 31 (94,691)"
     ],
     "measurements": {
-     "feedback_affordances_on_future_tap": 0,
-     "code": "DailyView.swift:493 `.onTapGesture { if avail { dayView = idx } }` with avail = idx <= ti (L462), so DailyView.swift:245 `if day > ti { Text(\"Unlocks \\(dayLabel(day))\") }` can never render"
+     "note_text": "\ud83d\udd12 Aug 31 unlocks on the day itself \u2014 come back then.",
+     "date_named": "Aug 31 (dayIndex 30, correct)"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Cheapest fix is on the cell, not the card: a lock glyph / 'Unlocks Aug 31' tooltip or a brief inline message when an unavailable cell is tapped. Reproduces CC-13-B.",
+   "current_status": "fixed",
+   "note": "The 31 cell shows the lock with NO tap required (visible in tc131-aug3-bottom.png, taken before any future-day tap); after the tap the cell gains a grey border + fill and the note under the grid names the right date. The tap remains a no-op on selection: the day card still read 'Aug 3 / Deal #539885 / Play Aug 3' and Aug 3 kept its gold tint.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-13:selected-day-invisible-at-play",
-   "claim": "When the sheet is scrolled far enough to reach the calendar, the day card's identity header (e.g. 'Aug 3' / 'Deal #539,885') is scrolled off behind the nav bar while the gold Play button is still on screen, so the only confirmation of WHICH day you are about to play is a pale tint on a 44x33 pt cell -- a mis-tap on an adjacent cell starts the wrong day's deal with nothing on screen to catch it.",
+   "claim": "With the sheet scrolled to the calendar, the day-card header naming the selected day is above the fold while the gold Play button is on screen, so nothing said which day Play would start. The button now carries the day name.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-13",
    "test_case": "TC-13.1",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-13/tc13-1-aug3-selected-belowfold.png",
-     ".qa-loop/evidence/round-1/wf-13/tc13-1-aug3-card.png"
+     ".qa-loop/evidence/round-1/wf-13/tc13-1-aug3-card.png",
+     "evidence/round-2/wf-13/tc131-aug3-bottom.png",
+     "evidence/round-2/wf-13/tc132-aug31-locked.png",
+     "evidence/round-2/wf-13/tc133b-daily-midattempt.png"
     ],
     "repro": [
      "cold launch",
      "tap Daily (290,175)",
      "swipe (200,700)->(200,300) -- the calendar is now on screen",
      "tap Aug 3 (94,515)",
-     "observe: the visible region is the tail of the objectives list + the Play button; the card header naming the day is above the fold (compare tc13-1-aug3-selected-belowfold.png with tc13-1-aug3-card.png, which needed a second swipe (200,400)->(200,740) to bring 'Aug 3' back into view)"
+     "observe: the visible region is the tail of the objectives list + the Play button; the card header naming the day is above the fold (compare tc13-1-aug3-selected-belowfold.png with tc13-1-aug3-card.png, which needed a second swipe (200,400)->(200,740) to bring 'Aug 3' back into view)",
+     "launch",
+     "tap Daily (290,176)",
+     "swipe (200,700)->(200,300)",
+     "read the gold button at (200,243)",
+     "tap Aug 4 (147,515)",
+     "read it again"
     ],
     "measurements": {
-     "swipes_to_confirm_selected_day": 1,
-     "calendar_cell_size_pt": "44 x 33",
-     "day_name_visible_next_to_Play_button": false
+     "aug3_label": "Play Aug 3",
+     "aug4_label": "Play Aug 4",
+     "today_label": "Play"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Partial reproduction of CC-13-C. The discoverability half of CC-13-C did NOT reproduce: the 'August 2026' header and weekday row are already peeking at the bottom of the sheet's first screen, which is a legible scroll cue, and one swipe reaches the grid. The confirmation half did reproduce. Cheap fix: label the button 'Play Aug 3' (it already says just 'Play') so day identity travels with the action.",
+   "current_status": "fixed",
+   "note": "Verified at the calendar scroll position with the header off-screen: the button read 'Play Aug 3', changed to 'Play Aug 4' on selecting Aug 4, and is the bare 'Play' (no suffix) on the Today card. CAVEAT for the implementer: the already-played branch ('Replay Aug N to improve') was NOT observed on device \u2014 no daily record was reachable inside this dispatch's turn budget; it shares the same daySuffix expression in DailyView.swift, so it is code-plausible but unverified.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
@@ -351,41 +408,60 @@
   },
   {
    "id": "ux/WF-14:replay-forfeits-grace-silently",
-   "claim": "While a live \u23f0 grace is running (yesterday's daily attempt, resumable today), the board's `Replay` pill destroys it in one unconfirmed tap and the day can NEVER earn \u23f0 again \u2014 no dialog before, no notice after; the Aug 29 card flipped from \"\u23f0 Resume your attempt today and it still counts\" to \"\u23f0 Same-day is earned on the day itself\". On a same-day attempt Replay costs nothing, so the asymmetry is invisible and the loss is irreversible by any user action.",
+   "claim": "The grace-aware confirm is still gated on hasLiveGame (moveCount > 0), so a \u23f0 grace with ZERO moves made today \u2014 tapped Play yesterday, no move, returned today \u2014 is destroyed with no dialog at all by ALL FOUR board-replacing controls: Replay, New game, the Daily sheet's Play button, and a how-to-win demo pill. The app itself shows '\u23f0 Resume your attempt today and it still counts' on that state one tap earlier, then silently makes it unrecoverable.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-14",
    "test_case": "TC-14.6",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-14/tc145-aug29-grace-line.png",
      ".qa-loop/evidence/round-1/wf-14/tc146-pathB-after-replay-board.png",
-     ".qa-loop/evidence/round-1/wf-14/tc146-pathB-after-replay-line.png"
+     ".qa-loop/evidence/round-1/wf-14/tc146-pathB-after-replay-line.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-grace-line-aug29.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-dailyplay-nodialog.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-replay-nodialog.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-replay-grace-gone.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-newgame-nodialog.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-zeromove-demopill-nodialog.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-grace-confirm-replay-withmoves.png"
     ],
     "repro": [
      "fixture: node .qa-loop/tools/make_save.mjs --day 28 --tier flawless --challengeDay 28 --startDay 28 | python3 .qa-loop/tools/inject_save.py <udid>  (= 'began Aug 29's challenge on Aug 29', today is Aug 30)",
      "launch; Auto-play Off; tap 'Not yet' (127,497) on the Ready-to-finish prompt",
      "tap Daily (359,175) -> swipe (200,700)->(200,300) -> tap Aug 29 (361,645) -> swipe (200,400)->(200,740): the \u23f0 line reads 'Resume your attempt today and it still counts'",
      "tap Done (345,100) -> tap the board's Replay pill (229,135)  [no dialog appears; board re-deals, Moves 0]",
-     "tap Daily (290,175) -> swipe to calendar -> tap Aug 29 (361,645): the \u23f0 line now reads 'Same-day is earned on the day itself'"
+     "tap Daily (290,175) -> swipe to calendar -> tap Aug 29 (361,645): the \u23f0 line now reads 'Same-day is earned on the day itself'",
+     "PRECONDITION (zero-move grace, the honest state Game.playChallenge persists): node .qa-loop/scratch/qa-worker-1/zero_move_save.mjs --day 28 (a fresh deal of seed 750496, moveCount 0, started false, challengeDay 28, challengeStartDay 28) | python3 .qa-loop/tools/inject_save.py <udid>; xcrun simctl launch",
+     "Board restores with the Aug 29 daily HUD and Moves 0; Daily (290,176) -> swipe (200,700)->(200,300) -> tap Aug 29 (361,645) shows the grace line '\u23f0 Resume your attempt today and it still counts' (wf14-zeromove-grace-line-aug29.png)",
+     "LEG 1 Daily-sheet Play: from that card tap 'Play Aug 29' (200,243) -> NO dialog, sheet dismisses, board re-deals; the persisted save flips to challengeStartDay 29 (grace gone)",
+     "LEG 2 Replay: re-inject, launch, tap Replay (229,136) -> NO dialog; re-open Daily -> Aug 29 card now reads '\u23f0 Same-day is earned on the day itself' (wf14-zeromove-replay-grace-gone.png)",
+     "LEG 3 New game: re-inject, launch, tap New game (51,136) -> NO dialog; deal jumps to a random #239526 and the Aug 29 HUD is gone",
+     "LEG 4 demo pill: re-inject, launch, Daily -> Aug 29 card -> tap the '\ud83e\udd49 Clear' how-to-win pill (118,312) -> NO dialog, demo bar 'Winning line \u00b7 0 / 78' up, Aug 29 HUD gone",
+     "CONTRAST (the part of the fix that works): inject make_save.mjs --day 28 --tier flawless --challengeDay 28 --startDay 28 (moveCount 85), 'Not yet', tap Replay -> the grace-aware confirm DOES fire and reads correctly: 'Give up \u23f0 Same-day for Aug 29?' / 'You began Aug 29's challenge on the day itself, so finishing it today still earns \u23f0 Same-day. Starting over makes it an attempt begun today, and Aug 29 can never earn \u23f0 again. Your 85 moves and your time will be discarded.'"
     ],
     "measurements": {
-     "taps_to_destroy": 1,
-     "confirmations_shown": 0,
-     "recoverable": false
+     "controls_that_destroy_silently": 4,
+     "controls_tested": 4,
+     "dialogs_shown_at_moveCount_0": 0,
+     "dialogs_shown_at_moveCount_85": 1
     }
    },
    "introduced_by_fix": false,
    "current_status": "open",
    "fix_risk": "metric-integrity",
-   "note": "TRAP: do NOT fix by preserving challengeStartDay across restartDeal() \u2014 that would let a player start a fresh full run on D+1 and still bank \u23f0, which is exactly what 'same-day' excludes. The safe fix is a warning/confirm while the grace is live. Overlaps the surface of ux/WF-3:board-reset-pills-no-confirm (same unguarded pill) but the incremental, WF-14-specific harm is that this loss is PERMANENT \u2014 replaying the day cannot restore \u23f0 \u2014 so a generic confirm reusing the existing 'You can replay the challenge afterwards' copy would NOT resolve this (that copy is the known-open review-loop item ux/index.html:gracelive-play-button-forfeits, reproduced verbatim here: tc146-pathA-confirm-copy.png).",
+   "note": "The round-1 fix's COPY is correct wherever it renders (verified with 85 moves on the board); only the gate is wrong. Bounded: all four controls, on both the board toolbar and the Daily sheet. TRAP (unchanged): do not fix by preserving challengeStartDay across a re-deal \u2014 that would mint \u23f0 for a run begun on D+1. The gate is the fix: widen hasLiveGame's use at ContentView.swift:343-345, DailyView.swift:273-274,335-336 and index.html:1797,1804 to `hasLiveGame || graceLive`, leaving hasLiveGame itself alone so a fresh casual board keeps its one-tap controls. Note the zero-move case has nothing else to lose (0 moves, 0:00), so the dialog's 'your 0 moves and your time will be discarded' clause needs suppressing there or it undercuts the warning.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
+     "status": "open"
+    },
+    {
+     "round": 2,
      "status": "open"
     }
    ]
@@ -430,93 +506,109 @@
   },
   {
    "id": "ux/WF-14:calendar-pip-unlabelled",
-   "claim": "The \u23f0 calendar marker is an unlabelled 5 pt gold dot in the cell's top-right corner, and the calendar legend row (right of \"August 2026\") lists only \ud83e\udd49 \ud83e\udd48 \ud83e\udd47 \ud83c\udf1f Flawless \u2014 nothing for \u23f0. A novice comparing Aug 27 (\ud83c\udf1f, no dot) with Aug 30 (\ud83c\udf1f + dot) has no way to learn what the extra dot means.",
+   "claim": "Calendar legend now names the \u23f0 corner pip.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-14",
    "test_case": "TC-14.2",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-14/tc142-calendar-fresh.png",
      ".qa-loop/evidence/round-1/wf-14/tc144-calendar-star-vs-pip.png",
-     ".qa-loop/evidence/round-1/wf-14/tc143-calendar-aug30-pip.png"
+     ".qa-loop/evidence/round-1/wf-14/tc143-calendar-aug30-pip.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-calendar-legend-dot.png"
     ],
     "repro": [
      "fresh install, Auto-play Off; win today's daily (any tier) and also win one past day (Aug 27)",
      "tap Daily -> swipe (200,700)->(200,300) to the calendar",
-     "compare the Aug 27 and Aug 30 cells and read the legend row right of 'August 2026'"
+     "compare the Aug 27 and Aug 30 cells and read the legend row right of 'August 2026'",
+     "fresh install, launch",
+     "tap Daily (279,175)",
+     "swipe (200,700)->(200,300)",
+     "read the row right of 'August 2026'"
     ],
-    "measurements": {
-     "legend_entries": 4,
-     "marker_types_drawn": 5
-    }
+    "measurements": {}
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "One-string fix (add an \u23f0 item to the legend row). Secondary risk not directly observed this pass: the pip uses Theme.gold, a hair from the gold TIER dot drawn at the same 5 pt size in the same cell, so on a gold-but-not-flawless \u23f0 day two near-identical gold dots would carry different meanings.",
+   "current_status": "fixed",
+   "note": "Legend reads '\ud83e\udd49 \ud83e\udd48 \ud83e\udd47 \ud83c\udf1f Flawless \u2022 \u23f0 Same-day' with a 5 pt gold dot before the \u23f0 glyph, matching the pip drawn in the cells. Fits on one line at Dynamic Type large.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-14:win-overlay-omits-the-day",
-   "claim": "The win overlay never names which day's challenge was completed \u2014 an Aug-29 grace win renders \"\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 2-day same-day streak.\" and a past-day (Aug 27) win renders the same tier line with no date at all; the deal number is the only clue. \"On time\" plus an advancing streak on a day that is not today invites the reading \"today is done\".",
+   "claim": "The win overlay now names the day when the graded attempt is not today's challenge.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-14",
    "test_case": "TC-14.5",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-14/tc145-grace-win-overlay.png",
      ".qa-loop/evidence/round-1/wf-14/tc144-pastday-win-overlay.png",
-     ".qa-loop/evidence/round-1/wf-14/tc143-win-overlay-sameday.png"
+     ".qa-loop/evidence/round-1/wf-14/tc143-win-overlay-sameday.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-grace-win-overlay-aug29.png",
+     ".qa-loop/evidence/round-2/wf-14/wf14-pastday-replay-no-ontime.png"
     ],
     "repro": [
      "grace case: inject make_save.mjs --day 28 --tier flawless --challengeDay 28 --startDay 28, launch, 'Not yet', Daily/Done, tap the toolbar Finish pill (171,175) -> overlay reads 'Deal #750,496 \u00b7 89 moves' + '\u23f0 On time \u2014 2-day same-day streak', never 'Aug 29'",
-     "past-day case: inject --day 26 --tier flawless --challengeDay 26 --startDay 29, launch, Finish (275,497) -> overlay reads 'Deal #937,619' + tier line, never 'Aug 27'"
+     "past-day case: inject --day 26 --tier flawless --challengeDay 26 --startDay 29, launch, Finish (275,497) -> overlay reads 'Deal #937,619' + tier line, never 'Aug 27'",
+     "inject make_save.mjs --day 28 --tier flawless --challengeDay 28 --startDay 28, launch, tap Finish (275,497)",
+     "overlay reads 'Aug 29: \ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'",
+     "same with --day 26 --challengeDay 26 --startDay 29 -> 'Aug 27: \ud83c\udf1f Flawless! ... all in a single run.' with no \u23f0 clause"
     ],
-    "measurements": {
-     "day_labels_in_overlay": 0
-    }
+    "measurements": {}
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Cheap fix: name the day in the daily line whenever challengeDay != todayIndex(). The copy omission is confirmed and reproduced twice; the specific 'player skips today believing it is done' harm was NOT directly reproduced this pass because today's challenge was already cleared in the state under test.",
+   "current_status": "fixed",
+   "note": "Verified on both non-today paths (\u23f0-grace win for Aug 29, and a plain past-day replay of Aug 27). Today's own win still renders without a prefix per winDayLabel's guard (not re-tested this dispatch).",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "bug/WF-4:autofinish-cascade-can-deny-gold",
-   "claim": "On some daily days the app's greedy auto-finish cascade sends cards home in an order that VIOLATES that day's ordering objective, so a player who plays a certified-flawless line and then accepts the app's own \"Ready to finish\" prompt can be denied Silver/Gold at the last moment. Harness evidence (day 21, seed from data/daily-pool.json): replaying the certified flawless line and running the app's cascade (tests/engine.mjs sendOneHomeStep, the same greedy rule as Game.runAutoFinish) finds NO finishable position at which the cascade wins AND keeps the tiers -- 'no finishable truncation of the flawless line keeps its tiers' -- while day 29 keeps all tiers.",
+   "claim": "The 'Ready to finish' prompt used to fire at day 21's move 64 and the cascade then awarded \ud83e\udd49\ud83e\udd48 only. On 4f02d1d the prompt no longer fires there, the Finish pill is still offered, and tapping it raises 'Finish now and miss \ud83e\udd47 Gold?' before running.",
    "type": "bug",
    "routing": "auto",
    "severity": "major",
-   "confidence": "suspected",
+   "confidence": "confirmed",
    "region": "WF-4",
    "test_case": "TC-4.1",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-15/wf15-day21-ready-to-finish-prompt.png",
      ".qa-loop/evidence/round-1/wf-15/wf15-day21-overlay-gold-denied.png",
      ".qa-loop/evidence/round-1/wf-15/wf15-win-overlay-flawless.png",
      ".qa-loop/evidence/round-1/wf-4/tc41-ask-prompt.png",
-     ".qa-loop/evidence/round-1/wf-4/tc41-win-overlay.png"
+     ".qa-loop/evidence/round-1/wf-4/tc41-win-overlay.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop11.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop12.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/d29-restore.png"
     ],
     "repro": [
      "Fresh install, Auto-play OFF, Auto-finish left at its default Ask.",
@@ -527,94 +619,109 @@
      "Control (same build, same session): the day-29 flawless save parked at move 92/96 finishes with '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.' - so the surface itself works; it is the EARLY finish offer that costs the medal.",
      "node .qa-loop/tools/make_save.mjs --day 29 --tier flawless --challengeDay 29 --startDay 29  -> succeeds: 'stop at move 92/96; finish -> won=true silver=true gold=true'",
      "node .qa-loop/tools/make_save.mjs --day 21 --tier flawless --challengeDay 21 --startDay 21  -> FAILS: 'no finishable truncation of the flawless line keeps its tiers' (same for days 24 and 27 per round-0 exploration)",
-     "in-app control (day 29, tiers survive): inject the day-29 save, relaunch, tap Finish (275,497) -> win overlay reads 'Flawless! all in a single run'"
+     "in-app control (day 29, tiers survive): inject the day-29 save, relaunch, tap Finish (275,497) -> win overlay reads 'Flawless! all in a single run'",
+     "node .qa-loop/scratch/qa-worker-2/save_at.mjs --day 21 --tier flawless --mode firstfinish --challengeDay 21 --startDay 21 | python3 .qa-loop/tools/inject_save.py <udid>  (move 64/87; offline cascade from there = bronze+silver, gold FALSE)",
+     "launch: NO 'Ready to finish' prompt; Auto-finish: Ask; gold Finish pill present; gold chip pending",
+     "tap Finish (158,167) -> alert 'Finish now and miss \ud83e\udd47 Gold?' / 'Keep playing' / 'Finish anyway'",
+     "tap 'Keep playing' (126,527) -> board pixel-identical to before (imgcrop_diff MAD 0.000), Finish pill still present"
     ],
     "measurements": {
-     "days_with_no_tier_preserving_finish": [
-      21,
-      24,
-      27
-     ],
-     "days_ok": [
-      20,
-      22,
-      23,
-      25,
-      26,
-      28,
-      29
-     ],
-     "day29_control_moves": 96,
-     "day29_control_result": "flawless retained"
+     "prompt_fired_at_tier_costing_position": false,
+     "finish_pill_present": true,
+     "alert_names_tier": "\ud83e\udd47 Gold"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
+   "current_status": "fixed",
    "fix_risk": "metric-integrity",
-   "note": "IN-APP REPRO STILL OUTSTANDING -- this is CC-15-C carried forward with new harness evidence, not an observed in-app failure, hence confidence 'suspected'. The day-29 in-app control passes, so the surface is exercised but the failing day is not. Do NOT change cascade semantics on this alone: first park day 21 at its FIRST finishable position regardless of tier (make_save currently refuses to emit such a save) and watch the win overlay drop the medal. TRAP: making auto-finish objective-aware changes scored outcomes; the safe direction may be to not offer/auto-run the cascade while a still-earnable tier would be broken by it, rather than silently reordering sends.",
+   "note": "Finish-affordance regression hunt (the flagged highest risk): NO regression found. The rewritten predicate simulateAutoFinish().won was differentially compared against the OLD sweep-to-completion implementation over all 21,956 prefix positions of every certified solution line (61 seeds x 4 tiers) via .qa-loop/scratch/qa-worker-2/diff_predicate.mjs - zero disagreements in either direction. In-app: day 29 move 92 still auto-offered the prompt, day 21 move 64 still shows the Finish pill, and both cascades ran and won when accepted.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-15:flawless-pill-both-vs-three",
-   "claim": "The \ud83c\udf1f how-to-win pill and its demo bar say Flawless is \"Both objectives in one run\", while the same sheet's legend, the day card and the win overlay all define it as \"\ud83e\udd49\ud83e\udd48\ud83e\udd47 all three earned in a single run\" - the one surface a novice uses to learn what \ud83c\udf1f costs contradicts every other surface, and the day card directly above it lists THREE objectives (Bronze/Silver/Gold).",
+   "claim": "FIXED: the \ud83c\udf1f how-to-win pill's label now reads \"\ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run\" wherever iOS renders it (the demo-bar headline), agreeing with the streaks legend, the day card's three objectives and the win overlay; the old \"Both objectives in one run\" phrasing is gone from both platforms.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-15",
    "test_case": "TC-15.1",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-15/wf15-crop-demo-bar.png",
      ".qa-loop/evidence/round-1/wf-15/wf15-streaks-and-today-flawless.png",
-     ".qa-loop/evidence/round-1/wf-15/wf15-pill-grid-today.png"
+     ".qa-loop/evidence/round-1/wf-15/wf15-pill-grid-today.png",
+     ".qa-loop/evidence/round-2/wf-10-15/wf15-demo-bar-flawless.png",
+     ".qa-loop/evidence/round-2/wf-10-15/wf15-win-overlay-flawless.png",
+     ".qa-loop/evidence/round-2/wf-10-15/wf15-daily-after-flawless.png"
     ],
     "repro": [
      "Fresh install. Tap Daily (283,175).",
      "Read the legend under the streak cards: 'A streak counts consecutive days holding that medal. Flawless = \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three earned in a single run of that day's deal.'",
      "Scroll to the Today card's 'Show me how to win:' 2x2 grid and tap \ud83c\udf1f Flawless (293,787).",
-     "OBSERVED demo bar: '\ud83c\udf1f Flawless: Both objectives in one run - 0 / 96'. The win overlay for the same day reads '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.'"
+     "OBSERVED demo bar: '\ud83c\udf1f Flawless: Both objectives in one run - 0 / 96'. The win overlay for the same day reads '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.'",
+     "launch (fresh install)",
+     "tap Auto-play (335,135) -> Off",
+     "tap Daily (276,175)",
+     "tap the \ud83c\udf1f Flawless pill (287,786)",
+     "read the demo-bar headline",
+     "tap Next (236,266)",
+     "tap Stop (357,266)"
     ],
     "measurements": {
-     "surfaces_saying_all_three": 3,
-     "surfaces_saying_both": 2,
-     "fix_scope": "one string (DailyView pill label + the demo-bar headline it feeds)"
+     "demo_bar_label": "\ud83c\udf1f Flawless: \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0 / 96",
+     "old_phrase_present": false,
+     "next_step_progress": "1 / 96"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "CC-15-A reproduced. Cheap, clearly-correct one-string fix ('all three objectives in one run'). Everything else in TC-15.1/15.2/15.3 passed: the 2x2 pill grid is correct, the \ud83c\udf1f pill is present on every reachable day sampled (Aug 3, 5, 6, 26, 29, 30 - the 3-pill days are exactly the universal-Silver ones), the demo starts paused and Stop re-deals cleanly, and the flawless win lights overlay + streak card + Today header + calendar \ud83c\udf1f in agreement with no date jitter.",
+   "current_status": "fixed",
+   "note": "Re-ran the repro on 4f02d1d. Demo bar: '\ud83c\udf1f Flawless: \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0 / 96', paused/ready (Start, not Pause); Next -> 1/96; Stop re-deals #551879 clean (Undo greyed, no Finish pill) with the day's challenge still bound. Swept the other flawless surfaces for drift and all agree: streak legend 'Flawless = \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three earned in a single run of that day's deal', win overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.', day-card header 'Today \ud83c\udf1f Flawless'. The demo-confirm alert (hasLiveGame path) never renders the label, so there is no fourth surface to drift. Caveat for the implementer: on iOS the pill BUTTON draws only the title '\ud83c\udf1f Flawless' \u2014 the label reaches a user only after they commit to the demo (the web pill shows it inline), so the pre-commitment discoverability the original finding was about is still weaker on iOS than on web. Not re-filed; flagging as context, not a new defect.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-3:board-reset-pills-no-confirm",
-   "claim": "The board's `New game` and `Replay` pills reset the game with no confirmation and no undo, even during a live daily-challenge attempt: one tap on `New game` while a scored Aug-30 attempt was 2 moves in silently dealt random deal #683001, dropped the challenge binding (objectives HUD gone) and emptied the undo history, with the attempt unrecoverable. The Daily sheet guards exactly this destruction with an \"End your daily attempt?\" / \"Discard the game in progress?\" confirm (DailyView.swift:42), but the board pills call game.newRandomGame()/game.restartDeal() directly (ContentView.swift:411,416 and rail 297), so the most reachable control on the screen is the unguarded one \u2014 and `New game`/`Replay` sit 91 pt and 87 pt from `Undo`, the pill a player taps constantly.",
+   "claim": "VERIFIED FIXED on device: the board's New game / Replay pills now confirm before discarding a live game, and only then \u2014 an untouched board and a won board are still exactly one tap.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-3",
    "test_case": "TC-3.1",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-3/wf3-daily-attempt-2-moves.png",
      ".qa-loop/evidence/round-1/wf-3/wf3-newgame-destroys-daily-attempt.png",
      ".qa-loop/evidence/round-1/wf-3/wf3-casual-2-moves-before-replay.png",
-     ".qa-loop/evidence/round-1/wf-3/wf3-after-replay-no-confirm-history-gone.png"
+     ".qa-loop/evidence/round-1/wf-3/wf3-after-replay-no-confirm-history-gone.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/02-newgame-untouched.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/06-newgame-live-confirm.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/08-replay-live-confirm.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/09-after-replay.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/13-daily-newgame-confirm.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/16-newgame-after-win.png"
     ],
     "repro": [
      "cold launch (board shows Deal #551879, Moves 0)",
@@ -622,39 +729,49 @@
      "tap the gold Play button (200,682) -> board with the 3-line objectives HUD, Deal #551879",
      "tap the A-hearts at col4 bottom (224,696), then the 9-spades at col7 bottom (370,696) -> Moves 2, Undo enabled, HUD live (wf3-daily-attempt-2-moves.png)",
      "tap New game (51,135) -> NO dialog: random Deal #683001, Moves 0, HUD gone, Undo greyed (wf3-newgame-destroys-daily-attempt.png)",
-     "casual variant: from a fresh casual deal make 2 moves (Moves 2, 2:42 on the clock), tap Replay (229,135) -> NO dialog, Moves 0, clock 0:00, Undo greyed, the 2 moves are unrecoverable"
+     "casual variant: from a fresh casual deal make 2 moves (Moves 2, 2:42 on the clock), tap Replay (229,135) -> NO dialog, Moves 0, clock 0:00, Undo greyed, the 2 moves are unrecoverable",
+     "cold launch (Deal #721394, Moves 0) -> tap New game (51,135): NO dialog, deal changes to #915806 in one tap [02]",
+     "tap How to play / Done, tap A-diamond at (175,650) -> Moves 1",
+     "tap New game (51,135): alert 'Discard the game in progress?' / 'Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.' / [Keep playing | New game] [06]",
+     "tap Keep playing (127,517): Deal #915806 and Undo-enabled state preserved [07]",
+     "tap Replay (229,135): same alert, destructive verb 'Replay' [08]; tap Replay (275,517) -> board pixel-identical to the initial deal, Moves 0, Time 0:00 (imgcrop_diff MAD 0.000 over tableau + header) [09]",
+     "Daily -> Play (daily #551879) -> one move -> tap New game: alert 'End your daily attempt?' / 'Your 1 move and your time will be discarded. You can replay the challenge afterwards.' [13]",
+     "inject bronze save for day 29, relaunch, Finish, Close the win overlay, tap New game (51,135): NO dialog, new deal #191548 in one tap [16]"
     ],
     "measurements": {
-     "confirm_dialogs_shown": 0,
-     "taps_to_destroy_daily_attempt": 1,
-     "moves_lost_in_repro": 2,
-     "undo_available_after": false,
-     "pill_gap_pt_undo_to_newgame": 91,
-     "pill_gap_pt_undo_to_replay": 87
+     "taps_untouched_board": 1,
+     "taps_won_board": 1,
+     "taps_live_board": 2,
+     "casual_copy": "This game is not a challenge, so there is no way back to it.",
+     "daily_copy": "You can replay the challenge afterwards."
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
+   "current_status": "fixed",
    "fix_risk": "behavior-change",
-   "note": "TRAP: gate any new confirm on state (moveCount > 0, or challengeDay != nil) so the common one-tap New game / Replay on an untouched board stays one tap \u2014 WF-3 budgets one tap and a blanket alert would regress every case. Do NOT 'fix' this by making restartDeal preserve challengeStartDay; that is the separate metric-integrity trap noted in candidate concern CC-14-B (it would mint a same-day streak for a run begun the next day). Distinct from the open ux/WF-6:demo-exit-drops-challenge-binding: that one is the demo's Stop/Done path, this one is the always-visible board pills and the missing confirm.",
+   "note": "Both halves hold: the confirm is genuinely gated on hasLiveGame (no dialog at Moves=0 or after a win), and the two-branch copy is correct per branch. Follow-on copy nit filed separately as ux/WF-3:replay-confirm-copy-mismatch (the branch text is written for New game and misfits Replay). NOT re-tested in landscape: rotation remains impossible with this toolset (HARNESS_NOTES), so the rail call sites are code-only.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "bug/WF-4:autoplay-denies-daily-gold",
-   "claim": "Reproduced in-app end-to-end on day 29: at the certified-flawless position (move 92) a SINGLE tap on the Auto-play pill made two automatic moves (Moves 92 -> 94) that flipped the HUD's gold chip 'Split every suit exactly at the Eight' from pending to a red X, and the resulting win overlay awarded only 'Daily challenge: bronze+silver earned' - gold and flawless permanently lost with zero card input from the player.",
+   "claim": "Auto-play's greedy safe-send used to put 8\u2660 on the DOWN foundation at day 29's certified-flawless position, killing \ud83e\udd47 and \ud83c\udf1f with no player input. Re-tested on 4f02d1d: the look-ahead refuses that send, the harmless 6\u2660 send still happens, the board is not stuck and the deal still wins flawless.",
    "type": "bug",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-4",
-   "test_case": "TC-8.2",
-   "build_sha": "b2ce1a4",
+   "test_case": "TC-4.1",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-5/tc42-ready-to-finish-prompt.png",
@@ -666,7 +783,12 @@
      ".qa-loop/evidence/round-1/wf-8/hud_before_s.png",
      ".qa-loop/evidence/round-1/wf-8/t82b_s.png",
      ".qa-loop/evidence/round-1/wf-8/hud_after_s.png",
-     ".qa-loop/evidence/round-1/wf-8/t84d_s.png"
+     ".qa-loop/evidence/round-1/wf-8/t84d_s.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/d29-restore.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop6.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop8.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop9.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop10.png"
     ],
     "repro": [
      "node .qa-loop/tools/make_save.mjs --day 29 --tier flawless | python3 .qa-loop/tools/inject_save.py <udid>   (harness predicts: finish -> won=true silver=true gold=true)",
@@ -684,46 +806,57 @@
      "tap the Auto-play pill (337,135) once -> label 'Auto-play: On'",
      "observe: Moves jumps to 94 by itself and the gold chip becomes a red X (hud_after_s.png)",
      "tap Auto-finish (73,175) twice (Ask->Off->On) -> cascade wins at Moves 96",
-     "win overlay reads 'Daily challenge: bronze+silver earned. On time - 1-day same-day streak.' - no gold, no flawless"
+     "win overlay reads 'Daily challenge: bronze+silver earned. On time - 1-day same-day streak.' - no gold, no flawless",
+     "node .qa-loop/scratch/qa-worker-2/save_at.mjs --day 29 --tier flawless --mode autoplaybreak | python3 .qa-loop/tools/inject_save.py <udid>  (parks day 29 at move 92, cells=6\u2660, col2=7\u2660/8\u2660\ufe0f? see note, col6=8\u2660, up=[5,8,7,8] down=[9,9,9,9])",
+     "launch: board restores, Auto-play: On, HUD gold chip pending, 'Ready to finish' prompt fires",
+     "tap 'Not yet' (127,497) -> deferAutoFinish() runs auto-play",
+     "observe: Moves 92->93, 6\u2660 sent UP (harmless), 8\u2660 LEFT ON THE BOARD, gold chip still pending",
+     "tap 8\u2660 manually (321,545) -> it goes DOWN, gold chip flips to red \u2717, Moves 94 (manual play is not gated)",
+     "tap Undo (142,135) -> gold chip back to pending",
+     "tap the Finish pill (164,172) -> cascade wins: 'You solved it!' 96 moves, '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.'"
     ],
     "measurements": {
-     "moves_at_restore": 92,
-     "moves_after_toggling_autoplay_on": 94,
-     "final_moves": 96,
-     "harness_predicted_tiers_without_autoplay": "silver=true gold=true (flawless)",
-     "tiers_awarded_in_app_with_autoplay_on": "bronze+silver only",
-     "user_card_inputs_between_restore_and_tier_loss": 0
+     "auto_moves_made": 1,
+     "tier_breaking_auto_sends": 0,
+     "final_tiers": "bronze+silver+gold+flawless"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
+   "current_status": "fixed",
    "fix_risk": "metric-integrity",
-   "note": "New evidence from the WF-8 lane, same defect and same id - do not mint a new one. Two things this round bounds: (a) the tier loss needs no gameplay at all, just the Auto-play pill (which is ON by default), and (b) the auto-finish cascade from move 92 is INNOCENT here - with Auto-play Off the same greedy cascade wins at 96 moves and the harness certifies it keeps gold, so on day 29 the culprit is isSafeAutoplay/runAutoplay only. TRAP: making autoplay objective-aware changes scored outcomes; a direction-only fix (never send to the 'down' end when the 'up' end is still reachable for that rank, or vice versa) is the narrower change.",
+   "note": "Verified all four sub-claims: (a) medal survives auto-play at the round-1 position; (b) refusal leaves the board playable and winnable - the same deal finished flawless from the refused position; (c) casual play unaffected (fresh deal #278203, auto-play made no scored decision; liveChallenge nil path); (d) the identical send made BY HAND is still allowed and correctly flips the HUD chip to \u2717, so the guard withholds only the automatic action.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-7:deal-play-discards-live-game-no-confirm",
-   "claim": "The Deal # alert's `Play` re-deals immediately and silently destroys whatever game is in progress \u2014 including a LIVE daily attempt (its moves, its clock, its objectives HUD) \u2014 with no confirmation and no way back, while the Daily sheet's `Play`, which performs the exact same destruction, warns first with \"Discard the game in progress? ... your 1 move and your time will be discarded.\" The field is pre-filled with the current deal number, so `Play` reads as the harmless \"play this deal\" and is one mis-tap away from `Cancel` in the same two-button row.",
+   "claim": "The Deal # alert's Play used to re-deal over a live game with no warning. On 4f02d1d it now routes through the same 'Discard the game in progress?' confirmation the board pills use, gated on a live game.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "major",
    "confidence": "confirmed",
    "region": "WF-7",
    "test_case": "TC-7.5",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-7/wf7-dailyview-play-confirms.png",
      ".qa-loop/evidence/round-1/wf-7/wf7-daily-attempt-live.png",
      ".qa-loop/evidence/round-1/wf-7/tc74-1000000-enabled.png",
      ".qa-loop/evidence/round-1/wf-7/wf7-deal-play-killed-daily-attempt.png",
-     ".qa-loop/evidence/round-1/wf-7/wf7-daily-after-kill.png"
+     ".qa-loop/evidence/round-1/wf-7/wf7-daily-after-kill.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf7-live-play-confirm.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/tc71-untouched-no-confirm.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/tc75-after-cancel.png"
     ],
     "repro": [
      "launch (fresh install)",
@@ -735,80 +868,104 @@
      "long-press the field (200,461) -> tap 'Select All' (142,413) -> type 1000000",
      "tap Play (274,528)",
      "OBSERVED: no confirmation of any kind; board is instantly Deal #1000000, Moves 0, Undo disabled, daily HUD gone",
-     "tap Daily (297,175): the Today card is back to its unplayed state (no resume affordance) - the attempt is simply gone"
+     "tap Daily (297,175): the Today card is back to its unplayed state (no resume affordance) - the attempt is simply gone",
+     "launch; tap the K-clubs at (370,650) -> Moves 1, clock running",
+     "tap Deal # (191,175); tap Play (275,527)",
+     "OBSERVED: alert 'Discard the game in progress? Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.' with Keep playing / Play that deal",
+     "tap Keep playing (127,517) -> Moves 1, Deal #10003 intact",
+     "TC-7.1 control: on an untouched board (Moves 0) the same Deal#->Select All->10003->Play sequence re-deals with NO confirm"
     ],
     "measurements": {
-     "confirmations_shown_by_DailyView_Play": 1,
-     "confirmations_shown_by_deal_alert_Play": 0,
-     "moves_lost_without_warning": 1,
-     "undo_available_after": false
+     "confirm_on_live_game": 1,
+     "confirm_on_untouched_board": 0,
+     "moves_lost_silently": 0
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Sibling of the open ux/WF-3:board-reset-pills-no-confirm but a DIFFERENT control and a strictly worse case: WF-3's pills at least look destructive, whereas this alert pre-fills the current deal so `Play` looks like a no-op, and this path can kill a daily attempt that the app's own DailyView considers worth confirming (DailyView.swift:42 already builds the exact copy: game.challengeDay != nil ? \"End your daily attempt?\" : \"Discard the game in progress?\"). FIX TRAP: make the confirm CONDITIONAL on game.moveCount > 0 (as DailyView does) - an unconditional confirm would add a tap to the common case and break WF-7's <=3-tap budget / TC-7.1. Code path: ContentView.swift:262 Button(\"Play\") -> Game.deal(seed:) always re-deals.",
+   "current_status": "fixed",
+   "note": "Single-tap path verified on device. The tap budget on an untouched board is unchanged (TC-7.1 passed). BUT the runloop hop the reviewer flagged does bite on a repeated tap - filed separately as bug/WF-7:deal-confirm-swallowed-by-double-tap.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-8:autoplay-toggle-mutates-scored-game",
-   "claim": "The Auto-play pill is presented as a setting but is an immediate, unconfirmed, un-undoable-in-one-tap game action: tapping it mid-game instantly played 2 cards and advanced the move counter 92 -> 94 on a scored daily run. Nothing on the pill, and no confirm, warns that flipping a preference will spend moves against a move-count objective (day 29's silver is 'four Kings within your first 9 moves').",
+   "claim": "Tapping the Auto-play pill used to play cards on the spot and spend move count. On 4f02d1d turning it On moves nothing (Moves stayed 1 across the toggle) and turning it Off halts the chain.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-8",
    "test_case": "TC-8.2",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "fix_risk": "behavior-change",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-8/t84b_s.png",
-     ".qa-loop/evidence/round-1/wf-8/t82b_s.png"
+     ".qa-loop/evidence/round-1/wf-8/t82b_s.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop2.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop3.png",
+     ".qa-loop/evidence/round-2/wf-2-4-6-8/crop6.png"
     ],
     "repro": [
      "restore any scored daily board with Auto-play: Off and at least one safely-homeable card exposed (day-29 save above, Moves 92)",
      "tap the Auto-play pill (337,135) once",
-     "the label flips to On AND the board plays itself: Moves 92 -> 94 with no card ever touched"
+     "the label flips to On AND the board plays itself: Moves 92 -> 94 with no card ever touched",
+     "cold launch, deal #278203; tap Auto-play (335,135) -> 'Auto-play: Off', Moves 0",
+     "tap A\u2666 at col5 bottom (273,650) -> Moves 1, A\u2666 on the diamonds UP foundation, no further automatic moves (Off honoured)",
+     "tap Auto-play (335,135) -> 'Auto-play: On'; screenshot after 2 s: Moves STILL 1, board pixel-unchanged except the pill label and clock (imgcrop_diff 0.7% over the whole board rect)",
+     "arming confirmed separately on the day-29 save: after 'Not yet' the armed auto-play made its next-move send (Moves 92->93) rather than dying"
     ],
     "measurements": {
-     "taps": 1,
-     "moves_added_by_a_settings_tap": 2,
-     "confirmations_shown": 0
+     "moves_before_toggle": 1,
+     "moves_after_toggle": 1,
+     "round1_moves_spent_by_toggle": 2
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Deliberately NOT a duplicate of bug/WF-4:autoplay-denies-daily-gold: this survives that fix. Even a perfectly direction-safe autoplay still spends real moves the instant a preference is toggled, and Causeway scores move counts (par, 'within your first N moves' objectives, Wins best-moves). Related in family to the open ux/WF-3:board-reset-pills-no-confirm. Cheap options: only apply the new setting from the next player move, or make the pill's first firing on an in-progress game confirm. TRAP: the moves it adds are recorded in the scored stream, so any change here changes recorded results.",
+   "current_status": "fixed",
+   "note": "Auto-play is still not dead: on the day-29 restore the armed chain fired on the next commit. Note for the record: on a fresh deal almost nothing is 'safe' under isSafeAutoplay (an exposed A\u2665 was correctly NOT auto-sent because 2\u2660/2\u2663 may still need it as a base), so a casual player will rarely see auto-play act early - that is the documented stricter rule, not a regression.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "bug/WF-13:daily-card-seed-grouped",
-   "claim": "The Daily day-card prints the deal number comma-grouped (\"Deal #850,804\") while the board pill and every Wins surface print the same number ungrouped (\"Deal #551879\", chip \"551879\") \u2014 the two screens disagree on the identifier a user needs to match, and a user cannot tell whether \"Deal #551,879\" and \"551879\" are the same deal. DailyView.swift:181 uses Text(\"Deal #\\(c.seed)\"), which interpolates through LocalizedStringKey and auto-groups the digits; it bypasses DealFormat.seed(), the ungrouped formatter added for exactly this bug in WinsView.",
+   "claim": "The Daily day-card printed the deal number comma-grouped (\"Deal #691,039\") while the board pill and every Wins surface printed it ungrouped. Re-verified on PAST-day cards this round: the card now prints ungrouped and matches the board pill.",
    "type": "bug",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-13",
-   "test_case": "TC-13.7",
-   "build_sha": "b2ce1a4",
+   "test_case": "TC-13.1",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-9-13b/tc13-6-aug5.png",
      ".qa-loop/evidence/round-1/wf-9-13b/tc13-7-aug1.png",
      ".qa-loop/evidence/round-1/wf-9-13b/board-pill-deal-551879-ungrouped.png",
-     ".qa-loop/evidence/round-1/wf-9-13b/tc9-2-wins-populated.png"
+     ".qa-loop/evidence/round-1/wf-9-13b/tc9-2-wins-populated.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/10-daily-sheet-top.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/11-daily-board.png",
+     "evidence/round-2/wf-13/tc131-aug3-card-crop.png",
+     "evidence/round-2/wf-13/tc133-aug4-board.png",
+     "evidence/round-2/wf-13/tc133b-daily-midattempt.png"
     ],
     "repro": [
      "launch",
@@ -817,64 +974,82 @@
      "tap Aug 1 (358,472)",
      "swipe (200,340)->(200,700) to scroll the day card into view",
      "read the card's right-hand deal label: 'Deal #691,039'",
-     "dismiss the sheet, read the board's Deal # pill and the Wins chips: ungrouped ('Deal #551879' / '551879')"
+     "dismiss the sheet, read the board's Deal # pill and the Wins chips: ungrouped ('Deal #551879' / '551879')",
+     "cold launch -> tap Daily (279,175)",
+     "read the Today card's right-hand deal label: 'Deal #551879' (no comma) [10]",
+     "tap Play (200,672) -> board pill reads 'Deal #551879' [11] \u2014 the two agree",
+     "tap Daily (290,176)",
+     "swipe (200,700)->(200,300)",
+     "tap Aug 3 (94,515)",
+     "swipe (200,300)->(200,640)",
+     "read card header"
     ],
     "measurements": {
-     "daily_card_label": "Deal #691,039",
-     "board_pill_label": "Deal #551879",
-     "wins_chip_label": "551879",
-     "wins_row_label": "Deal #551879",
-     "source": "ios/Causeway/Causeway/Views/DailyView.swift:181"
+     "aug3_card": "Deal #539885",
+     "aug4_card_then_board_pill": "Deal #625648 / Deal #625648",
+     "today_card": "Deal #551879"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "One-line fix: Text(\"Deal #\" + DealFormat.seed(c.seed)). Observed on all 7 day cards read this pass (Aug 1-7).",
+   "current_status": "fixed",
+   "note": "Past-day cards Aug 3 (#539885) and Aug 4 (#625648) and the Today card (#551879) all print ungrouped, and Aug 4's card number is byte-identical to the board's Deal # pill after Play. No other surface in this path regressed. (The separately-tracked win-overlay grouping bug/WF-4:win-overlay-seed-grouped was not in my path.)",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
   {
    "id": "ux/WF-9:deal-entry-out-of-range-silent",
-   "claim": "In Wins > 'Play a deal', a number above 1,000,000 leaves Play greyed out with no message and no other feedback \u2014 and because the only statement of the legal range is the field's placeholder, which the typed text has replaced, nothing on screen tells the user what is wrong or what to change.",
+   "claim": "Wins > 'Play a deal' now says why Play is dead: typing 2000000 shows a red 'Deal numbers run 1-1,000,000.' under the field, the bound is still enforced (no silent clamp), and an empty field stays quiet.",
    "type": "ux-design",
    "routing": "auto",
    "severity": "minor",
    "confidence": "confirmed",
    "region": "WF-9",
    "test_case": "TC-9.3",
-   "build_sha": "b2ce1a4",
+   "build_sha": "4f02d1d",
    "evidence": {
     "screenshots": [
      ".qa-loop/evidence/round-1/wf-9-13b/tc9-3-out-of-range-play-disabled.png",
-     ".qa-loop/evidence/round-1/wf-9-13b/tc9-1-wins-empty.png"
+     ".qa-loop/evidence/round-1/wf-9-13b/tc9-1-wins-empty.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/tc93-out-of-range.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/tc93-played-777.png"
     ],
     "repro": [
      "launch",
      "tap Wins (338,172)",
      "tap the 'Play a deal' field (164,186)",
      "type 2000000",
-     "observe: field reads 02000000, Play is disabled, no error text, placeholder hint gone"
+     "observe: field reads 02000000, Play is disabled, no error text, placeholder hint gone",
+     "launch; tap Wins (353,175); tap the 'Play a deal' field (164,186); type 2000000",
+     "OBSERVED: red 'Deal numbers run 1-1,000,000.' under the field, Play still disabled",
+     "dwell the field, Select All (144,239), type 777, tap Play (357,190) -> sheet dismisses, board is Deal #777, Moves 0"
     ],
     "measurements": {
-     "entered": "2000000",
-     "play_button": "disabled",
-     "error_text_shown": "none",
-     "source": "ios/Causeway/Causeway/Views/WinsView.swift enteredSeed / .disabled(enteredSeed == nil)"
+     "error_text_shown": "Deal numbers run 1-1,000,000.",
+     "play_disabled_out_of_range": true,
+     "valid_entry_loads": "Deal #777"
     }
    },
    "introduced_by_fix": false,
-   "current_status": "open",
-   "note": "Enforcing the bound is right (do not go back to clamping silently); what is missing is a one-line reason under the field, e.g. 'Deal numbers go up to 1,000,000'. TESTCASES TC-9.3 still says 'clamped 1-1,000,000' - the doc, not the app, is stale there.",
+   "current_status": "fixed",
+   "note": "Verified on device. TESTCASES TC-9.3 still says 'clamped 1...1,000,000' - the doc is the stale part, the app rejects rather than clamps.",
    "first_seen_round": 1,
    "status_history": [
     {
      "round": 1,
      "status": "open"
+    },
+    {
+     "round": 2,
+     "status": "fixed"
     }
    ]
   },
@@ -940,11 +1115,207 @@
      "status": "open"
     }
    ]
+  },
+  {
+   "id": "bug/WF-4:win-overlay-seed-grouped",
+   "claim": "The win overlay prints the solved deal comma-grouped \u2014 'Deal #551,879' \u2014 while its own 'Play deal #551880' button, the board pill and the Daily card all print the same class of number ungrouped; one dialog shows both formats at once, so a user cannot tell whether '#551,879' is the deal recorded as '551879' in Wins.",
+   "type": "bug",
+   "routing": "auto",
+   "severity": "minor",
+   "confidence": "confirmed",
+   "region": "WF-4",
+   "test_case": "TC-5.1",
+   "build_sha": "4f02d1d",
+   "evidence": {
+    "screenshots": [
+     ".qa-loop/evidence/round-2/wf-1-3-5/15-win-overlay.png"
+    ],
+    "repro": [
+     "node .qa-loop/tools/make_save.mjs --day 29 --tier bronze | grep '^{' | python3 .qa-loop/tools/inject_save.py <udid>",
+     "xcrun simctl launch <udid> com.whimsicaldistractions.Causeway",
+     "tap Finish (275,497) in the 'Ready to finish' prompt; wait ~8 s for the cascade",
+     "read the overlay's result line: 'Deal #551,879 \u00b7 87 moves \u00b7 1:49' next to its own button 'Play deal #551880'"
+    ],
+    "measurements": {
+     "overlay_result_line": "Deal #551,879",
+     "overlay_button_label": "Play deal #551880",
+     "board_pill_label": "Deal #551879",
+     "source": "ios/Causeway/Causeway/Views/ContentView.swift:901 \u2014 Text(\"Deal #\\(game.seed) \u00b7 ...\") interpolates through LocalizedStringKey and auto-groups"
+    }
+   },
+   "introduced_by_fix": false,
+   "current_status": "open",
+   "note": "Same root cause and same one-line remedy as bug/WF-13:daily-card-seed-grouped (route through DealFormat.seed), on a surface that fix did not cover. Pre-existing, not caused by round 1's fixes.",
+   "first_seen_round": 2,
+   "status_history": [
+    {
+     "round": 2,
+     "status": "open"
+    }
+   ]
+  },
+  {
+   "id": "ux/WF-3:replay-confirm-copy-mismatch",
+   "claim": "The new reset confirmation reuses New-game wording for Replay: tapping Replay on a live casual game warns 'This game is not a challenge, so there is no way back to it', but Replay reloads the very same deal, so the deal is not lost at all \u2014 the warning overstates the cost of the one control whose whole purpose is to restart this deal.",
+   "type": "ux-design",
+   "routing": "auto",
+   "severity": "minor",
+   "confidence": "confirmed",
+   "region": "WF-3",
+   "test_case": "TC-3.1",
+   "build_sha": "4f02d1d",
+   "evidence": {
+    "screenshots": [
+     ".qa-loop/evidence/round-2/wf-1-3-5/08-replay-live-confirm.png",
+     ".qa-loop/evidence/round-2/wf-1-3-5/09-after-replay.png"
+    ],
+    "repro": [
+     "cold launch -> tap New game (51,135) -> tap a bottom card to make 1 move",
+     "tap Replay (229,135)",
+     "read the alert: title 'Discard the game in progress?', body 'Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.', buttons [Keep playing | Replay]",
+     "tap Replay (275,517): the SAME deal #915806 reloads pixel-identical to its start \u2014 nothing about the deal was unrecoverable"
+    ],
+    "measurements": {
+     "replay_alert_message": "Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.",
+     "deal_before": 915806,
+     "deal_after": 915806
+    }
+   },
+   "introduced_by_fix": true,
+   "current_status": "open",
+   "note": "Cheap fix: branch the message on the verb as well as on challengeDay, e.g. Replay -> 'Your N moves and your time will be discarded and this deal starts over.' CODE-LEVEL, NOT DEVICE-VERIFIED (out of turn budget): the title is chosen only by challengeDay (ContentView resetConfirmTitle), so Replay during a daily attempt should read 'End your daily attempt?' even though Game.restartDeal():236-239 deliberately re-binds challengeDay \u2014 i.e. the attempt is restarted, not ended. Worth one screenshot next round before acting on that half.",
+   "first_seen_round": 2,
+   "status_history": [
+    {
+     "round": 2,
+     "status": "open"
+    }
+   ]
+  },
+  {
+   "id": "bug/WF-7:deal-confirm-swallowed-by-double-tap",
+   "claim": "The Deal # alert's confirmation is raised 0.1 s AFTER the alert dismisses, and its destructive 'Play that deal' button lands at (274,517) - 10 pt from the 'Play' the finger just hit at (275,527). A double-tap on Play (or any second tap in that strip within ~1 s) therefore confirms a discard the user never saw: the in-progress game, its moves and its clock are destroyed with the confirmation flashing past. Reproduced 2/2.",
+   "type": "bug",
+   "routing": "auto",
+   "severity": "major",
+   "confidence": "confirmed",
+   "region": "WF-7",
+   "test_case": "TC-7.5",
+   "build_sha": "4f02d1d",
+   "evidence": {
+    "screenshots": [
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf7-live-play-confirm.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf7-double-tap-play-result.png",
+     ".qa-loop/evidence/round-2/wf-7-9-11/wf7-double-tap-repro2.png"
+    ],
+    "repro": [
+     "launch (Deal #10003 restored, Moves 0)",
+     "tap the K-clubs at (370,650) -> Moves 1, clock running (a live game)",
+     "tap Deal # (191,175) -> the 'Play a deal' alert opens pre-filled with 10003",
+     "tap Play (275,527), then tap (275,527) AGAIN immediately (two ordinary taps, no special timing needed - ~0.5 s apart)",
+     "OBSERVED: no confirmation is left on screen; header reads Moves 0, Undo greyed, Deal #10003 re-dealt. The 1 move and the elapsed time are gone.",
+     "Contrast: a single tap on Play leaves the confirm up and 'Keep playing' preserves the game."
+    ],
+    "measurements": {
+     "confirm_button_center_pt": "274,517",
+     "alert_play_button_center_pt": "275,527",
+     "separation_pt": 10,
+     "deferred_present_delay_s": 0.1,
+     "moves_lost": 1,
+     "repro_rate": "2/2"
+    }
+   },
+   "introduced_by_fix": true,
+   "current_status": "open",
+   "note": "Caused by the DispatchQueue.main.asyncAfter(0.1) hop added in 9d4a4fc (ContentView.swift, deal alert Play). The confirm is a real dialog but offers no real protection while its destructive action materialises under the finger that just tapped. Cheapest safe fixes: present the confirm on the NEXT tap-eligible runloop turn but ignore touches for a short window, or make the confirmation a sheet/dialog whose destructive button is not co-located with the alert's Play (e.g. swap Keep playing to the right), or debounce pendingReset so a tap arriving <300 ms after it is raised is discarded. Do NOT solve it by dropping the confirmation.",
+   "first_seen_round": 2,
+   "status_history": [
+    {
+     "round": 2,
+     "status": "open"
+    }
+   ]
+  },
+  {
+   "id": "bug/DailyView:calendar-cells-have-no-identifier",
+   "claim": "Daily calendar cells cannot be addressed programmatically: calCell (Views/DailyView.swift:533-580) carries only .accessibilityLabel(dayLabel(idx)) \u2014 or \"<day>, locked until that date\" \u2014 applied to a ZStack that is never marked as a single accessibility element (.accessibilityElement(children: .combine)), and no .accessibilityIdentifier at all. Every other tappable surface in the app got identifiers on 5447237; the calendar grid was missed. Two round-2 regression guards (ux/WF-13:future-day-tap-no-feedback and ux/WF-13:selected-day-invisible-at-play) can only reach a cell through a label match against text that also appears in the day-card header and in the 'Unlocks <day>' placeholder, disambiguated by frame height \u2014 a brittle query for the one control whose mis-tap the second fix exists to prevent. The same gap hits VoiceOver: the label is attached to a container whose children (the date number, the \ud83c\udf1f/\ud83d\udd12/dot markers) are their own elements, so the cell may be announced as loose fragments rather than one 'Aug 3, gold' cell.",
+   "type": "bug",
+   "routing": "auto",
+   "severity": "minor",
+   "confidence": "confirmed",
+   "region": "WF-13",
+   "test_case": "TC-13.1",
+   "build_sha": "4f02d1d",
+   "evidence": {
+    "repro": [
+     "grep -n 'accessibilityIdentifier' ios/Causeway/Causeway/Views/DailyView.swift -> daily.play, daily.demo.<tier>, daily.export, daily.import, daily.lockednote, hud.day; NO cell id",
+     "read Views/DailyView.swift:533-580 (calCell): the only accessibility modifier is .accessibilityLabel(locked ? \"\\(dayLabel(idx)), locked until that date\" : dayLabel(idx)) on the ZStack, with no .accessibilityElement(children: .combine)",
+     "the same dayLabel(idx) string is also rendered by the day-card header (line 190) and by 'Unlocks \\(dayLabel(day))' (line 265), so a label query is ambiguous by construction"
+    ],
+    "measurements": {
+     "cells_per_month": 31,
+     "cell_hit_target_pt": "44x40",
+     "guards_weakened": 2
+    }
+   },
+   "introduced_by_fix": false,
+   "current_status": "open",
+   "note": "Recommended fix: .accessibilityIdentifier(\"daily.cal.\\(idx)\") plus .accessibilityElement(children: .combine) on calCell's ZStack. That makes both round-2 calendar guards deterministic (RegressionDailyCalendarTests.swift) and gives VoiceOver one element per day. Filed by the regression-test pass, not observed as a user-visible defect this round.",
+   "first_seen_round": 2,
+   "status_history": [
+    {
+     "round": 2,
+     "status": "open"
+    }
+   ]
+  },
+  {
+   "id": "bug/Main:scored-surfaces-addressable-only-by-copy",
+   "claim": "Four surfaces that regression guards must assert on have no accessibilityIdentifier, so the tests have to match visible copy \u2014 which makes a wording change look like a regression and a real regression look like a wording change. (1) The daily objectives HUD chips (Views/DailyView.swift:642-680) carry none; hud.day only renders when the challenge is NOT today, so the metric-integrity guard for ux/WF-6:demo-exit-drops-challenge-binding has to prove the HUD exists by querying the literal text 'Clear the deal'. (2) The win overlay (Views/ContentView.swift:895-905) is addressed by its 'You solved it! \ud83c\udf89' title \u2014 which also blocks a guard for ux/WF-14:win-overlay-omits-the-day, whose whole content is the overlay's day prefix. (3) The Wins 'Play a deal' TextField and its Play button (Views/WinsView.swift:45-55) are reachable only by placeholder/label, though the error line beside them does have wins.dealentry.problem. (4) The BACKUP note Text (Views/DailyView.swift:383) has none, so the archived bug/WF-11:cancel-note-not-updated guard matches 'Import cancelled.' verbatim.",
+   "type": "bug",
+   "routing": "auto",
+   "severity": "minor",
+   "confidence": "confirmed",
+   "region": "Main",
+   "test_case": "TC-6.4",
+   "build_sha": "4f02d1d",
+   "evidence": {
+    "repro": [
+     "grep -rn 'accessibilityIdentifier' ios/Causeway/Causeway --include='*.swift' -> 33 sites, none on the HUD chips, the win overlay, the Wins deal-entry field/button, or the backup note",
+     "read Views/DailyView.swift:642-680 (chips/objChip): only hud.day, and only for a day that is not today",
+     "read Views/ContentView.swift:895-905 (win overlay): title Text with no identifier",
+     "read Views/WinsView.swift:45-55: the TextField and Button(\"Play\") have no identifier; only the error line has one"
+    ],
+    "measurements": {
+     "surfaces_without_identifier": 4,
+     "guards_forced_onto_copy_matching": 4
+    }
+   },
+   "introduced_by_fix": false,
+   "current_status": "open",
+   "note": "Recommended identifiers: hud.objectives (or hud.chip.<tier>), win.overlay + win.dailyline, wins.dealentry.field / wins.dealentry.play, daily.backupnote. Cheap, and each one converts a copy-coupled assertion in ios/Causeway/CausewayUITests/Regression*.swift into a structural one. The win-overlay case is the one that actually blocked a guard this round: ux/WF-14:win-overlay-omits-the-day needs an injected save AND a stable handle on the overlay's daily line, and has neither.",
+   "first_seen_round": 2,
+   "status_history": [
+    {
+     "round": 2,
+     "status": "open"
+    }
+   ]
   }
  ],
  "usage": {
   "1": {
-   "ux-tester": 1334000
+   "ux-tester": 1334000,
+   "qa-implementer": 270039,
+   "fix-reviewer": 164223
+  },
+  "2": {
+   "ux-tester": 568810,
+   "regression-test-writer": 146532
   }
+ },
+ "round_shas": {
+  "1": "b2ce1a4",
+  "2": "4f02d1d"
  }
 }

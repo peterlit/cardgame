@@ -647,3 +647,46 @@ Full report: `.review-loop/REPORT.md` (converged after round 2 + closeout; 0 blo
   numbers are unaffected (`sidechain: true` still works). Fix: try
   `json.load(path + '.meta.json')["agentType"]` first, then the first record's `attributionAgent`,
   keeping the existing scan as a last resort.
+
+## QA loop 2026-08-30 (v0.9.0) — findings left open at the backstop
+
+Full report: `.qa-loop/REPORT.md`. 26 findings, 14 fixed and device-verified, 12 open, 0 blockers.
+
+**Two open majors, both able to lose a player's work:**
+- `bug/WF-7:deal-confirm-swallowed-by-double-tap` (**introduced by the loop's own fix**, `9d4a4fc`).
+  The `0.1 s asyncAfter` hop puts the destructive "Play that deal" at (274,517), 10 pt from the
+  alert's "Play" at (275,527), so a double-tap discards a live game unread (Moves 1 → 0, Undo
+  greyed). Reproduced 2/2. Fix the geometry or the timing — not by removing the confirm.
+- `ux/WF-14:replay-forfeits-grace-silently` (rejected fix, `c74fa96`). The grace-aware confirm is
+  gated on `hasLiveGame` (`moveCount > 0`), never widened. A zero-move grace attempt is destroyed
+  silently by **all four** controls (Daily-sheet Play, Replay, New game, demo pill). Fix is the gate:
+  `hasLiveGame || graceLive` at `Game.swift:432`, `ContentView.swift:343-345`,
+  `DailyView.swift:273-274,335-336`, `index.html:1797,1804` — and suppress the "your 0 moves and
+  your time will be discarded" clause in that state.
+
+**Open minors:** `bug/WF-4:win-overlay-seed-grouped` (the one seed surface the round-1 fix missed,
+`ContentView.swift:901`); `ux/WF-3:replay-confirm-copy-mismatch` (introduced by a fix — Replay reuses
+New-game wording and warns "there is no way back to it" about a deal Replay reloads verbatim);
+`bug/DailyView:calendar-cells-have-no-identifier` and `bug/Main:scored-surfaces-addressable-only-by-copy`
+(both filed by the regression writer; they are why two guards are weak, and the first also degrades
+VoiceOver).
+
+**Six proposals awaiting your decision** — excluded from convergence by design. The two with teeth:
+`ux/WF-13:daily-sheet-resets-to-today-midattempt` (behavior-change) and
+`ux/Main:clock-runs-during-modal-sheets` (metric-integrity — the clock ticks under the app's own
+auto-raised modal, measured at 1 Hz). Also: `ux/WF-13:calendar-month-locked-no-nav`,
+`ux/WF-13:par-never-surfaced`, `ux/WF-14:grace-invisible-from-daily-sheet`,
+`ux/WF-11:import-has-no-confirm-or-undo`.
+
+**Action required from you:** the eight new XCUITest files in `ios/Causeway/CausewayUITests/`
+(commit `1241c08`) are all `XCTSkipIf(true, "verify selectors, then remove this line")` and have
+**never run on a device**. Run the suite once and delete that line from each test that passes, in
+this order: `RegressionDemoExitRebindsDayTests` (metric-integrity) → `RegressionDiscardConfirmTests`
+→ `RegressionDealEntryRangeTests` / `RegressionFlawlessDemoLabelTests` (all-real selectors) →
+`RegressionAccessibilityIdentifiersTests` / `RegressionDailyCardSeedFormatTests` →
+`RegressionDailyCalendarTests` → `RegressionBackupCancelNoteTests` (expect flake).
+
+**Environment gap:** WF-12 (landscape) is entirely unverified — rotation is unreachable from this
+toolset (four routes exhausted; see `.qa-loop/REPORT.md`), so the landscape rail call sites of the
+new WF-3/WF-7 confirms were never exercised. A debug date override remains the highest-value
+testability change available; the ⏰ grace needs a two-day sequence to test honestly.

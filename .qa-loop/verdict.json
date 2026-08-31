@@ -1,28 +1,18 @@
 {
-  "round": 1,
-  "pass_type": "full",
+  "round": 2,
+  "pass_type": "targeted",
   "blockers_open": 0,
-  "majors_open": 7,
-  "minors_open": 8,
+  "majors_open": 2,
+  "minors_open": 4,
   "proposals_open": 6,
-  "closed": 0,
-  "new": 15,
+  "closed": 14,
+  "new": 5,
   "reopened": 0,
   "promoted": 0,
   "demoted": 0,
-  "net": -15,
-  "tokens": 2525000,
-  "cumulative_tokens": 2525000,
-  "decision": "continue",
-  "reason": "progress continuing",
-  "coverage": {
-    "ran": 69,
-    "total": 69,
-    "missing": [],
-    "blocked": [
-      "TC-12.1(novice)",
-      "TC-12.2(novice)",
-      "TC-12.3(power)"
-    ]
-  }
+  "net": 9,
+  "tokens": 715342,
+  "cumulative_tokens": 2483604,
+  "decision": "backstop",
+  "reason": "hit max_rounds"
 }

@@ -94,35 +94,23 @@ since 2026-08-15, WF-6). Inject a save instead:
 
 ## Performance measurement (PERF lane only)
 
-- The orchestrator runs `nfr_sampler.sh` in the background; mark your action windows in
-  `marks.jsonl` and read numbers from `nfr_analyze.py`. Do not do sampler arithmetic in
-  your own context.
-- Instantaneous CPU: `ps -o time=,rss= -p <pid>` at both window ends ÷ wall clock; resolve the
-  pid on the **host** via `pgrep -f "Causeway.app/Causeway"`.
-- Baselines, uncontended iPhone 17 Pro (342e3c0): cold launch→painted board ≤0.9 s; sheets
-  ~1.0-1.1 s; New game redeal 1.65 s; demo auto-advance 0.250-0.259 s/move (design 0.24);
-  auto-finish ~0.18 s/card +0.38 s to overlay; idle CPU 0-1%. Only slow path: **first Export
-  after a cold launch, ~1.8 s, no spinner**.
-- **Timing recipe that needs no tap timestamp (loop 4).** Run the filmstrip in a background
-  bash turn, fire the MCP action in the next turn, then md5 every frame: a static screen gives
-  byte-identical PNGs, so change-points ARE the animation boundaries. `touch` = first frame that
-  differs from the resting frame (press highlight / note-line change); `settled` = first frame of
-  the final identical run. md5 is ~free next to `imgcrop_diff.py` on 70+ frames — diff only the
-  2-3 frames you must attribute.
-- **You cannot timestamp an MCP tap from bash** (assistant-turn overhead t_pre->tap measured
-  4.0-4.3 s, and it varies). Do not quote tap latency off a bash `date`. Calibrate instead: run
-  the same t_pre->visible-change measurement on an instantaneous control (the Auto-play pill is a
-  pure @State flip) and quote the DIFFERENCE.
-- Baselines re-measured uncontended on b2ce1a4: cold launch->painted board 0.89 s; Daily sheet
-  open 0.93 s first-of-process / 0.70 s after; sheet dismiss->board 1.3 s; how-to-win pill->
-  confirm dialog 0.51 s; dialog->demo bar ~1.1 s; auto-finish 0.210 s/card (4 cards 1.57 s,
-  29 cards 6.10 s, continuous animation); first Export of a process touch->Files sheet 2.26 s
-  (0.96 s frozen, but the "Opening Files..." note IS up). Idle CPU 0.0 %, net 0 all session.
-- **nfr_analyze.py will flag a cold-launch window as a suspected leak** — a window that opens at
-  `simctl launch` starts at 60-110 MB RSS and warms to ~190-235 MB. Always mark loop windows so
-  they START on a warm process, and dismiss any candidate whose rss_start is below ~150 MB.
-- A landscape relayout stress test needs a **13+ card column** (11+ with the daily HUD);
-  below that the width term binds and nothing resizes.
+*(Archived to `.qa-loop/archive/HARNESS_NOTES-perf-section.md` — round 2 has no `[perf]` cases,
+and every tester pays for this file on every request. Restore it when a perf lane runs again.
+Round-1 baselines, for reference: cold launch→painted board 0.89 s; auto-finish cascade 0.210 s/card
+(animation-bound, not a stall); Daily sheet first open 0.93 s vs 0.69-0.72 s after; no memory leaks
+over 24 New game/Replay and 16 Daily open/dismiss cycles.)*
+
+## Board geometry addendum: the daily HUD shifts everything
+
+- With a live challenge the objectives banner pushes the board down ~73 pt: foundations up y≈369,
+  down y≈446, tableau card i top y ≈ 498+30*i (bottom card tap = top+45). The no-HUD numbers
+  (296/374/425) hit the foundation area and silently do nothing. Re-measure after any HUD/pill change.
+- Cheap read-back (no full frame): `xcrun simctl io <udid> screenshot s.png; sips -c <h> 1206
+  --cropOffset <top_px> 0 s.png --out c.png; sips -Z 800 c.png`. src px = pt x3; header + both pill
+  rows = px 200-520.
+- **The Preferences plist lags the running app** (cfprefsd cache): `PlistBuddy -c "Print :causeway.game"`
+  can show a save from several actions ago — nearly cost me a phantom finding. Terminate first, or
+  test durability with `simctl terminate` + `launch` and read the SCREEN.
 
 ## Rig hazards
 
@@ -140,6 +128,12 @@ since 2026-08-15, WF-6). Inject a save instead:
 
 ## Tester tooling index
 
+- `.qa-loop/tools/save_at.mjs --day D --tier flawless --mode firstfinish|autoplaybreak|move --at N
+  [--challengeDay d|none --startDay d|none]` — like `make_save.mjs`, but parks the save at an
+  ARBITRARY point of a day's certified line: `firstfinish` = the first position where the cascade
+  wins (day 21 -> move 64, the tier-costing offer), `autoplaybreak` = the first position where a
+  safe auto-play send would break a `split-at` Gold (day 29 -> move 92, the 8♠ case), `move` = a
+  literal move index. Pipe into `inject_save.py <udid>`.
 - `.qa-loop/tools/imgcrop_diff.py X0 Y0 X1 Y1 base.png frame.png [...]` — pure-python PNG
   crop-diff (MAD + %pixels changed). **The QA hosts have NO PIL, NO ImageMagick, no pyobjc** —
   build nothing new for image comparison, use this. Coords are SOURCE PIXELS (simctl @3x =
@@ -153,6 +147,8 @@ since 2026-08-15, WF-6). Inject a save instead:
   two mis-aimed taps this round came from that. Crop first (`sips -c h w --cropOffset t l`) so
   width is the larger side, then `-Z`.
 
+- `make_save.mjs` prints a `[make_save] ...` log line to STDOUT before the JSON, so the documented
+  pipe fails with a JSONDecodeError: use `node ... make_save.mjs ... | grep '^{' | python3 ... inject_save.py <udid>`.
 - The MCP control tool can return "user has not granted Claude access to <device>" on the FIRST
   call of a dispatch. It is a pending grant, not a hard block: **retry the same call a few turns
   later** (worked on the 3rd attempt this round). `xcrun simctl io <udid> screenshot` keeps
@@ -170,96 +166,55 @@ since 2026-08-15, WF-6). Inject a save instead:
   runs, then `imgcrop_diff.py` each frame against f001 over the card rect.
 
 
-## Chunk wf-11-backup (qa-worker-2, round 1)
 
-- **Cropping/downscaling a screenshot costs nothing extra: `sips` is on the QA hosts.**
-  `sips -c <h> <w> --cropOffset <top> <left> in.png --out out.png` (SOURCE PIXELS, @3x) and
-  `sips -Z <maxdim>` to downscale. One crop of raw px `0 2320 1206 300` reads the Daily
-  BACKUP note line; `1720 0 1206 900` gets calendar + BACKUP + note in ONE image.
-- `.qa-loop/tools/stats_state.py <udid> dump|load|clear` — read/write `causeway.daily`
-  (v3, wrapped as `{"version":3,"days":{...}}`) and `causeway.wins` in the app plist. The
-  fixture + assertion channel for stats work; `dump` also surfaces `.unreadable`/`.vN` stashes.
-  **Booleans must be real JSON `true`/`false`** — a `1` makes Swift's decode fail and the
-  store silently stashes to `causeway.daily.unreadable` and starts empty.
-- **File-picker fixtures** live in
-  `<sim>/data/Containers/Shared/AppGroup/<group.com.apple.FileProvider.LocalStorage>/File Provider Storage`
-  (find the group by `plutil -p <group>/.com.apple.mobile_container_manager.metadata.plist`).
-  Writing/overwriting there from the host works fine.
-- **Importer opens on `Recents` and can sit on "LOADING" forever** on a fresh boot — tap
-  `Browse` (285,819) to get On My iPhone. It remembers Browse for later imports in the run.
-  Daily sheet scrolled to bottom (3 x swipe (200,750)->(200,150)): Export (106,772),
-  Import (296,772), note line raw px y≈2400. Exporter `Save` (350,110); importer close `X`
-  (311,110). File grid (4 items): (71,258) (200,258) (331,258) / (71,456), alphabetical.
-- **Do NOT swipe DOWN on the Daily sheet body from y<=300 to scroll back up** — it dismisses
-  the sheet and the next swipe lands on SpringBoard. Re-open the sheet instead (it opens at
-  the top), or accept losing the sheet.
+## Chunk wf13-past-days
 
-## Chunk wf13-past-days (qa-worker-1, round 1)
+- Daily sheet, reading MANY past days cheaply: from the bottom-scrolled position do ONE extra
+  small swipe `(200,380)→(200,470)` (+~78 pt). The day card's Silver+Gold+⏰ lines, the gold
+  Play button AND the whole calendar are then on screen at once, so each further day costs
+  1 tap + 1 screenshot instead of a scroll round-trip. Cells at that offset: Aug 1 (361,549),
+  Aug 2-8 at y=592 (x = 40/94/147/201/254/307/361). The card HEADER (date + `Deal #`) stays
+  tucked under the nav bar there — it is readable as a faded date but the deal number is
+  hidden by `Done`, so use the full scroll-up only when you need the deal number.
+- Batch the image `Read`s: take the per-day screenshots in separate turns, then read them all
+  in one parallel block — turns, not images, are the dispatch budget.
+## Chunk wf-7-9-11 (round 2)
 
-- Daily sheet, scrolled to the BOTTOM (1 x swipe (200,700)->(200,300) from the top):
-  `Play` (200,243); calendar cells `x = 40 + 53.6*col` (col 0=Sun), `y = 471 + 44*row`
-  -> Aug 1 (361,471); Aug 2-8 y=515 at x=40/94/147/201/254/307/361; Aug 30 (40,691),
-  Aug 31 (94,691). Cells are ~44 x 33 pt. `derive_daily.py <date>` prints the same
-  coordinate — trust it over eyeballing.
-- **Scrolling the sheet back UP: swipe (200,400)->(200,740).** The notes' warning is real —
-  starting a downward swipe at y<=300 dismisses the sheet.
-- **Daily HUD shifts the whole board down by +88 pt** (3 objective lines + a day title).
-  Tableau card i top y = 513 + 30*i; bottom (full-height) card tap = top_y + 45; free
-  cells y=384 at x=274/323/372; foundations up y=384 / down y=462. Toolbar is ABOVE the
-  HUD and does not move (Undo 142,135; Daily 290,175).
-- Reading the HUD costs no full screenshot: `sips -c 190 1206 --cropOffset 740 0 shot.png`
-  gives the day title + all three objective markers legibly.
-- The `touch_path` free-cell drag from TC-13.4 works first try: 7 points, ~750 ms total,
-  ending with a 150 ms dwell on the cell.
+- **Files sheets (Export save / Import pick), iPhone 17 Pro pt.** Export -> exporter sheet: `Save`
+  (355,108). Import -> picker: `On My iPhone` grid, first file icon (71,257), second (200,255),
+  third (~330,255); tapping the ICON (not the label) opens it and the merge happens immediately.
+  Drop fixture JSON straight into the LocalStorage app group to make it appear:
+  `~/Library/Developer/CoreSimulator/Devices/<udid>/data/Containers/Shared/AppGroup/<id>/File Provider Storage`
+  where `<id>` is the group whose `.com.apple.mobile_container_manager.metadata.plist` says
+  `group.com.apple.FileProvider.LocalStorage`. Exported files land there too — read them from the
+  Mac to assert the exporter's contents.
+- Daily sheet: a downward swipe on the BODY once it is already scrolled to the top DISMISSES the
+  sheet (it does not just bounce). Scroll back up with 2 swipes, not 3, or re-open Daily.
+- Deal-# alert with the number pad NOT raised: `Cancel` (127,529), `Play` (275,527); the live-game
+  confirmation that follows puts `Keep playing` (127,517) / `Play that deal` (274,517) 10 pt away —
+  a second tap at the Play coordinate hits the destructive button.
 
-## Chunk wf-9-13b (qa-worker-2, round 1)
+## Chunk wf-14 (round 2)
 
-- **Batch gestures.** Several MCP `control` calls in ONE assistant block execute in order, and a
-  `Read` of the previous screenshot can ride along in the same block. Reading a Daily day card
-  therefore costs 2 turns, not 6: block = [swipe x2 to the calendar, tap the day cell, swipe back
-  up] + Read(previous), then one bash screenshot+crop.
-- **Calendar anchor.** The Daily sheet's BOTTOM is a hard scroll stop, so `derive_daily.py`'s
-  `cal cell y=515` is only reliable there: swipe (200,700)->(200,340) **twice** from a day-card
-  view lands on the stop every time (day cards differ in height when a day has 3 vs 4 pills, so
-  never reuse a mid-scroll offset). Scroll the card back with (200,340)->(200,700) once.
-- **One crop reads a whole day card:** `sips -c 1300 1206 --cropOffset 1050 0 shot.png` then
-  `sips -Z 600` — header + all three tier rows + the ⏰ line + the pill grid, legible.
-- Wins-sheet geometry: `Wins` pill moves to (345,175) once the Deal pill gains its ` ✓`.
-  Sheet: Done (339,99), deal field (164,186), Play (356,186). `dealText` is @State and RESETS on
-  every reopen — cheaper than fighting the number pad for a select-all (the field's long-press
-  edit menu did not appear for me at all).
-- Seeding wins is far cheaper than winning 7 deals: `stats_state.py <udid> load` with
-  `{"wins":{"<seed>":{"date":<Double>,"moves":N,"secs":N}}}` populates the Wins grid directly
-  (date is secs since 2001-01-01). One real injected-save win first to prove the record path.
+- **Zero-move daily-attempt fixture** (the state `playChallenge` persists before any move):
+  `node .qa-loop/scratch/qa-worker-1/zero_move_save.mjs --day D [--startDay d]` — a fresh
+  `dealState(seed)` board with `moveCount 0, started false, challengeDay/challengeStartDay`.
+  20 lines; re-create it from `make_save.mjs`'s tail if the scratch dir is gone. `make_save.mjs`
+  cannot produce it (it always parks at a near-win truncation).
+- **`.qa-loop/tools/save_at.mjs` is BROKEN on this checkout**: its imports use `../../../tools/...`
+  (one `..` too many) → `ERR_MODULE_NOT_FOUND /Users/plit/Documents/src/tools/solver/rules.mjs`.
+  `make_save.mjs` (`../../`) works. Fix the paths before relying on it.
+- **Do not trust a plist read for "did that tap change the model", even after `simctl terminate`**:
+  a Replay that demonstrably re-stamped `challengeStartDay` still read as the old value from
+  `causeway.game`. Assert on the SCREEN (re-open Daily and read the day card) instead; the
+  Daily-sheet Play leg did flush, so the lag is intermittent, which is worse than always-stale.
+## Chunk wf-10-15 (round 2)
 
-## Chunk wf-15 (qa-worker-2, round 1)
-
-- **Park a save at the FIRST finishable position REGARDLESS of tiers** (the fixture make_save
-  refuses to): copy `make_save.mjs` into your scratch, fix its three `'../../` import paths to
-  `'../../../`, and relax line 72 to `const need = a.won;`. Its stderr line then reports what the
-  app's own cascade would score (`silver=… gold=…`) — matched the in-app overlay exactly (day 21:
-  predicted finalMoves=83, overlay read 83 moves). Sweeping days 0-29 costs one bash turn.
-- **Reading a day card costs 2 turns**: one block = [swipe (200,700)->(200,340) x2 to the calendar
-  stop, tap the day cell, swipe (200,400)->(200,740) back up], then one bash
-  `screenshot + sips -c 1500 1206 --cropOffset 900 0 + sips -Z 450` shows header, all three
-  objectives, the ⏰ line and the whole pill grid legibly.
-- Today card pill grid (fresh install, unplayed): 🥉 Clear (115,747) 🥈 Silver (293,747)
-  🥇 Gold (115,787) 🌟 Flawless (293,787). A 3-pill day drops Silver and puts 🌟 alone on row 2.
-- Win overlay after a flawless+⏰ win: Close is at (316,512) (two-line result row); the Daily pill
-  on the board is then at (302,175).
-
-## Chunk wf-14-sameday (qa-worker-1, round 1)
-
-- **Injected ⏰ grace fixture works and is honest state, not a code inference:**
-  `make_save.mjs --day 28 --tier flawless --challengeDay 28 --startDay 28 | inject_save.py <udid>`
-  writes exactly "began Aug 29's challenge on Aug 29"; relaunch -> Not yet -> the Aug 29 day
-  card shows the live-grace branch. `stats_state.py <udid> clear` between grace repeats.
-- Auto-play: **Off survives inject_save + relaunch** (the injector only rewrites `causeway.game`),
-  so set it once at the start of the dispatch.
-- Win-overlay `Close` measured this round: **(318,511)** when the daily line wraps to two rows,
-  **(318,503)** when it does not. Cascade -> overlay took ~6-9 s from the Finish tap.
-- Day-card ⏰ line, sheet scrolled so the card is fully visible after
-  swipe(200,700->300) + tap cell + swipe(200,400->740): card `Play` sits at **(201,672)** and the
-  ⏰ line at raw px y≈1855-1900. Crops that read it: `sips -c 170 1206 --cropOffset 1750`.
-- Calendar last two rows in ONE cheap crop: `sips -c 320 1206 --cropOffset 1870 shot.png` —
-  shows Aug 23-31 with tier glyphs and the ⏰ corner pip legibly at `-Z 800`.
+- The how-to-win grid's two rows are only ~39 pt apart (bottom-scrolled sheet: Clear/Silver
+  y≈744, Gold/Flawless y≈783, columns x≈115/287). A y off by 40 silently starts the
+  NEIGHBOURING tier's demo — always read the demo-bar headline before trusting a pill tap.
+- Stronger "sticky tier" fixture than a manual break: after the flawless win, inject
+  `make_save.mjs --day D --tier bronze --challengeDay D --startDay D` and Finish. That records a
+  genuine completed WORSE run on the same day, so `mergeTiers` OR-ing is tested for real.
+- Wipe daily records without a reinstall: terminate + `launchctl stop cfprefsd`, then drop keys
+  `causeway.daily` (+ `causeway.game`) from the app plist — copy `inject_save.py`'s preamble.
