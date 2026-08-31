@@ -166,3 +166,73 @@ test('day 29: an unguarded safe auto-play send would break the day\'s Gold split
   assert.equal(refusals, unguardedBreaks,
     'every breaking send must be refused by the look-ahead — a send that breaks a live tier may never be made automatically');
 });
+
+// ---------------------------------------------------------------------------------------------
+// The OTHER half of the auto-finish fix, and the riskiest part of it: the win-detection predicate
+// behind the Finish affordance was rewritten from an ad-hoc sweep to `simulateAutoFinish().won`
+// (iOS Game.autoFinishWouldWin / canOfferFinish; web autoFinishWouldWin). The prediction had to
+// move into sendOneHome's EXACT execution order so that the predicted foundation SPLIT matches the
+// one the cascade really produces — which is what autoFinishTierCost() reads.
+//
+// A false NEGATIVE there is silent and expensive: the Finish pill simply stops being offered on
+// boards that are finishable, and nothing on screen says why. Round 2's tester differentially
+// verified the two predicates over every prefix of every baked line (21,956 positions, zero
+// disagreements); this pins that property permanently, so a future edit to the cascade's order or
+// its termination condition can't quietly change WHETHER a board is reported finishable.
+//
+// The oracle below is deliberately a DIFFERENT algorithm: it sweeps cells and all eight columns to
+// completion on every pass instead of restarting from the cells after each single send. The two
+// must agree on `won` everywhere (emptying the board by foundation sends alone is order-
+// independent) while being free to disagree on the ORDER — which is exactly why the app may not
+// use this one to predict the split.
+function sweepWouldWin(state) {
+  const up = state.up.slice(), down = state.down.slice();
+  const cells = state.cells.slice();
+  const tab = state.tableau.map(c => c.slice());
+  const canUp = c => c.rank === up[c.suit] + 1 && c.rank < down[c.suit];
+  const canDown = c => c.rank === down[c.suit] - 1 && c.rank > up[c.suit];
+  const send = c => { if (canUp(c)) up[c.suit] = c.rank; else down[c.suit] = c.rank; };
+  let moved = true;
+  while (moved) {
+    moved = false;
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      if (c && (canUp(c) || canDown(c))) { cells[i] = null; send(c); moved = true; }
+    }
+    for (const col of tab) {
+      while (col.length) {
+        const c = col[col.length - 1];
+        if (!canUp(c) && !canDown(c)) break;
+        col.pop(); send(c); moved = true;
+      }
+    }
+  }
+  return up.every((u, s) => down[s] === u + 1);
+}
+
+test('the finish-affordance predicate is order-independent (no false "not finishable" anywhere on a baked line)', () => {
+  let positions = 0, finishable = 0, disagreements = [];
+  for (const [seedKey, lines] of Object.entries(sol.solutions)) {
+    const seed = Number(seedKey);
+    for (const [tier, line] of Object.entries(lines)) {
+      if (typeof line !== 'string' || !line) continue;
+      for (const { state } of walk(seed, line)) {
+        positions++;
+        const exec = simulateAutoFinish(state).won;   // the app's predicate (execution order)
+        const sweep = sweepWouldWin(state);           // independent oracle (pass order)
+        if (exec !== sweep && disagreements.length < 5) {
+          disagreements.push(`seed ${seed} ${tier} @ position ${positions}: exec=${exec} sweep=${sweep}`);
+        }
+        if (exec) finishable++;
+      }
+    }
+  }
+  assert.deepEqual(disagreements, [],
+    'simulateAutoFinish().won disagrees with an order-independent sweep — the Finish affordance is now wrong on some boards');
+  assert.ok(positions > 20000, `expected the whole baked corpus (~22k positions), walked ${positions}`);
+  // The predicate must still DISCRIMINATE: a constant-true or constant-false rewrite would sail
+  // through the agreement check above only if the oracle broke the same way, but a floor here makes
+  // the intent explicit — most positions are not finishable, and the tails of the lines are.
+  assert.ok(finishable > 0 && finishable < positions,
+    `the finishable/not split collapsed (${finishable} of ${positions}) — the predicate stopped discriminating`);
+});
