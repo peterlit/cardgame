@@ -44,7 +44,6 @@ final class RegressionDiscardConfirmTests: XCTestCase {
     /// ux/WF-3:board-reset-pills-no-confirm — New game and Replay must confirm
     /// before throwing a live game away, and only then.
     func testBoardResetPillsConfirmOnlyWhenAGameIsLive() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -89,7 +88,6 @@ final class RegressionDiscardConfirmTests: XCTestCase {
     /// ux/WF-7:deal-play-discards-live-game-no-confirm — the Deal # alert's Play
     /// must route through the same confirmation the board pills use.
     func testDealNumberPlayConfirmsBeforeDiscardingALiveGame() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

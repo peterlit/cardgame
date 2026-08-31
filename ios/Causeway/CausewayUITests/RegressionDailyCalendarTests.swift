@@ -48,7 +48,6 @@ final class RegressionDailyCalendarTests: XCTestCase {
     /// ux/WF-13:future-day-tap-no-feedback — a locked (future, in-pool) cell must
     /// answer the tap with a dated explanation instead of swallowing it.
     func testTappingALockedFutureDayExplainsWhy() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -76,7 +75,6 @@ final class RegressionDailyCalendarTests: XCTestCase {
     /// ux/WF-13:selected-day-invisible-at-play — the Play button must name the
     /// day it will start whenever that day is not today.
     func testPlayButtonNamesTheSelectedDay() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -114,7 +112,6 @@ final class RegressionDailyCalendarTests: XCTestCase {
     /// ux/WF-14:calendar-pip-unlabelled — the ⏰ same-day corner pip must be named
     /// in the calendar legend.
     func testCalendarLegendNamesTheSameDayPip() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

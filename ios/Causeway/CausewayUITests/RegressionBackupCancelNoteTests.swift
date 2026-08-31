@@ -38,7 +38,6 @@ final class RegressionBackupCancelNoteTests: XCTestCase {
     /// bug/WF-11:cancel-note-not-updated — a cancelled import must say so, not
     /// leave the "Opening Files…" progress note standing.
     func testCancellingTheImportPickerSaysSo() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

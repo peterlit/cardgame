@@ -35,7 +35,6 @@ final class RegressionAccessibilityIdentifiersTests: XCTestCase {
     /// bug/Main:no-accessibility-identifiers-anywhere — the board and the Daily
     /// sheet must keep addressing every control by a stable identifier.
     func testShippedAccessibilityIdentifiersArePresent() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

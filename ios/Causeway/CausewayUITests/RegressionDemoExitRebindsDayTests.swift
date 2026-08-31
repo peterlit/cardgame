@@ -41,6 +41,21 @@ import XCTest
 
 final class RegressionDemoExitRebindsDayTests: XCTestCase {
 
+
+    /// A demo pill re-deals the board, so when a game is already live the app
+    /// (correctly, since round 1) interposes a confirm before the demo bar opens.
+    /// Prior tests in the same run leave that state behind, so clear it here —
+    /// the subject under test is what happens AFTER the demo opens.
+    private func confirmDemoIfAsked(_ app: XCUIApplication) {
+        for title in ["End your daily attempt?", "Discard the game in progress?"] {
+            let alert = app.alerts[title]
+            if alert.waitForExistence(timeout: 2) {
+                alert.buttons["Show demo"].tap()
+                return
+            }
+        }
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -48,7 +63,6 @@ final class RegressionDemoExitRebindsDayTests: XCTestCase {
     /// ux/WF-6:demo-exit-drops-challenge-binding — Stop must land on the day's
     /// SCORED challenge, fresh, not on a casual deal of its seed.
     func testDemoStopLandsOnTheScoredChallengeNotACasualDeal() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -62,6 +76,7 @@ final class RegressionDemoExitRebindsDayTests: XCTestCase {
         try XCTSkipUnless(clear.waitForExistence(timeout: 5),
                           "today's daily has no baked bronze solution — no demo to leave")
         clear.tap()
+        confirmDemoIfAsked(app)
 
         // Mid-demo: step the app's own line so the board is demo-touched.
         XCTAssertTrue(app.buttons["demo.next"].waitForExistence(timeout: 5),

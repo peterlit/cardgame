@@ -29,6 +29,21 @@ import XCTest
 
 final class RegressionFlawlessDemoLabelTests: XCTestCase {
 
+
+    /// A demo pill re-deals the board, so when a game is already live the app
+    /// (correctly, since round 1) interposes a confirm before the demo bar opens.
+    /// Prior tests in the same run leave that state behind, so clear it here —
+    /// the subject under test is what happens AFTER the demo opens.
+    private func confirmDemoIfAsked(_ app: XCUIApplication) {
+        for title in ["End your daily attempt?", "Discard the game in progress?"] {
+            let alert = app.alerts[title]
+            if alert.waitForExistence(timeout: 2) {
+                alert.buttons["Show demo"].tap()
+                return
+            }
+        }
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -36,7 +51,6 @@ final class RegressionFlawlessDemoLabelTests: XCTestCase {
     /// ux/WF-15:flawless-pill-both-vs-three — the 🌟 demo headline must say all
     /// THREE medals, never "both objectives".
     func testFlawlessDemoHeadlineSaysAllThree() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
@@ -50,6 +64,7 @@ final class RegressionFlawlessDemoLabelTests: XCTestCase {
         try XCTSkipUnless(flawless.waitForExistence(timeout: 5),
                           "today's daily ships no flawless line — nothing to label")
         flawless.tap()
+        confirmDemoIfAsked(app)
 
         let headline = app.staticTexts["demo.headline"]
         XCTAssertTrue(headline.waitForExistence(timeout: 5), "demo bar did not open")

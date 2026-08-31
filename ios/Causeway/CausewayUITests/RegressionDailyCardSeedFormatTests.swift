@@ -34,7 +34,6 @@ final class RegressionDailyCardSeedFormatTests: XCTestCase {
     /// bug/WF-13:daily-card-seed-grouped — every "Deal #" on the Daily sheet must
     /// print the seed ungrouped, exactly as the board pill identifies it.
     func testDailyCardPrintsTheDealNumberUngrouped() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait

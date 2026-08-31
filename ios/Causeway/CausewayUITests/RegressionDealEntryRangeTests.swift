@@ -39,7 +39,6 @@ final class RegressionDealEntryRangeTests: XCTestCase {
     /// ux/WF-9:deal-entry-out-of-range-silent — an out-of-range deal number must
     /// say why Play is dead, and an empty field must stay quiet.
     func testOutOfRangeDealNumberExplainsWhyPlayIsDisabled() throws {
-        try XCTSkipIf(true, "verify selectors, then remove this line")
 
         let app = XCUIApplication()
         XCUIDevice.shared.orientation = .portrait
