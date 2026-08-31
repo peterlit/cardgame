@@ -1,0 +1,278 @@
+{
+  "round": 2,
+  "round_start_sha": "16db5a7603f853cd1d4bce3c275cfd01e7a30814",
+  "max_rounds": 2,
+  "token_budget": null,
+  "findings": [
+    {
+      "id": "tests/daily.test.mjs:ontime-wiring-unpinned",
+      "claim": "The whole web-side \u23f0 same-day feature could be deleted green, and the iOS pin matched both call sites of `challengeStartDay = todayIndex()` so either could be deleted green.",
+      "evidence": {},
+      "severity": "major",
+      "region": "tests/daily.test.mjs:349-382, tests/ios-parity.test.mjs:100-125",
+      "current_status": "fixed",
+      "note": "Re-verified in round 2 by my own run of .review-loop/briefs/round-2-mutants.json: web-drop-startday-stamp, web-ontime-constant, web-drop-ontime-arg, web-drop-calendar-pip, web-drop-restart-restamp all killed, and BOTH iOS stamp mutants (ios-drop-playchallenge-stamp, ios-drop-restartdeal-stamp) now actually run and are killed. Stays fixed.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "correctness/daily.mjs:ontime-grace-window-too-wide",
+      "claim": "isOnTime's grace is documented as a midnight grace but compares DAY INDICES only, so an attempt begun any time on day D and won any time on D+1 earns the award; the closeout fixed the wording in some places but left the comments sitting on both SHIPPING implementations still asserting the disproven midnight framing.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "index.html:1240-1245, ios/Causeway/Causeway/Model/Daily.swift:340-349",
+      "current_status": "partial",
+      "note": "Behaviour genuinely unchanged (verified: all three isOnTime bodies are the same day-index comparison as before this diff), and the BACKLOG entry is good. But the claim 'both platforms' comments now say begun-on-D-counts-if-won-any-time-on-D+1' is FALSE: only the shared-core comment (tests/daily.mjs), the two restore comments and the Game.swift property doc were rewritten. ACTION for a human: paste the tests/daily.mjs:264-266 wording onto index.html:1240-1241, ios/Causeway/Causeway/Model/Daily.swift:341-344, index.html:450-451 and docs/architecture/overview.md:369. A maintainer reading either shipping implementation still learns the wrong rule. (prompts.md:698 is a historical prompt log \u2014 leave it.)",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "partial"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "ui/DailyView.swift:ontime-line-contradicts-grace",
+      "claim": "On day D+1 the day card for day D claimed '\u23f0 Same-day is earned on the day itself' while an in-progress attempt begun on D would still earn \u23f0 if won that day.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "index.html:1494-1505, ios/Causeway/Causeway/Views/DailyView.swift:271-297",
+      "current_status": "fixed",
+      "note": "Verified: gating is `challengeDay===day && challengeStartDay===day && ti===day+1` on both platforms, and it cannot misfire \u2014 D+2 fails ti===day+1; a day with no live attempt fails challengeDay===day (challengeDay is nulled on deal and on win, index.html:507/1439, Game.swift:199/844); today takes the earlier isToday/day==ti branch; a Replay re-stamps challengeStartDay=todayIndex() so the branch goes dark, which is what makes the 'resume' verb honest. Copy is byte-identical across platforms (checked as escaped literals). Branch is pinned WITH its condition on both sides, and my independent mutation run killed web-gracelive-constant-false, web-drop-gracelive-line, ios-gracelive-constant-false and ios-drop-gracelive-copy. @Published on Game.swift:102 is correct and sufficient (DailyView holds @ObservedObject var game, Game.swift:8); no didSet, no write-back, so no publish cycle; it is set adjacent to the already-@Published challengeDay so the extra invalidations coalesce in the same runloop tick. Swift target builds clean (xcodebuild BUILD SUCCEEDED against the dispatch's simulator).",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "tools/loop-usage.py:since-filter-is-file-granular",
+      "claim": "--since filtered whole transcript FILES by mtime then summed every record in them, over-reporting a long session touched minutes ago in full.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tools/loop-usage.py:39-51, 78-132",
+      "current_status": "fixed",
+      "note": "Hard-verified against REAL transcripts, since this feeds the loop-cost deliverable. (a) The filter does real work: over the last 30 min the same 6 files yield 154 requests per-record vs 172 file-granular. (b) rec_time matches the actual format \u2014 every record uses ISO-8601 with a literal Z ('2026-08-30T19:12:43.593Z'); the .replace('Z','+00:00') makes it parse on pre-3.11 Pythons too, and .timestamp() yields UTC epoch, the same basis as `date +%s`. (c) `undated` cannot inflate the number: 0 of 17,353 billed records in the whole project corpus lack a timestamp, and a live run reports undated:0. (d) The bool guard is right (True would otherwise read as epoch 1s and be silently dropped) and the 1e11 millis heuristic separates cleanly (now ~1.7e9 s vs ~1.7e12 ms). (e) mtime pre-filter reasoning is sound and safe in the only direction that matters: it can only exclude files whose LAST append precedes the cutoff, which by append-only construction cannot hold a later record; a touched/copied file is over-kept, never under-kept. (f) sidechain is set before the `continue`, so a partially-in-window subagent still reports sidechain:true (verified on live rows). (g) Images are counted only inside kept records, so a screenshot in an out-of-window record no longer inflates a windowed total. (h) The tests are not tautologies: the old file-granular code gives requests 3 / input 700 against the fixture, the tests demand 2 / 600, and JSON.parse(stdout) implicitly pins the undated note to stderr. Shape unchanged apart from the additive `undated` key.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ],
+      "introduced_by_fix": false
+    },
+    {
+      "id": "tests/ios-parity.test.mjs:ontime-surfaces-unpinned",
+      "claim": "The round-1 guard pinned the \u23f0 award surfaces on web only, so the iOS calendar pip, day-card line, streaks-strip column and win-overlay line were all deletable green on the platform that ships; the web onTime streak accessor and iOS's persist of challengeStartDay were likewise unpinned.",
+      "evidence": {},
+      "severity": "major",
+      "region": "tests/ios-parity.test.mjs:127-151",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "VERIFIED by my own independent mutation run, not the implementer's claim: all five round-1 survivors are now killed (ios-drop-calendar-pip, ios-drop-daycard-ontime-line, ios-drop-streaks-strip-column, ios-drop-win-overlay-ontime, ios-drop-persist-startday), plus web-drop-ontime-streak and web-drop-streak-row. I also probed the two constant-satisfaction escapes the pins were supposed to close: ios-win-overlay-ontime-and-false (AND with a constant on the other side) is killed, and ios-restore-guesses-todayindex (a differently-shaped fallback re-added at restore) is killed. 17/17, exit 0. NOTE the mirror gap this round OPENED on the web side: see tests/daily.test.mjs:web-ontime-surfaces-unpinned.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tools/mutate.py:manifest-mutant-never-ran",
+      "claim": "The round-1 manifest paired a multi-line `original` with a `line` key, so mutate.py never ran ios-drop-playchallenge-stamp; the implementer reported a kill it had not observed and did not notice mutate.py exiting 1.",
+      "evidence": {},
+      "severity": "minor",
+      "region": ".review-loop/briefs/round-2-mutants.json",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Confirmed independently: the round-2 manifest drops the `line` key for the multi-line mutant, the mutant executes, and the whole manifest exits 0 with 17 killed / 0 survived / 0 mismatches. The underlying mutate.py limitation (a `line` key plus a multi-line `original` always errors) lives in the plugin cache, outside this repo, so nothing further to do here.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "parity/index.html:restartdeal-null-startday-divergence",
+      "claim": "Web restartDeal preserved a null start day on retry while iOS re-stamped todayIndex(), so a pre-\u23f0 save replayed on day D earned \u23f0 on D+1 on iOS and not on web.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "index.html:1697-1703",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified by walking the scenario on both platforms: pre-\u23f0 save restored -> startDay null on both (index.html:575, Game.swift:304 \u2014 the round-2 guard is NOT undone, and both remain pinned); Replay -> both stamp todayIndex(); win on D+1 -> isOnTime true on both. The docs sentence that was false on iOS is corrected (docs/daily-challenges.md:433-435 now names Replay as the way the grace returns). Mutant web-restartdeal-regress-null-startday killed in my run.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/daily.test.mjs:web-ontime-surfaces-unpinned",
+      "claim": "The web day-card \u23f0 block and the win-overlay's same-day STREAK NUMBER were deletable/zeroable with the suite green (three mutants survived my round-2 run).",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tests/daily.test.mjs:357-385",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "I re-ran the manifest myself: exit 0, killed 12 / survived 0 / mismatches 0 \u2014 my three round-2 survivors are dead. I also probed for the prior rounds' failure mode (omitted mutants) by hand-mutating the ONE \u23f0 surface the new manifest does not cover, the iOS `Text(\"\u23f0 Cleared on the day\")` earned line: node tests/ios-parity.test.mjs exits 1, so it is genuinely pinned. No omission found on the new branch or on loop-usage.py.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/daily.test.mjs:stale-fallback-comment",
+      "claim": "The comment above the restore pin said an older save 'falls back to the challenge day', the opposite of the line it annotates.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tests/daily.test.mjs:358-366",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Comment now reads 'a save written before \u23f0 shipped has NO start day and must stay null (never `?? challengeDay`)' directly above the `: null;` pin. Matches the code it annotates and matches the twin comments at index.html:573-575 and Game.swift:300-303.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "ux/index.html:gracelive-play-button-forfeits",
+      "claim": "The new '\u23f0 Resume your attempt today and it still counts' line sits directly above the day card's only button, and that button forfeits the grace: on web it calls playChallenge() with NO confirmation, re-dealing the live attempt and re-stamping challengeStartDay=todayIndex(). A player who reads the new line and taps the obvious control loses both the in-progress game and the \u23f0 the line just promised.",
+      "evidence": [
+        "index.html:1504 (the new line)",
+        "index.html:1474-1475 (`onclick=\"playChallenge(${day})\"`, no confirm)",
+        "index.html:1289-1295 (playChallenge deals and stamps challengeStartDay=todayIndex())",
+        "ios/Causeway/Causeway/Views/DailyView.swift:290 (same line)",
+        "ios/Causeway/Causeway/Views/DailyView.swift:252-258 (tap goes through the confirm)",
+        "ios/Causeway/Causeway/Views/DailyView.swift:52-54 (confirm says 'You can replay the challenge afterwards')"
+      ],
+      "severity": "minor",
+      "region": "index.html:1472-1505, ios/Causeway/Causeway/Views/DailyView.swift:244-268",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "NEW, created by the closeout's fourth branch \u2014 the previous copy ('earned on the day itself') did not invite an action. The real 'resume' gesture is to CLOSE the sheet, which the line never says. iOS is partly protected by the 'End your daily attempt?' dialog, but its reassurance 'You can replay the challenge afterwards' is precisely false in this state: replaying is exactly what forfeits \u23f0. Web has no dialog at all, so the loss is one tap and silent. ACTION: (1) web \u2014 when graceLive, either route playChallenge through a confirm or relabel the button; (2) iOS \u2014 when graceLive, append something like '\u2014 this forfeits \u23f0 same-day' to confirmMessage (DailyView.swift:44-55); (3) cheapest of all, extend the line to 'Resume your attempt today (close this) and it still counts'.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tools/loop-usage.py:agent-always-null",
+      "claim": "agent_type_of() never finds an agent type in real transcripts, so every row reports \"agent\": null. The loop-cost writeup the user is about to produce cannot attribute sidechain cost to implementer vs reviewer, even though the type IS recorded on disk.",
+      "evidence": [
+        "tools/loop-usage.py:59-75 (looks for top-level subagent_type/agentType/subagentType, or an `Agent` tool_use inside the transcript's own records \u2014 none of which appear in a subagent transcript)",
+        "tools/loop-usage.py:16-17 (docstring promises `agent` names its type)",
+        "live run: every row emits \"agent\": null",
+        "~/.claude/projects/.../subagents/agent-*.meta.json contains {\"agentType\":\"review-loop-tools:skeptical-reviewer\",...}",
+        "each subagent record carries attributionAgent with the same value (94 of 153 records in a sampled transcript)"
+      ],
+      "severity": "minor",
+      "region": "tools/loop-usage.py:59-75",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "PRE-EXISTING, not caused by this closeout, and it does not corrupt any token number \u2014 sidechain:true still works, so 'sum the sidechain rows' is safe. ACTION: in agent_type_of, first try json.load(path + '.meta.json').get('agentType'), then fall back to the first record's r.get('attributionAgent'); keep the existing scan as a last resort. Two lines, and it turns the sidechain block into a per-agent breakdown.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        }
+      ]
+    }
+  ],
+  "scope": "f42c632..HEAD -- ':!prompts.md'",
+  "usage": {
+    "0": {
+      "reviewer": 79621
+    },
+    "1": {
+      "implementer": 30287,
+      "reviewer": 43343
+    },
+    "2": {
+      "implementer": 124647,
+      "reviewer": 133378
+    }
+  },
+  "round_shas": {
+    "1": "f0680ef9ff97f0cf57e4ace3f6fca79fb59be1a4",
+    "2": "16db5a7603f853cd1d4bce3c275cfd01e7a30814"
+  }
+}

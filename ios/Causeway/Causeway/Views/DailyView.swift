@@ -467,10 +467,17 @@ struct DailyView: View {
         let validDaily = !poolMatches ? [:] : backup.dailyInts
             .filter { (dayMin...dayMax).contains($0.key) }
             .mapValues { r in
+                // `runs` rides along: it is the per-day clear log, and the backup file carries it
+                // (TierResult is Codable). Dropping it here would make the feature's primary use
+                // case — restoring onto a new device — silently return every solved day with an
+                // empty history, since DailyStore.merge folds through mergeRuns(local, imported).
+                // Same sanitising rule as moves/elapsed: a run with a non-positive count or time is
+                // not something this app can have written, so it is dropped rather than displayed.
                 TierResult(bronze: r.bronze, silver: r.silver, gold: r.gold, flawless: r.flawless,
                            onTime: r.onTime,
                            moves: (r.moves ?? 0) > 0 ? r.moves : nil,
-                           elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil)
+                           elapsed: (r.elapsed ?? 0) > 0 ? r.elapsed : nil,
+                           runs: Array(r.runs.filter { $0.moves > 0 && $0.elapsed > 0 }.suffix(runLogMax)))
             }
         let validWins = backup.winsInts.filter {
             (1...Game.maxSeed).contains($0.key) && $0.value.moves > 0 && $0.value.secs > 0

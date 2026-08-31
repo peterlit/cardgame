@@ -21,8 +21,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { applyMove, isWon } from '../tools/solver/rules.mjs';
 import { dealState } from '../tools/solver/solve.mjs';
-import { simulateAutoFinish, isSafeAutoplay, canFoundationUp } from './engine.mjs';
+import { simulateAutoFinish, isSafeAutoplay, canFoundationUp, sendOneHomeStep } from './engine.mjs';
 import { dailyChallenge, evaluateChallenge } from './daily.mjs';
+import { loadWeb } from './web-extract.mjs';
+
+// The SHIPPED web copies of the two refusals, lifted out of index.html and run for real. String
+// pins (tests/ios-parity.test.mjs) prove those functions still READ a certain way; only this proves
+// they still DO anything. Mutation testing showed the difference: replacing the live/lost
+// comparison in both with `const sLive=false, gLive=false` — which restores both shipped bugs
+// verbatim — survived the entire suite.
+const web = loadWeb();
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pool = JSON.parse(readFileSync(join(REPO, 'data/daily-pool.json'), 'utf8'));
@@ -147,9 +155,13 @@ test('day 29: an unguarded safe auto-play send would break the day\'s Gold split
     for (const e of fo) { if (e.end === 'up') u[e.suit]++; else d[e.suit]++; }
     return u.some(x => x > R) || d.some(x => x > 13 - R);
   };
-  let refusals = 0, unguardedBreaks = 0;
+  // The look-ahead UNDER TEST is the shipped web one, lifted out of index.html — NOT a second copy
+  // of the rule written here. (An earlier version of this test incremented `refusals` and
+  // `unguardedBreaks` in the same statement and compared them, which no implementation could fail.)
+  let refusals = 0, unguardedBreaks = 0, allowed = 0;
   for (const { state, telem } of walk(pool.days[day].seed, line)) {
     if (violated(telem.foundationOrder)) break;   // the line itself never gets here; belt and braces
+    web.set({ challengeDay: day, dailyPool: pool.days, state, telem, moveCount: telem.moves });
     const cards = [
       ...state.cells.map((c, i) => c && { c, where: `cell${i}` }),
       ...state.tableau.map((t, i) => t.length && { c: t[t.length - 1], where: `col${i}` }),
@@ -158,13 +170,55 @@ test('day 29: an unguarded safe auto-play send would break the day\'s Gold split
       if (!isSafeAutoplay(state, c)) continue;
       const toUp = canFoundationUp(state, c);
       const after = telem.foundationOrder.concat([{ suit: c.suit, rank: c.rank, end: toUp ? 'up' : 'down', moveIdx: telem.moves + 1 }]);
-      if (violated(after)) { unguardedBreaks++; refusals++; }
+      const refused = web.autoSendWouldBreakTier(c, toUp);
+      if (violated(after)) { unguardedBreaks++; if (refused) refusals++; }
+      else if (!refused) allowed++;
     }
   }
   assert.ok(unguardedBreaks > 0,
     'no safe-autoplay send along day 29\'s flawless line breaks the Gold split any more — the reproduction moved, so re-verify Game.autoSendWouldBreakTier');
   assert.equal(refusals, unguardedBreaks,
-    'every breaking send must be refused by the look-ahead — a send that breaks a live tier may never be made automatically');
+    'the shipped web autoSendWouldBreakTier let a Gold-breaking send through — a send that breaks a live tier may never be made automatically');
+  // ...and it is a refusal, not a blanket block: auto-play must still clear the harmless cards.
+  assert.ok(allowed > 0,
+    'autoSendWouldBreakTier now refuses every safe-autoplay send on day 29 — auto-play has become a blanket block during challenges');
+});
+
+// The other web half of bug/WF-4, on the day the in-app report was written against. At day 21's
+// FIRST finishable position the cascade wins but spends Gold, so the shipped autoFinishTierCost must
+// name 🥇 there (which is what makes maybeAutoFinish withhold the prompt) — and must fall silent on
+// a day/position where the cascade keeps everything, or the affordance disappears for casual play.
+test('index.html autoFinishTierCost names the tier the cascade would spend (and stays silent when it spends none)', () => {
+  const day = 21, ch = dailyChallenge(day, pool);
+  const line = sol.solutions[String(pool.days[day].seed)].flawless;
+  let costAtFirstOffer = null;
+  for (const pos of walk(pool.days[day].seed, line)) {
+    web.set({ challengeDay: day, dailyPool: pool.days, state: pos.state, telem: pos.telem, moveCount: pos.telem.moves });
+    if (!finishFrom(pos, ch)) continue;                 // not finishable yet (or already won)
+    costAtFirstOffer = web.autoFinishTierCost();
+    break;
+  }
+  assert.ok(costAtFirstOffer, 'day 21 never becomes finishable along its own flawless line');
+  assert.deepEqual(costAtFirstOffer, ['🥇 Gold'],
+    'the shipped web autoFinishTierCost no longer reports the Gold day 21\'s first finishable cascade spends — maybeAutoFinish would offer it again');
+
+  // Casual play (no challenge bound) must never be charged for finishing.
+  web.set({ challengeDay: null, dailyPool: null });
+  assert.deepEqual(web.autoFinishTierCost(), [], 'autoFinishTierCost charges a tier outside a challenge');
+
+  // And on a position whose cascade keeps every tier, the cost is empty so the prompt still fires.
+  const d29 = 29, ch29 = dailyChallenge(d29, pool);
+  const line29 = sol.solutions[String(pool.days[d29].seed)].flawless;
+  let sawFreeFinish = false;
+  for (const pos of walk(pool.days[d29].seed, line29)) {
+    const res = finishFrom(pos, ch29);
+    if (!(res && res.silver && res.gold)) continue;
+    web.set({ challengeDay: d29, dailyPool: pool.days, state: pos.state, telem: pos.telem, moveCount: pos.telem.moves });
+    assert.deepEqual(web.autoFinishTierCost(), [],
+      'autoFinishTierCost invents a cost at a day-29 position where the cascade demonstrably keeps 🥈 and 🥇 — the Finish offer would never appear');
+    sawFreeFinish = true;
+  }
+  assert.ok(sawFreeFinish, 'day 29 lost its tier-preserving finish — the control for the blanket-block case is gone');
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -235,4 +289,83 @@ test('the finish-affordance predicate is order-independent (no false "not finish
   // the intent explicit — most positions are not finishable, and the tails of the lines are.
   assert.ok(finishable > 0 && finishable < positions,
     `the finishable/not split collapsed (${finishable} of ${positions}) — the predicate stopped discriminating`);
+});
+
+// ---------------------------------------------------------------------------------------------
+// The cascade's SEND ORDER, which the differential test above deliberately cannot see.
+//
+// `won` is order-independent (emptying the board by foundation sends alone reaches the same place
+// whatever order you do it in), so the 21k-position oracle constrains WHETHER a board is finishable
+// and nothing else. But autoFinishTierCost() reads `events`, and the day's tier is usually decided
+// by the SPLIT — which end each card arrived from, in order. simulateAutoFinish exists in its odd
+// "one card, then start again from the cells" shape for exactly that reason: it must predict the
+// stream sendOneHome actually produces, or the "Finish now and miss…" dialog names the wrong tiers.
+// Mutation testing proved that unguarded: deleting `if(sent) continue;` — the line that makes the
+// prediction restart at the cells after every send — left all 120 tests green.
+//
+// So pin the prediction against EXECUTION: loop the canonical single-step sender and read the
+// events off the foundations it moves. This is the app's real cascade (Game.sendOneHome / web
+// sendOneHome repeat this step to fixpoint), reconstructed independently of the simulator.
+function stepwiseSends(state, moveCount = 0) {
+  const s = { up: state.up.slice(), down: state.down.slice(), cells: state.cells.slice(),
+              tableau: state.tableau.map(c => c.slice()) };
+  const events = [];
+  let moves = moveCount;
+  for (;;) {
+    const up = s.up.slice(), down = s.down.slice();
+    if (!sendOneHomeStep(s)) break;
+    moves++;
+    let ev = null;
+    for (let suit = 0; suit < 4; suit++) {
+      if (s.up[suit] !== up[suit]) ev = { suit, rank: s.up[suit], end: 'up', moveIdx: moves };
+      else if (s.down[suit] !== down[suit]) ev = { suit, rank: s.down[suit], end: 'down', moveIdx: moves };
+    }
+    assert.ok(ev, 'sendOneHomeStep reported a send that moved no foundation');
+    events.push(ev);
+  }
+  return { won: s.up.every((u, i) => s.down[i] === u + 1), events, moves };
+}
+
+test('the predicted cascade is the executed cascade, card for card (both shipped copies)', () => {
+  let positions = 0, withSends = 0, firstMismatch = null, webChecked = 0;
+  for (const [seedKey, lines] of Object.entries(sol.solutions)) {
+    const seed = Number(seedKey);
+    for (const [tier, line] of Object.entries(lines)) {
+      if (typeof line !== 'string' || !line) continue;
+      for (const { state, telem } of walk(seed, line)) {
+        positions++;
+        const exec = stepwiseSends(state, telem.moves);       // execution order, reconstructed
+        const pred = simulateAutoFinish(state, telem.moves);  // what the app predicts (tests/engine.mjs)
+        if (exec.events.length) withSends++;
+        if (!firstMismatch) {
+          try {
+            assert.deepEqual(pred.events, exec.events);
+            assert.equal(pred.moves, exec.moves);
+            assert.equal(pred.won, exec.won);
+          } catch {
+            firstMismatch = `seed ${seed} ${tier} @ position ${positions}: predicted ` +
+              `${pred.events.map(e => e.rank + e.end[0]).join(' ')} but the cascade sends ` +
+              `${exec.events.map(e => e.rank + e.end[0]).join(' ')}`;
+          }
+        }
+        // The shipped web copy runs the same gauntlet, on a sample dense enough to catch a reorder
+        // (running it on all ~22k positions costs seconds for no extra signal).
+        if (positions % 7 === 0) {
+          web.set({ state, moveCount: telem.moves, challengeDay: null, dailyPool: null, telem });
+          const wp = web.simulateAutoFinish();
+          if (!firstMismatch) {
+            try { assert.deepEqual(wp.events, exec.events); assert.equal(wp.moves, exec.moves); }
+            catch { firstMismatch = `index.html simulateAutoFinish disagrees with the cascade at seed ${seed} ${tier} position ${positions}`; }
+          }
+          webChecked++;
+        }
+      }
+    }
+  }
+  assert.equal(firstMismatch, null,
+    `the auto-finish prediction no longer matches the order sendOneHome executes — autoFinishTierCost would name the wrong tiers: ${firstMismatch}`);
+  assert.ok(positions > 20000, `expected the whole baked corpus (~22k positions), walked ${positions}`);
+  assert.ok(webChecked > 2000, `web copy barely sampled (${webChecked} positions)`);
+  // The comparison must have real work to compare: mostly-empty event streams would prove nothing.
+  assert.ok(withSends > 1000, `only ${withSends} positions have any cascade at all — the corpus stopped exercising the send order`);
 });

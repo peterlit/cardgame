@@ -1,0 +1,121 @@
+// Load the SHIPPED web implementations out of index.html and run them for real.
+//
+// Why this exists: every other guard on index.html is a *string pin* (tests/ios-parity.test.mjs).
+// A pin proves a line still reads the way it read when it was written; it proves nothing about what
+// the line DOES, and it covers only the lines someone thought to pin. Mutation testing found the
+// hole: neutering `objViolated`'s `case 'moves'` / `case 'end-bias'` bodies to `return false`, and
+// neutering the live/lost comparison in `autoSendWouldBreakTier` and `autoFinishTierCost` to
+// `const sLive=false, gLive=false`, all survived the whole suite. Those are precisely the shipped
+// bugs bug/WF-4 fixed — auto-play denying Gold, the auto-finish prompt firing mid-flawless-line —
+// and the suite stayed green with them back in.
+//
+// index.html is a single-file app: its game code is plain top-level declarations in one <script>,
+// with no module boundary to import. So we lift the declarations we want by NAME (brace/statement
+// matching, not line numbers, so ordinary edits above them don't break extraction), concatenate
+// them in dependency order, and evaluate the result once in a function scope that also declares the
+// handful of mutable globals the app keeps on the page (`state`, `telem`, `moveCount`,
+// `challengeDay`, `dailyPool`). No DOM is touched: every function lifted here is pure over those.
+//
+// The extraction is deliberately strict — a missing name throws with the name in the message — so
+// that RENAMING or deleting a shipped function fails loudly here instead of silently skipping the
+// behavioural tests that depend on it.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
+export const htmlSource = readFileSync(join(REPO, 'index.html'), 'utf8');
+
+// Walk `src` from `i`, returning the index just past the statement/block that starts there.
+// Understands nesting, ' " ` strings (with escapes and ${} interpolation) and both comment forms.
+// `stopAtSemicolon` ends a const/let declaration at its own top-level `;`; otherwise we end at the
+// `}` that closes the first `{` (a function body).
+function scanTo(src, i, stopAtSemicolon) {
+  let depth = 0, seenBrace = false;
+  const stack = [];   // template-literal ${ } nesting
+  while (i < src.length) {
+    const c = src[i], n = src[i + 1];
+    if (c === '/' && n === '/') { i = src.indexOf('\n', i); if (i < 0) return src.length; continue; }
+    if (c === '/' && n === '*') { i = src.indexOf('*/', i + 2); if (i < 0) return src.length; i += 2; continue; }
+    if (c === '"' || c === "'" || c === '`') {
+      const q = c; i++;
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (q === '`' && src[i] === '$' && src[i + 1] === '{') { stack.push(depth); depth = 0; i += 2; break; }
+        if (src[i] === q) { i++; break; }
+        i++;
+      }
+      continue;
+    }
+    if (c === '{' || c === '(' || c === '[') { depth++; if (c === '{') seenBrace = true; i++; continue; }
+    if (c === '}' || c === ')' || c === ']') {
+      depth--;
+      if (depth < 0 && stack.length) {           // closing a ${ } — resume the template literal
+        depth = stack.pop(); i++;
+        while (i < src.length) {                 // ...to its closing backtick
+          if (src[i] === '\\') { i += 2; continue; }
+          if (src[i] === '$' && src[i + 1] === '{') { stack.push(depth); depth = 0; i += 2; break; }
+          if (src[i] === '`') { i++; break; }
+          i++;
+        }
+        continue;
+      }
+      i++;
+      if (depth === 0 && seenBrace && !stopAtSemicolon) return i;
+      continue;
+    }
+    if (c === ';' && depth === 0 && stopAtSemicolon) return i + 1;
+    i++;
+  }
+  throw new Error('unterminated declaration while extracting from index.html');
+}
+
+/// Lift the top-level `function NAME(...)` / `const NAME = ...` / `let NAME = ...` declaration.
+/// A multi-declarator statement (`const a=..., b=...;`) comes back whole — ask for one of its names.
+export function extractDecl(name) {
+  const re = new RegExp(`^[ \\t]*(function|const|let)[ \\t]+${name}\\b`, 'm');
+  const m = re.exec(htmlSource);
+  if (!m) throw new Error(`index.html: no top-level declaration of \`${name}\` — was it renamed or deleted?`);
+  const start = m.index + (m[0].length - m[0].trimStart().length);
+  const end = scanTo(htmlSource, start, m[1] !== 'function');
+  return htmlSource.slice(start, end);
+}
+
+// Dependency order matters only for `const` (TDZ); functions hoist. Kept explicit so a reader can
+// see exactly which shipped code is under test here.
+const NAMES = [
+  // --- daily engine: objectives, checkers, the two live HUD hints ---
+  'RANK_NAME', 'RANK_SHORT', 'rankName', 'upDown', 'foldHome', 'endsFirst', 'beforeAce',
+  'suitTopFirst', 'suitSprint', 'rankRush', 'suitBalance', 'OBJECTIVES',
+  'gradeOf', 'labelOf', 'makeObjective', 'dailyChallenge', 'evaluate', 'evaluateChallenge',
+  'objViolated', 'objSecured',
+  // --- board rules + the two places the app moves cards by itself ---
+  'BLACK_SUITS', 'canFoundationUp', 'canFoundationDown', 'rankOnFound', 'isSafeAutoplay',
+  'simulateAutoFinish', 'autoFinishWouldWin', 'autoSendWouldBreakTier', 'autoFinishTierCost',
+];
+const EXPORTS = NAMES.filter(n => n === n.toLowerCase() || /^[a-z]/.test(n));
+
+/// Build a fresh sandbox holding the shipped web functions. `g` seeds the page globals; the
+/// returned object exposes the functions plus a `set(globals)` to move the board between cases.
+export function loadWeb(g = {}) {
+  const body = NAMES.map(extractDecl).join('\n');
+  const src = `
+    "use strict";
+    const NCELLS = 4, NCOLS = 8;
+    let state = null, telem = null, moveCount = 0, challengeDay = null, dailyPool = null;
+    ${body}
+    return {
+      ${EXPORTS.join(', ')},
+      set(o){ if('state' in o) state=o.state; if('telem' in o) telem=o.telem;
+              if('moveCount' in o) moveCount=o.moveCount; if('challengeDay' in o) challengeDay=o.challengeDay;
+              if('dailyPool' in o) dailyPool=o.dailyPool; },
+    };`;
+  const web = new Function(src)();
+  web.set(g);
+  return web;
+}
+
+/// A blank telemetry record shaped like the one index.html keeps on the page.
+export function blankTelem(over = {}) {
+  return { cellUses: 0, undos: 0, foundationOrder: [], maxRunMoved: 0, ...over };
+}

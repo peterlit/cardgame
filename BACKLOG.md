@@ -374,6 +374,13 @@ findings fixed:
   is error-prone and could break the build. Add an XCTest target in Xcode that asserts the
   Swift engine reproduces the same golden deal orders (`tests/engine.test.mjs` GOLDEN) and
   the same `isSafeAutoplay` cases, so both platforms are pinned to one contract. Ties to M8.
+  **Partially mitigated 2026-08-30 (review-loop round 1).** `tests/web-extract.mjs` now lifts the
+  shipped web functions out of `index.html` by name and RUNS them (`tests/web-behaviour.test.mjs`
+  for `objViolated`/`objSecured`; `tests/autofinish-tiers.test.mjs` for `autoSendWouldBreakTier`,
+  `autoFinishTierCost` and the cascade send order), so the web half of the shared contract has
+  behavioural — not just string-pin — coverage. Swift still has none: its guards are the drift
+  pins, now extended to every `objViolated` family and to the live-tier reads inside both
+  refusals. F6 remains the only way to make the Swift copies executable under test.
 - **UITEST-target — RESOLVED 2026-08-21.** The `CausewayUITests` UI Testing Bundle target now
   exists in `project.pbxproj` and runs. Xcode had never re-serialized the project when the target
   was added in the GUI, leaving both schemes pointing at a blueprint id that no target defined.

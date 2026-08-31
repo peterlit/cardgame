@@ -1,278 +1,190 @@
 {
-  "round": 2,
-  "round_start_sha": "16db5a7603f853cd1d4bce3c275cfd01e7a30814",
+  "round": 1,
+  "round_start_sha": "a65bb3bee66e9aeccd71cb6f94285939840c1dd7",
   "max_rounds": 2,
   "token_budget": null,
   "findings": [
     {
-      "id": "tests/daily.test.mjs:ontime-wiring-unpinned",
-      "claim": "The whole web-side \u23f0 same-day feature could be deleted green, and the iOS pin matched both call sites of `challengeStartDay = todayIndex()` so either could be deleted green.",
-      "evidence": {},
-      "severity": "major",
-      "region": "tests/daily.test.mjs:349-382, tests/ios-parity.test.mjs:100-125",
-      "current_status": "fixed",
-      "note": "Re-verified in round 2 by my own run of .review-loop/briefs/round-2-mutants.json: web-drop-startday-stamp, web-ontime-constant, web-drop-ontime-arg, web-drop-calendar-pip, web-drop-restart-restamp all killed, and BOTH iOS stamp mutants (ios-drop-playchallenge-stamp, ios-drop-restartdeal-stamp) now actually run and are killed. Stays fixed.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ],
-      "introduced_by_fix": false
-    },
-    {
-      "id": "correctness/daily.mjs:ontime-grace-window-too-wide",
-      "claim": "isOnTime's grace is documented as a midnight grace but compares DAY INDICES only, so an attempt begun any time on day D and won any time on D+1 earns the award; the closeout fixed the wording in some places but left the comments sitting on both SHIPPING implementations still asserting the disproven midnight framing.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "index.html:1240-1245, ios/Causeway/Causeway/Model/Daily.swift:340-349",
-      "current_status": "partial",
-      "note": "Behaviour genuinely unchanged (verified: all three isOnTime bodies are the same day-index comparison as before this diff), and the BACKLOG entry is good. But the claim 'both platforms' comments now say begun-on-D-counts-if-won-any-time-on-D+1' is FALSE: only the shared-core comment (tests/daily.mjs), the two restore comments and the Game.swift property doc were rewritten. ACTION for a human: paste the tests/daily.mjs:264-266 wording onto index.html:1240-1241, ios/Causeway/Causeway/Model/Daily.swift:341-344, index.html:450-451 and docs/architecture/overview.md:369. A maintainer reading either shipping implementation still learns the wrong rule. (prompts.md:698 is a historical prompt log \u2014 leave it.)",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "partial"
-        }
-      ],
-      "introduced_by_fix": false
-    },
-    {
-      "id": "ui/DailyView.swift:ontime-line-contradicts-grace",
-      "claim": "On day D+1 the day card for day D claimed '\u23f0 Same-day is earned on the day itself' while an in-progress attempt begun on D would still earn \u23f0 if won that day.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "index.html:1494-1505, ios/Causeway/Causeway/Views/DailyView.swift:271-297",
-      "current_status": "fixed",
-      "note": "Verified: gating is `challengeDay===day && challengeStartDay===day && ti===day+1` on both platforms, and it cannot misfire \u2014 D+2 fails ti===day+1; a day with no live attempt fails challengeDay===day (challengeDay is nulled on deal and on win, index.html:507/1439, Game.swift:199/844); today takes the earlier isToday/day==ti branch; a Replay re-stamps challengeStartDay=todayIndex() so the branch goes dark, which is what makes the 'resume' verb honest. Copy is byte-identical across platforms (checked as escaped literals). Branch is pinned WITH its condition on both sides, and my independent mutation run killed web-gracelive-constant-false, web-drop-gracelive-line, ios-gracelive-constant-false and ios-drop-gracelive-copy. @Published on Game.swift:102 is correct and sufficient (DailyView holds @ObservedObject var game, Game.swift:8); no didSet, no write-back, so no publish cycle; it is set adjacent to the already-@Published challengeDay so the extra invalidations coalesce in the same runloop tick. Swift target builds clean (xcodebuild BUILD SUCCEEDED against the dispatch's simulator).",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ],
-      "introduced_by_fix": false
-    },
-    {
-      "id": "tools/loop-usage.py:since-filter-is-file-granular",
-      "claim": "--since filtered whole transcript FILES by mtime then summed every record in them, over-reporting a long session touched minutes ago in full.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "tools/loop-usage.py:39-51, 78-132",
-      "current_status": "fixed",
-      "note": "Hard-verified against REAL transcripts, since this feeds the loop-cost deliverable. (a) The filter does real work: over the last 30 min the same 6 files yield 154 requests per-record vs 172 file-granular. (b) rec_time matches the actual format \u2014 every record uses ISO-8601 with a literal Z ('2026-08-30T19:12:43.593Z'); the .replace('Z','+00:00') makes it parse on pre-3.11 Pythons too, and .timestamp() yields UTC epoch, the same basis as `date +%s`. (c) `undated` cannot inflate the number: 0 of 17,353 billed records in the whole project corpus lack a timestamp, and a live run reports undated:0. (d) The bool guard is right (True would otherwise read as epoch 1s and be silently dropped) and the 1e11 millis heuristic separates cleanly (now ~1.7e9 s vs ~1.7e12 ms). (e) mtime pre-filter reasoning is sound and safe in the only direction that matters: it can only exclude files whose LAST append precedes the cutoff, which by append-only construction cannot hold a later record; a touched/copied file is over-kept, never under-kept. (f) sidechain is set before the `continue`, so a partially-in-window subagent still reports sidechain:true (verified on live rows). (g) Images are counted only inside kept records, so a screenshot in an out-of-window record no longer inflates a windowed total. (h) The tests are not tautologies: the old file-granular code gives requests 3 / input 700 against the fixture, the tests demand 2 / 600, and JSON.parse(stdout) implicitly pins the undated note to stderr. Shape unchanged apart from the additive `undated` key.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ],
-      "introduced_by_fix": false
-    },
-    {
-      "id": "tests/ios-parity.test.mjs:ontime-surfaces-unpinned",
-      "claim": "The round-1 guard pinned the \u23f0 award surfaces on web only, so the iOS calendar pip, day-card line, streaks-strip column and win-overlay line were all deletable green on the platform that ships; the web onTime streak accessor and iOS's persist of challengeStartDay were likewise unpinned.",
-      "evidence": {},
-      "severity": "major",
-      "region": "tests/ios-parity.test.mjs:127-151",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "VERIFIED by my own independent mutation run, not the implementer's claim: all five round-1 survivors are now killed (ios-drop-calendar-pip, ios-drop-daycard-ontime-line, ios-drop-streaks-strip-column, ios-drop-win-overlay-ontime, ios-drop-persist-startday), plus web-drop-ontime-streak and web-drop-streak-row. I also probed the two constant-satisfaction escapes the pins were supposed to close: ios-win-overlay-ontime-and-false (AND with a constant on the other side) is killed, and ios-restore-guesses-todayindex (a differently-shaped fallback re-added at restore) is killed. 17/17, exit 0. NOTE the mirror gap this round OPENED on the web side: see tests/daily.test.mjs:web-ontime-surfaces-unpinned.",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tools/mutate.py:manifest-mutant-never-ran",
-      "claim": "The round-1 manifest paired a multi-line `original` with a `line` key, so mutate.py never ran ios-drop-playchallenge-stamp; the implementer reported a kill it had not observed and did not notice mutate.py exiting 1.",
-      "evidence": {},
-      "severity": "minor",
-      "region": ".review-loop/briefs/round-2-mutants.json",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Confirmed independently: the round-2 manifest drops the `line` key for the multi-line mutant, the mutant executes, and the whole manifest exits 0 with 17 killed / 0 survived / 0 mismatches. The underlying mutate.py limitation (a `line` key plus a multi-line `original` always errors) lives in the plugin cache, outside this repo, so nothing further to do here.",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "parity/index.html:restartdeal-null-startday-divergence",
-      "claim": "Web restartDeal preserved a null start day on retry while iOS re-stamped todayIndex(), so a pre-\u23f0 save replayed on day D earned \u23f0 on D+1 on iOS and not on web.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "index.html:1697-1703",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Verified by walking the scenario on both platforms: pre-\u23f0 save restored -> startDay null on both (index.html:575, Game.swift:304 \u2014 the round-2 guard is NOT undone, and both remain pinned); Replay -> both stamp todayIndex(); win on D+1 -> isOnTime true on both. The docs sentence that was false on iOS is corrected (docs/daily-challenges.md:433-435 now names Replay as the way the grace returns). Mutant web-restartdeal-regress-null-startday killed in my run.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/daily.test.mjs:web-ontime-surfaces-unpinned",
-      "claim": "The web day-card \u23f0 block and the win-overlay's same-day STREAK NUMBER were deletable/zeroable with the suite green (three mutants survived my round-2 run).",
-      "evidence": {},
-      "severity": "minor",
-      "region": "tests/daily.test.mjs:357-385",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "I re-ran the manifest myself: exit 0, killed 12 / survived 0 / mismatches 0 \u2014 my three round-2 survivors are dead. I also probed for the prior rounds' failure mode (omitted mutants) by hand-mutating the ONE \u23f0 surface the new manifest does not cover, the iOS `Text(\"\u23f0 Cleared on the day\")` earned line: node tests/ios-parity.test.mjs exits 1, so it is genuinely pinned. No omission found on the new branch or on loop-usage.py.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/daily.test.mjs:stale-fallback-comment",
-      "claim": "The comment above the restore pin said an older save 'falls back to the challenge day', the opposite of the line it annotates.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "tests/daily.test.mjs:358-366",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Comment now reads 'a save written before \u23f0 shipped has NO start day and must stay null (never `?? challengeDay`)' directly above the `: null;` pin. Matches the code it annotates and matches the twin comments at index.html:573-575 and Game.swift:300-303.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "ux/index.html:gracelive-play-button-forfeits",
-      "claim": "The new '\u23f0 Resume your attempt today and it still counts' line sits directly above the day card's only button, and that button forfeits the grace: on web it calls playChallenge() with NO confirmation, re-dealing the live attempt and re-stamping challengeStartDay=todayIndex(). A player who reads the new line and taps the obvious control loses both the in-progress game and the \u23f0 the line just promised.",
+      "id": "persistence/DailyView.swift:import-drops-run-log",
+      "claim": "The stats-backup importer rebuilds every imported day with TierResult(bronze:silver:gold:flawless:onTime:moves:elapsed:) and never passes `runs`, so the newly-added per-day clear log is silently discarded on import. On the feature's primary use case \u2014 restoring onto a new device \u2014 every solved day comes back with runs == [], and the new day card reports 'Cleared \u00b7 best 96 moves in 5:41 \u00b7 par 72' instead of 'Cleared 4x ... Moves each run: ...', permanently losing the history the backup file actually contained.",
       "evidence": [
-        "index.html:1504 (the new line)",
-        "index.html:1474-1475 (`onclick=\"playChallenge(${day})\"`, no confirm)",
-        "index.html:1289-1295 (playChallenge deals and stamps challengeStartDay=todayIndex())",
-        "ios/Causeway/Causeway/Views/DailyView.swift:290 (same line)",
-        "ios/Causeway/Causeway/Views/DailyView.swift:252-258 (tap goes through the confirm)",
-        "ios/Causeway/Causeway/Views/DailyView.swift:52-54 (confirm says 'You can replay the challenge afterwards')"
+        "ios/Causeway/Causeway/Views/DailyView.swift:467-474",
+        "ios/Causeway/Causeway/Model/Daily.swift:346 (TierResult.runs defaults to [])",
+        "ios/Causeway/Causeway/Model/DailyStore.swift:33-38 (merge -> mergeTiers(local, imported); mergeRuns([], local) keeps only local)",
+        "ios/Causeway/Causeway/Views/DailyView.swift:1547-1554 (clearsSummary keys the count off r.runs.count)"
       ],
-      "severity": "minor",
-      "region": "index.html:1472-1505, ios/Causeway/Causeway/Views/DailyView.swift:244-268",
+      "severity": "major",
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:460-480",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "StatsBackup encodes/decodes runs correctly (TierResult is Codable); only the sanitising re-construction at the import site drops it. Fix is one argument: runs: r.runs (optionally filtered to rows with moves > 0).",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/autofinish-tiers.test.mjs:tautological-refusal-assert",
+      "claim": "The assertion that is supposed to prove auto-play refuses every tier-breaking send is a tautology: `refusals` and `unguardedBreaks` are both incremented inside the same `if (violated(after))` statement, so `assert.equal(refusals, unguardedBreaks)` can never fail for any implementation. The test named 'the look-ahead must refuse it' exercises no look-ahead code at all \u2014 it recomputes split-at's violation rule inline and compares it to itself.",
+      "evidence": [
+        "tests/autofinish-tiers.test.mjs:150 (let refusals = 0, unguardedBreaks = 0)",
+        "tests/autofinish-tiers.test.mjs:161 (if (violated(after)) { unguardedBreaks++; refusals++; })",
+        "tests/autofinish-tiers.test.mjs:166 (assert.equal(refusals, unguardedBreaks, 'every breaking send must be refused'))"
+      ],
+      "severity": "major",
+      "region": "tests/autofinish-tiers.test.mjs:140-170",
       "introduced_by_fix": true,
       "current_status": "open",
-      "note": "NEW, created by the closeout's fourth branch \u2014 the previous copy ('earned on the day itself') did not invite an action. The real 'resume' gesture is to CLOSE the sheet, which the line never says. iOS is partly protected by the 'End your daily attempt?' dialog, but its reassurance 'You can replay the challenge afterwards' is precisely false in this state: replaying is exactly what forfeits \u23f0. Web has no dialog at all, so the loss is one tap and silent. ACTION: (1) web \u2014 when graceLive, either route playChallenge through a confirm or relabel the button; (2) iOS \u2014 when graceLive, append something like '\u2014 this forfeits \u23f0 same-day' to confirmMessage (DailyView.swift:44-55); (3) cheapest of all, extend the line to 'Resume your attempt today (close this) and it still counts'.",
-      "first_seen_round": 2,
+      "note": "The only surviving real assertion in that test is unguardedBreaks > 0, i.e. 'the repro still exists'. Nothing checks that any shipped autoSendWouldBreakTier declines it.",
+      "first_seen_round": 0,
       "status_history": [
         {
-          "round": 2,
+          "round": 0,
           "status": "open"
         }
       ]
     },
     {
-      "id": "tools/loop-usage.py:agent-always-null",
-      "claim": "agent_type_of() never finds an agent type in real transcripts, so every row reports \"agent\": null. The loop-cost writeup the user is about to produce cannot attribute sidechain cost to implementer vs reviewer, even though the type IS recorded on disk.",
+      "id": "tests/engine.mjs:sim-send-order-untested",
+      "claim": "MUTATION-PROVEN: deleting `if(sent) continue;` from simulateAutoFinish \u2014 the exact edit the diff says is 'what lets prediction and execution agree card-for-card', because a different order predicts a different SPLIT \u2014 survives the entire node suite (120 tests still pass), including the 'canon: days 21, 24, 27' test and the 21k-position differential test. The differential oracle only compares `won`, which the file itself documents as order-independent, so no test constrains the predicted send order that autoFinishTierCost's split prediction is built on. A future reorder of the cascade would ship a Finish-cost dialog that names the wrong tiers with a green suite.",
       "evidence": [
-        "tools/loop-usage.py:59-75 (looks for top-level subagent_type/agentType/subagentType, or an `Agent` tool_use inside the transcript's own records \u2014 none of which appear in a subagent transcript)",
-        "tools/loop-usage.py:16-17 (docstring promises `agent` names its type)",
-        "live run: every row emits \"agent\": null",
-        "~/.claude/projects/.../subagents/agent-*.meta.json contains {\"agentType\":\"review-loop-tools:skeptical-reviewer\",...}",
-        "each subagent record carries attributionAgent with the same value (94 of 153 records in a sampled transcript)"
+        "tests/engine.mjs:102 (`if(sent) continue;`) \u2014 mutant `canon-sim-order-restart` -> replacement ';' -> outcome SURVIVED",
+        "tests/autofinish-tiers.test.mjs:2795-2820 (sweepWouldWin oracle compares .won only)",
+        "tests/autofinish-tiers.test.mjs:2662-2679 (days 21/24/27 canon did not move under the mutant)"
       ],
-      "severity": "minor",
-      "region": "tools/loop-usage.py:59-75",
-      "introduced_by_fix": false,
+      "severity": "major",
+      "region": "tests/engine.mjs:78-110",
+      "introduced_by_fix": true,
       "current_status": "open",
-      "note": "PRE-EXISTING, not caused by this closeout, and it does not corrupt any token number \u2014 sidechain:true still works, so 'sum the sidechain rows' is safe. ACTION: in agent_type_of, first try json.load(path + '.meta.json').get('agentType'), then fall back to the first record's r.get('attributionAgent'); keep the existing scan as a last resort. Two lines, and it turns the sidechain block into a per-agent breakdown.",
-      "first_seen_round": 2,
+      "note": "mutate.py run had 0 errors; kill/survive outcomes are verified. Needed: an assertion that simulateAutoFinish().events equals the stream produced by looping the canonical sendOneHomeStep from the same position.",
+      "first_seen_round": 0,
       "status_history": [
         {
-          "round": 2,
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "parity/index.html:objViolated-untested-on-both-shipped-copies",
+      "claim": "MUTATION-PROVEN: the rewritten fail-fast checker objViolated has zero behavioural coverage in either shipped copy. Mutating index.html's `case 'moves'` and `case 'end-bias'` bodies to `return false`, and iOS Daily.swift's `case \"end-bias\"` body to `return false`, all SURVIVE the full node suite. That is the same blind spot that let this function sit on a dead pre-parameterised id set ('aces-first', 'split-even', 'cells-le-1') for months with every objective falling through to `default: false` \u2014 the very regression this diff fixes. Only tests/daily.mjs's new canonical copy is tested (and only for end-bias and split-at); no parity test compares the shipped copies to it.",
+      "evidence": [
+        "index.html:1682 (`case 'moves': return t.moves>p.N;`) \u2014 mutant -> `return false;` -> SURVIVED",
+        "index.html:1689 (`case 'end-bias': ... .some(x=>x>13-p.min);`) \u2014 mutant -> `return false;` -> SURVIVED",
+        "ios/Causeway/Causeway/Model/Daily.swift:465-468 \u2014 mutant `return (p.end == \"up\" ? x.d : x.u).contains { $0 > 13 - m }` -> `return false` -> SURVIVED",
+        "tests/daily.test.mjs:183,186,194 \u2014 the only objViolated assertions in the suite (end-bias x2, split-at x1) and they exercise tests/daily.mjs only",
+        "control: the ios-parity text pin DOES kill an objSecured edit (mutant ios-objSecured-endbias-off-by-one -> KILLED), showing pins work where they exist and objViolated has none"
+      ],
+      "severity": "major",
+      "region": "index.html:1678-1700; ios/Causeway/Causeway/Model/Daily.swift:454-480",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "Cheapest fix: add objViolated to the ios-parity pin lists for both files (as objSecured already is), plus per-family behavioural cases in daily.test.mjs for the 11 uncovered ids.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "parity/index.html:web-tier-refusal-untested",
+      "claim": "MUTATION-PROVEN: both web halves of bug/WF-4 can be neutered without any test noticing. Replacing `const sLive=!objViolated(ch.silver,base), gLive=!objViolated(ch.gold,base);` with `const sLive=false, gLive=false;` in autoSendWouldBreakTier (index.html:698) and in autoFinishTierCost (index.html:991) both SURVIVE the full node suite. With that mutation auto-play resumes denying Gold and the auto-finish prompt resumes firing mid-flawless-line \u2014 exactly the shipped bugs \u2014 and the suite stays green. The ios-parity guards for this feature are string pins on other lines of the same functions, so they do not cover the live/lost comparison.",
+      "evidence": [
+        "index.html:698 \u2014 mutant `web-autoSendWouldBreakTier-neutered` -> SURVIVED",
+        "index.html:991 \u2014 mutant `web-autoFinishTierCost-neutered` -> SURVIVED",
+        "tests/ios-parity.test.mjs:509-554 (the WF-4 test asserts only that specific source strings are present)",
+        "tests/autofinish-tiers.test.mjs imports simulateAutoFinish/isSafeAutoplay from tests/engine.mjs \u2014 it never loads index.html or the Swift"
+      ],
+      "severity": "major",
+      "region": "index.html:683-712, index.html:985-1005",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "Same shape applies to iOS Game.autoSendWouldBreakTier/autoFinishTierCost, which have no XCTest at all (the UI test target has no unit tests for Game).",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves",
+      "claim": "The 'never forfeit the same-day grace silently' guard is gated on hasLiveGame, which requires moveCount > 0. A challenge started on day D with zero moves made (open the sheet, tap Play, background the app) restores on D+1 with challengeDay=D, challengeStartDay=D and moveCount=0, so graceLive is true but hasLiveGame is false: New game / Replay / Deal-Play reset with no dialog, restartDeal re-stamps challengeStartDay to D+1, and day D can never earn the on-time award again. Both platforms.",
+      "evidence": [
+        "ios/Causeway/Causeway/Model/Game.swift:432 (hasLiveGame requires moveCount > 0)",
+        "ios/Causeway/Causeway/Views/ContentView.swift:343 (requestReset gates the whole confirmation on hasLiveGame)",
+        "ios/Causeway/Causeway/Model/Game.swift:258 (challengeStartDay is persisted, so a 0-move attempt survives relaunch)",
+        "index.html:1841 (hasLiveGame) and index.html:1849 (confirmReset returns true immediately when !hasLiveGame())"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Model/Game.swift:428-436; index.html:1837-1860",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "Fix: OR graceLive into the gate (`hasLiveGame || graceLive`) so the grace dialog can fire at move 0.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "tests/RegressionDailyCalendarTests.swift:skip-instead-of-fail",
+      "claim": "Two of the three calendar tripwires call XCTSkipUnless on the very locator the fix introduces, so removing the fix turns the test GREEN (skipped) rather than red. Deleting the `.accessibilityLabel(locked ? \"...locked until that date\" : ...)` added in this diff makes the locked-cell query find nothing and testTappingALockedFutureDayExplainsWhy skips; likewise the Play-names-the-day test skips whenever the cell-label query returns nothing. A regression tripwire that reports 'skipped' on the regression is not a tripwire.",
+      "evidence": [
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:61-62 (try XCTSkipUnless(locked.waitForExistence...))",
+        "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:105 (try XCTSkipUnless(!candidates.isEmpty ...))",
+        "ios/Causeway/Causeway/Views/DailyView.swift:615 (the .accessibilityLabel these queries depend on, added in this diff)"
+      ],
+      "severity": "minor",
+      "region": "ios/Causeway/CausewayUITests/RegressionDailyCalendarTests.swift:50-110",
+      "introduced_by_fix": true,
+      "current_status": "open",
+      "note": "The files themselves flag the calendar cells as 'the brittle part'; the fix is a stable identifier (daily.cal.<idx>) plus XCTAssertTrue rather than XCTSkipUnless once the pool is known to contain a future day.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "id": "parity/index.html:deal-entry-clamps-silently",
+      "claim": "ux/WF-9 (deal entry out of range is silent) was fixed on iOS only. The web deal modal still clamps: goDeal() does Math.max(1, Math.min(1000000, ...)), so typing 5000000 deals #1000000 with no message \u2014 the player gets a different deal from the one they asked for, and after this diff that clamp now also runs behind a 'discard your game?' confirmation. iOS instead refuses the entry and says 'Deal numbers run 1-1,000,000.'",
+      "evidence": [
+        "index.html:1825 (const n=Math.max(1, Math.min(1000000, Math.floor(+v)));)",
+        "ios/Causeway/Causeway/Views/WinsView.swift:70-73 (entryProblem) and the enteredSeed nil-on-out-of-range rule",
+        "tests/ios-parity.test.mjs has no pin for the deal-entry range on either platform"
+      ],
+      "severity": "minor",
+      "region": "index.html:1822-1832",
+      "introduced_by_fix": false,
+      "current_status": "open",
+      "note": "Cheap: reject and show the range in the web modal, matching WinsView.entryProblem.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
           "status": "open"
         }
       ]
     }
   ],
-  "scope": "f42c632..HEAD -- ':!prompts.md'",
+  "scope": "b2ce1a4..HEAD -- :!prompts.md :!BACKLOG.md :!.qa-loop :!.review-loop :!causeway-reviewer-evaluation-examples.md",
   "usage": {
     "0": {
-      "reviewer": 79621
-    },
-    "1": {
-      "implementer": 30287,
-      "reviewer": 43343
-    },
-    "2": {
-      "implementer": 124647,
-      "reviewer": 133378
+      "reviewer": 165896
     }
   },
   "round_shas": {
-    "1": "f0680ef9ff97f0cf57e4ace3f6fca79fb59be1a4",
-    "2": "16db5a7603f853cd1d4bce3c275cfd01e7a30814"
+    "1": "a65bb3bee66e9aeccd71cb6f94285939840c1dd7"
   }
 }

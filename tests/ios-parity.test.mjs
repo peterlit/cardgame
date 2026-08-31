@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { RUN_LOG_MAX } from './daily.mjs';
+import { RUN_LOG_MAX, OBJECTIVES } from './daily.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const norm = s => s.replace(/\s+/g, ' ').trim();
@@ -128,6 +128,57 @@ test('objSecured secures end-bias from live board state on both platforms (no we
   for (const [name, src] of [['index.html', html], ['Daily.swift', swift]])
     assert.ok(!src.includes(norm('end-restrictions — not securable')),
       `${name}: objSecured is back to treating end-bias as unsecurable until the win`);
+});
+
+// ---- the live HUD hint: is this tier already IMPOSSIBLE? (objViolated, the fail-fast checker) ----
+// This is the most load-bearing UI-only function in the app: it draws the ✗ on a tier chip AND it is
+// the predicate both auto-play refusals are computed from (autoSendWouldBreakTier,
+// autoFinishTierCost). It has rotted before — all three copies sat on a pre-parameterised id set
+// ('aces-first', 'split-even', 'cells-le-1'), none of which the generator can emit, so every
+// objective fell through to `default: false` and no chip ever went ✗. Nothing caught it, because
+// the only objViolated assertions in the suite exercised tests/daily.mjs, the copy nobody ships.
+//
+// index.html's copy is now RUN for real (tests/web-behaviour.test.mjs). Swift has no test target, so
+// it gets the strongest cheap guard: every family the generator can emit must be handled by name,
+// no retired id may reappear, and each branch's body is pinned to the canonical rule.
+test('iOS objViolated handles every objective family the generator can emit (no fall-through rot)', () => {
+  const raw = readFileSync(join(IOS, 'Model/Daily.swift'), 'utf8');
+  const start = raw.indexOf('func objViolated(');
+  assert.ok(start > 0, 'Daily.swift no longer defines objViolated');
+  const end = raw.indexOf('\n}', start);
+  const body = norm(raw.slice(start, end));
+  for (const id of Object.keys(OBJECTIVES))
+    assert.ok(body.includes(`case "${id}":`),
+      `iOS objViolated has no branch for '${id}' — it falls through to \`default: false\`, so that tier's chip can never go ✗ and neither auto-play refusal will ever protect it`);
+  for (const dead of ['aces-first', 'split-even', 'cells-le-1'])
+    assert.ok(!body.includes(`case "${dead}"`), `iOS objViolated is back on the retired id '${dead}'`);
+  // Bodies, family for family, against tests/daily.mjs objViolated (behaviour-tested in daily.test.mjs).
+  for (const snippet of [
+    'case "moves":    return t.moves > (p.N ?? 0)',
+    'case "no-undo":  return t.undos > 0',
+    'case "cells-le": return t.cellUses > (p.N ?? 0)',
+    'case "max-run":  return t.maxRunMoved > (p.N ?? 1)',
+    'case "big-move": return false',
+    'let r = p.R ?? 7, x = upDown(t) return x.u.contains { $0 > r } || x.d.contains { $0 > 13 - r }',
+    'let m = p.min ?? 0, x = upDown(t) return (p.end == "up" ? x.d : x.u).contains { $0 > 13 - m }',
+    'case "ends-first":     return !endsFirstOK(t, p)',
+    'case "before-ace":     return !beforeAceOK(t, p)',
+    'case "suit-top-first": return !suitTopFirstOK(t, p)',
+    'case "suit-sprint":    return !suitSprintOK(t)',
+    'let n = p.N ?? 0 if let at = rushCompleted(t, p.rank ?? 1) { return at > n } return t.moves > n',
+    'case "suit-balance":   return maxSpread(t) > (p.N ?? 13)',
+  ]) assert.ok(body.includes(norm(snippet)), `iOS objViolated drifted from the canonical rule: ${snippet}`);
+});
+
+// ---- a restored stats backup must bring the per-day clear log with it ----
+// The importer re-builds every imported TierResult field by field (to sanitise hand-edited files),
+// and left `runs` off the constructor — so restoring onto a NEW DEVICE, the feature's whole point,
+// returned every solved day with an empty history and the day card fell back to "best N moves".
+// DailyStore.merge folds through mergeRuns(local, imported), so nothing downstream could recover it.
+test('iOS stats import carries the per-day run log (restoring a backup keeps the clear history)', () => {
+  const view = read('Views/DailyView.swift');
+  assert.ok(view.includes(norm('runs: Array(r.runs.filter { $0.moves > 0 && $0.elapsed > 0 }.suffix(runLogMax))')),
+    'the stats importer stopped carrying `runs` — a restored backup silently drops every day\'s clear log');
 });
 
 pin('Model/Daily.swift', 'grades and labels derive from the parameter', [
@@ -517,6 +568,16 @@ test('auto-play and auto-finish refuse (never reorder) when a live tier is at st
     'iOS look-ahead no longer compares live-before against violated-after');
   assert.ok(html.includes(norm('return (sLive && objViolated(ch.silver,t)) || (gLive && objViolated(ch.gold,t));')),
     'web look-ahead no longer compares live-before against violated-after');
+  // The `WasLive`/`Live` half of that comparison is the load-bearing one: hard-code it to false and
+  // both refusals silently switch off (auto-play denies Gold again, the finish prompt fires
+  // mid-flawless-line) while every other pin here still passes. tests/autofinish-tiers.test.mjs now
+  // runs the web pair for real; iOS has no test target, so these lines are pinned on both.
+  const count = (hay, needle) => hay.split(norm(needle)).length - 1;
+  // BOTH iOS refusals (autoSendWouldBreakTier and autoFinishTierCost) must compute it, hence 2.
+  assert.equal(count(game, 'let silverWasLive = !objViolated(ch.silver, t) let goldWasLive = !objViolated(ch.gold, t)'), 2,
+    'an iOS refusal stopped computing which tiers are still live — hard-coding those to false switches the refusal off silently');
+  assert.equal(count(html, 'const sLive=!objViolated(ch.silver,base), gLive=!objViolated(ch.gold,base);'), 2,
+    'a web refusal stopped computing which tiers are still live — hard-coding those to false switches the refusal off silently');
   // ...and the end it would use is the one the engine already picked, never a "better" one.
   assert.ok(game.includes(norm('let toUp = canFoundationUp(c)')), 'iOS auto-play no longer takes the engine\'s end');
   assert.ok(html.includes(norm('const toUp=canFoundationUp(c);')), 'web auto-play no longer takes the engine\'s end');
