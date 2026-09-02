@@ -105,6 +105,8 @@ const NAMES = [
   // --- board rules + the two places the app moves cards by itself ---
   'BLACK_SUITS', 'canFoundationUp', 'canFoundationDown', 'rankOnFound', 'isSafeAutoplay',
   'simulateAutoFinish', 'autoFinishWouldWin', 'autoSendWouldBreakTier', 'autoFinishTierCost',
+  // --- the daily calendar's month window (which months the grid may show) ---
+  'civilOf', 'monthNo', 'calMonthRange', 'clampCalMonth',
 ];
 const EXPORTS = NAMES.filter(n => n === n.toLowerCase() || /^[a-z]/.test(n));
 

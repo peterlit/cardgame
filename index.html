@@ -243,7 +243,13 @@
   .dauto{ font-size:11px; color:#6f7468; margin-bottom:11px; display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
   .dpill{ font-size:10.5px; padding:2px 7px; border-radius:14px; background:rgba(42,59,68,.1); color:#40484a; font-weight:600; }
   .dcalhd{ display:flex; justify-content:space-between; align-items:center; margin:2px 2px 7px; }
-  .dcalhd .dm{ font-family:Georgia,serif; font-size:15px; font-weight:700; }
+  .dcalhd .dm{ font-family:Georgia,serif; font-size:15px; font-weight:700; min-width:9.5em; text-align:center; }
+  .dcalhd .dnav{ display:flex; align-items:center; gap:2px; }
+  /* 34px keeps the month arrows a real tap target on a phone (a 22px one is a miss magnet). */
+  .dcalhd .dmb{ background:none; border:0; color:inherit; font:inherit; font-size:19px; line-height:1;
+    min-width:34px; min-height:32px; padding:4px 9px; border-radius:6px; cursor:pointer; opacity:.75; }
+  .dcalhd .dmb:hover:not(:disabled){ background:rgba(255,255,255,.10); opacity:1; }
+  .dcalhd .dmb:disabled{ opacity:.22; cursor:default; }
   .dcalhd .dleg{ display:flex; gap:8px; font-size:10px; opacity:.8; } .dcalhd .dleg span{ display:inline-flex; align-items:center; gap:3px; }
   .d3{ width:6px; height:6px; border-radius:50%; display:inline-block; }
   /* The ⏰ corner pip in the legend: five marker types are drawn in the grid and the legend named
@@ -418,7 +424,7 @@
     <h2>Daily Challenges</h2>
     <div class="dstreaks" id="dailyStreaks"></div>
     <div class="dcard" id="dailyCard"></div>
-    <div class="dcalhd"><span class="dm" id="dailyMonth"></span>
+    <div class="dcalhd"><span class="dnav"><button class="dmb" id="calPrev" aria-label="Previous month">&lsaquo;</button><span class="dm" id="dailyMonth"></span><button class="dmb" id="calNext" aria-label="Next month">&rsaquo;</button></span>
       <span class="dleg"><span><i class="d3" style="background:#c98b3a"></i>🥉</span><span><i class="d3" style="background:#9aa0a6"></i>🥈</span><span><i class="d3" style="background:#d9ad55"></i>🥇</span><span>🌟 Flawless</span><span><i class="d3 legpip"></i>⏰ Same-day</span></span></div>
     <div class="ddow"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
     <div class="dgrid" id="dailyGrid"></div>
@@ -1552,7 +1558,12 @@ const MEDAL={bronze:'🥉',silver:'🥈',gold:'🥇'};
 const DOTCOL={bronze:'#c98b3a',silver:'#9aa0a6',gold:'#d9ad55'};
 function refreshDailyBtn(){ const b=document.getElementById("dailyBtn"); if(b){ b.disabled=!dailyPool; b.title=dailyPool?"Today's challenge + your streaks":"Daily challenges unavailable"; } }
 let dailyView=null;   // which day the Daily overlay is showing (defaults to today)
-function openDaily(){ if(!dailyPool) return; lockedDay=null; dailyView=Math.max(0,Math.min(todayIndex(),dailyPool.length-1)); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
+// Which MONTH the calendar grid is drawing. Separate from dailyView: the grid used to be hard-wired
+// to `new Date()`, so on the 1st of a month every earlier day — including an attempt still inside
+// its ⏰ grace — became unreachable, with no control to go back.
+let calY=0, calM=0;
+function setCalMonthFrom(idx){ const c=civilOf(idx); calY=c.y; calM=c.m; }
+function openDaily(){ if(!dailyPool) return; lockedDay=null; dailyView=Math.max(0,Math.min(todayIndex(),dailyPool.length-1)); setCalMonthFrom(dailyView); renderDaily(); document.getElementById("dailyOverlay").classList.add("show"); }
 function closeDaily(){ document.getElementById("dailyOverlay").classList.remove("show"); }
 // The unavailable calendar cell the player last tapped (null = none) — see renderDailyCal.
 let lockedDay=null;
@@ -1637,11 +1648,38 @@ function renderDailyCard(){
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
      ${btn}${showBtn}`;
 }
-function fmtDayLabel(idx){const b=new Date(Date.UTC(2026,7,1));b.setUTCDate(b.getUTCDate()+idx);return b.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
+// Civil date of a day index, epoch day 0 = 2026-08-01. UTC throughout so a negative local offset
+// cannot roll the answer back a day.
+function civilOf(idx){const b=new Date(Date.UTC(2026,7,1));b.setUTCDate(b.getUTCDate()+idx);
+  return {y:b.getUTCFullYear(),m:b.getUTCMonth()+1,d:b.getUTCDate(),date:b};}
+function fmtDayLabel(idx){return civilOf(idx).date.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
+// The months the calendar may show: exactly those the seeded pool spans. Navigating outside them
+// would only ever draw a grid of dead cells.
+const monthNo=(y,m)=>y*12+(m-1);
+function calMonthRange(){
+  const last=Math.max(0,(dailyPool?dailyPool.length:1)-1);
+  const a=civilOf(0), b=civilOf(last);
+  return {min:monthNo(a.y,a.m), max:monthNo(b.y,b.m)};
+}
+// Step the grid a month at a time, clamped to the pool. dailyView is left alone: which day the card
+// shows and which month the grid draws are independent, exactly as tapping a cell in a past month
+// leaves the grid where it is.
+const clampCalMonth=n=>{const r=calMonthRange(); return Math.max(r.min,Math.min(r.max,n));};
+function shiftCalMonth(delta){
+  const n=clampCalMonth(monthNo(calY,calM)+delta);
+  calY=Math.floor(n/12); calM=(n%12)+1; lockedDay=null; renderDaily();
+}
 function renderDailyCal(){
-  const ti=todayIndex(); const now=new Date(); const y=now.getFullYear(), m=now.getMonth()+1;
-  document.getElementById("dailyMonth").textContent=now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  const first=((daysFromCivil(y,m,1)%7)+4)%7; const dim=new Date(y,m,0).getDate();
+  const ti=todayIndex();
+  // The month drawn is calY/calM, NOT today's month — see shiftCalMonth.
+  if(!calM) setCalMonthFrom(dailyView==null?ti:dailyView);
+  const y=calY, m=calM;
+  document.getElementById("dailyMonth").textContent=
+    new Date(Date.UTC(y,m-1,1)).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
+  const r=calMonthRange(), cur=monthNo(y,m);
+  document.getElementById("calPrev").disabled = cur<=r.min;
+  document.getElementById("calNext").disabled = cur>=r.max;
+  const first=((daysFromCivil(y,m,1)%7)+4)%7; const dim=new Date(Date.UTC(y,m,0)).getUTCDate();
   let html='';
   for(let i=0;i<first;i++) html+='<div class="dcell empty"></div>';
   for(let d=1;d<=dim;d++){
@@ -1949,6 +1987,8 @@ document.getElementById("winsBtn").onclick=openWins;
 document.getElementById("winsClose").onclick=closeWins;
 document.getElementById("dailyBtn").onclick=openDaily;
 document.getElementById("dailyClose").onclick=closeDaily;
+document.getElementById("calPrev").onclick=()=>shiftCalMonth(-1);
+document.getElementById("calNext").onclick=()=>shiftCalMonth(1);
 document.getElementById("winsDealGo").onclick=winsPlay;
 document.getElementById("winsDealInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); winsPlay(); } });
 function refreshAutoplayBtn(){

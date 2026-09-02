@@ -266,6 +266,20 @@ const IOS_BODIES = {
     't.foundationOrder.append(contentsOf: sim.events) let after = evaluateChallenge(ch, t) ' +
     'var lost: [String] = [] if silverWasLive && !after.silver { lost.append("🥈 Silver") } ' +
     'if goldWasLive && !after.gold { lost.append("🥇 Gold") } return lost }'],
+  // The calendar's month window. `civilOf` is the inverse of dayIndexFor and decides which months
+  // the grid may show; get it wrong and the grid either strands a seeded month (the 2026-09-01 bug:
+  // August unreachable) or offers a month of dead cells.
+  'Model/Daily.swift civilOf': ['Model/Daily.swift', 'func civilOf(',
+    'func civilOf(_ idx: Int) -> (year: Int, month: Int, day: Int) { var c = DateComponents(); ' +
+    'c.year = 2026; c.month = 8; c.day = 1 let cal = Calendar(identifier: .gregorian) ' +
+    'guard let base = cal.date(from: c), let d = cal.date(byAdding: .day, value: idx, to: base) ' +
+    'else { return (2026, 8, 1) } let p = cal.dateComponents([.year, .month, .day], from: d) ' +
+    'return (p.year ?? 2026, p.month ?? 8, p.day ?? 1) }'],
+  'Views/DailyView.swift monthNo': ['Views/DailyView.swift', 'private func monthNo(of',
+    'private func monthNo(of idx: Int) -> Int { let c = civilOf(idx) return c.year * 12 + (c.month - 1) }'],
+  'Views/DailyView.swift calMonthRange': ['Views/DailyView.swift', 'private var calMonthRange',
+    'private var calMonthRange: ClosedRange<Int> { let last = max(0, pool.count - 1) ' +
+    'return monthNo(of: 0)...max(monthNo(of: 0), monthNo(of: last)) }'],
 };
 
 test('the iOS fail-fast checker and both refusals are pinned WHOLE — nothing can be spliced into them', () => {
@@ -274,6 +288,29 @@ test('the iOS fail-fast checker and both refusals are pinned WHOLE — nothing c
       `${label} changed shape. A statement was added, removed or reordered in a function that decides ` +
       `whether a tier chip goes ✗ and whether auto-play/auto-finish may spend a live tier. Re-verify the ` +
       `behaviour against tests/daily.mjs and the shipped web copy, then update the expected text here.`);
+});
+
+// ---- the calendar grid must be drawn from calMonth, never from today's date ----
+// The grid read `Calendar.current.dateComponents([.year, .month], from: Date())` directly, so it
+// could only ever draw the current month: on 2026-09-01 every August day became unreachable, with
+// no control to go back, and the ⏰ grace on a 2026-08-31 attempt could not be reached either.
+// The web twin (index.html renderDailyCal) is covered behaviourally in tests/web-behaviour.test.mjs.
+test('iOS daily calendar draws the month it is NAVIGATED to, not today (both arrows present, both bounded)', () => {
+  const view = read('Views/DailyView.swift');
+  assert.ok(view.includes(norm('let shown = calMonth == 0 ? monthNo(of: clampedToday) : calMonth')),
+    'the grid no longer takes its month from calMonth — if it reads Date() again, every earlier month is stranded');
+  assert.ok(!/private var calendar: some View \{ let now = Calendar\.current/.test(view),
+    'the calendar is reading Date() for its month again');
+  assert.ok(view.includes(norm('monthArrow("chevron.left", "Previous month", by: -1, enabled: shown > range.lowerBound)')),
+    'the back arrow is gone, or is no longer bounded by the pool');
+  assert.ok(view.includes(norm('monthArrow("chevron.right", "Next month", by: 1, enabled: shown < range.upperBound)')),
+    'the forward arrow is gone, or is no longer bounded by the pool');
+  // The step itself clamps into the pool, the same clamp index.html's clampCalMonth applies.
+  assert.ok(view.includes(norm('calMonth = min(r.upperBound, max(r.lowerBound, (calMonth == 0 ? monthNo(of: clampedToday) : calMonth) + delta))')),
+    'the month step no longer clamps to the seeded pool');
+  // Tapping a cell must not move the grid, and stepping the grid must not move the day card.
+  assert.ok(view.includes(norm('if avail { dayView = idx; lockedDay = nil } else { lockedDay = idx }')),
+    'the cell tap changed shape — the day card and the drawn month are meant to stay independent');
 });
 
 // ---- a restored stats backup must bring the per-day clear log with it ----

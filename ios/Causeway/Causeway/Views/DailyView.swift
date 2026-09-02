@@ -11,6 +11,12 @@ struct DailyView: View {
     /// Which day the card is showing (defaults to today, clamped into the pool).
     @State private var dayView: Int = 0
 
+    /// Which MONTH the grid is drawing, as year*12 + (month-1); 0 = not yet set (see onAppear).
+    /// Separate from `dayView`: the grid used to be hard-wired to `Date()`, so on the 1st of a month
+    /// every earlier day — including an attempt still inside its ⏰ grace — became unreachable, with
+    /// no control to go back.
+    @State private var calMonth: Int = 0
+
     // Stats backup (Export/Import) — a local, iCloud-free way to save/restore progress.
     @State private var showExporter = false
     @State private var showImporter = false
@@ -97,7 +103,7 @@ struct DailyView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
-        .onAppear { dayView = clampedToday }
+        .onAppear { dayView = clampedToday; calMonth = monthNo(of: clampedToday) }
         // onCancellation overloads (iOS 17+): the completion handler isn't called on an
         // interactive cancel, so acknowledge cancel explicitly instead of leaving stale text.
         .fileExporter(isPresented: $showExporter, document: exportDoc, contentTypes: [.json],
@@ -513,15 +519,25 @@ struct DailyView: View {
     // MARK: month calendar
 
     private var calendar: some View {
-        let now = Calendar.current.dateComponents([.year, .month], from: Date())
-        let y = now.year ?? 2026, m = now.month ?? 1
+        // The month drawn is `calMonth`, NOT today's month — see monthStep.
+        let shown = calMonth == 0 ? monthNo(of: clampedToday) : calMonth
+        let y = shown / 12, m = shown % 12 + 1
+        let range = calMonthRange
         let ti = todayIndex()
         let first = floorMod(floorMod(daysFromCivil(y, m, 1), 7) + 4, 7)   // 0 = Sunday (matches web; floor-mod matches JS %)
         let dim = daysInMonth(y, m)
         return VStack(spacing: 8) {
-            HStack {
+            // The month title and its arrows own the first row; the legend gets its own line below.
+            // They shared a row until the arrows arrived, at which point the legend lost ~68 pt and
+            // truncated "⏰ Same-day" to "Sam…" — the one marker the legend exists to name.
+            HStack(spacing: 2) {
+                monthArrow("chevron.left", "Previous month", by: -1, enabled: shown > range.lowerBound)
                 Text(monthLabel(y, m)).font(.system(size: 14, weight: .semibold))
+                    .accessibilityIdentifier("daily.cal.month")
+                monthArrow("chevron.right", "Next month", by: 1, enabled: shown < range.upperBound)
                 Spacer()
+            }
+            HStack {
                 // Five marker types are drawn in the grid; the legend used to name four. The ⏰
                 // corner pip — a bare 5 pt gold dot — was the unnamed one, and it is drawn in the
                 // same colour and size as the gold TIER dot, so it had to be shown AS a dot here
@@ -536,6 +552,7 @@ struct DailyView: View {
                 }
                 .font(.system(size: 11)).foregroundStyle(.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
             }
             LazyVGrid(columns: calCols, spacing: 4) {
                 // All three ForEach blocks below are siblings inside ONE LazyVGrid, so their ids share
@@ -632,6 +649,41 @@ struct DailyView: View {
         case "silver": return Color(hex: 0x9AA0A6)
         default:       return Color(hex: 0xD9AD55)
         }
+    }
+
+    // MARK: month navigation
+
+    /// year*12 + (month-1) for a day index — the grid's month key.
+    private func monthNo(of idx: Int) -> Int {
+        let c = civilOf(idx)
+        return c.year * 12 + (c.month - 1)
+    }
+
+    /// The months the calendar may show: exactly those the seeded pool spans. Navigating outside
+    /// them would only ever draw a grid of dead cells.
+    private var calMonthRange: ClosedRange<Int> {
+        let last = max(0, pool.count - 1)
+        return monthNo(of: 0)...max(monthNo(of: 0), monthNo(of: last))
+    }
+
+    /// Step the grid a month at a time, clamped to the pool. `dayView` is left alone: which day the
+    /// card shows and which month the grid draws are independent, exactly as tapping a cell in a
+    /// past month leaves the grid where it is.
+    private func monthArrow(_ icon: String, _ label: String, by delta: Int, enabled: Bool) -> some View {
+        Button {
+            let r = calMonthRange
+            calMonth = min(r.upperBound, max(r.lowerBound, (calMonth == 0 ? monthNo(of: clampedToday) : calMonth) + delta))
+            lockedDay = nil
+        } label: {
+            Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+                .frame(width: 34, height: 32)          // a real tap target, not a 13pt glyph
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 0.75 : 0.22)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(delta < 0 ? "daily.cal.prev" : "daily.cal.next")
     }
 
     // MARK: date helpers

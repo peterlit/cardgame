@@ -198,3 +198,41 @@ test('index.html parseDealNumber: out-of-range entries are refused, never clampe
   assert.equal(parseDealNumber(' 42 '), 42);
   assert.equal(parseDealNumber('42.7'), 42, 'a fractional entry floors to a playable deal, as it always has');
 });
+
+// ---- the daily calendar's month window ----
+// The grid used to be drawn from `new Date()` alone, with no control to leave the current month:
+// on 2026-09-01 every August day — including an attempt still inside its ⏰ grace — became
+// unreachable, and the seeded pool's first month could not be played at all. The month is now
+// state (`calY`/`calM`), stepped by clampCalMonth, and the arrows are disabled at the pool's ends.
+// These run the SHIPPED helpers, so deleting the clamp or widening it past the pool fails here.
+const AUG = 2026 * 12 + 7, SEP = 2026 * 12 + 8, OCT = 2026 * 12 + 9;
+
+test('index.html civilOf: day 0 is 2026-08-01 and the index walks the civil calendar', () => {
+  const web = loadWeb();
+  assert.deepEqual([web.civilOf(0).y, web.civilOf(0).m, web.civilOf(0).d], [2026, 8, 1]);
+  assert.deepEqual([web.civilOf(30).y, web.civilOf(30).m, web.civilOf(30).d], [2026, 8, 31]);
+  assert.deepEqual([web.civilOf(31).y, web.civilOf(31).m, web.civilOf(31).d], [2026, 9, 1],
+    'the month must roll at the month boundary, or the grid draws the wrong month');
+  assert.deepEqual([web.civilOf(60).y, web.civilOf(60).m, web.civilOf(60).d], [2026, 9, 30]);
+  assert.equal(web.monthNo(2026, 8), AUG);
+  assert.equal(web.monthNo(2026, 9), SEP);
+});
+
+test('index.html calMonthRange spans exactly the seeded pool, so no month of dead cells is reachable', () => {
+  const web = loadWeb();
+  web.set({ dailyPool: new Array(61).fill({}) });     // the shipped pool: 2026-08-01..2026-09-30
+  assert.deepEqual(web.calMonthRange(), { min: AUG, max: SEP });
+  web.set({ dailyPool: new Array(31).fill({}) });     // a one-month pool collapses to one month
+  assert.deepEqual(web.calMonthRange(), { min: AUG, max: AUG });
+});
+
+test('index.html clampCalMonth: September can still reach August, and neither end runs off the pool', () => {
+  const web = loadWeb();
+  web.set({ dailyPool: new Array(61).fill({}) });
+  assert.equal(web.clampCalMonth(SEP - 1), AUG,
+    'stepping back from the current month must reach the previous one — this is the bug that stranded August');
+  assert.equal(web.clampCalMonth(AUG - 1), AUG, 'stepping back from the first seeded month stays put');
+  assert.equal(web.clampCalMonth(SEP + 1), SEP, 'stepping forward from the last seeded month stays put');
+  assert.equal(web.clampCalMonth(OCT), SEP);
+  assert.equal(web.clampCalMonth(AUG), AUG);
+});

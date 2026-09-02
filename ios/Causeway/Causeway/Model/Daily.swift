@@ -45,6 +45,18 @@ func dayLabel(_ idx: Int) -> String {
     return f.string(from: d)
 }
 
+/// Civil (year, month, day) of a day index, epoch day 0 = 2026-08-01. The inverse of dayIndexFor,
+/// and the mirror of index.html's `civilOf`; the Daily sheet's calendar uses it to decide which
+/// months the seeded pool spans.
+func civilOf(_ idx: Int) -> (year: Int, month: Int, day: Int) {
+    var c = DateComponents(); c.year = 2026; c.month = 8; c.day = 1
+    let cal = Calendar(identifier: .gregorian)
+    guard let base = cal.date(from: c), let d = cal.date(byAdding: .day, value: idx, to: base)
+    else { return (2026, 8, 1) }
+    let p = cal.dateComponents([.year, .month, .day], from: d)
+    return (p.year ?? 2026, p.month ?? 8, p.day ?? 1)
+}
+
 /// Today's day index in the player's local calendar (matches web's `new Date()` local reading).
 func todayIndex() -> Int {
     let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
