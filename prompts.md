@@ -736,3 +736,18 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     `docs/review-loop-0.8.1-feedback.md`: all four v0.7.1 gaps are fixed, and the new ones are the
     closeout's build-is-not-a-test blind spot, a closeout blocker with nowhere to go, and
     `thrashing_soft` asking for "one more round" at the backstop.
+
+84. "We are in September now, and I can no longer navigate to August to play older deals." Correct:
+    the calendar grid was rendered straight from `new Date()` on both platforms — `renderDailyCal`
+    took `y`/`m` from today, `DailyView.calendar` from `Calendar.current.dateComponents(from: Date())`
+    — and nothing else in the sheet could change the month, so on the 1st every earlier day fell off
+    the app: no replaying a past challenge, and no reaching an attempt still inside its ⏰ grace. The
+    month is now state (`calY`/`calM`, `calMonth`) with a back/forward arrow either side of the
+    title, clamped to exactly the months the seeded pool spans, and the drawn month stays
+    independent of which day the card shows. Verified in both shipping surfaces, not just in tests:
+    the browser (September → ‹ → all 31 August days playable, Aug 12 opens deal #706747) and the
+    simulator (same day, same deal number — parity by observation). The arrows cost the iOS legend
+    ~68 pt and truncated "⏰ Same-day" to "Sam…", so the legend moved to its own line. Guarded by
+    running the shipped web helpers (`civilOf`, `calMonthRange`, `clampCalMonth` lifted out of
+    index.html) and by whole-body pins on the Swift twins plus a pin that the grid reads `calMonth`
+    and never `Date()`; 7/7 mutants killed, including "the grid reads Date() again" on both sides.
