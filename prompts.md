@@ -751,3 +751,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     running the shipped web helpers (`civilOf`, `calMonthRange`, `clampCalMonth` lifted out of
     index.html) and by whole-body pins on the Swift twins plus a pin that the grid reads `calMonth`
     and never `Date()`; 7/7 mutants killed, including "the grid reads Date() again" on both sides.
+
+85. Do the one-modifier fix (the review loop's open blocker: the UI test target red on `main`), defer
+    seeding more dates; then give feedback on the latest review loop. The "one modifier" was
+    necessary but not sufficient — a good lesson in taking a reviewer's FIX note as a hypothesis
+    rather than a diagnosis. `.accessibilityElement(children: .combine)` + `.accessibilityAddTraits(.isButton)`
+    on the calendar cell is real and fixes the VoiceOver defect (cells now expose as
+    `Button, label: "Sep 3"`, locked ones as `"Sep 5, locked until that date"`, instead of a bare
+    `staticText "3"`), but applying it alone left both tests still failing. Dumping the accessibility
+    tree showed the whole grid missing — weekday header letters included, which no per-cell modifier
+    could cause: `openDailyCalendar` scrolled until the legend `.exists`, which is TRUE for an
+    element that is only in the hierarchy, so it stopped after zero swipes with the grid below the
+    fold, and a `LazyVGrid` materialises nothing until it is on screen. `.isHittable` turned the
+    class green. Whole UI suite now 21/21, zero skips (it had been 9-of-11 with skips); node 139/139.
+    Feedback went into `docs/review-loop-0.8.1-feedback.md` §5: a "FIX:" note reads the same whether
+    the reviewer tried it or not (wants a `fix_verified` flag), and — the one that stings — the loop
+    had written the September calendar bug down itself, as a *justification* for a test skip ("the
+    grid shows this month only"), twelve hours before it arrived as a user bug report.

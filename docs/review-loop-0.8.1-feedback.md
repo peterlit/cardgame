@@ -172,3 +172,69 @@ reviewer that enumerated the call sites and ran one XCUITest class. The watch li
 designed. Worth repeating because this run makes the sharper version of the point: the loop is
 *excellent* at proving a test is worthless, and only as good as one agent's reading at proving a
 shipped predicate is right.
+
+---
+
+## 5. Postscript — what the days after the run taught (2026-09-04)
+
+Three days of ordinary work on the reviewed code turned two of the gaps above from arguments into
+measurements, and found one new item that matters more than any of them.
+
+### The closeout-blocker gap has a price now
+
+Gap #2 predicted that a blocker opened by the closeout reviewer has nowhere to go. It went nowhere:
+the loop wrote its report, marked itself `done`, and left the UI test target RED on `main`. It stayed
+red until a human read the report and asked for the fix by hand. Nothing in the loop escalated, and
+nothing would have.
+
+### NEW — a "FIX:" note carries the reviewer's authority whether or not the reviewer tried it
+
+The blocker's note ended with a specific, confident remedy: *add
+`.accessibilityElement(children: .combine)` … then re-run BOTH calendar tests.* Applying exactly that
+left both tests still failing. Dumping the accessibility tree showed why — **two** faults, not one:
+
+1. the cell was not an accessibility element (the reviewer's half — necessary, and it does work: cells
+   now expose as `Button, label: "Sep 3"` instead of a bare `staticText "3"`); and
+2. `openDailyCalendar` scrolls until the legend `.exists`, which is TRUE for an element that is only
+   in the hierarchy — so it stopped after zero swipes with the grid still below the fold, and the grid
+   is a `LazyVGrid`, which materialises nothing (not even its weekday header) until it is on screen.
+   Switching that predicate to `.isHittable` is what turned the class green, 3/3, 0 skipped.
+
+The reviewer ran the test and read its failure message; it never inspected the tree, so its causal
+story was the plausible one rather than the true one. That is a fair thing for a reviewer to do — but
+the report renders a PROPOSED fix and a VERIFIED one in identical prose, and a reader (or the next
+implementer) cannot tell them apart.
+
+**Fix:** add a `fix_verified` flag to any finding whose note carries a remedy, set only when the agent
+actually applied it and re-ran, and render the others as "remedy proposed, not verified". One field,
+and it stops a confident sentence from being mistaken for a tested one.
+
+### NEW — the loop normalised a product defect into an environmental constraint
+
+The closeout implementer wrote this skip reason, and the closeout reviewer read the file and endorsed
+it: `XCTSkip("today is the last day of the month — the grid shows this month only, so it holds no
+future cell")`. Both agents therefore KNEW the calendar drew the current month and nothing else. Both
+treated it as a property of the app to design tests around.
+
+Twelve hours later that exact fact arrived as a user bug report: *"We are in September now, and I can
+no longer navigate to August to play older deals."* Every August challenge — including an attempt
+still inside its ⏰ grace — had fallen off both platforms on the 1st.
+
+The finding was never missed for want of evidence; it was written down, in the loop's own output, as
+a justification. A scoped review looks at a diff, and "the grid can only ever show one month" was not
+in the diff — so the constraint got absorbed instead of questioned.
+
+**Fix:** when an agent justifies a skip, an exemption, or a test-shape decision by citing a product
+limitation, that citation must be emitted as a finding (severity arguable, existence not). It is
+mechanical, it is nearly free, and here it was the difference between a report and a user's bug
+report. Worth a companion line in the report template too: *"this review saw only `<range>`; behaviour
+outside it was not examined"* — the WATCH LIST is diff-anchored and should say so.
+
+### mutate.py's error message points at the wrong thing
+
+`mutate.py` builds an isolated worktree from HEAD, so uncommitted work is invisible to it. A manifest
+run against a working tree returns every mutant as
+`"original text occurs 0 times (need exactly 1; add 'line')"` — which reads as a malformed manifest
+and invites you to go add line numbers. The same manifest, unchanged, went 7 killed / 0 survived /
+0 errors the moment the change was committed. **Fix:** when the count is 0, say so in the worktree's
+own terms — *"not found in the worktree at HEAD; mutate.py cannot see uncommitted changes."*

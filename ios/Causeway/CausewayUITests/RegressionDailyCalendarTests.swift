@@ -162,8 +162,13 @@ final class RegressionDailyCalendarTests: XCTestCase {
         XCTAssertTrue(app.buttons["toolbar.daily"].waitForExistence(timeout: 5))
         app.buttons["toolbar.daily"].tap()
         XCTAssertTrue(app.navigationBars["Daily Challenges"].waitForExistence(timeout: 5))
-        // The calendar sits below the streak cards and the day card.
-        for _ in 0..<3 where !app.staticTexts["⏰ Same-day"].exists {
+        // The calendar sits below the streak cards and the day card. Scroll until the legend is
+        // HITTABLE, not merely present: an off-screen element still reports `exists`, so the old
+        // `.exists` loop stopped after zero swipes with the grid still below the fold — and the
+        // grid is a LazyVGrid, which materialises no cells (not even its weekday header) until it
+        // is on screen. Every "no calendar cell for <day>" failure this class has produced came
+        // from that, not from the grid being broken.
+        for _ in 0..<6 where !app.staticTexts["⏰ Same-day"].isHittable {
             app.swipeUp()
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }

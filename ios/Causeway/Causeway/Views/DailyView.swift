@@ -640,6 +640,13 @@ struct DailyView: View {
             // An unavailable cell now ANSWERS the tap instead of swallowing it.
             if avail { dayView = idx; lockedDay = nil } else { lockedDay = idx }
         }
+        // The label below is only reachable if the ZStack IS an accessibility element: without
+        // `.combine` the cell exposes its children instead, so VoiceOver announced every day as a
+        // bare number — no month, no earned tiers, no lock state — and no query could ever find the
+        // cell by its label (tests/RegressionDailyCalendarTests.swift:cell-locator-never-matched).
+        // The cell is tappable, so it also announces AS a button.
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(locked ? "\(dayLabel(idx)), locked until that date" : dayLabel(idx))
     }
 

@@ -739,7 +739,8 @@ What it deliberately did NOT do, with enough detail to pick up cold:
 Report: `.review-loop/REPORT.md` (stopped at `thrashing_soft` after round 2; a human chose abort +
 closeout). Full state is versioned under `.review-loop/`. Four items outlive the loop.
 
-- **BLOCKER — the UI test target is RED on `main`, and the cause is a shipping VoiceOver defect.**
+- ~~**BLOCKER — the UI test target is RED on `main`, and the cause is a shipping VoiceOver defect.**~~
+  **FIXED 2026-09-04** (see the correction below the entry).
   `RegressionDailyCalendarTests.testPlayButtonNamesTheSelectedDay` fails at
   `RegressionDailyCalendarTests.swift:135` ("no calendar cell for Aug 30"), verified by running the
   target, not by reading it. `DailyView.swift:626` applies `.accessibilityLabel` to a bare `ZStack`
@@ -752,6 +753,18 @@ closeout). Full state is versioned under `.review-loop/`. Four items outlive the
   `.accessibilityIdentifier("daily.cal.<idx>")` at `DailyView.swift:626`, then run BOTH calendar
   tests (not `build-for-testing`). This is the same work as the already-filed
   `bug/DailyView:calendar-cells-have-no-identifier`.
+
+  **Correction, from fixing it:** the reviewer's remedy was necessary but NOT sufficient, and doing
+  exactly what the note said left both tests still failing. Dumping the accessibility tree showed two
+  faults. (1) The cell was not an accessibility element — `.accessibilityElement(children: .combine)`
+  plus `.accessibilityAddTraits(.isButton)` fixes that, and cells now expose as
+  `Button, label: "Sep 3"` (locked ones as `"Sep 5, locked until that date"`) instead of a bare
+  `staticText "3"`; that is the VoiceOver half, and it was real. (2) `openDailyCalendar` scrolled
+  until the legend `.exists`, which is TRUE for an element that is merely in the hierarchy, so it
+  stopped after zero swipes with the grid still below the fold — and the grid is a `LazyVGrid`, which
+  materialises nothing (not even its weekday header) until it is on screen. `.isHittable` is what
+  turned the class green: 3 tests, 3 passed, 0 skipped, plus the full UI suite. Any future
+  "no calendar cell for <day>" failure should be read as a scroll-predicate problem first.
 - **The loop's structural stopper: `ios/Causeway` has no Swift unit-test target.** Every guard on
   Swift is a string comparison performed by `tests/ios-parity.test.mjs`. Two rounds of pinning the
   functions the reviewer named ended with the reviewer finding new ones — mutants
