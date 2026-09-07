@@ -768,3 +768,17 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     the reviewer tried it or not (wants a `fix_verified` flag), and — the one that stings — the loop
     had written the September calendar bug down itself, as a *justification* for a test skip ("the
     grid shows this month only"), twelve hours before it arrived as a user bug report.
+
+86. Moving the project to another Claude account that will have the working directory but none of my
+    memory — what exists only there, and write it down. Eight memory files, of which the load-bearing
+    ones were never in the repo at all: the four standing rules (commit every task; keep prompts.md
+    and BACKLOG.md current in the same commit; run the review loop after any non-trivial change;
+    keep web and iOS in sync), the design north star (perfect-information pure-skill solitaire for a
+    FreeCell player who dislikes luck and hidden cards — the tiebreaker for design questions), and
+    the pbxproj trap that once shipped a landscape-only build to a physical iPhone and survived a
+    delete + clean + reboot. Written as HANDOFF.md (state, verified commands, traps, loop economics,
+    a map of where knowledge lives) plus a short CLAUDE.md that a session auto-loads, with README
+    pointing at both. Everything was re-verified rather than copied: the memory still claimed Xcode
+    was not installed and that the suite had 67 tests — it is Xcode 26.5 and 139 + 21. Also recorded
+    the two live deadlines a newcomer cannot infer: the daily pool runs dry 2026-09-30, and the App
+    Store submission is blocked on four owner-only items.

@@ -62,3 +62,14 @@ The web prototype and the iOS app share the same rules and deal numbering (a giv
 deal number produces the identical layout on both). They don't share code — the logic is
 maintained as parallel copies held in sync by drift-guard tests. See
 [`docs/architecture/overview.md`](docs/architecture/overview.md).
+
+## Working on it
+
+`npm test` runs the shared logic suite. The iOS app has an XCUITest suite; build and run
+it from Xcode or with `xcodebuild test`.
+
+If you are new to the repo — human or agent — start with [`HANDOFF.md`](HANDOFF.md): the
+current state, the commands that are known to work, and the handful of traps that have
+cost real time here. [`CLAUDE.md`](CLAUDE.md) holds the working agreements that apply to
+every change. Outstanding work is in [`BACKLOG.md`](BACKLOG.md); the running story of the
+project is in [`prompts.md`](prompts.md).
