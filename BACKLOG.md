@@ -785,3 +785,55 @@ closeout). Full state is versioned under `.review-loop/`. Four items outlive the
   2026-09-30 `testTappingALockedFutureDayExplainsWhy` passes through the out-of-pool branch and no
   longer exercises the ux/WF-13 path it was written for. Fix: bound the date guard by pool size and
   keep the two lockedNote branches as distinct assertions.
+
+## Skeptical review 2026-09-07 — findings verified against source 2026-09-08
+
+An independent review ([docs/skeptical-review-2026-09-07.md](docs/skeptical-review-2026-09-07.md),
+baseline `21fb200`) filed 11 findings. Each was re-verified here at the cited lines; **all 11 are
+real at the code level.** (Runtime measurements — modal pixel geometry, the 2.26 s clock probe, the
+Buddhist-calendar index value — are the reviewer's, but every mechanism behind them checks out.)
+Open items, in the review's IDs:
+
+- **R1 (P1, web)** — startup `restoreGame()` (`index.html:2028→595`) runs autoplay/auto-finish
+  synchronously while `dailyPool` is still null (fetch at 1391); the tier guard bails permissive
+  when the pool is absent (700) and `recordChallengeResult` returns null with no retry (1546) after
+  `recordWin` has already cleared the save. Tier loss and lost daily credit on a slow/failed fetch.
+- **R2 (P1, both)** — a saved attempt carries seed + `challengeDay` but no binding between them:
+  `recordChallengeResult` (`Game.swift:935`, web 1546-1549) scores the CURRENT challenge at that day
+  index without checking its seed is the seed played. Becomes live for every player the moment the
+  pool is regenerated. Minimal fix: verify `pool[day].seed == seed` at restore and at scoring.
+- **R3 (P2, both)** — `recordWin`'s guard (`Game.swift:909`, web `index.html:1231`) puts
+  stopTimer/clearSaved behind `winRecorded`; `undo()` re-persists an unfinished board without
+  resetting it (`Game.swift:507`, web 783), so win→undo→win skips all cleanup.
+- **R4 (P1, both)** — `confirmReset()` guards only newBtn/replayBtn/goDeal; web `playChallenge`
+  (1401), `winsPlay` (1870), `dealRandom` (2012), the unfocused `N` key (2020) and iOS WinsView
+  (`WinsView.swift:87,108`) all `deal()` straight through a live attempt, forfeiting ⏰ grace.
+  `showSolution`'s own guard (1528) misses casual progress. Wider than the earlier three-route note.
+- **R5 (P2, iOS)** — `todayIndex()` feeds `Calendar.current` components into the Gregorian
+  day-number algorithm (`Daily.swift:61`); Buddhist/Hebrew/Islamic system calendars produce garbage
+  indices. Fix: Gregorian calendar + local time zone for civil arithmetic.
+- **R6 (P1, web)** — `.overlay`/`.panel` (`index.html:124`) has no max-height or internal scroll;
+  the Daily panel overflows a 720 px viewport with Close unreachable, and no Escape handler.
+- **R7 (P2, web)** — `dragUp` reinstates a stale source (`index.html:1201`); a cell emptied by
+  autoplay mid-drag yields `[null]`, which passes the `.length` guards and throws in `canStack*`.
+- **R8 (P1, tooling)** — `build-month.mjs` warns on underfill then writes anyway with exit 0
+  (283-297), selects from scratch and reorders (no append/prefix guarantee). Must fail closed
+  **before** any reseeding; the pool still runs out 2026-09-30, which couples this to R2.
+- **R9 (P2, iOS)** — `GameClock` does `elapsed += 1` per timer delivery (`GameClock.swift:21`);
+  stalls undercount. This is the old L4, upgraded from polish to measurement defect.
+- **R10 (P2, tests)** — the `.isHittable`-legend scroll criterion
+  (`RegressionDailyCalendarTests.swift:171`) is layout/date-sensitive: green 2026-09-04, red (2 of
+  21) on the reviewer's 2026-09-07 run with the legend hittable before the LazyVGrid materialised.
+  Durable fix: scroll toward the target cell with stable per-day identifiers + a controlled date;
+  same visit should close the pool-end time bomb above.
+- **R11 (P2, iOS)** — `mergeTiers` keeps independent minima (`Daily.swift:431-432`) and
+  `clearsSummary` (`DailyView.swift:284`) renders them as one run that never happened; "Cleared N×"
+  reads a bounded, deduplicated list as a lifetime count.
+- **Harness drift (tests)** — `tests/web-extract.mjs:119` declares `NCELLS = 4`; shipping
+  `index.html:443` says 3. Five-minute fix, and a caution against treating extraction as production.
+
+A phased fix plan was proposed in conversation (prompts.md #87): lifecycle P1s first (R4→R2→R1→R3),
+then surfaces (R5/R6/R7/R10), then a swiftc-based native harness (no pbxproj edits), then the
+fail-closed builder before reseeding, then polish. Owner decisions pending: post-win-undo
+semantics, seed-binding vs full generation fingerprint, Swift test-target timing, and whether R8
+jumps the queue given the 09-30 pool expiry.

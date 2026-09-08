@@ -782,3 +782,19 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     was not installed and that the suite had 67 tests — it is Xcode 26.5 and 139 + 21. Also recorded
     the two live deadlines a newcomer cannot infer: the daily pool runs dry 2026-09-30, and the App
     Store submission is blocked on four owner-only items.
+
+87. Review `docs/skeptical-review-2026-09-07.md` — agree or not, and propose a plan. Verified all
+    11 findings against the cited source lines rather than taking the report's word: every one is
+    real at the code level, including the ones that contradict our own green Sep-4 state (R10's
+    calendar-helper fragility — the `.isHittable` legend criterion is layout/date-sensitive, so
+    "green on the 4th" and "red on the 7th" are both true). Confirmed along the way: `confirmReset`
+    guards only 3 of the ~8 board-replacement routes; `recordChallengeResult` never checks the
+    pool's seed against the seed played; `recordWin`'s cleanup sits behind the once-only guard while
+    `undo()` re-persists; web restore runs autoplay before the daily pool fetch lands; `GameClock`
+    counts deliveries, not time; `web-extract.mjs` sandboxes 4 cells against the shipping 3. Two
+    places I'd shade the review: R2+R8 are coupled to the 09-30 pool expiry harder than it says
+    (reseeding makes R2 live for every saved attempt), and R1's fix is simpler than its
+    recommendation reads — gate restore's automation on pool readiness and the exactly-once retry
+    machinery mostly evaporates. Findings recorded as a dated BACKLOG section with verified line
+    references; phased plan proposed (lifecycle P1s → surfaces → swiftc native harness → fail-closed
+    builder → polish) with four owner decisions flagged. No fixes applied — assessment only, as asked.
