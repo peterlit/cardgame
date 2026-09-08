@@ -798,3 +798,22 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     machinery mostly evaporates. Findings recorded as a dated BACKLOG section with verified line
     references; phased plan proposed (lifecycle P1s → surfaces → swiftc native harness → fail-closed
     builder → polish) with four owner decisions flagged. No fixes applied — assessment only, as asked.
+
+88. Proceed with the plan from #87 (all four decisions taken: post-win undo → casual, R2 →
+    minimal seed-binding, Xcode closed → real test target authorized, order approved), collecting
+    review-loop feedback along the way. Everything landed, in six commits: the NCELLS harness
+    drift; a real Swift unit-test target (the pbxproj edited while Xcode was verifiably closed —
+    first executable Swift model tests ever, including a replay of all 61 certified lines through
+    the real move API in ~3 s); the lifecycle P1s (one board-replacement gate over all eight web
+    routes + the iOS Wins sheet, (day,seed) identity binding, pool-readiness gating with a
+    durable pending grade, post-win-undo latch reset); the surfaces (bounded scrollable panels +
+    Escape, stale-drag rejection, Gregorian todayIndex, wall-clock GameClock with explicit
+    background pause, calendar tests pinned to Aug 15 scrolling to daily.cal.<idx>, fewest/fastest
+    unfused); the builder's publishing contract (fail-closed, --extend verbatim-prefix, --rebuild
+    requires a generation bump — five tests run the builder); and the stale docs (iOS README's
+    "no Xcode" line, listing's portrait-only/double-tap/missing-daily, privacy's export wording,
+    HANDOFF/CLAUDE refreshed). Two more latent bugs surfaced en route: web-extract's scanTo
+    truncated destructured-param functions, and the deferred-onWin race with the R3 fix turned
+    out already guarded by finishGen. Suites at close: node 153/153, native unit 11/11, calendar
+    UI 3/3, full iOS suite re-run this session. Review-loop feedback collected throughout went to
+    docs/review-loop-skeptical-review-feedback.md.

@@ -837,3 +837,51 @@ then surfaces (R5/R6/R7/R10), then a swiftc-based native harness (no pbxproj edi
 fail-closed builder before reseeding, then polish. Owner decisions pending: post-win-undo
 semantics, seed-binding vs full generation fingerprint, Swift test-target timing, and whether R8
 jumps the queue given the 09-30 pool expiry.
+
+## 2026-09-08 — the skeptical review's findings addressed
+
+All eleven findings from the 2026-09-07 review (verified section above) were fixed in one pass,
+commits `6c248b8..23114d0` + the docs commit that carries this note. Per-item status:
+
+- **R1 FIXED** — `dailyRulesPending()` holds all automation while a restored daily attempt's pool
+  fetch is outstanding; a win meanwhile banks a durable pending grade, replayed by
+  `scorePendingDaily()` on pool arrival (any session). Executable web tests run the shipped path.
+- **R2 FIXED (minimal, per owner)** — `challengeBindingValid` (both platforms) at restore, pool
+  arrival, and scoring; mismatch degrades to casual. Native unit tests cover restore both ways.
+- **R3 FIXED (owner: casual continuation)** — post-win undo resets the record-once latch; a re-win
+  reconciles clock/save/stores. Native test drives win→undo→win through the real move API.
+- **R4 FIXED** — web `requestDeal()` gate over all 8 user routes (+ typing/dialog guards on the
+  keyboard shortcut); iOS WinsView routes through `ContentView.requestDealFromDismissal`. The route
+  matrix is pinned; the older "three re-deal entry points" item above is closed by this.
+- **R5 FIXED** — `todayIndex()` is Gregorian + local time zone; presentation keeps the locale.
+- **R6 FIXED** — `.panel` is viewport-bounded with internal scroll; Escape closes the top
+  informational dialog (never the finish prompt — that's a decision).
+- **R7 FIXED** — `selectedCards()` refuses vacant/stale sources; a mid-drag autoplay steal snaps
+  back instead of throwing.
+- **R8 FIXED** — builder publishing contract: fail-closed underfill, candidate-validate-swap
+  writes, `--extend` preserves published days verbatim, `--rebuild` demands a POOL_VERSION bump.
+  Five tests run the builder. **Reseeding itself stays deferred by the owner** — but the mechanism
+  is now safe to resume with (`--extend --days 92` when the time comes). Pool still ends
+  **2026-09-30**.
+- **R9 FIXED** — GameClock measures wall time; background pause is explicit. 5 unit tests incl. a
+  blocked-run-loop probe. (Closes L4. The physical-device memory item I6/I6-verify remains open
+  and untouched.)
+- **R10 FIXED** — calendar UI tests pin the clock (CAUSEWAY_TODAY_OVERRIDE, DEBUG-only), scroll to
+  the target cell by the new stable `daily.cal.<idx>` identifier. Closes the pool-end test time
+  bomb and `bug/DailyView:calendar-cells-have-no-identifier`. One note: the out-of-pool
+  locked-note branch ("No challenge on …") is no longer exercised by UI test — it is only
+  reachable when today is past the pool end, which the pinned clock deliberately never is.
+- **R11 FIXED** — fewest/fastest labelled separately everywhere; clear count caps at the bounded
+  log ("20+×"). Pinned as parity contract.
+- **Harness drift FIXED** — web-extract NCELLS 4→3; plus a second latent extraction bug found
+  while testing R1: `scanTo` truncated any function with a destructured parameter.
+- **F6 (no Swift unit-test target) CLOSED** — `CausewayTests` exists (owner authorized the pbxproj
+  edit, Xcode closed). 11 unit tests incl. a full 61-day certified-line replay through the real
+  move API (~3 s). F6b's concrete drift example is fixed; the wider "generate the inline web
+  script from a canonical module" idea stays open below.
+
+**Still open after this pass** (unchanged from the review's "ugly" chapter): the secondary-screen
+hierarchy simplification (daily sheet information density), a real VoiceOver/large-text
+playthrough (owner or device time), the single-file-web build step idea, daily-challenges.md's
+corrections-first structure, and the owner-only shipping items (URLs, contact email, physical
+iOS 17/18 pass, I6 Release memory measurement).

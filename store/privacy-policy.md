@@ -14,8 +14,11 @@ location, photos, camera, microphone, or device identifiers.
 The app saves a small amount of game data **locally on your device only** — your settings,
 the list of deal numbers you've solved, and a snapshot of your current in-progress game (the
 board layout, free cells, foundations, move count, and elapsed time) so you can resume after
-closing the app. This information never leaves your device and is removed if you delete the
-app.
+closing the app. The app never sends this information anywhere. The one way it can leave
+your device is an action you take yourself: the stats **backup/export** feature writes a
+file to a destination you choose (via the Files sheet), and importing reads such a file
+back. What happens to an exported file is entirely in your hands. All local data is removed
+if you delete the app.
 
 ## Children
 The app is suitable for all ages and collects no data, so it poses no privacy risk to

@@ -7,9 +7,19 @@ Challenges, win tracking, and the MobilityWare-style look are all reimplemented 
 
 ## Requirements
 
-- **Xcode 16+** (free, Mac App Store). Only the Command Line Tools are installed on this
-  machine, which is enough to *edit* but **not to build/run** — install full Xcode first.
-- iOS 17+ deployment target. Runs on the iOS Simulator or a device.
+- **Xcode 16+** (free, Mac App Store). This machine has Xcode 26.5 installed and building.
+- iOS 17+ deployment target. Runs on the iOS Simulator or a device. Portrait and both
+  landscape orientations are supported.
+
+## Tests
+
+- `CausewayTests` — Swift unit tests against the real model (deal parity with the web
+  engine, the daily lifecycle, the clock, and a full replay of every bundled winning line
+  through the real move API). Runs in seconds.
+- `CausewayUITests` — XCUITest regression suite. Date-dependent tests pin the clock via
+  `CAUSEWAY_TODAY_OVERRIDE` (DEBUG-only launch environment).
+- Both are in the `Causeway` scheme's test action: `xcodebuild test -scheme Causeway ...`
+  (serial; see HANDOFF.md for the exact invocation).
 
 ## Build & run
 

@@ -2,8 +2,9 @@
 
 Copy-paste into App Store Connect. Character limits noted in (parens); stay under them.
 
-> ⚠️ **Early alpha.** This build has only been tested on **iPhone 13 Pro** and supports
-> **portrait orientation only**. The warning below is repeated in the user-facing copy.
+> ⚠️ **Early alpha.** This build has only been tested on **iPhone 13 Pro**. It supports
+> portrait and both landscape orientations. The warning below is repeated in the
+> user-facing copy.
 
 ---
 
@@ -20,7 +21,7 @@ Build each suit from both ends
 
 ## Promotional text (170 — editable later without review)
 ```
-Early alpha! A new full-information solitaire — build each suit from both ends. Pure skill, no luck. Currently iPhone-only, portrait. Feedback very welcome!
+Early alpha! A new full-information solitaire — build each suit from both ends. Pure skill, no luck, a certified-winnable Daily Challenge. iPhone-only for now. Feedback very welcome!
 ```
 
 ## Keywords (100, comma-separated, no spaces after commas)
@@ -33,8 +34,8 @@ solitaire,freecell,patience,card game,puzzle,brain,skill,strategy,cards,offline,
 EARLY ALPHA — please read
 
 Causeway is a brand-new game in active development. This release has only been tested on
-iPhone 13 Pro and supports portrait orientation only. You may hit rough edges, and it may
-not look right on other devices yet. Feedback is very welcome — thank you for trying it!
+iPhone 13 Pro (portrait and landscape). You may hit rough edges, and it may not look right
+on other devices yet. Feedback is very welcome — thank you for trying it!
 
 ----------
 
@@ -52,7 +53,9 @@ FEATURES
 - Pure skill — every card is visible, no luck involved
 - Build each suit from both ends (dual foundations)
 - 3 free cells and two-way tableau building
-- Smart double-tap, undo, and safe auto-play
+- Tap to smart-move, drag to place exactly; undo and safe auto-play
+- Daily Challenges — every day a certified-winnable deal with Silver and Gold
+  objectives, streaks, and a Flawless star for acing all three in one run
 - Numbered deals (1-1,000,000) — replay or share any exact deal
 - Tracks the deals you've solved
 - Fully offline: no accounts, no ads, no data collected
@@ -102,8 +105,9 @@ the largest iPhone size; reuse for others. Suggested shots:
 
 ## Review notes (paste into "Notes for the Reviewer")
 ```
-This is an early alpha. It is designed and tested for iPhone in portrait only. No login,
-no network, no data collection. Everything is playable from a fresh launch.
+This is an early alpha, designed and tested for iPhone (portrait and landscape). No login,
+no network, no data collection. Everything is playable from a fresh launch; the Daily
+Challenges work fully offline from bundled data.
 ```
 
 ## Recommended before submitting (alpha)

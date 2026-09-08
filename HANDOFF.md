@@ -48,7 +48,7 @@ the player can't reason about, or an unwinnable deal is against the grain of the
 Every command here was run on 2026-09-04 and produced what it says.
 
 ```bash
-npm test                    # node --test "tests/**/*.test.mjs" → 139 tests, 139 pass, 0 skipped
+npm test                    # node --test "tests/**/*.test.mjs" → 153 tests, 153 pass, 0 skipped
 ```
 
 Web preview — a python http.server on port 8123 is configured in `.claude/launch.json` (config name
@@ -65,9 +65,13 @@ project is `ios/Causeway/Causeway.xcodeproj`, scheme `Causeway`, bundle id
 xcodebuild build -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination 'generic/platform=iOS Simulator'
 
-# the UI tests — 21 tests, 21 pass, 0 skipped (takes ~8 min serially)
+# ALL tests — CausewayTests (11 Swift unit tests, seconds) + CausewayUITests (21 UI
+# tests, ~8 min serially) → 32 pass, 0 skipped
 xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination "id=<UDID>" -parallel-testing-enabled NO -derivedDataPath <scratch>/dd
+
+# just the fast Swift unit tests
+xcodebuild test ... -only-testing:CausewayTests
 ```
 
 Create your own simulator (`xcrun simctl create <name> "iPhone 16 Pro"`) rather than borrowing a
@@ -97,9 +101,11 @@ manifest then runs clean.
 
 **XCUITest `.exists` is true for off-screen elements, and a `LazyVGrid` materialises nothing until it
 is actually on screen.** A helper that scrolls "until the element exists" stops after zero swipes and
-then finds an empty grid — including its static header labels, which is the tell that it is a
-scrolling problem and not an accessibility one. Use `.isHittable`. Every `no calendar cell for <day>`
-failure this repo has produced came from that.
+then finds an empty grid. `.isHittable` on a landmark is NOT enough either — the legend can clear the
+fold while the grid below it is still empty; that went green on Sep 4 and red on Sep 7 with no code
+change. The calendar helper now scrolls until the TARGET CELL itself (`daily.cal.<idx>`) is hittable,
+under a pinned clock (`CAUSEWAY_TODAY_OVERRIDE`, DEBUG-only). Scroll toward the thing you need, and
+never key a UI test on the real date — the pool is finite, so real-date tests are time bombs.
 
 **`ios/Causeway` has no Swift unit-test target** (only `CausewayUITests`). Every guard on Swift logic
 is therefore a *string comparison* performed by a Node test (`tests/ios-parity.test.mjs`) — whole-body
