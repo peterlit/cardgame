@@ -236,3 +236,110 @@ test('index.html clampCalMonth: September can still reach August, and neither en
   assert.equal(web.clampCalMonth(OCT), SEP);
   assert.equal(web.clampCalMonth(AUG), AUG);
 });
+
+// ---- R2 (skeptical review 2026-09-07): the attempt's identity is (day, seed), together ----
+// A save from an older pool generation can carry a day index that NOW names a different deal —
+// the review reproduced current day 0 (seed 691039) being credited by a board dealt from the v2
+// generation's seed 543528. The shipped predicate below is what restore-reconciliation and both
+// scoring paths consult; it must refuse every mismatched pair.
+test('index.html challengeBindingValid: an attempt binds only while day and seed still agree', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const pool = JSON.parse(readFileSync(join(repo, 'data/daily-pool.json'), 'utf8')).days;
+  const web = loadWeb();
+  assert.equal(web.challengeBindingValid(0, pool[0].seed, pool), true, 'the genuine pair must bind');
+  assert.equal(web.challengeBindingValid(0, pool[1].seed, pool), false,
+    "another day's seed must not score as day 0");
+  assert.equal(web.challengeBindingValid(0, 543528, pool), false,
+    "the v2 generation's day-0 seed must not score as the current day 0");
+  assert.equal(web.challengeBindingValid(null, pool[0].seed, pool), false, 'casual play never binds');
+  assert.equal(web.challengeBindingValid(pool.length, pool[0].seed, pool), false,
+    'a day beyond the pool cannot bind');
+  assert.equal(web.challengeBindingValid(0, pool[0].seed, null), false, 'no pool, no binding');
+});
+
+// ---- R1 (skeptical review): a daily win while the pool is absent must not lose its credit ----
+// Reproduced by the review: with the fetch pending, finishing a daily attempt recorded the win,
+// cleared the save, and returned a null daily result that nothing ever retried. The shipped fix
+// banks a pending grade and replays it on pool arrival — these run the SHIPPED functions.
+test('index.html recordChallengeResult banks a pending grade when the pool is absent, and scorePendingDaily grades it exactly once', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const pool = JSON.parse(readFileSync(join(repo, 'data/daily-pool.json'), 'utf8')).days;
+  const web = loadWeb();
+  const telem = { cellUses: 0, undos: 0, foundationOrder: [], maxRunMoved: 0 };
+
+  // A won day-29 attempt, rules not yet arrived (dailyPool null).
+  web.set({ challengeDay: 29, challengeStartDay: 29, seed: pool[29].seed,
+            moveCount: 94, telem, dailyPool: null });
+  const deferred = web.recordChallengeResult(120);
+  assert.equal(deferred.deferred, true, 'a poolless daily win must come back marked deferred');
+  assert.equal(deferred.day, 29);
+  assert.equal(deferred.res, null);
+  assert.equal(web.challengeDay, null, 'the attempt is over — its binding must not linger');
+  assert.ok(web.__ls['causeway.pendingDaily'], 'the grade request must be persisted, not held in memory');
+  const stash = JSON.parse(web.__ls['causeway.pendingDaily']);
+  assert.equal(stash.day, 29);
+  assert.equal(stash.seed, pool[29].seed);
+  assert.equal(typeof stash.winDay, 'number', 'the ⏰ judgment needs the day the player actually won');
+
+  // The pool arrives: the banked win grades, once.
+  web.set({ dailyPool: pool });
+  web.scorePendingDaily();
+  const rec = web.dailyStore.days[29];
+  assert.ok(rec && rec.bronze, 'the banked win must earn its Bronze when the pool lands');
+  assert.equal(web.__ls['causeway.pendingDaily'], undefined, 'the stash is one-shot');
+  const before = JSON.stringify(web.dailyStore);
+  web.scorePendingDaily();
+  assert.equal(JSON.stringify(web.dailyStore), before, 'a second replay must be a no-op');
+});
+
+test('index.html scorePendingDaily refuses a banked grade whose (day, seed) no longer bind (R2 applies to R1)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const pool = JSON.parse(readFileSync(join(repo, 'data/daily-pool.json'), 'utf8')).days;
+  const web = loadWeb();
+  const telem = { cellUses: 0, undos: 0, foundationOrder: [], maxRunMoved: 0 };
+  // Banked under an older generation: day 0 with a seed the current pool does not map there.
+  web.set({ challengeDay: 0, challengeStartDay: 0, seed: 543528, moveCount: 93, telem, dailyPool: null });
+  web.recordChallengeResult(60);
+  web.set({ dailyPool: pool });
+  web.scorePendingDaily();
+  assert.equal(web.dailyStore.days[0], undefined,
+    'a mismatched banked grade must not credit the current day 0');
+  assert.equal(web.__ls['causeway.pendingDaily'], undefined, 'the stash is still consumed');
+});
+
+test('index.html recordChallengeResult with the pool present still scores synchronously (R1 changed nothing for the normal path)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const { dirname, join } = await import('node:path');
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const pool = JSON.parse(readFileSync(join(repo, 'data/daily-pool.json'), 'utf8')).days;
+  const web = loadWeb();
+  const telem = { cellUses: 0, undos: 0, foundationOrder: [], maxRunMoved: 0 };
+  web.set({ challengeDay: 3, challengeStartDay: 3, seed: pool[3].seed,
+            moveCount: 88, telem, dailyPool: pool });
+  const r = web.recordChallengeResult(200);
+  assert.equal(r.day, 3);
+  assert.ok(r.res.bronze, 'a completed challenge always banks Bronze');
+  assert.ok(!r.deferred);
+  assert.ok(web.dailyStore.days[3].bronze);
+  assert.equal(web.challengeDay, null);
+});
+
+test('index.html dailyRulesPending: automation is barred exactly while a daily attempt awaits its rules', () => {
+  const web = loadWeb();
+  web.set({ challengeDay: 5, dailyPool: null });
+  assert.equal(web.dailyRulesPending(), true, 'daily attempt + no pool = rules pending');
+  web.set({ dailyPool: new Array(61).fill({ seed: 1 }) });
+  assert.equal(web.dailyRulesPending(), false, 'pool arrived — automation may resume');
+  web.set({ challengeDay: null, dailyPool: null });
+  assert.equal(web.dailyRulesPending(), false, 'casual play never waits on the pool');
+});

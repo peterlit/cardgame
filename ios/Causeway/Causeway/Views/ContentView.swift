@@ -268,7 +268,7 @@ struct ContentView: View {
             // holds the card until the drop mutates the board).
             if let d = drag, !dragSourceHoldsCard(d.source) { drag = nil }
         }
-        .sheet(isPresented: $showWins) { WinsView(game: game) }
+        .sheet(isPresented: $showWins) { WinsView(game: game, playDeal: requestDealFromDismissal) }
         .sheet(isPresented: $showDaily) { DailyView(game: game) }
         .sheet(isPresented: $showRules) { RulesView() }
         // Two actions ONLY (side-by-side row): with three, landscape's auto-raised number pad
@@ -286,13 +286,9 @@ struct ContentView: View {
                 // worth confirming (ux/WF-7:deal-play-discards-live-game-no-confirm). Same state
                 // gate as the board pills, so the ≤3-tap "type a number and play it" budget is
                 // unchanged on an untouched board.
-                // The hop off this runloop turn is required: raising the confirmation from inside
-                // the dismissing alert's own action swallows it.
-                if game.hasLiveGame {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
-                } else {
-                    withAnimation { game.deal(seed: n) }
-                }
+                // The dismissal-safe gate (shared with WinsView): raising the confirmation from
+                // inside the dismissing alert's own action swallows it.
+                requestDealFromDismissal(n)
             }
             .disabled(enteredSeed == nil)
         } message: { Text("Enter a deal number (\(DealFormat.seedRangeHint)) to play that exact deal.") }
@@ -342,6 +338,19 @@ struct ContentView: View {
     /// one-tap cases stay one tap.
     private func requestReset(_ action: PendingReset) {
         if game.hasLiveGame { pendingReset = action } else { performReset(action) }
+    }
+    /// The same gate for a deal requested from a DISMISSING sheet or alert (the deal dialog, the
+    /// Wins screen). Raising the confirmation from inside the dismissal transition swallows it,
+    /// so the live-game case hops off this runloop turn before setting pendingReset.
+    /// Every user-triggered board replacement must route through requestReset or this — WinsView
+    /// used to call game.deal directly, which silently ended a live attempt and forfeited a live
+    /// ⏰ grace (skeptical-review R4).
+    private func requestDealFromDismissal(_ n: Int) {
+        if game.hasLiveGame {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+        } else {
+            withAnimation { game.deal(seed: n) }
+        }
     }
     private func performReset(_ action: PendingReset) {
         withAnimation {

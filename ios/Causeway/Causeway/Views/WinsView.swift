@@ -4,6 +4,11 @@ import SwiftUI
 /// deals — tap a range to drill into the individual deals with stats and replay.
 struct WinsView: View {
     @ObservedObject var game: Game
+    /// Board replacement is the SESSION's decision, not this sheet's: the callback lands in
+    /// ContentView.requestDealFromDismissal, whose confirmation protects a live attempt. This
+    /// sheet used to call game.deal directly — the one route that could silently destroy a live
+    /// game and its ⏰ grace (skeptical-review R4).
+    let playDeal: (Int) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var dealText = ""
@@ -84,7 +89,7 @@ struct WinsView: View {
 
     private func playEntered() {
         guard let n = enteredSeed else { return }
-        game.deal(seed: n)
+        playDeal(n)
         dismiss()
     }
 
@@ -105,7 +110,7 @@ struct WinsView: View {
             Section {
                 ForEach(rows, id: \.seed) { row in
                     Button {
-                        game.deal(seed: row.seed)
+                        playDeal(row.seed)
                         dismiss()
                     } label: {
                         HStack {

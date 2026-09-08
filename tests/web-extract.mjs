@@ -61,7 +61,10 @@ function scanTo(src, i, stopAtSemicolon) {
         continue;
       }
       i++;
-      if (depth === 0 && seenBrace && !stopAtSemicolon) return i;
+      // A function ends at the `}` that returns depth to 0 — specifically `}`, not any closer:
+      // `function isOnTime({challengeDay,...})` opens a brace INSIDE its parameter list, and
+      // ending on the parameter list's `)` truncated the declaration mid-signature.
+      if (depth === 0 && seenBrace && !stopAtSemicolon && c === '}') return i;
       continue;
     }
     if (c === ';' && depth === 0 && stopAtSemicolon) return i + 1;
@@ -101,12 +104,15 @@ const NAMES = [
   'RANK_NAME', 'RANK_SHORT', 'rankName', 'upDown', 'foldHome', 'endsFirst', 'beforeAce',
   'suitTopFirst', 'suitSprint', 'rankRush', 'suitBalance', 'OBJECTIVES',
   'gradeOf', 'labelOf', 'makeObjective', 'dailyChallenge', 'evaluate', 'evaluateChallenge',
-  'objViolated', 'objSecured',
+  'objViolated', 'objSecured', 'challengeBindingValid',
   // --- board rules + the two places the app moves cards by itself ---
   'BLACK_SUITS', 'canFoundationUp', 'canFoundationDown', 'rankOnFound', 'isSafeAutoplay',
   'simulateAutoFinish', 'autoFinishWouldWin', 'autoSendWouldBreakTier', 'autoFinishTierCost',
   // --- the daily calendar's month window (which months the grid may show) ---
   'civilOf', 'monthNo', 'calMonthRange', 'clampCalMonth',
+  // --- the daily session lifecycle: dates, scoring, and the R1 pending-grade path ---
+  'daysFromCivil', 'EPOCH_DAYS', 'dayIndexFor', 'todayIndex', 'isOnTime', 'RUN_LOG_MAX', 'mergeRuns', 'mergeTiers',
+  'saveDaily', 'recordChallengeResult', 'scorePendingDaily', 'dailyRulesPending',
 ];
 const EXPORTS = NAMES.filter(n => n === n.toLowerCase() || /^[a-z]/.test(n));
 
@@ -118,12 +124,26 @@ export function loadWeb(g = {}) {
     "use strict";
     const NCELLS = 3, NCOLS = 8;
     let state = null, telem = null, moveCount = 0, challengeDay = null, dailyPool = null;
+    let challengeStartDay = null, seed = 0, dailyStore = { version: 3, days: {} }, dailyView = null;
+    // localStorage stand-in, so the shipped persistence-adjacent code (saveDaily,
+    // scorePendingDaily, recordChallengeResult's R1 stash) RUNS instead of being stubbed out.
+    // __ls is handed back for assertions.
+    const __ls = {};
+    const lsGet = k => Object.prototype.hasOwnProperty.call(__ls, k) ? __ls[k] : null;
+    const lsSet = (k, v) => { __ls[k] = String(v); };
+    const lsRemove = k => { delete __ls[k]; };
     ${body}
     return {
       ${EXPORTS.join(', ')},
+      __ls,
+      get dailyStore(){ return dailyStore; },
+      get challengeDay(){ return challengeDay; },
+      get challengeStartDay(){ return challengeStartDay; },
       set(o){ if('state' in o) state=o.state; if('telem' in o) telem=o.telem;
               if('moveCount' in o) moveCount=o.moveCount; if('challengeDay' in o) challengeDay=o.challengeDay;
-              if('dailyPool' in o) dailyPool=o.dailyPool; },
+              if('dailyPool' in o) dailyPool=o.dailyPool;
+              if('challengeStartDay' in o) challengeStartDay=o.challengeStartDay;
+              if('seed' in o) seed=o.seed; if('dailyStore' in o) dailyStore=o.dailyStore; },
     };`;
   const web = new Function(src)();
   web.set(g);

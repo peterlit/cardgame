@@ -734,7 +734,15 @@ function autoplayOneStep(){
 }
 let autoTimer=null;
 function stopAutoplay(){ if(autoTimer){ clearTimeout(autoTimer); autoTimer=null; } }
+// R1 (skeptical review): startup restores the board synchronously, but a daily attempt's RULES
+// arrive by fetch. Until the pool lands, the tier guards see "nothing at stake" (they return
+// permissive on a null pool), so automation acting in that window can spend a live Gold with zero
+// card input — reproduced by the review on a certified flawless prefix. While the attempt's rules
+// are pending, nothing moves a card on the player's behalf; manual play stays open. The pool's
+// arrival re-runs the automation under the real rules. (iOS bundles its pool — no such window.)
+function dailyRulesPending(){ return challengeDay!=null && !dailyPool; }
 function runAutoplay(){
+  if(dailyRulesPending()) return;
   if(!autoplayOn || autoTimer || !startTime) return;   // hold off until the first move
   const step=()=>{
     autoTimer=null;
@@ -779,6 +787,15 @@ function undo(){
   telem.foundationOrder.length = h.foundationOrder ?? telem.foundationOrder.length;
   telem.cellUses = h.cellUses ?? telem.cellUses;
   telem.maxRunMoved = h.maxRunMoved ?? telem.maxRunMoved;
+  // Undoing a SCORED win: the award stands (recordWin already wrote the stores, and the daily
+  // binding was cleared at scoring), and play continues as a casual game — so the record-once
+  // latch resets, letting a re-completion run recordWin FRESH: clock stopped, save cleared, the
+  // seed's best merged. Leaving winRecorded latched skipped all of that — the re-win kept an
+  // unfinished save that resurrected on reload, one card from done (skeptical-review R3;
+  // owner decision 2026-09-08: post-win undo = casual continuation).
+  if(winRecorded){ winRecorded=false; pendingWin=null; }
+  // recordWin stopped the display clock; play is live again, so it must tick again (iOS parity).
+  if(startTime && !timerId) startTimer();
   selection=null; render(false);
   saveGame();
 }
@@ -1007,6 +1024,7 @@ function autoFinishTierCost(){
 }
 // Offer or perform auto-finish when the board becomes finishable, per the current mode.
 function maybeAutoFinish(){
+  if(dailyRulesPending()) return;   // R1: no cascade while the attempt's objectives are unreadable
   if(!startTime || isWon() || finishing || finishPromptOpen || !autoFinishWouldWin()) return;
   // Never offer, and never auto-run, a cascade that would spend a tier this attempt can still earn.
   // The board stays finishable and the manual Finish button stays available — that path asks first
@@ -1021,7 +1039,7 @@ function deferAutoFinish(){ autoFinishDeferred=true; hideFinishPrompt(); runAuto
 // The finish prompt (ask mode) + the manual Finish button.
 function showFinishPrompt(){ finishPromptOpen=true; document.getElementById("finishOverlay").classList.add("show"); refreshFinishBtn(); }
 function hideFinishPrompt(){ finishPromptOpen=false; document.getElementById("finishOverlay").classList.remove("show"); refreshFinishBtn(); }
-function canOfferFinish(){ return !!startTime && !isWon() && !finishing && !finishPromptOpen && autoFinishWouldWin(); }
+function canOfferFinish(){ return !!startTime && !isWon() && !finishing && !finishPromptOpen && !dailyRulesPending() && autoFinishWouldWin(); }
 function refreshFinishBtn(){ const b=document.getElementById("finishBtn"); if(b) b.style.display = canOfferFinish() ? "" : "none"; }
 
 /* ---------- rendering ---------- */
@@ -1241,7 +1259,8 @@ function recordWin(){
   refreshHud();
   const daily = recordChallengeResult(secs);   // score the daily attempt (if any); clears challengeDay
   pendingWin = { seed, moves:moveCount, secs, prev, daily: daily ? daily.res : null,
-                 dailyDay: daily ? daily.day : null };
+                 dailyDay: daily ? daily.day : null,
+                 dailyDeferred: daily ? !!daily.deferred : false };   // R1: banked, grades on pool arrival
 }
 function onWin(){
   recordWin();   // durable side effects, exactly once (no-op if already recorded)
@@ -1251,7 +1270,9 @@ function onWin(){
   // a ⏰-grace win): "On time" plus an advancing streak on a day that is not today otherwise reads
   // as "today is done" (ux/WF-14:win-overlay-omits-the-day).
   const winDay = (w.dailyDay!=null && w.dailyDay!==todayIndex()) ? `${fmtDayLabel(w.dailyDay)}: ` : '';
-  const dailyLine = w.daily
+  const dailyLine = w.dailyDeferred
+    ? " " + winDay + "Daily challenge won — your medals will be recorded when the daily data loads."
+    : w.daily
     ? " " + winDay + ((w.daily.flawless
         ? "🌟 Flawless! 🥉🥈🥇 all in a single run."
         : `Daily challenge: ${['bronze','silver','gold'].filter(k=>w.daily[k]).map(k=>MEDAL[k]).join(' ')||'—'} earned.`)
@@ -1262,7 +1283,7 @@ function onWin(){
   const next = w.seed>=1000000 ? 1 : w.seed+1;      // suggest the next deal number
   const nextBtn = document.getElementById("winNext");
   nextBtn.textContent = `Play deal #${next}`;
-  nextBtn.onclick = ()=>deal(next);
+  nextBtn.onclick = ()=>requestDeal(()=>deal(next));
   document.getElementById("overlay").classList.add("show");
 }
 function hideWin(){ document.getElementById("overlay").classList.remove("show"); }
@@ -1387,8 +1408,27 @@ let dailyStore=loadDaily();
 // index names a different challenge and would credit tiers that were never played. Dropped, once.
 function loadDaily(){ try{ const g=JSON.parse(lsGet("causeway.daily")); if(g&&g.days&&g.version===3) return g; }catch(e){} return {version:3, days:{}}; }
 function saveDaily(){ lsSet("causeway.daily", JSON.stringify(dailyStore)); }
+// R2: a restored attempt claims (challengeDay, seed), but restoreGame() runs before the pool
+// arrives, so only this moment can confirm the pair still name the same deal. On mismatch the
+// board lives on as a casual game — silently, because nothing the player did caused it and there
+// is nothing for them to decide.
+function reconcileChallengeBinding(){
+  if(challengeDay==null || !dailyPool) return;
+  if(challengeBindingValid(challengeDay, seed, dailyPool)) return;
+  challengeDay=null; challengeStartDay=null;
+  saveGame(); refreshHud(); render(false);
+}
 // The app is served, so fetch the baked pool. (file:// would fail — the Daily button stays disabled.)
-fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{ dailyPool=p.days; refreshDailyBtn(); }).catch(()=>{ refreshDailyBtn(); });
+// Arrival order matters: reconcile the restored attempt's identity (R2), grade any banked win
+// (R1), THEN let automation act — it was held off while the rules were unreadable, and it must
+// only ever run under the real objectives.
+fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{
+  dailyPool=p.days;
+  reconcileChallengeBinding();
+  scorePendingDaily();
+  refreshDailyBtn(); refreshFinishBtn();
+  runAutoplay(); maybeAutoFinish();
+}).catch(()=>{ refreshDailyBtn(); });
 // Baked winning lines for "Show me how to win" (seed -> compact token string). Optional: absent =
 // the feature just doesn't offer itself for that seed.
 let dailySolutions=null;
@@ -1397,10 +1437,15 @@ fetch("data/daily-solutions.json").then(r=>r.json()).then(s=>{ dailySolutions=s.
 /* ---- play a challenge, and score it on win ---- */
 function playChallenge(day){
   if(!dailyPool||!dailyRec(day)||day>todayIndex()) return;
-  stopDemo();
-  deal(dailyPool[day].seed);   // resets telem + clears challengeDay
-  challengeDay=day; challengeStartDay=todayIndex(); saveGame();
-  closeDaily(); render();
+  // Through the shared gate like every other replacement route: the Daily sheet's Play/Replay
+  // went straight from onclick to deal(), silently ending a live attempt — and forfeiting a live
+  // ⏰ grace with it (skeptical-review R4). Demo exits land here too; confirmReset is a pass-through
+  // then, because hasLiveGame is false while demoing.
+  requestDeal(()=>{
+    deal(dailyPool[day].seed);   // resets telem + clears challengeDay
+    challengeDay=day; challengeStartDay=todayIndex(); saveGame();
+    closeDaily(); render();
+  });
 }
 
 /* ---- "Show me how to win": animate a baked winning line (assisted; never scored) ----
@@ -1522,11 +1567,12 @@ function showSolution(seed, tier, label, day){
   tier = tier || 'bronze';
   const tokens = solutionLine(seed, tier);
   if(!tokens) return;
-  // The demo re-deals the board: never silently discard an in-progress daily attempt (moves
-  // made, not yet won). No restore-after-demo — resuming a demo-touched flow is the
-  // "finish the app's own line" scoring hole. (Parity with iOS DailyView's confirmation.)
-  if(challengeDay!=null && moveCount>0 &&
-     !confirm("Watching a demo re-deals the board, so your current daily attempt (moves and time) will be discarded. Continue?")) return;
+  // The demo re-deals the board: never silently discard an in-progress game. The old guard here
+  // was weaker than hasLiveGame — `challengeDay!=null && moveCount>0` waved through casual
+  // progress and a zero-move attempt still carrying its ⏰ grace (skeptical-review R4). Same gate
+  // as every other replacement route now; a demo already running passes straight through, since
+  // hasLiveGame is false while demoing. (Parity with iOS DailyView's confirmation.)
+  if(!confirmReset()) return;
   stopDemo();
   closeDaily();
   deal(seed);            // fresh deal, casual (challengeDay=null), telemetry reset
@@ -1541,9 +1587,34 @@ function showSolution(seed, tier, label, day){
   updateDemoBar();
   render();
 }
+// An attempt's identity is (day, seed) — TOGETHER. A save from an older pool generation can carry
+// a day index that now names a different deal, and scoring by day alone would credit today's
+// challenge for a board it never saw (skeptical-review R2). Only the pool can confirm the pair
+// still agree; a mismatched attempt survives as a casual game, never as another day's puzzle.
+// (iOS twin: Game.challengeBindingValid.)
+function challengeBindingValid(day, boardSeed, pool){
+  if(day==null || !pool) return false;
+  const ch=dailyChallenge(day,pool);
+  return !!ch && ch.seed===boardSeed;
+}
 // Fold a won challenge attempt into the day's record. Called synchronously from recordWin().
 function recordChallengeResult(secs){
-  if(challengeDay==null || !dailyPool) return null;
+  if(challengeDay==null) return null;
+  if(!dailyPool){
+    // R1: the win is real but its rules haven't arrived (slow or failed fetch), and recordWin is
+    // about to clear the save — returning null here used to erase the daily credit forever. Bank
+    // the grade request durably instead; scorePendingDaily() replays it the moment the pool
+    // lands, in this session or any later one. winDay is stamped NOW: the ⏰ judgment belongs to
+    // the day the player actually won, not the day the fetch finally worked.
+    lsSet("causeway.pendingDaily", JSON.stringify({
+      day:challengeDay, startDay:challengeStartDay, seed, winDay:todayIndex(),
+      moves:moveCount, secs, telem }));
+    const day=challengeDay; challengeDay=null; challengeStartDay=null;
+    return {day, res:null, deferred:true};
+  }
+  // R2: refuse to score an attempt whose board is not the challenge's deal. Cleared to casual so
+  // a stale binding can't linger past the win.
+  if(!challengeBindingValid(challengeDay, seed, dailyPool)){ challengeDay=null; challengeStartDay=null; return null; }
   const ch=dailyChallenge(challengeDay,dailyPool);
   const onTime=isOnTime({challengeDay,winDay:todayIndex(),attemptStartDay:challengeStartDay});
   const res=evaluateChallenge(ch,{won:true,moves:moveCount,elapsed:secs,cellUses:telem.cellUses,undos:telem.undos,foundationOrder:telem.foundationOrder,maxRunMoved:telem.maxRunMoved},onTime);
@@ -1551,6 +1622,24 @@ function recordChallengeResult(secs){
   saveDaily();
   const day=challengeDay; challengeDay=null; challengeStartDay=null;
   return {day, res};
+}
+// R1: grade a win banked while the pool was absent. One shot — the stash is consumed whether it
+// grades or is judged ungradable (R2's binding check applies here too: a pending grade from an
+// older generation must not credit today's challenge). Exactly-once: the stash is written only in
+// recordWin's synchronous once-only path, and removed before grading.
+function scorePendingDaily(){
+  if(!dailyPool) return;
+  let p; try{ p=JSON.parse(lsGet("causeway.pendingDaily")); }catch(e){ p=null; }
+  if(p==null && lsGet("causeway.pendingDaily")==null) return;
+  lsRemove("causeway.pendingDaily");
+  if(!p || typeof p.day!=="number" || !challengeBindingValid(p.day, p.seed, dailyPool)) return;
+  const ch=dailyChallenge(p.day,dailyPool);
+  const t=(p.telem && Array.isArray(p.telem.foundationOrder)) ? p.telem : {cellUses:0,undos:0,foundationOrder:[],maxRunMoved:0};
+  const onTime=isOnTime({challengeDay:p.day, winDay:p.winDay, attemptStartDay:(typeof p.startDay==="number")?p.startDay:null});
+  const res=evaluateChallenge(ch,{won:true,moves:p.moves,elapsed:p.secs,cellUses:t.cellUses,undos:t.undos,foundationOrder:t.foundationOrder,maxRunMoved:t.maxRunMoved},onTime);
+  dailyStore.days[p.day]=mergeTiers(dailyStore.days[p.day],res);
+  saveDaily();
+  if(dailyView!=null) renderDaily();
 }
 
 /* ---- rendering ---- */
@@ -1837,7 +1926,7 @@ function openWinsDetail(a,b){
       `<span class="dm">${r.moves} moves · ${fmtTime(r.secs)}${date}</span></button>`;
   }).join("");
   list.querySelectorAll(".deal-row").forEach(el=>
-    el.onclick=()=>{ closeWins(); deal(+el.dataset.seed); });
+    el.onclick=()=>requestDeal(()=>{ closeWins(); deal(+el.dataset.seed); }));
   const back=document.getElementById("winsBack");
   back.style.display="";
   back.onclick=openWins;
@@ -1867,7 +1956,7 @@ function winsPlay(){
   // deal a board the player did not ask for.
   const n=parseDealNumber(document.getElementById("winsDealInput").value);
   if(n===null) return;
-  closeWins(); deal(n);
+  requestDeal(()=>{ closeWins(); deal(n); });
 }
 
 function openDeal(){
@@ -1885,8 +1974,7 @@ function goDeal(){
   // deal" while it actually re-deals and destroys whatever is in progress — including a live
   // daily attempt (ux/WF-7:deal-play-discards-live-game-no-confirm). Same state gate as the
   // board pills, so the empty-board case is still one tap.
-  if(!confirmReset()) return;
-  closeDeal(); deal(n);
+  requestDeal(()=>{ closeDeal(); deal(n); });
 }
 
 /* ---------- wiring ---------- */
@@ -1896,9 +1984,10 @@ function goDeal(){
 // moved in still has something a re-deal destroys forever — day D's ⏰ Same-day, which any restart
 // re-stamps to today (bug/Game.swift:grace-forfeited-without-confirm-at-zero-moves).
 function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !demoing; }
-// The board's own destructive controls confirm before throwing a live game away — the Daily sheet
-// has guarded exactly this destruction since round 0, while `New game` / `Replay`, the most
-// reachable controls on the screen, went straight through (ux/WF-3:board-reset-pills-no-confirm).
+// The confirmation every replacement route shares (via requestDeal below). Guarding grew up in
+// pieces — New game / Replay first (ux/WF-3:board-reset-pills-no-confirm), the deal dialog later
+// (ux/WF-7) — while daily Play, the Wins panel and the N shortcut stayed unguarded until the
+// 2026-09-07 skeptical review's R4 unified them all here.
 // A daily attempt is replayable, a casual game is not, so the copy must not promise a way back
 // that does not exist.
 function confirmReset(){
@@ -1921,8 +2010,14 @@ function confirmReset(){
 // Is a ⏰ same-day GRACE riding on the current attempt? Exactly isOnTime's grace window: begun on
 // day D, still unfinished, being played on D+1. (iOS twin: Game.graceLive.)
 function graceLiveNow(){ return challengeDay!=null && challengeStartDay===challengeDay && todayIndex()===challengeDay+1; }
-document.getElementById("newBtn").onclick=()=>{ if(!confirmReset()) return; stopDemo(); deal(randomSeed()); };
-document.getElementById("winRandom").onclick=()=>deal(randomSeed());
+// ONE gate for every user-triggered board replacement. Which button the player used must never
+// decide whether a live attempt is protected: daily Play/Replay, the Wins panel, the random-deal
+// button, the win overlay's next/random and the N shortcut all went straight to deal() while
+// New game confirmed (skeptical-review R4; iOS twin: ContentView.requestReset). `go` runs only
+// once confirmReset has said yes — deal() itself handles demo teardown and the win overlay.
+function requestDeal(go){ if(!confirmReset()) return false; go(); return true; }
+document.getElementById("newBtn").onclick=()=>requestDeal(()=>deal(randomSeed()));
+document.getElementById("winRandom").onclick=()=>requestDeal(()=>deal(randomSeed()));
 document.getElementById("winClose").onclick=hideWin;
 document.getElementById("undoBtn").onclick=()=>{ stopDemo(); undo(); };
 // Both mid-demo "Stop" and post-line "Done" re-deal the seed (via endDemo/restartDeal, hoisted
@@ -1955,7 +2050,7 @@ function restartDeal(){
   // (parity with iOS Game.restartDeal, which re-stamps unconditionally).
   if(day!=null){ challengeDay=day; challengeStartDay=todayIndex(); saveGame(); render(); }
 }
-document.getElementById("replayBtn").onclick=()=>{ if(!confirmReset()) return; restartDeal(); };
+document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal);
 function refreshAutoFinishBtn(){
   const label = autoFinishMode==="ask"?"Ask":autoFinishMode==="on"?"On":"Off";
   document.getElementById("autoBtn").textContent = "Auto-finish: " + label;
@@ -2009,15 +2104,21 @@ document.getElementById("autoplayBtn").onclick=()=>{
 refreshAutoplayBtn();
 document.getElementById("seedBtn").onclick=openDeal;
 document.getElementById("dealGo").onclick=goDeal;
-document.getElementById("dealRandom").onclick=()=>{ closeDeal(); deal(randomSeed()); };
+document.getElementById("dealRandom").onclick=()=>requestDeal(()=>{ closeDeal(); deal(randomSeed()); });
 document.getElementById("dealCancel").onclick=closeDeal;
 document.getElementById("dealInput").addEventListener("keydown",e=>{
   if(e.key==="Enter"){ e.preventDefault(); goDeal(); }
   if(e.key==="Escape"){ e.preventDefault(); closeDeal(); }
 });
 document.addEventListener("keydown",e=>{
+  // Typing in a field (the deal number box) or working inside an open dialog must never fire a
+  // board shortcut: an 'n' typed into an input used to throw the live game away with no
+  // confirmation at all (skeptical-review R4 — the unfocused global handler).
+  const tag = e.target && e.target.tagName;
+  if(tag==="INPUT" || tag==="TEXTAREA" || tag==="SELECT") return;
+  if(document.querySelector(".overlay.show")) return;
   if((e.key==="z"||e.key==="Z")&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); undo(); }
-  if(e.key==="n"||e.key==="N"){ deal(randomSeed()); }
+  if(e.key==="n"||e.key==="N"){ requestDeal(()=>deal(randomSeed())); }
 });
 
 // Capture the latest board + elapsed before the tab is hidden or closed.

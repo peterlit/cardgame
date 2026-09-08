@@ -361,8 +361,12 @@ pin('Model/Game.swift', 'same-day attempt bookkeeping', [
   'challengeDay: challengeDay, challengeStartDay: challengeStartDay, telem: telem,',
   // restore: an older save without a start day stays nil — never guessed from the challenge day
   // (`?? s.challengeDay`), which would hand the next-day grace to a backfilled attempt that cannot
-  // prove it. Pinned with the following line so re-adding a fallback trips the guard.
-  `challengeStartDay = s.challengeStartDay
+  // prove it. Pinned through the R2 identity check so re-adding a fallback (or dropping the
+  // binding guard) trips this.
+  `challengeStartDay = s.challengeStartDay`,
+  `if challengeDay != nil, !challengeBindingValid(day: challengeDay, boardSeed: seed) {
+            challengeDay = nil; challengeStartDay = nil
+        }
         telem = s.telem ?? Telemetry()`,
   // ...and the recorded start day is what recordChallengeResult judges the win by.
   'onTime: isOnTime(challengeDay: day, winDay: todayIndex(),',
@@ -416,6 +420,55 @@ pin('Views/ContentView.swift', 'win-overlay ⏰ line', [
 pin('Model/Game.swift', 'recordWin once-only gate', [
   'guard !winRecorded else { return }',
 ]);
+
+// ---- R3 (skeptical review): undoing a scored win resets the latch, so a re-win reconciles ----
+// The award stands (owner decision 2026-09-08: post-win undo = casual continuation), but the
+// once-only latch must not survive the undo — a latched re-win skipped stopTimer + save cleanup,
+// leaving a running clock and an unfinished save that resurrected on relaunch one card from done.
+// The iOS sequence is executable-tested in CausewayTests/SolutionReplayTests; these pin the twins.
+pin('Model/Game.swift', 'post-win undo resets the record-once latch', [
+  `won = false`,
+  `winRecorded = false
+        // A win stops the clock; undoing back into play must resume it (else elapsed
+        // freezes and a later re-win would persist a bogus best time).
+        if started && !clock.isRunning { startTimer() }`,
+]);
+test('R3: web undo resets the record-once latch and resumes the clock (twin of the tested iOS sequence)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  assert.ok(html.includes(norm('if(winRecorded){ winRecorded=false; pendingWin=null; }')),
+    'web undo leaves winRecorded latched — a re-win would skip stopTimer/clearSavedGame again');
+  assert.ok(html.includes(norm('if(startTime && !timerId) startTimer();')),
+    'web undo no longer resumes the display clock after a post-win undo');
+});
+
+// ---- R1 (skeptical review): the pool-readiness gate's WIRING (web only — iOS bundles its pool) ----
+// The predicate and the scoring/stash behaviour are executable-tested in web-behaviour.test.mjs;
+// what Node cannot run is the timer/DOM wiring, so these pin where the gate is consulted. Losing
+// any one of them re-opens a reproduced defect: autoplay spending a live Gold before the fetch
+// lands, or the finish cascade running with the objectives unreadable.
+test('R1: web automation consults dailyRulesPending at every entry, and pool arrival resumes it (wiring pins)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  assert.ok(html.includes(norm(`function runAutoplay(){
+  if(dailyRulesPending()) return;`)),
+    'runAutoplay no longer holds off while a daily attempt\'s rules are pending');
+  assert.ok(html.includes(norm(`function maybeAutoFinish(){
+  if(dailyRulesPending()) return;`)),
+    'maybeAutoFinish no longer holds off while a daily attempt\'s rules are pending');
+  assert.ok(html.includes(norm('&& !dailyRulesPending() && autoFinishWouldWin()')),
+    'the manual Finish button shows while the attempt\'s objectives are unreadable');
+  // pool arrival: identity first (R2), banked grade second (R1), automation last — and only then.
+  assert.ok(html.includes(norm(`dailyPool=p.days;
+  reconcileChallengeBinding();
+  scorePendingDaily();
+  refreshDailyBtn(); refreshFinishBtn();
+  runAutoplay(); maybeAutoFinish();`)),
+    'the pool-arrival handler lost its reconcile → grade → resume order');
+  // ...and a mismatched restored binding degrades to casual, persisted.
+  assert.ok(html.includes(norm(`if(challengeBindingValid(challengeDay, seed, dailyPool)) return;
+  challengeDay=null; challengeStartDay=null;
+  saveGame(); refreshHud(); render(false);`)),
+    'reconcileChallengeBinding no longer degrades a mismatched attempt to casual');
+});
 
 // ---- "Show me how to win" token applier: MUST match the web + solver token semantics ----
 // F = column-top → foundation; G = free cell → foundation; end 0=up / 1=down; T/C/X per rules.mjs.
@@ -595,10 +648,40 @@ test('board reset controls confirm only when there is a live game to lose (no we
   assert.ok(html.includes(norm('function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !demoing; }')),
     'web lost its hasLiveGame gate');
   assert.ok(html.includes(norm('if(!hasLiveGame()) return true;')), 'web confirmReset is no longer state-gated');
-  assert.ok(html.includes(norm('document.getElementById("replayBtn").onclick=()=>{ if(!confirmReset()) return; restartDeal(); };')),
-    'web Replay no longer confirms');
-  assert.ok(html.includes(norm('document.getElementById("newBtn").onclick=()=>{ if(!confirmReset()) return; stopDemo(); deal(randomSeed()); };')),
-    'web New game no longer confirms');
+  // EVERY user-triggered replacement route goes through the one gate (skeptical-review R4): which
+  // button the player used must never decide whether a live attempt is protected. The startup deal
+  // after a failed restore is the only direct deal() left, and it replaces nothing.
+  assert.ok(html.includes(norm('function requestDeal(go){ if(!confirmReset()) return false; go(); return true; }')),
+    'web lost its single requestDeal gate');
+  for (const [route, needle] of [
+    ['Replay', 'document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal);'],
+    ['New game', 'document.getElementById("newBtn").onclick=()=>requestDeal(()=>deal(randomSeed()));'],
+    ['win-overlay random', 'document.getElementById("winRandom").onclick=()=>requestDeal(()=>deal(randomSeed()));'],
+    ['win-overlay next-deal', 'nextBtn.onclick = ()=>requestDeal(()=>deal(next));'],
+    ['deal-dialog random', 'document.getElementById("dealRandom").onclick=()=>requestDeal(()=>{ closeDeal(); deal(randomSeed()); });'],
+    ['Wins typed entry', 'requestDeal(()=>{ closeWins(); deal(n); });'],
+    ['Wins history row', 'el.onclick=()=>requestDeal(()=>{ closeWins(); deal(+el.dataset.seed); }));'],
+    ['N shortcut', 'if(e.key==="n"||e.key==="N"){ requestDeal(()=>deal(randomSeed())); }'],
+  ]) {
+    assert.ok(html.includes(norm(needle)), `web ${route} no longer routes through the requestDeal gate`);
+  }
+  // ...and the global shortcut handler must stay deaf while typing in a field or inside a dialog:
+  // an 'n' typed into the deal-number box used to throw the live game away unconfirmed.
+  assert.ok(html.includes(norm('if(tag==="INPUT" || tag==="TEXTAREA" || tag==="SELECT") return;')),
+    'web keyboard shortcuts fire while typing in a field');
+  assert.ok(html.includes(norm('if(document.querySelector(".overlay.show")) return;')),
+    'web keyboard shortcuts fire under an open dialog');
+  // playChallenge and showSolution replace the board from the Daily sheet — same gate.
+  assert.ok(/function playChallenge\(day\)\{[\s\S]{0,700}?requestDeal\(/.test(html),
+    'web playChallenge no longer routes through the requestDeal gate');
+  assert.ok(/function showSolution\([\s\S]{0,900}?if\(!confirmReset\(\)\) return;/.test(html),
+    'web showSolution no longer confirms through the shared gate');
+  // iOS: the Wins sheet hands its deal to the session gate instead of dealing itself.
+  const wins = read('Views/WinsView.swift');
+  assert.ok(wins.includes(norm('let playDeal: (Int) -> Void')) && !wins.includes('game.deal(seed:'),
+    'iOS WinsView deals directly again instead of routing through ContentView\'s gate');
+  assert.ok(content.includes(norm('WinsView(game: game, playDeal: requestDealFromDismissal)')),
+    'ContentView no longer hands WinsView the gated deal callback');
   // the casual branch must NOT inherit the challenge-only promise.
   for (const [name, src] of [['index.html', html], ['ContentView.swift', content]]) {
     assert.ok(src.includes(norm('This game is not a challenge, so there is no way back to it.')),
@@ -627,14 +710,15 @@ test('board reset controls confirm only when there is a live game to lose (no we
 test('the deal-number entry confirms before discarding a live game (no web↔iOS drift)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   const content = read('Views/ContentView.swift');
-  assert.ok(content.includes(norm(`if game.hasLiveGame {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
-                } else {
-                    withAnimation { game.deal(seed: n) }
-                }`)),
-    'the iOS "Play a deal" alert no longer confirms (or no longer state-gates) its re-deal');
-  assert.ok(html.includes(norm(`if(!confirmReset()) return;
-  closeDeal(); deal(n);`)),
+  assert.ok(content.includes(norm(`private func requestDealFromDismissal(_ n: Int) {
+        if game.hasLiveGame {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+        } else {
+            withAnimation { game.deal(seed: n) }
+        }
+    }`)),
+    'the iOS dismissal-safe deal gate no longer confirms (or no longer state-gates) its re-deal');
+  assert.ok(html.includes(norm('requestDeal(()=>{ closeDeal(); deal(n); });')),
     'the web deal modal no longer confirms its re-deal');
 });
 

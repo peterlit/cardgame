@@ -321,6 +321,13 @@ final class Game: ObservableObject {
         // day D begun today and finished after a relaunch on D+1 would be falsely awarded ⏰.
         // nil ⇒ isOnTime() credits the save only for a win on the challenge's own date.
         challengeStartDay = s.challengeStartDay
+        // The attempt's identity is (day, seed) — TOGETHER. A save from an older pool generation
+        // can carry a day index that now names a different deal; scoring by day alone would credit
+        // today's challenge for a board it never saw (skeptical-review R2). The board survives as
+        // a casual game — nothing the player did caused the mismatch, so no dialog.
+        if challengeDay != nil, !challengeBindingValid(day: challengeDay, boardSeed: seed) {
+            challengeDay = nil; challengeStartDay = nil
+        }
         telem = s.telem ?? Telemetry()
         dailyResult = nil
         winRecorded = false      // restore() only accepts an in-progress board (boardComplete rejected above)
@@ -501,6 +508,14 @@ final class Game: ObservableObject {
         telem.maxRunMoved = h.maxRunMoved
         selection = nil
         won = false
+        // Undoing a SCORED win: the award stands (recordWin already wrote the stores, and the
+        // daily binding was cleared at scoring), and play continues as a casual game — so the
+        // record-once latch resets, letting a re-completion run recordWin FRESH: clock stopped,
+        // save cleared, the seed's best merged. Leaving winRecorded latched skipped all of that —
+        // the re-win left the clock running and an unfinished save that resurrected on relaunch,
+        // one card from done (skeptical-review R3; owner decision 2026-09-08: post-win undo =
+        // casual continuation). Web twin: undo().
+        winRecorded = false
         // A win stops the clock; undoing back into play must resume it (else elapsed
         // freezes and a later re-win would persist a bogus best time).
         if started && !clock.isRunning { startTimer() }
@@ -929,10 +944,26 @@ final class Game: ObservableObject {
         persist()
     }
 
+    /// The attempt's identity is (day, seed) — TOGETHER: does the pool still say this day is this
+    /// deal? False for a day outside the pool or a board from another generation's seed. A
+    /// mismatched attempt may continue as a casual game; it must never score as another puzzle
+    /// (skeptical-review R2; web twin: challengeBindingValid).
+    private func challengeBindingValid(day: Int?, boardSeed: Int) -> Bool {
+        guard let day, let ch = dailyChallenge(day, pool) else { return false }
+        return ch.seed == boardSeed
+    }
+
     /// Fold a won challenge attempt into the day's record (OR-accumulated). Returns the graded
     /// attempt for the win overlay, or nil for casual play. Clears challengeDay.
     private func recordChallengeResult(secs: Int) -> TierResult? {
-        guard let day = challengeDay, let ch = dailyChallenge(day, pool) else { return nil }
+        // The binding guard is defense in depth here: playChallenge always binds correctly and
+        // restore() drops a stale binding, so a mismatch at win time should be unreachable — but
+        // this is the last gate before daily credit is written (skeptical-review R2).
+        guard let day = challengeDay, challengeBindingValid(day: day, boardSeed: seed),
+              let ch = dailyChallenge(day, pool) else {
+            challengeDay = nil; challengeStartDay = nil
+            return nil
+        }
         let attempt = Attempt(won: true, moves: moveCount, elapsed: secs,
                               cellUses: telem.cellUses, undos: telem.undos,
                               foundationOrder: telem.foundationOrder,
