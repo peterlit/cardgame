@@ -35,6 +35,17 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "CB5E1A2B3C4D5E6F00000022"
+               BuildableName = "CausewayTests.xctest"
+               BlueprintName = "CausewayTests"
+               ReferencedContainer = "container:Causeway.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "C761C3703031FA7B00429DAC"
                BuildableName = "CausewayUITests.xctest"
                BlueprintName = "CausewayUITests"
