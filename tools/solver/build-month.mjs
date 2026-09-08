@@ -19,7 +19,7 @@
 // of a family already used, and a rare certification (one only a few seeds support) is preferred
 // over a common one, since rare material is the hardest to place. Adjacent days are then reordered
 // so no two consecutive days share an objective family.
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -273,6 +273,39 @@ function serialize(pool) {
   return `{\n  "version": ${pool.version},\n  "epoch": ${JSON.stringify(pool.epoch)},\n  "minSeed": ${pool.minSeed},\n  "maxSeed": ${pool.maxSeed},\n  "days": [\n${rows}\n  ]\n}\n`;
 }
 
+// ---- publishing contract (skeptical-review R8) --------------------------------------------------
+// The existing output decides the MODE before anything is selected:
+//   fresh   — `out` absent/empty: build all --days from scratch.
+//   extend  — --extend: every published day stays byte-identical; only the days beyond them are
+//             filled. A published (seed, objectives) pair is a player's history — it never changes.
+//   rebuild — --rebuild: replace a non-empty pool. Allowed ONLY with a bumped POOL_VERSION,
+//             because a rebuild renames every day's challenge and the clients drop their daily
+//             history exactly once per generation (web loadDaily v-gate / iOS DailyStore).
+// Anything else refuses, loudly, before selection. And an underfilled selection FAILS with the
+// previous output untouched — this script once overwrote 61 good days with 0 and exited 0.
+
+let existing = null;
+if (existsSync(out)) { try { existing = JSON.parse(readFileSync(out, 'utf8')); } catch { existing = null; } }
+const existingDays = existing?.days?.length ? existing.days : null;
+const refuse = msg => { console.error('REFUSING: ' + msg); process.exit(1); };
+
+if (has('extend') && has('rebuild')) refuse('--extend and --rebuild are opposites — pick one');
+if (existingDays && !has('extend') && !has('rebuild')) {
+  refuse(`${out} already holds ${existingDays.length} published days.\n` +
+    `  --extend  keeps them verbatim and fills days ${existingDays.length}..${nDays - 1} (--days ${nDays});\n` +
+    `  --rebuild replaces them — requires a bumped POOL_VERSION, since a rebuild renames every\n` +
+    `  day's challenge and clients drop their daily history on the generation change.`);
+}
+if (has('extend')) {
+  if (!existingDays) refuse(`--extend needs an existing non-empty pool at ${out}`);
+  if (existing.epoch !== EPOCH) refuse(`existing epoch ${existing.epoch} != ${EPOCH} — extension may not move day 0`);
+  if (existing.version !== POOL_VERSION) refuse(`existing version ${existing.version} != POOL_VERSION ${POOL_VERSION} — extension may not change generation`);
+  if (existingDays.length >= nDays) refuse(`pool already holds ${existingDays.length} days ≥ --days ${nDays} — raise --days to extend`);
+}
+if (has('rebuild') && existingDays && existing.version === POOL_VERSION) {
+  refuse(`--rebuild with unchanged POOL_VERSION ${POOL_VERSION} — bump it (and the clients' accepted store generation) first, or this generation's history silently mis-scores against the new days`);
+}
+
 if (!has('select-only')) await certifyAll();
 loadFlawlessCache();
 
@@ -280,27 +313,68 @@ const recs = [...readCache(cache).values()].filter(r => list.includes(r.seed));
 const winnable = recs.filter(r => r.winnable);
 console.log(`\ncertified ${recs.length} candidates: ${winnable.length} winnable, ${recs.filter(isDailyEligible).length} daily-eligible`);
 
-const chosen = spread(selectMonthBalanced(recs));
-if (chosen.length < nDays) console.warn(`WARNING: only ${chosen.length} of ${nDays} days could be filled — widen --candidates`);
+// Published seeds are spoken for; the selection fills only the open slots.
+const publishedSeeds = new Set((has('extend') ? existingDays : []).map(d => d.seed));
+const slotsToFill = has('extend') ? nDays - existingDays.length : nDays;
+const fresh = spread(selectMonthBalanced(recs.filter(r => !publishedSeeds.has(r.seed))));
 console.log(`flawless gate: ${gateOn ? `${fSolves} joint searches + ${fStatic} rejected structurally` : 'DISABLED (--no-flawless-gate)'}`);
 
+if (fresh.length < slotsToFill) {
+  console.error(`FAILING CLOSED: only ${fresh.length} of ${slotsToFill} days could be filled — ` +
+    `widen --candidates or raise --budget. ${out} is untouched.`);
+  process.exit(1);
+}
+
+const newDays = fresh.map(c => ({
+  seed: c.rec.seed,
+  par: c.rec.par,
+  silver: { id: c.silver.id, param: c.silver.param },
+  gold: { id: c.gold.id, param: c.gold.param },
+}));
 const pool = {
   version: POOL_VERSION, epoch: EPOCH, minSeed: MIN_SEED, maxSeed: MAX_SEED,
-  days: chosen.map(c => ({
-    seed: c.rec.seed,
-    par: c.rec.par,
-    silver: { id: c.silver.id, param: c.silver.param },
-    gold: { id: c.gold.id, param: c.gold.param },
-  })),
+  days: has('extend') ? [...existingDays, ...newDays] : newDays,
 };
+
+// Write a CANDIDATE, validate the bytes about to be published, then swap. A truncated or invalid
+// bundle must never replace a good one.
+const candidatePath = out + '.candidate';
 mkdirSync(dirname(out), { recursive: true });
-writeFileSync(out, serialize(pool));
+writeFileSync(candidatePath, serialize(pool));
+const check = JSON.parse(readFileSync(candidatePath, 'utf8'));
+const fail = msg => {
+  console.error(`FAILING CLOSED: candidate invalid — ${msg}; ${out} is untouched (candidate kept at ${candidatePath})`);
+  process.exit(1);
+};
+if (check.days.length !== nDays) fail(`${check.days.length} days, expected ${nDays}`);
+if (new Set(check.days.map(d => d.seed)).size !== check.days.length) fail('duplicate seeds');
+for (const [i, d] of check.days.entries()) {
+  if (!(d.seed >= MIN_SEED && d.seed <= MAX_SEED)) fail(`day ${i} seed ${d.seed} out of the daily range`);
+  if (!d.silver?.id || !d.gold?.id || !Number.isFinite(d.par)) fail(`day ${i} is incomplete`);
+  if (d.silver.id === d.gold.id) fail(`day ${i} pairs family ${d.gold.id} with itself`);
+}
+if (has('extend')) {
+  for (const [i, d] of existingDays.entries()) {
+    if (JSON.stringify(check.days[i]) !== JSON.stringify(d))
+      fail(`published day ${i} changed — extension must preserve every published (seed, objectives) verbatim`);
+  }
+}
+renameSync(candidatePath, out);
 
 const ids = new Set(), keys = new Set();
-for (const c of chosen) { ids.add(c.gold.id); ids.add(c.silver.id); keys.add(c.gold.key); keys.add(c.silver.key); }
-console.log(`\nmonth written to ${out}: ${pool.days.length} days, ${ids.size} distinct objective families, ${keys.size} distinct challenges`);
-for (let i = 0; i < chosen.length; i++) {
-  const c = chosen[i];
-  console.log(`  ${dayLabel(i)}  #${c.rec.seed}  par ${String(c.rec.par).padStart(3)}  ` +
+for (const c of fresh) { ids.add(c.gold.id); ids.add(c.silver.id); keys.add(c.gold.key); keys.add(c.silver.key); }
+const base = has('extend') ? existingDays.length : 0;
+console.log(`\n${has('extend') ? 'extension' : 'month'} written to ${out}: ${pool.days.length} days total, ` +
+            `${fresh.length} new (${ids.size} distinct objective families, ${keys.size} distinct challenges among them)`);
+for (let i = 0; i < fresh.length; i++) {
+  const c = fresh[i];
+  console.log(`  ${dayLabel(base + i)}  #${c.rec.seed}  par ${String(c.rec.par).padStart(3)}  ` +
               `S: ${labelOf(c.silver.id, c.silver.param)}\n              G: ${labelOf(c.gold.id, c.gold.param)}`);
+}
+
+// The iOS app bundles COPIES of data/*.json. A changed pool must be re-synced and its
+// daily-solutions.json rebuilt (docs/solver.md), or the two platforms ship different calendars.
+const iosCopy = `${dirname(dirname(dirname(fileURLToPath(import.meta.url))))}/ios/Causeway/Causeway/daily-pool.json`;
+if (existsSync(iosCopy) && readFileSync(iosCopy, 'utf8') !== serialize(pool)) {
+  console.warn(`\nNOTE: ${iosCopy} now differs from ${out} — sync it and rebuild daily-solutions.json before shipping.`);
 }
