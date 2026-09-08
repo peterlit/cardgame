@@ -247,7 +247,15 @@ struct ContentView: View {
             .foregroundStyle(Theme.ink)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { game.persist() }   // capture latest board + elapsed before eviction
+            // Background time is not play time: the clock's measurement is wall-clock now (R9),
+            // so the old "Timer just stops firing" accident must become an explicit pause. Pause
+            // BEFORE persist so the banked seconds are what the save carries.
+            if phase == .active {
+                game.clock.resumeFromBackground()
+            } else {
+                game.clock.pauseForBackground()
+                game.persist()   // capture latest board + elapsed before eviction
+            }
         }
         .onChange(of: game.dealGeneration) { _, _ in
             // New deal (any path — New game, Replay, demo Stop/Done, Daily play, deal alert):

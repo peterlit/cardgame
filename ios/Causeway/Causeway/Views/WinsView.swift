@@ -125,7 +125,10 @@ struct WinsView: View {
                                 Image(systemName: "play.circle.fill").foregroundStyle(Theme.gold)
                             }
                             Spacer()
-                            Text("\(row.rec.moves) moves · \(DealFormat.time(row.rec.secs)) · \(row.rec.date.formatted(.dateTime.month(.abbreviated).day()))")
+                            // fewest/fastest, SEPARATELY: WinRecord keeps independent minima, so
+                            // "96 moves · 5:41" as one phrase can describe a run that never
+                            // happened (skeptical-review R11; web twin: openWinsDetail's row).
+                            Text("fewest \(row.rec.moves) moves · fastest \(DealFormat.time(row.rec.secs)) · \(row.rec.date.formatted(.dateTime.month(.abbreviated).day()))")
                                 .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                         }
                         .contentShape(Rectangle())

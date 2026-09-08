@@ -129,6 +129,11 @@
   .panel {
     background:#2c3b3a; color:#f1ece0; border:1px solid rgba(255,255,255,.18); border-radius:16px;
     padding:26px 28px; text-align:center; max-width:340px; box-shadow:0 18px 50px rgba(0,0,0,.5);
+    /* A panel taller than the viewport must scroll INSIDE itself: the fixed overlay centers its
+       child, so an unbounded panel clips at BOTH ends — at 1280×720 the Daily panel ran from
+       −175px to 895px with its Close button unreachable, and scrolling moved the board behind
+       the overlay instead (skeptical-review R6). */
+    max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
   }
   .panel h2 { margin:0 0 8px; font-size:26px; color:var(--gold); }
   .panel p { margin:6px 0 18px; opacity:.9; font-size:14px; line-height:1.4; }
@@ -814,8 +819,14 @@ function commitMove(){
 /* selection: {kind:'tableau',col,idx} | {kind:'cell',idx} */
 function selectedCards(){
   if(!selection) return [];
-  if(selection.kind==="cell") return [state.cells[selection.idx]];
-  return state.tableau[selection.col].slice(selection.idx);
+  // A drop can arrive with a STALE source: autoplay may move the captured card between
+  // pointer-down and pointer-up, and dragUp reinstates the old location as the selection. A
+  // vacated cell used to come back as [null], which passed the nonempty-array guards and reached
+  // code dereferencing a card (skeptical-review R7: `Cannot read properties of null`). Vacant or
+  // out-of-range sources yield [], which every tryDest* refuses — the drop becomes a snap-back.
+  if(selection.kind==="cell"){ const c=state.cells[selection.idx]; return c ? [c] : []; }
+  const t=state.tableau[selection.col];
+  return t ? t.slice(selection.idx) : [];
 }
 
 function tryDestTableau(col){
@@ -1722,8 +1733,13 @@ function renderDailyCard(){
   const runs=rec.runs||[];
   let clearsLine='';
   if(rec.bronze){
-    const parts=[runs.length>1?`Cleared ${runs.length}×`:'Cleared'];
-    if(Number.isFinite(rec.moves)) parts.push(`best ${rec.moves} moves`+(Number.isFinite(rec.elapsed)?` in ${fmtTime(rec.elapsed)}`:''));
+    // The minima are INDEPENDENT bests — fewest moves and fastest time may come from different
+    // runs, so they must never fuse into one "best X moves in T" that never happened
+    // (skeptical-review R11). And the run log is capped+deduplicated (RUN_LOG_MAX), so a full
+    // log reads "20+×" instead of posing as a lifetime total. (iOS twin: clearsSummary.)
+    const parts=[runs.length>1?`Cleared ${runs.length>=RUN_LOG_MAX?RUN_LOG_MAX+'+':runs.length}×`:'Cleared'];
+    if(Number.isFinite(rec.moves)) parts.push(`fewest ${rec.moves} moves`);
+    if(Number.isFinite(rec.elapsed)) parts.push(`fastest ${fmtTime(rec.elapsed)}`);
     parts.push(`par ${c.par}`);
     clearsLine=`<div class="dclears">${parts.join(' · ')}`
       +(runs.length>1?`<div class="dclrow">Moves each run: ${runs.map(r=>r.moves).join(' · ')}</div>`:'')
@@ -1921,9 +1937,12 @@ function openWinsDetail(a,b){
   list.innerHTML = rows.map(r=>{
     const cur = r.seed===seed ? " cur" : "";
     const date = r.date ? ` · ${fmtDate(r.date)}` : "";
+    // fewest/fastest, SEPARATELY: wins[] keeps independent minima per deal, so "96 moves · 5:41"
+    // as one phrase can describe a run that never happened (skeptical-review R11; iOS twin:
+    // WinsView's row).
     return `<button class="deal-row${cur}" data-seed="${r.seed}">`+
       `<span>Deal #${r.seed}</span>`+
-      `<span class="dm">${r.moves} moves · ${fmtTime(r.secs)}${date}</span></button>`;
+      `<span class="dm">fewest ${r.moves} moves · fastest ${fmtTime(r.secs)}${date}</span></button>`;
   }).join("");
   list.querySelectorAll(".deal-row").forEach(el=>
     el.onclick=()=>requestDeal(()=>{ closeWins(); deal(+el.dataset.seed); }));
@@ -2111,6 +2130,16 @@ document.getElementById("dealInput").addEventListener("keydown",e=>{
   if(e.key==="Escape"){ e.preventDefault(); closeDeal(); }
 });
 document.addEventListener("keydown",e=>{
+  // Escape closes the top informational dialog — the Daily sheet's Close lived below the fold of
+  // a 720px viewport with no keyboard exit at all (skeptical-review R6). The finish prompt is
+  // NOT on this list: it is a decision, and Escape must not silently pick an answer for it. The
+  // deal dialog's input has its own Escape handler; this one covers the unfocused case.
+  if(e.key==="Escape"){
+    for(const [id, close] of [["dailyOverlay",closeDaily],["winsOverlay",closeWins],
+                              ["dealOverlay",closeDeal],["overlay",hideWin]]){
+      if(document.getElementById(id).classList.contains("show")){ e.preventDefault(); close(); return; }
+    }
+  }
   // Typing in a field (the deal number box) or working inside an open dialog must never fire a
   // board shortcut: an 'n' typed into an input used to throw the live game away with no
   // confirmation at all (skeptical-review R4 — the unfocused global handler).

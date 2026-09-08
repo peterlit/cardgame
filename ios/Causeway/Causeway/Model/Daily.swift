@@ -57,9 +57,23 @@ func civilOf(_ idx: Int) -> (year: Int, month: Int, day: Int) {
     return (p.year ?? 2026, p.month ?? 8, p.day ?? 1)
 }
 
-/// Today's day index in the player's local calendar (matches web's `new Date()` local reading).
+/// Today's day index, read in the player's local TIME ZONE but always on the GREGORIAN calendar.
 func todayIndex() -> Int {
-    let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+    #if DEBUG
+    // UI tests pin the calendar (launchEnvironment CAUSEWAY_TODAY_OVERRIDE="y-m-d"): date-
+    // dependent tests otherwise drift with the wall clock and outlive the finite pool — the
+    // calendar regressions went red purely because September advanced (skeptical-review R10).
+    if let raw = ProcessInfo.processInfo.environment["CAUSEWAY_TODAY_OVERRIDE"] {
+        let p = raw.split(separator: "-").compactMap { Int($0) }
+        if p.count == 3 { return dayIndexFor(p[0], p[1], p[2]) }
+    }
+    #endif
+    // Civil-date arithmetic is GREGORIAN by contract — daysFromCivil implements the Gregorian
+    // algorithm, and the web twin's `new Date()` getters are Gregorian by spec. `Calendar.current`
+    // follows the device's PREFERRED calendar: under th_TH@calendar=buddhist it fed year 2569
+    // into the Gregorian formula and returned index 198364, warping every date guard in the app
+    // (skeptical-review R5). Locale belongs in presentation; arithmetic stays Gregorian.
+    let c = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: Date())
     return dayIndexFor(c.year ?? 2026, c.month ?? 1, c.day ?? 1)
 }
 

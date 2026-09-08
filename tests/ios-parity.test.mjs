@@ -433,6 +433,30 @@ pin('Model/Game.swift', 'post-win undo resets the record-once latch', [
         // freezes and a later re-win would persist a bogus best time).
         if started && !clock.isRunning { startTimer() }`,
 ]);
+// ---- R11 (skeptical review): independent minima never fuse into one apparent run ----
+// wins[] and the daily record keep fewest-moves and fastest-time SEPARATELY (min-merged across
+// runs), so "best 96 moves in 5:41" could describe a performance that never happened. Both
+// platforms now label the two bests apart, and cap the clear count at the bounded run log.
+test('R11: fewest and fastest are labelled separately on both platforms, and the clear count caps honestly', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const daily = read('Views/DailyView.swift');
+  const wins = read('Views/WinsView.swift');
+  assert.ok(html.includes(norm('parts.push(`fewest ${rec.moves} moves`);')) &&
+            html.includes(norm('parts.push(`fastest ${fmtTime(rec.elapsed)}`);')),
+    'web daily card re-fused the independent minima into one phrase');
+  assert.ok(html.includes(norm('`Cleared ${runs.length>=RUN_LOG_MAX?RUN_LOG_MAX+\'+\':runs.length}×`')),
+    'web clear count reads a bounded, deduplicated log as a lifetime total again');
+  assert.ok(html.includes(norm('fewest ${r.moves} moves · fastest ${fmtTime(r.secs)}')),
+    'web wins rows re-fused the independent minima');
+  assert.ok(daily.includes(norm('if let m = r.moves { parts.append("fewest \\(m) moves") }')) &&
+            daily.includes(norm('if let e = r.elapsed { parts.append("fastest " + DealFormat.time(e)) }')),
+    'iOS daily card re-fused the independent minima into one phrase');
+  assert.ok(daily.includes(norm('let count = r.runs.count >= runLogMax ? "\\(runLogMax)+" : "\\(r.runs.count)"')),
+    'iOS clear count reads a bounded, deduplicated log as a lifetime total again');
+  assert.ok(wins.includes('fewest \\(row.rec.moves) moves · fastest \\(DealFormat.time(row.rec.secs))'),
+    'iOS wins rows re-fused the independent minima');
+});
+
 test('R3: web undo resets the record-once latch and resumes the clock (twin of the tested iOS sequence)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   assert.ok(html.includes(norm('if(winRecorded){ winRecorded=false; pendingWin=null; }')),

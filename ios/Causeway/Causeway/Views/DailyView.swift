@@ -273,16 +273,19 @@ struct DailyView: View {
         }
     }
 
-    /// "Cleared 3× · best 96 moves in 5:41 · par 72" — the day's banked best, put next to the
-    /// solver's par so the move count means something, with the clear count that produced it.
+    /// "Cleared 3× · fewest 96 moves · fastest 5:41 · par 72" — the day's banked bests, put next
+    /// to the solver's par so the move count means something. The minima are INDEPENDENT — 80
+    /// moves in one run and 5:00 in another must never fuse into "best 80 moves in 5:00", a run
+    /// that never happened (skeptical-review R11) — and the count caps honestly: the run log
+    /// keeps `runLogMax` deduplicated entries, so a fuller log reads "20+×", not a fake total.
     /// Built as a plain String on purpose: `Text("... \(m) moves")` interpolates through
     /// LocalizedStringKey and would GROUP the digits, the same trap the deal number fell into
     /// (bug/WF-13:daily-card-seed-grouped).
     private func clearsSummary(_ r: TierResult, par: Int) -> String {
-        var parts = [r.runs.count > 1 ? "Cleared \(r.runs.count)×" : "Cleared"]
-        if let m = r.moves {
-            parts.append(r.elapsed.map { "best \(m) moves in " + DealFormat.time($0) } ?? "best \(m) moves")
-        }
+        let count = r.runs.count >= runLogMax ? "\(runLogMax)+" : "\(r.runs.count)"
+        var parts = [r.runs.count > 1 ? "Cleared \(count)×" : "Cleared"]
+        if let m = r.moves { parts.append("fewest \(m) moves") }
+        if let e = r.elapsed { parts.append("fastest " + DealFormat.time(e)) }
         parts.append("par \(par)")
         return parts.joined(separator: " · ")
     }
@@ -648,6 +651,10 @@ struct DailyView: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(locked ? "\(dayLabel(idx)), locked until that date" : dayLabel(idx))
+        // The STABLE per-day locator the UI tests scroll toward. Labels shift with lock state and
+        // wording; the identifier never does (skeptical-review R10; filed since round 2 as
+        // bug/DailyView:calendar-cells-have-no-identifier).
+        .accessibilityIdentifier("daily.cal.\(idx)")
     }
 
     private func dotColor(_ tier: String) -> Color {
