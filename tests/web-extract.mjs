@@ -116,7 +116,7 @@ export function loadWeb(g = {}) {
   const body = NAMES.map(n => extractDecl(n)).join('\n');   // not point-free: map's index arg would land in `src`
   const src = `
     "use strict";
-    const NCELLS = 4, NCOLS = 8;
+    const NCELLS = 3, NCOLS = 8;
     let state = null, telem = null, moveCount = 0, challengeDay = null, dailyPool = null;
     ${body}
     return {
