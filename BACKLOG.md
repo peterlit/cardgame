@@ -885,3 +885,27 @@ hierarchy simplification (daily sheet information density), a real VoiceOver/lar
 playthrough (owner or device time), the single-file-web build step idea, daily-challenges.md's
 corrections-first structure, and the owner-only shipping items (URLs, contact email, physical
 iOS 17/18 pass, I6 Release memory measurement).
+
+## 2026-09-08 — review-loop round 1 on the pass above
+
+- **Blocker FIXED** — `--extend` could never publish: the selector was asked for `--days` days
+  instead of the open slots, so every extension failed its own candidate day-count check.
+  Selection now fills exactly the open slots; verified end-to-end (61 published + 4 fresh).
+- **Majors FIXED** — an extension inherits the published days' novelty counters and hard-bars
+  exact published (silver, gold) pairs, enforced again on the output bytes; a daily-pool.json
+  that exists but won't parse REFUSES instead of counting as absent (corruption ≠ absence);
+  builder tests now include three POSITIVE cases (fresh publish, extend publish, corrupt-refusal)
+  against the tracked cache — the suite can no longer be satisfied by a tool that always refuses;
+  the Swift unit tests snapshot/restore every `causeway.*` default instead of deleting them, so
+  the still-pending on-device run cannot erase the owner's real history (sentinel-verified).
+- **Minors FIXED** — the web pool fetch retries with capped backoff (one failed fetch no longer
+  disables automation for the whole session); web post-win undo re-anchors the clock past the
+  overlay dwell (iOS GameClock parity, pinned in ios-parity.test.mjs); a deferred win overlay
+  redraws with the actual medals when the pool lands.
+- **NEW OPEN: clients don't couple daily history to the pool generation.** POOL_VERSION (builder,
+  4) and the clients' store gates (web `g.version===3`, iOS `DailyStore.version = 3`) are
+  independent numbers — bumping POOL_VERSION satisfies `--rebuild`'s gate but changes nothing on
+  either client, so after a rebuild every player's day-N medals would score against a different
+  day-N challenge. The builder's refusal message now states this outright (bump = necessary, not
+  sufficient). Only matters if a rebuild is ever chosen over `--extend`; the sanctioned reseed
+  path is `--extend`, which is unaffected.

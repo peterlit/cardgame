@@ -6,19 +6,31 @@ import XCTest
 /// reads the same, not that it does the same (the 2026-09-07 skeptical review's central "ugly").
 /// These tests construct the real `Game` and run the real methods.
 ///
-/// `Game` persists through `UserDefaults.standard`, so each test clears the game's keys before and
-/// after itself: the suite must pass in any order and leave the test host's container clean.
+/// `Game` persists through `UserDefaults.standard`, and TEST_HOST is Causeway.app — this suite
+/// runs INSIDE the shipping app's container. On the owner's physical device those defaults ARE
+/// the real win history and daily medals, so each test SNAPSHOTS every `causeway.`-prefixed key,
+/// clears them for a deterministic start, and RESTORES the snapshot after itself (deleting
+/// whatever the test wrote — including versioned backup keys like `causeway.daily.v<N>`). The
+/// suite still passes in any order, and the host's container survives it byte-for-byte.
 final class CausewayModelTests: XCTestCase {
 
-    private let gameKeys = ["causeway.game", "causeway.daily", "causeway.wins",
-                            "causeway.autoplay", "causeway.autofinishmode"]
+    private var savedDefaults: [String: Any] = [:]
+    private var causewayKeys: [String] {
+        UserDefaults.standard.dictionaryRepresentation().keys.filter { $0.hasPrefix("causeway.") }
+    }
 
     override func setUp() {
         super.setUp()
-        for k in gameKeys { UserDefaults.standard.removeObject(forKey: k) }
+        savedDefaults = [:]
+        for k in causewayKeys {
+            savedDefaults[k] = UserDefaults.standard.object(forKey: k)
+            UserDefaults.standard.removeObject(forKey: k)
+        }
     }
     override func tearDown() {
-        for k in gameKeys { UserDefaults.standard.removeObject(forKey: k) }
+        for k in causewayKeys { UserDefaults.standard.removeObject(forKey: k) }
+        for (k, v) in savedDefaults { UserDefaults.standard.set(v, forKey: k) }
+        savedDefaults = [:]
         super.tearDown()
     }
 

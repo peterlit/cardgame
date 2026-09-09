@@ -461,8 +461,14 @@ test('R3: web undo resets the record-once latch and resumes the clock (twin of t
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   assert.ok(html.includes(norm('if(winRecorded){ winRecorded=false; pendingWin=null; }')),
     'web undo leaves winRecorded latched — a re-win would skip stopTimer/clearSavedGame again');
-  assert.ok(html.includes(norm('if(startTime && !timerId) startTimer();')),
-    'web undo no longer resumes the display clock after a post-win undo');
+  // The resume must EXCLUDE the stopped stretch: iOS GameClock banks seconds at stop() and
+  // re-anchors on resume, so overlay-dwell never counts as play. The web's single startTime
+  // anchor shifts forward by the stopped duration to mean the same thing — losing either line
+  // makes the platforms measure the same play differently again.
+  assert.ok(html.includes(norm('winStopAt=Date.now();')),
+    'web recordWin no longer marks when the clock stopped — a post-win undo would resume inflated');
+  assert.ok(html.includes(norm('if(startTime && !timerId){ if(winStopAt){ startTime += Date.now()-winStopAt; winStopAt=null; } startTimer(); }')),
+    'web undo no longer resumes the display clock re-anchored past the overlay dwell');
 });
 
 // ---- R1 (skeptical review): the pool-readiness gate's WIRING (web only — iOS bundles its pool) ----

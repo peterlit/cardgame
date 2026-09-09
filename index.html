@@ -529,7 +529,7 @@ function deal(theSeed){
   resetTelem(); challengeDay=null; challengeStartDay=null; demoDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
-  winRecorded=false; pendingWin=null;   // fresh game — allow the next win to record
+  winRecorded=false; pendingWin=null; winStopAt=null;   // fresh game — allow the next win to record
   refreshHud();
   hideWin();
   render(false);
@@ -598,7 +598,7 @@ function restoreGame(){
   telem = (g.telem && Array.isArray(g.telem.foundationOrder)) ? g.telem : { cellUses:0, undos:0, foundationOrder:[], maxRunMoved:0 };
   if(typeof telem.maxRunMoved!=="number") telem.maxRunMoved=0;
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
-  winRecorded=false; pendingWin=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
+  winRecorded=false; pendingWin=null; winStopAt=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
   const es = g.elapsedSecs||0;
   if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
   setMoves(moveCount); setTime(es);
@@ -799,8 +799,12 @@ function undo(){
   // unfinished save that resurrected on reload, one card from done (skeptical-review R3;
   // owner decision 2026-09-08: post-win undo = casual continuation).
   if(winRecorded){ winRecorded=false; pendingWin=null; }
-  // recordWin stopped the display clock; play is live again, so it must tick again (iOS parity).
-  if(startTime && !timerId) startTimer();
+  // recordWin stopped the display clock; play is live again, so it must tick again — with the
+  // anchor shifted past the stopped stretch, so time spent staring at the win overlay is
+  // EXCLUDED. iOS GameClock banks seconds at stop() and re-anchors on resume; without this shift
+  // the two platforms measured the same play differently, and a web re-win reported (and saved)
+  // an elapsed inflated by the overlay dwell.
+  if(startTime && !timerId){ if(winStopAt){ startTime += Date.now()-winStopAt; winStopAt=null; } startTimer(); }
   selection=null; render(false);
   saveGame();
 }
@@ -1252,7 +1256,7 @@ function startTimer(){ stopTimer(); timerId=setInterval(()=>{ setTime(Math.floor
 function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 
 /* ---------- win ---------- */
-let winRecorded=false, pendingWin=null;
+let winRecorded=false, pendingWin=null, winStopAt=null;   // winStopAt: when recordWin froze the clock
 // Durable win side effects — recorded exactly once, synchronously at the winning move so a tab
 // close during the deferred-overlay beat can't lose the win/best-time. Stashes the display data
 // (secs + prior best) for the deferred overlay, since wins[seed] gets overwritten here.
@@ -1260,6 +1264,7 @@ function recordWin(){
   if(winRecorded) return;
   winRecorded=true;
   stopTimer();
+  winStopAt=Date.now();   // if a post-win undo resumes play, overlay-dwell time is excluded (iOS parity)
   clearSavedGame();   // finished game — a reload should start fresh
   const secs = startTime?Math.floor((Date.now()-startTime)/1000):0;
   const prev = wins[seed];
@@ -1433,13 +1438,24 @@ function reconcileChallengeBinding(){
 // Arrival order matters: reconcile the restored attempt's identity (R2), grade any banked win
 // (R1), THEN let automation act — it was held off while the rules were unreadable, and it must
 // only ever run under the real objectives.
-fetch("data/daily-pool.json").then(r=>r.json()).then(p=>{
+// A failed fetch RETRIES with capped backoff: dailyRulesPending() holds automation (autoplay,
+// the finish cascade, the Finish button) closed while a daily attempt's rules are unreadable —
+// correct, but a single silent failure used to hold it closed for the entire session. The pool
+// is a small static file; asking again every so often is cheap, and each arrival re-runs the
+// gated automation through the handler below.
+function loadDailyPool(attempt=0){
+  fetch("data/daily-pool.json").then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }).then(p=>{
   dailyPool=p.days;
   reconcileChallengeBinding();
   scorePendingDaily();
   refreshDailyBtn(); refreshFinishBtn();
   runAutoplay(); maybeAutoFinish();
-}).catch(()=>{ refreshDailyBtn(); });
+  }).catch(()=>{
+    refreshDailyBtn();
+    setTimeout(()=>loadDailyPool(attempt+1), Math.min(30000, 1000*2**Math.min(attempt,5)));
+  });
+}
+loadDailyPool();
 // Baked winning lines for "Show me how to win" (seed -> compact token string). Optional: absent =
 // the feature just doesn't offer itself for that seed.
 let dailySolutions=null;
@@ -1651,6 +1667,14 @@ function scorePendingDaily(){
   dailyStore.days[p.day]=mergeTiers(dailyStore.days[p.day],res);
   saveDaily();
   if(dailyView!=null) renderDaily();
+  // The deferred win overlay promised "your medals will be recorded when the daily data loads".
+  // If the player is still looking at that promise when the pool lands, KEEP it on the overlay:
+  // swap the graded result into the stashed win and redraw the message. (Overlay dismissed =
+  // nothing to redraw; the Daily sheet already carries the record.)
+  if(pendingWin && pendingWin.dailyDeferred && pendingWin.dailyDay===p.day){
+    pendingWin.daily=res; pendingWin.dailyDeferred=false;
+    if(document.getElementById("overlay").classList.contains("show")) onWin();
+  }
 }
 
 /* ---- rendering ---- */

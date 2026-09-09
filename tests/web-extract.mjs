@@ -125,6 +125,7 @@ export function loadWeb(g = {}) {
     const NCELLS = 3, NCOLS = 8;
     let state = null, telem = null, moveCount = 0, challengeDay = null, dailyPool = null;
     let challengeStartDay = null, seed = 0, dailyStore = { version: 3, days: {} }, dailyView = null;
+    let pendingWin = null;   // stays null here, so scorePendingDaily's overlay-refresh branch (DOM) short-circuits
     // localStorage stand-in, so the shipped persistence-adjacent code (saveDaily,
     // scorePendingDaily, recordChallengeResult's R1 stash) RUNS instead of being stubbed out.
     // __ls is handed back for assertions.

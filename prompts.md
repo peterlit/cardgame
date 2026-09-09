@@ -817,3 +817,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     out already guarded by finishGen. Suites at close: node 153/153, native unit 11/11, calendar
     UI 3/3, full iOS suite re-run this session. Review-loop feedback collected throughout went to
     docs/review-loop-skeptical-review-feedback.md.
+
+89. Review-loop round 1 (automated skeptical reviewer) on the #88 pass: 9 open findings — 1
+    blocker, 4 major, 4 minor. All addressed. The blocker was real and embarrassing: `--extend`
+    could never publish, because the selector filled `--days` slots instead of the open ones, so
+    61 published + N fresh always failed the builder's own candidate validation — and the only
+    sanctioned reseed path for the 2026-09-30 pool expiry failed closed on its happy path. Fixed
+    (selection fills exactly the open slots), plus the majors: extension now seeds novelty
+    counters from the published days and hard-bars exact published (silver, gold) pairs (checked
+    again on the output bytes); a corrupt daily-pool.json refuses instead of parsing as absent;
+    three POSITIVE builder tests (fresh publish, extend publish, corrupt-refusal) against the
+    tracked cache, closing the "a suite of refusals is satisfied by a tool that always refuses"
+    hole; Swift unit tests snapshot/restore `causeway.*` defaults instead of deleting them
+    (sentinel-verified — an on-device run no longer erases real history). Minors: pool fetch
+    retries with capped backoff, web post-win undo re-anchors the clock past the overlay dwell
+    (iOS parity, newly pinned), the deferred win overlay redraws when the pool lands, and the
+    `--rebuild` gate's message stops claiming a client coupling that doesn't exist (the missing
+    coupling is a new BACKLOG item). Suites: node 156/156 (3 new), native unit 11/11.

@@ -171,7 +171,26 @@ function silverOptions(rec) {
 const goldOptions = rec => rec.supports.filter(isGold)
   .map(v => ({ id: v.id, param: v.param, key: variantKey(v.id, v.param), rare: true }));
 
-function selectMonth(recs, capPerFamily) {
+// The exact-pair identity of a day's challenge, independent of how the option was keyed at
+// selection time (universal Silvers use synthetic keys like `moves:f=1.1`; published days store
+// only id+param). variantKey is canonical for both.
+const pairKey = (s, g) => `${variantKey(s.id, s.param)}|${variantKey(g.id, g.param)}`;
+// A published day's Silver back-translated to the selector's option key(s). `moves` options are
+// keyed per FACTOR, so every factor that lands on the published N gets the penalty — no alias
+// escapes it. Anything else (including `no-undo`, whose variantKey IS its option key) is 1:1.
+function publishedSilverKeys(d) {
+  if (d.silver.id === 'moves') {
+    const ks = MOVE_FACTORS.filter(f => Math.max(d.par, Math.round(d.par * f)) === d.silver.param.N)
+      .map(f => `moves:f=${f}`);
+    if (ks.length) return ks;
+  }
+  return [variantKey(d.silver.id, d.silver.param)];
+}
+
+// `want` is how many days to SELECT — the whole month when building fresh, only the open slots
+// when extending. `prior` (extend only) carries the published days: their objective usage seeds
+// the novelty counters, and their exact (silver, gold) pairs are barred outright.
+function selectMonth(recs, capPerFamily, want, prior) {
   const eligible = recs.filter(isDailyEligible);
   // Rarity: how many eligible seeds certify each variant key. Rare material gets placed first.
   const support = new Map();
@@ -184,6 +203,13 @@ function selectMonth(recs, capPerFamily) {
   // deadline is per-seed, so its key is always new) win every slot and the tier reads as one idea.
   const idUses = new Map(), keyUses = new Map();
   const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+  // An extension inherits the published month's novelty debt: counters start from what those days
+  // already used, or the fresh days silently rerun August's puzzles across the seam.
+  for (const d of prior?.days ?? []) {
+    bump(idUses, 'gold:' + d.gold.id); bump(keyUses, variantKey(d.gold.id, d.gold.param));
+    bump(idUses, 'silver:' + d.silver.id);
+    for (const k of publishedSilverKeys(d)) bump(keyUses, k);
+  }
   const capped = (tier, o) => (idUses.get(tier + ':' + o.id) || 0) >= capPerFamily;
   const novelty = (tier, o) => {
     const idN = idUses.get(tier + ':' + o.id) || 0, keyN = keyUses.get(o.key) || 0;
@@ -195,7 +221,7 @@ function selectMonth(recs, capPerFamily) {
   };
 
   const used = new Set(), chosen = [], rejected = new Set();
-  for (let slot = 0; slot < nDays; slot++) {
+  for (let slot = 0; slot < want; slot++) {
     // Take the most-varied triple that is also FLAWLESS-certified; a triple that fails the gate is
     // blacklisted and the slot re-picked, so the gate costs variety only when nothing else fits.
     let placed = false;
@@ -212,6 +238,10 @@ function selectMonth(recs, capPerFamily) {
             // "at least 10 from the Ace end" as the Gold is one objective printed twice, and the
             // Gold implies the Silver.
             if (s.id === g.id) continue;
+            // A published (silver, gold) pair is spoken for outright — the -60 novelty penalty
+            // discourages repeats, but "never repeat an exact challenge" across the seam is a
+            // rule, not a preference.
+            if (prior?.pairs.has(pairKey(s, g))) continue;
             if (rejected.has(fkey(rec.seed, s, g))) continue;
             const score = gs + novelty('silver', s);
             if (!best || score > best.score) best = { score, rec, gold: g, silver: s };
@@ -234,22 +264,23 @@ function selectMonth(recs, capPerFamily) {
 
 // Fill the month under the tightest per-family cap that still fills it. A tight cap is what forces
 // the tiers to range across families instead of one family with many parameters.
-function selectMonthBalanced(recs) {
+function selectMonthBalanced(recs, want, prior) {
   let best = [];
   for (let cap = 3; cap <= 12; cap++) {
-    const chosen = selectMonth(recs, cap);
+    const chosen = selectMonth(recs, cap, want, prior);
     if (chosen.length > best.length) best = chosen;
-    if (chosen.length >= nDays) return chosen;
+    if (chosen.length >= want) return chosen;
   }
   return best;
 }
 
 // Spread the chosen days so no two consecutive dates share an objective family (a greedy pass over
 // the selection order; purely cosmetic, but a month that alternates reads as more varied).
-function spread(chosen) {
+// `seam` is the last PUBLISHED day when extending, so the published/new boundary alternates too.
+function spread(chosen, seam) {
   const pool = chosen.slice(), out = [];
   while (pool.length) {
-    const prev = out[out.length - 1];
+    const prev = out[out.length - 1] ?? seam;
     let i = 0;
     if (prev) {
       const clash = c => c.gold.id === prev.gold.id || c.silver.id === prev.silver.id;
@@ -278,16 +309,31 @@ function serialize(pool) {
 //   fresh   — `out` absent/empty: build all --days from scratch.
 //   extend  — --extend: every published day stays byte-identical; only the days beyond them are
 //             filled. A published (seed, objectives) pair is a player's history — it never changes.
-//   rebuild — --rebuild: replace a non-empty pool. Allowed ONLY with a bumped POOL_VERSION,
-//             because a rebuild renames every day's challenge and the clients drop their daily
-//             history exactly once per generation (web loadDaily v-gate / iOS DailyStore).
+//   rebuild — --rebuild: replace a non-empty pool. Allowed ONLY with a bumped POOL_VERSION so the
+//             generations are distinguishable — but note the clients do NOT currently read the
+//             pool version (their store gates are independent numbers), so a rebuild also needs a
+//             client-side history drop/re-key. The refusal message spells this out; BACKLOG tracks
+//             the missing coupling.
 // Anything else refuses, loudly, before selection. And an underfilled selection FAILS with the
 // previous output untouched — this script once overwrote 61 good days with 0 and exited 0.
 
-let existing = null;
-if (existsSync(out)) { try { existing = JSON.parse(readFileSync(out, 'utf8')); } catch { existing = null; } }
-const existingDays = existing?.days?.length ? existing.days : null;
 const refuse = msg => { console.error('REFUSING: ' + msg); process.exit(1); };
+// A file that EXISTS but will not parse is corruption, not absence — falling through to fresh
+// mode here would let a bare run clobber a truncated-but-real published pool, exiting 0. Only a
+// genuinely empty file counts as "no pool yet".
+let existing = null;
+if (existsSync(out)) {
+  const raw = readFileSync(out, 'utf8');
+  if (raw.trim() !== '') {
+    try { existing = JSON.parse(raw); } catch (e) {
+      refuse(`${out} exists but cannot be parsed (${e.message}) — a corrupt pool is not an absent one; fix or move it before building`);
+    }
+    if (!Array.isArray(existing?.days)) {
+      refuse(`${out} parses but has no days[] array — not a pool this tool recognizes; fix or move it before building`);
+    }
+  }
+}
+const existingDays = existing?.days?.length ? existing.days : null;
 
 if (has('extend') && has('rebuild')) refuse('--extend and --rebuild are opposites — pick one');
 if (existingDays && !has('extend') && !has('rebuild')) {
@@ -303,7 +349,12 @@ if (has('extend')) {
   if (existingDays.length >= nDays) refuse(`pool already holds ${existingDays.length} days ≥ --days ${nDays} — raise --days to extend`);
 }
 if (has('rebuild') && existingDays && existing.version === POOL_VERSION) {
-  refuse(`--rebuild with unchanged POOL_VERSION ${POOL_VERSION} — bump it (and the clients' accepted store generation) first, or this generation's history silently mis-scores against the new days`);
+  refuse(`--rebuild with unchanged POOL_VERSION ${POOL_VERSION} — bump it first so the generations are at least distinguishable.\n` +
+    `  WARNING: bumping is necessary but NOT sufficient. Neither client reads the pool's version\n` +
+    `  (web gates on its localStorage store version, iOS DailyStore on its own private one), so a\n` +
+    `  rebuild ALSO needs a client-side change that drops or re-keys per-day history — otherwise\n` +
+    `  every player's day-N medals keep applying to a completely different day-N challenge.\n` +
+    `  (Tracked in BACKLOG.md: clients do not yet couple daily history to the pool generation.)`);
 }
 
 if (!has('select-only')) await certifyAll();
@@ -313,10 +364,16 @@ const recs = [...readCache(cache).values()].filter(r => list.includes(r.seed));
 const winnable = recs.filter(r => r.winnable);
 console.log(`\ncertified ${recs.length} candidates: ${winnable.length} winnable, ${recs.filter(isDailyEligible).length} daily-eligible`);
 
-// Published seeds are spoken for; the selection fills only the open slots.
+// Published seeds are spoken for; the selection fills ONLY the open slots (selecting nDays here
+// once made every --extend fail its own candidate validation: 61 published + nDays fresh). The
+// published days ride along as `prior` so the fresh ones inherit their novelty debt.
 const publishedSeeds = new Set((has('extend') ? existingDays : []).map(d => d.seed));
 const slotsToFill = has('extend') ? nDays - existingDays.length : nDays;
-const fresh = spread(selectMonthBalanced(recs.filter(r => !publishedSeeds.has(r.seed))));
+const prior = has('extend')
+  ? { days: existingDays, pairs: new Set(existingDays.map(d => pairKey(d.silver, d.gold))) }
+  : null;
+const fresh = spread(selectMonthBalanced(recs.filter(r => !publishedSeeds.has(r.seed)), slotsToFill, prior),
+                     has('extend') ? existingDays[existingDays.length - 1] : null);
 console.log(`flawless gate: ${gateOn ? `${fSolves} joint searches + ${fStatic} rejected structurally` : 'DISABLED (--no-flawless-gate)'}`);
 
 if (fresh.length < slotsToFill) {
@@ -357,6 +414,12 @@ if (has('extend')) {
   for (const [i, d] of existingDays.entries()) {
     if (JSON.stringify(check.days[i]) !== JSON.stringify(d))
       fail(`published day ${i} changed — extension must preserve every published (seed, objectives) verbatim`);
+  }
+  // The never-repeat rule, enforced on the BYTES about to ship, not just inside the selector.
+  const pubPairs = new Set(existingDays.map(d => pairKey(d.silver, d.gold)));
+  for (let i = existingDays.length; i < check.days.length; i++) {
+    if (pubPairs.has(pairKey(check.days[i].silver, check.days[i].gold)))
+      fail(`day ${i} repeats a published (silver, gold) challenge pair verbatim`);
   }
 }
 renameSync(candidatePath, out);

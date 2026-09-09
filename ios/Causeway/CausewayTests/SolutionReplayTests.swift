@@ -6,15 +6,27 @@ import XCTest
 /// coverage. Every shipped day's certificate is re-proved by the shipping model on every test run.
 final class SolutionReplayTests: XCTestCase {
 
-    private let gameKeys = ["causeway.game", "causeway.daily", "causeway.wins",
-                            "causeway.autoplay", "causeway.autofinishmode"]
+    // TEST_HOST is Causeway.app: `UserDefaults.standard` here IS the shipping app's container, and
+    // this suite writes graded records for every pool day mid-run. Snapshot every `causeway.` key,
+    // clear for determinism, and restore after — an on-device run must not erase the owner's real
+    // history (see CausewayModelTests for the twin).
+    private var savedDefaults: [String: Any] = [:]
+    private var causewayKeys: [String] {
+        UserDefaults.standard.dictionaryRepresentation().keys.filter { $0.hasPrefix("causeway.") }
+    }
 
     override func setUp() {
         super.setUp()
-        for k in gameKeys { UserDefaults.standard.removeObject(forKey: k) }
+        savedDefaults = [:]
+        for k in causewayKeys {
+            savedDefaults[k] = UserDefaults.standard.object(forKey: k)
+            UserDefaults.standard.removeObject(forKey: k)
+        }
     }
     override func tearDown() {
-        for k in gameKeys { UserDefaults.standard.removeObject(forKey: k) }
+        for k in causewayKeys { UserDefaults.standard.removeObject(forKey: k) }
+        for (k, v) in savedDefaults { UserDefaults.standard.set(v, forKey: k) }
+        savedDefaults = [:]
         super.tearDown()
     }
 
