@@ -49,7 +49,11 @@ struct RulesView: View {
                     rule("The catch", "The up and down halves of a suit can never cross. A 7 or 8 has no home until the ends climb to reach it — plan around it.")
                     rule("Tableau", "Build in alternating colours, one rank at a time, in either direction — a pile can run down (red on black) or up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run as a group if you have enough free cells and empty columns.")
                     rule("Free cells", "Three single-card parking spots.")
-                    rule("Controls", "Tap a card to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Tapping a card in a run moves the whole run. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
+                    // The old sentence promised "Tap a card to send it to its best spot" with no precondition,
+                    // and on a fresh deal most cards are buried — a novice following it read the
+                    // resulting silence as a broken tap (ux/WF-10:controls-overpromises-tap). Name the
+                    // precondition AND the refusal cue.
+                    rule("Controls", "Tap a card that heads a tidy run — or has nothing below it — to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Tapping a card in a run moves the whole run. A card that can't move, or has nowhere to go, just wiggles. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
                     // Both automation pills are ON by default and neither was documented anywhere
                     // in the app, so a novice met an unexplained mid-game "Ready to finish" prompt
                     // (ux/WF-10:automation-undocumented).
