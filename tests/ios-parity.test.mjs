@@ -992,6 +992,15 @@ test('the Replay confirm says the deal starts over, on both platforms (no web↔
     'web Replay confirm no longer says the deal starts over');
   assert.ok(html.includes(norm(`document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal, 'replay');`)),
     'web Replay no longer tells confirmReset which control is asking');
+  // Round 2: the TITLE branches on the control too — Replay restarts the attempt, it does not
+  // end it, so "End your daily attempt?" must never headline a Replay confirm.
+  assert.ok(content.includes(norm(`if case .replay = pendingReset {
+            return game.challengeDay != nil ? "Restart your daily attempt?" : "Start this deal over?"`)),
+    'iOS Replay confirm title no longer says restart / start over');
+  assert.ok(html.includes(norm(`const title = kind==='replay'
+    ? (challengeDay!=null ? 'Restart your daily attempt?' : 'Start this deal over?')
+    : (challengeDay!=null ? 'End your daily attempt?' : 'Discard the game in progress?');`)),
+    'web Replay confirm title no longer says restart / start over');
 });
 
 // ux/WF-9:wins-row-no-run-count — a Wins row's "fewest N moves · fastest T" can describe a pair no

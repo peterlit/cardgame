@@ -30,6 +30,9 @@
 //   - the ALERTS have no identifiers (SwiftUI .alert): queried by their title
 //     and button labels, which are asserted verbatim on purpose — the copy IS
 //     the fix (it names what is lost, and whether it can be replayed).
+//   - Titles differ per control since round 2 (ux/WF-3:replay-confirm-copy-mismatch):
+//     New game / Play a deal ask "Discard the game in progress?", Replay asks
+//     "Start this deal over?" (it restarts THIS deal — nothing is lost for good).
 //
 import XCTest
 
@@ -75,12 +78,15 @@ final class RegressionDiscardConfirmTests: XCTestCase {
         XCTAssertEqual(dealPill.label, liveSeed, "Keep playing must not re-deal")
         XCTAssertEqual(moves.label, liveMoves, "Keep playing must not touch the board")
 
-        // --- Replay asks too, with ITS verb ------------------------------------
+        // --- Replay asks too, with ITS verb and ITS title ----------------------
+        // Round 2 (ux/WF-3:replay-confirm-copy-mismatch): Replay restarts this deal, so its
+        // headline is "Start this deal over?" — "Discard the game in progress?" is New game's.
+        let replayAlert = app.alerts["Start this deal over?"]
         app.buttons["toolbar.replay"].tap()
-        XCTAssertTrue(alert.waitForExistence(timeout: 3),
-                      "Replay destroyed a live game with no confirmation")
-        XCTAssertTrue(alert.buttons["Replay"].exists, "the Replay confirm must carry the Replay verb")
-        alert.buttons["Replay"].tap()
+        XCTAssertTrue(replayAlert.waitForExistence(timeout: 3),
+                      "Replay destroyed a live game with no confirmation (or its title regressed to New game's: \(app.alerts.firstMatch.label))")
+        XCTAssertTrue(replayAlert.buttons["Replay"].exists, "the Replay confirm must carry the Replay verb")
+        replayAlert.buttons["Replay"].tap()
         XCTAssertEqual(dealPill.label, liveSeed, "Replay must restart the SAME deal")
         XCTAssertEqual(moves.label, "0", "Replay must return to move 0")
     }

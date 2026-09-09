@@ -452,6 +452,13 @@ struct ContentView: View {
         // A live ⏰ grace is the one loss no replay can undo, so it leads the dialog
         // (ux/WF-14:replay-forfeits-grace-silently).
         if game.graceLive, let day = game.challengeDay { return "Give up ⏰ Same-day for \(dayLabel(day))?" }
+        // Replay reloads THIS deal — the attempt restarts, it does not end — so the headline must
+        // not say "End" above a body that says the challenge starts over
+        // (ux/WF-3:replay-confirm-copy-mismatch). Same branch as the body's tail; the confirm
+        // itself stays (Replay really does discard the moves and the clock). Web twin: confirmReset(kind).
+        if case .replay = pendingReset {
+            return game.challengeDay != nil ? "Restart your daily attempt?" : "Start this deal over?"
+        }
         return game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
     }
     private var resetConfirmVerb: String {

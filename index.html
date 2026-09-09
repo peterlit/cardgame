@@ -2099,7 +2099,12 @@ function confirmReset(kind){
   const tail = kind==='replay'
     ? (challengeDay!=null ? ' This challenge starts over from the beginning.' : ' This deal starts over from the beginning.')
     : (challengeDay!=null ? ' You can replay the challenge afterwards.' : ' This game is not a challenge, so there is no way back to it.');
-  return confirm(`${challengeDay!=null ? 'End your daily attempt?' : 'Discard the game in progress?'}${cost}${tail}`);
+  // Replay's headline restarts, it does not end: "End your daily attempt?" above "This challenge
+  // starts over" was the false half (ux/WF-3:replay-confirm-copy-mismatch; iOS twin: resetConfirmTitle).
+  const title = kind==='replay'
+    ? (challengeDay!=null ? 'Restart your daily attempt?' : 'Start this deal over?')
+    : (challengeDay!=null ? 'End your daily attempt?' : 'Discard the game in progress?');
+  return confirm(`${title}${cost}${tail}`);
 }
 // Is a ⏰ same-day GRACE riding on the current attempt? Exactly isOnTime's grace window: begun on
 // day D, still unfinished, being played on D+1. (iOS twin: Game.graceLive.)
