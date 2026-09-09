@@ -661,6 +661,9 @@ test('the Daily calendar names the day it will play and answers a locked tap (no
   // deal number: ungrouped, through the shared formatter (never Text("Deal #\(c.seed)")).
   assert.ok(daily.includes(norm('Text("Deal #" + DealFormat.seed(c.seed))')),
     'DailyView day card no longer formats its deal number through DealFormat.seed (it will group the digits)');
+  // ...and the win overlay, the surface those fixes did not cover (bug/WF-4:win-overlay-seed-grouped).
+  assert.ok(read('Views/ContentView.swift').includes(norm('Text("Deal #" + DealFormat.seed(game.seed) + " · \\(game.moveCount) moves · "')),
+    'the win overlay no longer formats its deal number through DealFormat.seed (it will group the digits)');
   // (the negative form is anchored on the rendered call, since the explanatory comment beside it
   // quotes the old interpolation on purpose)
   assert.ok(!daily.includes(norm('Text("Deal #\\(c.seed)").font(')),

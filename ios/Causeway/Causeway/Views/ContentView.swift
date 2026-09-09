@@ -1015,7 +1015,11 @@ struct ContentView: View {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 14) {
                 Text("You solved it! 🎉").font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
-                Text("Deal #\(game.seed) · \(game.moveCount) moves · \(DealFormat.time(game.clock.elapsed))")
+                // A plain String, not an interpolated LocalizedStringKey: interpolating the Int GROUPED
+                // the digits, so this line read "Deal #608,530" beside its own "Play deal #608531"
+                // button and the board pill's "608530" (bug/WF-4:win-overlay-seed-grouped) — the same
+                // trap DailyView and WinsView already route around through DealFormat.seed.
+                Text("Deal #" + DealFormat.seed(game.seed) + " · \(game.moveCount) moves · " + DealFormat.time(game.clock.elapsed))
                     .font(.system(size: 14)).multilineTextAlignment(.center).foregroundStyle(.white)
                 if let dl = winDailyText {
                     Text(dl).font(.system(size: 14, weight: .semibold))
