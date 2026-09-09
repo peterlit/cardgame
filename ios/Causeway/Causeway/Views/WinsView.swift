@@ -33,6 +33,7 @@ struct WinsView: View {
                             ForEach(ranges, id: \.lowerBound) { r in
                                 NavigationLink { rangeDetail(r) } label: { rangeChip(r) }
                                     .buttonStyle(.plain)
+                                    .accessibilityIdentifier("wins.range.\(r.lowerBound)")
                             }
                         }
                     }
@@ -53,9 +54,11 @@ struct WinsView: View {
                 TextField("Number \(DealFormat.seedRangeHint)", text: $dealText)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("wins.dealentry.field")
                 Button("Play", action: playEntered)
                     .buttonStyle(.borderedProminent)
                     .disabled(enteredSeed == nil)
+                    .accessibilityIdentifier("wins.dealentry.play")
             }
             // Say WHY Play is dead. The only statement of the legal range is the field's
             // placeholder, which the typed text replaces — so an out-of-range entry left a greyed
@@ -141,6 +144,7 @@ struct WinsView: View {
                     // the gold "currently playing" marker keeps its explicit tint, and the footer
                     // below states the affordance the tint used to imply.
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("wins.row.\(row.seed)")
                 }
             } footer: {
                 // The row's two numbers are INDEPENDENT minima (WinRecord keeps no run count, and

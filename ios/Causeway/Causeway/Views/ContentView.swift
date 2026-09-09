@@ -1122,19 +1122,30 @@ struct ContentView: View {
                 // trap DailyView and WinsView already route around through DealFormat.seed.
                 Text("Deal #" + DealFormat.seed(game.seed) + " · \(game.moveCount) moves · " + DealFormat.time(game.clock.elapsed))
                     .font(.system(size: 14)).multilineTextAlignment(.center).foregroundStyle(.white)
+                    .accessibilityIdentifier("win.dealline")
                 if let dl = winDailyText {
                     Text(dl).font(.system(size: 14, weight: .semibold))
                         .multilineTextAlignment(.center).foregroundStyle(Theme.gold)
+                        .accessibilityIdentifier("win.dailyline")
                 }
                 HStack(spacing: 8) {
                     pill("Play deal #\(game.nextSeed)", primary: true) { withAnimation { game.deal(seed: game.nextSeed) } }
+                        .accessibilityIdentifier("win.play")
                     pill("Random") { withAnimation { game.newRandomGame() } }
+                        .accessibilityIdentifier("win.random")
                     pill("Close") { game.dismissWin() }
+                        .accessibilityIdentifier("win.close")
                 }
             }
             .padding(24)
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: 0x2C3B3A)))
             .padding(28)
+            // Structural identifiers (children stay addressable): the overlay's lines and pills
+            // were reachable only by their copy, so a wording change on this surface read as a
+            // regression in every test that had to match it verbatim
+            // (bug/Main:scored-surfaces-addressable-only-by-copy).
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("win.overlay")
         }
     }
 }

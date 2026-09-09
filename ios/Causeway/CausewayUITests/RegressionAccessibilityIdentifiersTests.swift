@@ -64,5 +64,32 @@ final class RegressionAccessibilityIdentifiersTests: XCTestCase {
             XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5),
                           "missing Daily sheet identifier: \(id)")
         }
+        // Round 2 (bug/DailyView:day-card-and-streak-cards-addressable-only-by-label): the day
+        // card's header, tier rows and ⏰ line, and the backup note, are addressable without
+        // matching their prose. (The streak cards live in a LazyVGrid — materialised only on
+        // screen — so they are asserted where a test has scrolled to them, not here.)
+        XCTAssertTrue(app.otherElements["daily.card.header"].waitForExistence(timeout: 5),
+                      "missing day-card header identifier")
+        XCTAssertTrue(app.staticTexts["daily.card.title"].exists, "missing day-card title identifier")
+        for tier in ["bronze", "silver", "gold"] {
+            let row = app.otherElements["daily.tier.\(tier)"]
+            XCTAssertTrue(row.exists, "missing tier row identifier: daily.tier.\(tier)")
+            XCTAssertTrue(["earned", "open"].contains(row.value as? String ?? ""),
+                          "daily.tier.\(tier) must carry its state as a value, got \(String(describing: row.value))")
+        }
+        let sameday = app.staticTexts["daily.sameday"]
+        XCTAssertTrue(sameday.exists, "missing ⏰ line identifier")
+        XCTAssertTrue(["cleared", "today", "grace", "past"].contains(sameday.value as? String ?? ""),
+                      "daily.sameday must name its branch as a value, got \(String(describing: sameday.value))")
+        XCTAssertTrue(app.staticTexts["daily.backupnote"].exists, "missing backup note identifier")
+        app.buttons["Done"].tap()
+
+        // Round 2 (bug/Main:scored-surfaces-addressable-only-by-copy): the Wins entry row.
+        XCTAssertTrue(app.buttons["toolbar.wins"].waitForExistence(timeout: 5))
+        app.buttons["toolbar.wins"].tap()
+        XCTAssertTrue(app.textFields["wins.dealentry.field"].waitForExistence(timeout: 5),
+                      "missing Wins deal-entry field identifier")
+        XCTAssertTrue(app.buttons["wins.dealentry.play"].exists, "missing Wins deal-entry Play identifier")
+        app.buttons["Done"].tap()
     }
 }

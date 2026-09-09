@@ -172,16 +172,19 @@ struct DailyView: View {
     /// (ux/WF-5:streak-card-headline-unlabelled).
     private var streaksRow: some View {
         let s = streaks(days, todayIndex())
-        let items: [(String, String, StreakRun)] =
-            [("🔥", "Play", s.play), ("⏰", "Same-day", s.onTime), ("🥈", "Silver", s.silver),
-             ("🥇", "Gold", s.gold), ("🌟", "Flawless", s.flawless)]
+        // (icon, label, stable identifier key, run) — the key names the card for tests and
+        // assistive tech independent of its label wording
+        // (bug/DailyView:day-card-and-streak-cards-addressable-only-by-label).
+        let items: [(String, String, String, StreakRun)] =
+            [("🔥", "Play", "play", s.play), ("⏰", "Same-day", "ontime", s.onTime), ("🥈", "Silver", "silver", s.silver),
+             ("🥇", "Gold", "gold", s.gold), ("🌟", "Flawless", "flawless", s.flawless)]
         return VStack(spacing: 6) {
             // Three columns, not one row of five: five cards across truncate their labels on a phone.
             // Three across at ordinary sizes; scaled captions need the width, so two (then one)
             // at accessibility sizes rather than truncating "Same-day" and "day streak".
             let streakCols = dynamicTypeSize >= .accessibility3 ? 1 : (dynamicTypeSize.isAccessibilitySize ? 2 : 3)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: streakCols), spacing: 8) {
-                ForEach(items, id: \.1) { ic, label, run in
+                ForEach(items, id: \.2) { ic, label, key, run in
                     VStack(spacing: 1) {
                         HStack(spacing: 3) {
                             Text(ic).font(f(13))
@@ -200,6 +203,8 @@ struct DailyView: View {
                     .background(RoundedRectangle(cornerRadius: 12).fill(Color.gray.opacity(0.12)))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(label): current streak \(run.current) days, \(run.total) days total, best \(run.best) days")
+                    .accessibilityValue("\(run.current)")   // the headline number, readable without parsing the sentence
+                    .accessibilityIdentifier("daily.streak.\(key)")
                 }
             }
             // "par" appears on every solved day card and nowhere else explained it
@@ -220,8 +225,10 @@ struct DailyView: View {
                 HStack {
                     Text(dayView == ti ? "Today" : dayLabel(dayView))
                         .font(f(16, weight: .bold))
+                        .accessibilityIdentifier("daily.card.title")
                     if rec?.flawless == true {
                         Text("🌟 Flawless").font(f(12, weight: .bold)).foregroundStyle(Theme.gold)
+                            .accessibilityIdentifier("daily.card.flawless")
                     }
                     Spacer()
                     // Ungrouped, through DealFormat.seed: `Text("Deal #\(c.seed)")` interpolates into a
@@ -229,7 +236,10 @@ struct DailyView: View {
                     // while the board pill and every Wins surface said "691039" for the same deal
                     // (bug/WF-13:daily-card-seed-grouped).
                     Text("Deal #" + DealFormat.seed(c.seed)).font(f(13)).foregroundStyle(.secondary).monospacedDigit()
+                        .accessibilityIdentifier("daily.card.seed")
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("daily.card.header")
                 VStack(spacing: 8) {
                     tierRow("Bronze", "bronze", "Clear the deal", rec, future: dayView > ti)
                     tierRow("Silver", "silver", c.silver.label, rec, future: dayView > ti)
@@ -314,6 +324,13 @@ struct DailyView: View {
                 .foregroundStyle(color)
                 .accessibilityLabel(done ? "earned" : (future ? "not yet available" : (missed ? "missed" : "not attempted")))
         }
+        // The row is addressable by tier, with its state as a value, so a tick that stops
+        // rendering as checkmark.circle.fill is not invisible to a test
+        // (bug/DailyView:day-card-and-streak-cards-addressable-only-by-label). Children stay
+        // addressable (the symbol's own label/identifier is unchanged).
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("daily.tier.\(tier)")
+        .accessibilityValue(done ? "earned" : "open")
     }
 
     /// "Cleared 3× · fewest 96 moves · fastest 5:41 · par 72" — the day's banked bests, put next
@@ -393,23 +410,30 @@ struct DailyView: View {
     @ViewBuilder private func onTimeLine(rec: TierResult?, day: Int, ti: Int) -> some View {
         let run = streaks(days, todayIndex()).onTime
         let graceLive = game.challengeDay == day && game.challengeStartDay == day && ti == day + 1
+        // One identifier for the line, its BRANCH as the value ("cleared" / "today" / "grace" /
+        // "past"), so the ⏰ state is readable without pinning its prose
+        // (bug/DailyView:day-card-and-streak-cards-addressable-only-by-label).
         if rec?.onTime == true {
             Text("⏰ Cleared on the day")
                 .font(f(12, weight: .semibold)).foregroundStyle(Theme.gold)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("daily.sameday").accessibilityValue("cleared")
         } else if day == ti {
             Text(run.current > 0 ? "⏰ Win today to keep your \(run.current)-day same-day streak"
                                  : "⏰ Win today to start a same-day streak")
                 .font(f(12, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("daily.sameday").accessibilityValue("today")
         } else if graceLive {
             Text("⏰ Resume your attempt today and it still counts")
                 .font(f(12, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("daily.sameday").accessibilityValue("grace")
         } else {
             Text("⏰ Same-day is earned on the day itself")
                 .font(f(12)).foregroundStyle(.secondary.opacity(0.7))
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("daily.sameday").accessibilityValue("past")
         }
     }
 
@@ -485,6 +509,7 @@ struct DailyView: View {
             Text(backupNote ?? "Save your streaks & solved deals to a file, or restore them. Importing merges — it never erases progress.")
                 .font(f(11)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("daily.backupnote")
         }
         .padding(.top, 4)
     }
@@ -853,9 +878,9 @@ struct DailyHUD: View {
                 .lineLimit(1).fixedSize()
                 .accessibilityIdentifier("hud.day")
         }
-        objChip("🥉", "Clear the deal", state: t.won ? .ok : .live, oneLine: oneLine)
-        objChip("🥈", c.silver.label, state: liveState(c.silver, t), oneLine: oneLine)
-        objChip("🥇", c.gold.label, state: liveState(c.gold, t), oneLine: oneLine)
+        objChip("🥉", "bronze", "Clear the deal", state: t.won ? .ok : .live, oneLine: oneLine)
+        objChip("🥈", "silver", c.silver.label, state: liveState(c.silver, t), oneLine: oneLine)
+        objChip("🥇", "gold", c.gold.label, state: liveState(c.gold, t), oneLine: oneLine)
     }
 
     private enum ObjState { case ok, no, live }
@@ -868,14 +893,19 @@ struct DailyHUD: View {
         // On track: green ✓ as soon as the tier is locked in (guaranteed just by clearing the deal).
         return objSecured(obj, t, up: game.up, down: game.down) ? .ok : .live
     }
-    private func objChip(_ medal: String, _ label: String, state: ObjState, oneLine: Bool) -> some View {
+    private func objChip(_ medal: String, _ tier: String, _ label: String, state: ObjState, oneLine: Bool) -> some View {
         let mark = state == .ok ? "✓" : (state == .no ? "✗" : "·")
         let color: Color = state == .ok ? .green : (state == .no ? Color(hex: 0xE8927C) : .white)
         return HStack(alignment: .firstTextBaseline, spacing: 3) {
+            // The mark carries the tier's identifier: its label IS the state ("🥇·" / "🥇✓" / "🥇✗"),
+            // and the tests that read it no longer have to find it by that literal
+            // (bug/Main:scored-surfaces-addressable-only-by-copy).
             Text("\(medal)\(mark)").font(.system(size: 11, weight: .bold)).foregroundStyle(color)
+                .accessibilityIdentifier("hud.chip.\(tier)")
             Text(label).font(.system(size: 10)).foregroundStyle(.white)
                 .lineLimit(oneLine ? 1 : nil)
                 .fixedSize(horizontal: false, vertical: true)   // wrap, never truncate, when stacked
+                .accessibilityIdentifier("hud.chip.\(tier).label")
         }
     }
 }

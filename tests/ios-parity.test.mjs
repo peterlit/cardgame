@@ -384,7 +384,8 @@ test('iOS stamps the ⏰ start day at both attempt entry points (no web↔iOS dr
 // stays quiet, while the web twins of all four ARE pinned in tests/daily.test.mjs.
 pin('Views/DailyView.swift', '⏰ award surfaces (streaks strip, day-card line, calendar pip)', [
   // the Same-day column of the streaks strip, in the canonical order the web renders.
-  '[("🔥", "Play", s.play), ("⏰", "Same-day", s.onTime), ("🥈", "Silver", s.silver),',
+  // (round 2 added a stable identifier key per card: daily.streak.<key>)
+  '[("🔥", "Play", "play", s.play), ("⏰", "Same-day", "ontime", s.onTime), ("🥈", "Silver", "silver", s.silver),',
   // the day card's ⏰ line: earned on the day...
   `if rec?.onTime == true {
             Text("⏰ Cleared on the day")`,
