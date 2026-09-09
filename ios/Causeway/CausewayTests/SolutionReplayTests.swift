@@ -175,4 +175,42 @@ final class SolutionReplayTests: XCTestCase {
         let fresh = makeGame(); fresh.deal(seed: seed)
         XCTAssertEqual(g.tableau, fresh.tableau, "rewound to move 0 the board must be the opening position")
     }
+
+    /// Round 2: Prev is offered from the completion banner too, and re-enters the paused demo one
+    /// move short — the finished board never becomes playable, and nothing is scored.
+    func testDemoStepBackFromCompletionBannerReentersPausedDemoOneMoveShort() throws {
+        let seed = makeGame().pool[0].seed
+        let g = makeGame()
+        g.showSolution(seed, tier: "bronze")
+        let total = Int(g.demoProgress.split(separator: "/").last!.trimmingCharacters(in: .whitespaces))!
+        XCTAssertGreaterThan(total, 1)
+        for _ in 0..<total { g.demoStepOnce() }
+        XCTAssertFalse(g.demoing, "a complete line ends the demo")
+        XCTAssertNotNil(g.demoDoneMessage, "a complete line shows the banner")
+        XCTAssertTrue(g.demoCanStepBack, "the banner must offer Prev")
+
+        // Reference: the same line stepped forward to N-1.
+        let ref = makeGame()
+        ref.showSolution(seed, tier: "bronze")
+        for _ in 0..<(total - 1) { ref.demoStepOnce() }
+
+        g.demoStepBack()
+        XCTAssertTrue(g.demoing, "Prev from the banner re-enters the demo (input locked)")
+        XCTAssertTrue(g.demoPaused, "…paused, not auto-advancing")
+        XCTAssertNil(g.demoDoneMessage, "…and takes the banner down")
+        XCTAssertEqual(g.demoProgress, "\(total - 1) / \(total)")
+        XCTAssertEqual(g.tableau, ref.tableau, "Prev from the banner must show the position before the last move")
+        XCTAssertEqual(g.cells, ref.cells)
+        XCTAssertEqual(g.up, ref.up)
+        XCTAssertEqual(g.down, ref.down)
+        XCTAssertFalse(g.hasLiveGame, "a demo board is never a live game")
+        XCTAssertFalse(g.canUndo, "Prev must never arm Undo")
+        XCTAssertFalse(g.winStore.isWon(seed), "a demo never records anything")
+
+        // Next replays the final move and the banner returns, exactly as before.
+        g.demoStepOnce()
+        XCTAssertFalse(g.demoing)
+        XCTAssertNotNil(g.demoDoneMessage)
+        XCTAssertFalse(g.winStore.isWon(seed))
+    }
 }

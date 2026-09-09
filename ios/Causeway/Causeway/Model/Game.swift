@@ -1110,8 +1110,13 @@ final class Game: ObservableObject {
         demoAdvance()
     }
 
-    /// Whether "Prev" has anything to rewind: paused, with at least one move shown.
-    var demoCanStepBack: Bool { demoing && demoPaused && demoIdx > 0 }
+    /// Whether "Prev" has anything to rewind: paused with at least one move shown — or sitting on
+    /// the completion banner, where the last move is the one most worth a second look and used to
+    /// cost a full re-entry (Done, Daily, the pill, Start, a timed Pause) to see again
+    /// (ux/WF-6:demo-has-no-step-back, round 2).
+    var demoCanStepBack: Bool { (demoing && demoPaused || demoBannerUp) && demoIdx > 0 }
+    /// The completed-line banner is showing: the demo is over, its line and cursor still loaded.
+    private var demoBannerUp: Bool { !demoing && demoDoneMessage != nil && !demoMoves.isEmpty }
 
     /// "Prev": show the position one move EARLIER. Re-simulates the line from the opening
     /// position — never an Undo of the live board: the demo board is not playable, `history`
@@ -1121,6 +1126,17 @@ final class Game: ObservableObject {
     /// move, since every other card lands where it already is.
     func demoStepBack() {
         guard demoCanStepBack else { return }
+        // From the banner, re-enter the demo PAUSED at the position before its last move: the
+        // board goes from complete back to one card short, so input must lock again (demoing)
+        // and the bar must show the paused controls. Nothing about scoring changes — the banner
+        // state was already unplayable (boardComplete) and the demo board never reaches commit().
+        if demoBannerUp {
+            demoing = true
+            demoPaused = true
+            demoStarted = true
+            demoDoneMessage = nil
+            demoGen &+= 1   // no queued step exists, but a fresh generation costs nothing
+        }
         let target = demoIdx - 1
         withAnimation(.easeOut(duration: 0.22)) {
             layOutBoard()

@@ -1004,14 +1004,15 @@ struct ContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("demo.headline")
             Spacer(minLength: 6)
+            // Prev re-simulates the line one move shorter (Game.demoStepBack) — it is not an
+            // Undo, and Undo stays disabled while the bar is up. Offered while paused mid-line AND
+            // from the completion banner, where it re-enters the paused demo at the last move.
+            if game.demoCanStepBack {
+                demoPill("Prev") { game.demoStepBack() }
+                    .accessibilityIdentifier("demo.prev")
+            }
             if game.demoing {
                 if game.demoPaused {
-                    // Prev re-simulates the line one move shorter (Game.demoStepBack) — it is not
-                    // an Undo, and Undo stays disabled while the bar is up.
-                    if game.demoCanStepBack {
-                        demoPill("Prev") { game.demoStepBack() }
-                            .accessibilityIdentifier("demo.prev")
-                    }
                     demoPill("Next") { game.demoStepOnce() }
                         .accessibilityIdentifier("demo.next")
                 }

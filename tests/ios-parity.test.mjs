@@ -617,6 +617,24 @@ test('web demo exit paths re-deal (no playable demo-touched board)', () => {
     'Game.demoAdvance no longer aborts to a re-deal on a bad token');
 });
 
+// ux/WF-6:demo-has-no-step-back (round 2) — Prev is offered from the completion banner on both
+// platforms and re-enters the PAUSED demo (input locked) one move short; it never unlocks the board.
+test('Prev from the demo banner re-enters a paused demo on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const game = read('Model/Game.swift');
+  assert.ok(game.includes(norm('var demoCanStepBack: Bool { (demoing && demoPaused || demoBannerUp) && demoIdx > 0 }')),
+    'iOS demoCanStepBack no longer covers the completion banner');
+  assert.ok(game.includes(norm(`if demoBannerUp {
+            demoing = true
+            demoPaused = true
+            demoStarted = true
+            demoDoneMessage = nil`)), 'iOS demoStepBack no longer re-enters the demo paused from the banner');
+  assert.ok(html.includes(norm('if(prev) prev.style.display=(demoIdx>0)?"":"none";')),
+    'web demo banner no longer shows Prev');
+  assert.ok(html.includes(norm('if(bannerUp){ demoing=true; demoPaused=true; demoStarted=true; }')),
+    'web demoStepBack no longer re-enters the demo paused from the banner');
+});
+
 // ---- 🌟 Flawless says the SAME thing on every surface (ux/WF-15:flawless-pill-both-vs-three) ----
 // The how-to-win pill's label is the only definition of 🌟 a novice reads before spending a demo on
 // it, and it feeds the demo bar's headline verbatim. It used to say "Both objectives in one run"

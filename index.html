@@ -1533,7 +1533,9 @@ function updateDemoBar(){
   const tierName={bronze:'winning',silver:'Silver',gold:'Gold',flawless:'Flawless'}[demoTier]||'winning';
   if(done){
     if(msg) msg.textContent=`That's a ${tierName} line — tap Done to try it yourself.`;
-    if(prev) prev.style.display="none";
+    // Prev stays on the banner: the last move is the one most worth a second look, and it used to
+    // cost a full re-entry to see again (ux/WF-6:demo-has-no-step-back; iOS twin: demoCanStepBack).
+    if(prev) prev.style.display=(demoIdx>0)?"":"none";
     if(next) next.style.display="none";
     if(pause) pause.style.display="none";
     if(stop) stop.textContent="Done";
@@ -1599,7 +1601,12 @@ function demoStepOnce(){
 // Never an undo of the live board: the demo board is not playable, `history` stays empty, and
 // nothing here touches commitMove/telemetry (ux/WF-6:demo-has-no-step-back; iOS twin: demoStepBack).
 function demoStepBack(){
-  if(!demoing || !demoPaused || demoIdx<=0) return;
+  const bar=document.getElementById("demoBar");
+  const bannerUp = !demoing && !!demoMoves && bar && bar.classList.contains("show");   // completed line
+  if(!(demoing && demoPaused || bannerUp) || demoIdx<=0) return;
+  // From the banner, re-enter the demo PAUSED at the position before its last move (parity with
+  // iOS demoStepBack): the board goes from complete back to one card short, so input locks again.
+  if(bannerUp){ demoing=true; demoPaused=true; demoStarted=true; }
   const target=demoIdx-1;
   state=layoutBoard(seed); moveCount=0; selection=null;
   for(let i=0;i<target;i++){ if(!applyDemoToken(demoMoves[i])){ restartDeal(); return; } }
