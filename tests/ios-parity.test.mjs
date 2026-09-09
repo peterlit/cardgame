@@ -713,10 +713,11 @@ test('board reset controls confirm only when there is a live game to lose (no we
   // EVERY user-triggered replacement route goes through the one gate (skeptical-review R4): which
   // button the player used must never decide whether a live attempt is protected. The startup deal
   // after a failed restore is the only direct deal() left, and it replaces nothing.
-  assert.ok(html.includes(norm('function requestDeal(go){ if(!confirmReset()) return false; go(); return true; }')),
+  // `kind` (qa-loop round 1, ux/WF-3) only picks the confirm's tail; the gate is unchanged.
+  assert.ok(html.includes(norm('function requestDeal(go, kind){ if(!confirmReset(kind)) return false; go(); return true; }')),
     'web lost its single requestDeal gate');
   for (const [route, needle] of [
-    ['Replay', 'document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal);'],
+    ['Replay', 'document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal, \'replay\');'],
     ['New game', 'document.getElementById("newBtn").onclick=()=>requestDeal(()=>deal(randomSeed()));'],
     ['win-overlay random', 'document.getElementById("winRandom").onclick=()=>requestDeal(()=>deal(randomSeed()));'],
     ['win-overlay next-deal', 'nextBtn.onclick = ()=>requestDeal(()=>deal(next));'],
@@ -960,4 +961,21 @@ test('a day with all three medals banked across runs says "Not yet Flawless" on 
 test('the iOS Daily legend defines par', () => {
   assert.ok(read('Views/DailyView.swift').includes(norm('Par = the shortest winning line the solver certified for that deal.')),
     'the iOS Daily legend lost its definition of par');
+});
+
+// ux/WF-3:replay-confirm-copy-mismatch — Replay reloads the SAME deal, so its confirm must not say
+// "there is no way back to it". Both platforms branch the TAIL on the control; the confirm itself
+// (and the cost sentence) is unchanged, and the casual New-game tail keeps its "no way back".
+test('the Replay confirm says the deal starts over, on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const content = read('Views/ContentView.swift');
+  assert.ok(content.includes(norm(`if case .replay = pendingReset {
+            tail = game.challengeDay != nil ? "This challenge starts over from the beginning."
+                                            : "This deal starts over from the beginning."`)),
+    'iOS Replay confirm no longer says the deal starts over');
+  assert.ok(html.includes(norm(`const tail = kind==='replay'
+    ? (challengeDay!=null ? ' This challenge starts over from the beginning.' : ' This deal starts over from the beginning.')`)),
+    'web Replay confirm no longer says the deal starts over');
+  assert.ok(html.includes(norm(`document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal, 'replay');`)),
+    'web Replay no longer tells confirmReset which control is asking');
 });

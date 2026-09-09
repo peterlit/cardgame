@@ -2059,7 +2059,10 @@ function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !d
 // 2026-09-07 skeptical review's R4 unified them all here.
 // A daily attempt is replayable, a casual game is not, so the copy must not promise a way back
 // that does not exist.
-function confirmReset(){
+// `kind` names the control asking ('replay' or undefined): Replay reloads the SAME deal, so the
+// casual tail "there is no way back to it" was false for it (ux/WF-3:replay-confirm-copy-mismatch;
+// iOS twin: ContentView.resetConfirmMessage). The confirm itself is identical for every kind.
+function confirmReset(kind){
   if(!hasLiveGame()) return true;
   // A zero-move board reaches this dialog only through a live ⏰ grace (hasLiveGame): there are no
   // moves and no clock to spend, so "Your 0 moves…" would be both false and alarming.
@@ -2072,9 +2075,10 @@ function confirmReset(){
     const d = fmtDayLabel(challengeDay);
     return confirm(`Give up ⏰ Same-day for ${d}? You began ${d}'s challenge on the day itself, so finishing it today still earns ⏰ Same-day. Starting over makes it an attempt begun today, and ${d} can never earn ⏰ again.${cost}`);
   }
-  return confirm(challengeDay!=null
-    ? `End your daily attempt?${cost} You can replay the challenge afterwards.`
-    : `Discard the game in progress?${cost} This game is not a challenge, so there is no way back to it.`);
+  const tail = kind==='replay'
+    ? (challengeDay!=null ? ' This challenge starts over from the beginning.' : ' This deal starts over from the beginning.')
+    : (challengeDay!=null ? ' You can replay the challenge afterwards.' : ' This game is not a challenge, so there is no way back to it.');
+  return confirm(`${challengeDay!=null ? 'End your daily attempt?' : 'Discard the game in progress?'}${cost}${tail}`);
 }
 // Is a ⏰ same-day GRACE riding on the current attempt? Exactly isOnTime's grace window: begun on
 // day D, still unfinished, being played on D+1. (iOS twin: Game.graceLive.)
@@ -2084,7 +2088,7 @@ function graceLiveNow(){ return challengeDay!=null && challengeStartDay===challe
 // button, the win overlay's next/random and the N shortcut all went straight to deal() while
 // New game confirmed (skeptical-review R4; iOS twin: ContentView.requestReset). `go` runs only
 // once confirmReset has said yes — deal() itself handles demo teardown and the win overlay.
-function requestDeal(go){ if(!confirmReset()) return false; go(); return true; }
+function requestDeal(go, kind){ if(!confirmReset(kind)) return false; go(); return true; }
 document.getElementById("newBtn").onclick=()=>requestDeal(()=>deal(randomSeed()));
 document.getElementById("winRandom").onclick=()=>requestDeal(()=>deal(randomSeed()));
 document.getElementById("winClose").onclick=hideWin;
@@ -2119,7 +2123,7 @@ function restartDeal(){
   // (parity with iOS Game.restartDeal, which re-stamps unconditionally).
   if(day!=null){ challengeDay=day; challengeStartDay=todayIndex(); saveGame(); render(); }
 }
-document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal);
+document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal, 'replay');
 function refreshAutoFinishBtn(){
   const label = autoFinishMode==="ask"?"Ask":autoFinishMode==="on"?"On":"Off";
   document.getElementById("autoBtn").textContent = "Auto-finish: " + label;

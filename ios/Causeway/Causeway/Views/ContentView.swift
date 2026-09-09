@@ -420,12 +420,23 @@ struct ContentView: View {
                     + " Starting over makes it an attempt begun today, and \(d) can never earn ⏰ again.",
                     cost].compactMap { $0 }.joined(separator: " ")
         }
-        // A daily attempt is replayable, a casual game is not — the daily-specific promise must
-        // never be reused for a casual game, whose loss really is final. (Same split as
-        // DailyView's confirmation copy.)
-        return [cost, game.challengeDay != nil
+        // Replay reloads THIS deal, so "there is no way back to it" was false for the one control
+        // whose whole purpose is to start it over (ux/WF-3:replay-confirm-copy-mismatch). The
+        // confirm itself stays — Replay really does discard the moves and the clock — only the
+        // tail names what happens next. Web twin: confirmReset(kind).
+        let tail: String
+        if case .replay = pendingReset {
+            tail = game.challengeDay != nil ? "This challenge starts over from the beginning."
+                                            : "This deal starts over from the beginning."
+        } else {
+            // A daily attempt is replayable, a casual game is not — the daily-specific promise must
+            // never be reused for a casual game, whose loss really is final. (Same split as
+            // DailyView's confirmation copy.)
+            tail = game.challengeDay != nil
                 ? "You can replay the challenge afterwards."
-                : "This game is not a challenge, so there is no way back to it."].compactMap { $0 }.joined(separator: " ")
+                : "This game is not a challenge, so there is no way back to it."
+        }
+        return [cost, tail].compactMap { $0 }.joined(separator: " ")
     }
 
     /// Landscape LEFT rail — the toolbar controls as a narrow vertical column of full-width pills,
