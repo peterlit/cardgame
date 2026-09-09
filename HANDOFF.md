@@ -2,8 +2,9 @@
 
 Written 2026-09-04 at commit `5573947`, by the assistant that had been working on this repo, for a
 successor with a different account and no inherited memory. Everything below was **verified against
-the working tree on the day it was written**, not recalled — where a fact has an expiry (a date, a
-count, a "current"), it says so.
+the working tree**, not recalled — where a fact has an expiry (a date, a count, a "current"), it
+says so. Since 2026-09-09 this file is kept current as a standing rule (§1.5); last full
+re-verification **2026-09-09**.
 
 The repo's own docs cover the product ([`README.md`](README.md)), the architecture
 ([`docs/architecture/overview.md`](docs/architecture/overview.md)) and the outstanding work
@@ -33,6 +34,10 @@ were discoverable from the code.
    copies in `index.html` and `ios/Causeway/Causeway/Model/*.swift`, held together by drift-guard
    tests. A rule changed on one platform and not the other is a defect, and the test suite is
    deliberately built to catch exactly that.
+5. **Keep this file up to date.** (Owner's instruction, 2026-09-09.) When a task invalidates
+   something HANDOFF asserts — a count, a command, a trap, the state of the world — fix it in the
+   same commit. This file already drifted once: for a day it denied the existence of a Swift test
+   target that §3 of the same file described.
 
 ## 2. The design north star
 
@@ -45,10 +50,10 @@ the player can't reason about, or an unwinnable deal is against the grain of the
 
 ## 3. Verified commands
 
-Every command here was run on 2026-09-04 and produced what it says.
+Every command here was run and produced what it says (counts re-verified 2026-09-09).
 
 ```bash
-npm test                    # node --test "tests/**/*.test.mjs" → 153 tests, 153 pass, 0 skipped
+npm test                    # node --test "tests/**/*.test.mjs" → 161 tests, 161 pass, 0 skipped
 ```
 
 Web preview — a python http.server on port 8123 is configured in `.claude/launch.json` (config name
@@ -107,11 +112,13 @@ change. The calendar helper now scrolls until the TARGET CELL itself (`daily.cal
 under a pinned clock (`CAUSEWAY_TODAY_OVERRIDE`, DEBUG-only). Scroll toward the thing you need, and
 never key a UI test on the real date — the pool is finite, so real-date tests are time bombs.
 
-**`ios/Causeway` has no Swift unit-test target** (only `CausewayUITests`). Every guard on Swift logic
-is therefore a *string comparison* performed by a Node test (`tests/ios-parity.test.mjs`) — whole-body
-pins that catch an inserted line, plus behavioural coverage of the web twin. This is a known
-structural weakness, it is what stalled the last review loop, and adding a real test target is an open
-decision, not an oversight. Until then: a Swift change that is only "pinned" is not tested.
+**Swift logic was untestable until 2026-09-07** — `ios/Causeway` had no unit-test target, and every
+guard on Swift logic was a *string comparison* performed by a Node test (`tests/ios-parity.test.mjs`).
+That era is over: `CausewayTests` now exists (commit `743b664`, pbxproj edit authorized by the owner)
+with 11 unit tests across `CausewayModelTests`, `GameClockTests`, and `SolutionReplayTests`. The
+parity pins remain — they are the web↔iOS drift guard, not a substitute for running tests — so the
+residual trap is narrower: a Swift change covered *only* by a pin and not by `CausewayTests` is
+still not tested. Run the target.
 
 ## 5. The review and QA loops
 
@@ -137,9 +144,10 @@ Things worth knowing before you run one:
   bug in its own output — as a *justification for a test skip* ("the grid shows this month only") —
   twelve hours before it arrived as a user bug report.
 
-## 6. Where things stand (2026-09-04)
+## 6. Where things stand (2026-09-09)
 
-**Green.** `npm test` 139/139, the iOS UI suite 21/21, zero skips on either. `main` is clean.
+**Green.** `npm test` 161/161; iOS 32/32 (`CausewayTests` 11 unit + `CausewayUITests` 21 UI), zero
+skips anywhere. `main` is clean.
 
 **The pool expires on 2026-09-30.** `data/daily-pool.json` holds 61 certified days from the
 2026-08-01 epoch. After that date there are no daily challenges at all, on either platform. The owner
@@ -152,13 +160,18 @@ URL, the contact email in `store/privacy-policy.md`, and a pass on real iOS 17/1
 simulator runtimes 18.5 and 26.5 exist on this Mac. Rollback point for the shipping-prep work is the
 git tag `pre-ship-prep`.
 
-**Open work** is at the bottom of `BACKLOG.md`, newest sections last — the last review loop and QA
-loop each left a section naming what they did not close. The largest open item there is the missing
-Swift test target described in §4.
+**Open work** is at the bottom of `BACKLOG.md`, newest sections last — each loop leaves a dated
+section naming what it did not close. The former largest item (the missing Swift test target) is
+CLOSED; what's left open is medium/low: DV-1 (daily Play/solution can silently discard an in-progress
+casual game), L2 (web hotkeys fire while typing), L5 (chimera bests), L7/L8 (iOS polish), and one
+deliberately-open review-loop minor (the real-clock default in `GameClock` is untested).
 
-**Recent history worth skimming:** the last four commits fixed the daily calendar (it could only ever
-draw the current month, so on 2026-09-01 all of August became unreachable), fixed the calendar cells'
-accessibility, and recorded the loop measurements. `prompts.md` entries 83–85 tell that story from the
+**Recent history worth skimming:** the 2026-09-07 skeptical review (`docs/skeptical-review-2026-09-07.md`)
+and the pass that addressed it — the pool builder now publishes under a fail-closed contract, the
+attempt lifecycle got one replacement gate, the Swift unit-test target landed, and two review-loop
+rounds converged on that work. Then the loop-state git policy was codified: **conclusions in git,
+evidence and scratch on disk**, enforced by `tests/repo-hygiene.test.mjs` via nested `.gitignore`
+allowlists in `.qa-loop/`/`.review-loop/`. `prompts.md` entries 86–94 tell that story from the
 owner's side.
 
 ## 7. Where the knowledge lives

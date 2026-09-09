@@ -886,3 +886,11 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     161/161 (4 new). Plus an untracked-by-design `plugin-feedback-conclusions-in-git.md` for
     the loop-plugin maintainer: ship the allowlist at bootstrap, stage by explicit path,
     preflight/closeout hygiene checks, Finder-dup awareness, optional out-of-tree evidence.
+
+95. Asked whether HANDOFF.md is up to date. It wasn't: §4 still denied the Swift unit-test
+    target that §3 of the same file described (closed by `743b664`), §6 was a 2026-09-04
+    snapshot (139 node tests vs the actual 161; "largest open item" long closed; "recent
+    history" three stories behind), and §3/CLAUDE.md carried a stale 153. Fixed all of it,
+    verified counts by running the suite (161/161, 0 skipped), and added the owner's new
+    standing rule — keep HANDOFF current, in the same commit as whatever invalidates it —
+    to HANDOFF §1.5, CLAUDE.md, and assistant memory.

@@ -19,6 +19,8 @@ that apply to *every* task, so they live here.
   `.gitignore` allowlists in `.qa-loop/` and `.review-loop/` are the definition of
   "conclusion". To track a new durable output type, add its exact name to the allowlist;
   never `git add -f` around it. `tests/repo-hygiene.test.mjs` enforces this.
+- **Keep `HANDOFF.md` up to date.** When a task invalidates something it asserts — a count, a
+  command, a trap, the state of the world — fix it in the same commit.
 - **Web and iOS must stay in sync.** `index.html` and `ios/Causeway/Causeway/Model/*.swift` are
   parallel implementations of the same rules, held together by drift-guard tests. Change a rule on
   one platform, change it on the other, and make a test prove it.
@@ -40,7 +42,7 @@ about. That is the tiebreaker for design questions.
 
 ## Verify before you claim
 
-- `npm test` → 153 tests, 0 skipped (as of 2026-09-08).
+- `npm test` → 161 tests, 0 skipped (as of 2026-09-09).
 - iOS: `xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway
   -destination "id=<UDID>" -parallel-testing-enabled NO` runs BOTH targets — `CausewayTests`
   (11 Swift unit tests, seconds) and `CausewayUITests` (21 UI tests, ~8 min) → 32 total,
