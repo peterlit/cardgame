@@ -40,10 +40,10 @@ final class RegressionExportProgressNoteTests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
         XCTAssertTrue(export.isHittable, "the BACKUP section's Export button never came on screen")
-        XCTAssertFalse(app.staticTexts["Opening Files…"].exists, "the note must not stand before the tap")
+        XCTAssertNotEqual(app.staticTexts["daily.backupnote"].label, "Opening Files…", "the note must not stand before the tap")
 
         export.tap()
-        XCTAssertTrue(app.staticTexts["Opening Files…"].waitForExistence(timeout: 3),
+        XCTAssertTrue(QA.wait(3) { app.staticTexts["daily.backupnote"].label == "Opening Files…" },
                       "Export gave no acknowledgement — the note never flipped to 'Opening Files…' (the round-1 freeze is back)")
 
         // Tidy up: dismiss the Files sheet if it exposes a Cancel we can reach (best effort).

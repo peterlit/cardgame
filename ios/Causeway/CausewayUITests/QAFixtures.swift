@@ -200,6 +200,12 @@ enum QA {
         return cond()
     }
 
+    /// The win overlay (ContentView.winOverlay, "win.overlay"): a container element, so the query
+    /// is type-agnostic. Replaces matching the overlay by its "You solved it! 🎉" title.
+    static func winOverlay(_ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)["win.overlay"]
+    }
+
     /// Accept the "Ready to finish" prompt the restored fixtures raise, and wait for the win overlay.
     static func finishFromPrompt(_ app: XCUIApplication) {
         let prompt = app.alerts["Ready to finish"]
@@ -208,7 +214,7 @@ enum QA {
         XCTAssertTrue(alert(prompt, contains: "Every remaining card can go home. Send them all now?"),
                       "prompt body changed: \(alertText(prompt))")
         prompt.buttons["Finish"].tap()
-        XCTAssertTrue(app.staticTexts["You solved it! 🎉"].waitForExistence(timeout: 40),
+        XCTAssertTrue(winOverlay(app).waitForExistence(timeout: 40),
                       "Finish did not cascade to the win overlay")
     }
 

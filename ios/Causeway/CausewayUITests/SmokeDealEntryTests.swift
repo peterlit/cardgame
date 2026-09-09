@@ -75,11 +75,11 @@ final class SmokeDealEntryTests: XCTestCase {
         // Route B — the Wins screen's Play, double-tapped.
         app.buttons["toolbar.wins"].tap()
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
-        let winsField = app.textFields.firstMatch
+        let winsField = app.textFields["wins.dealentry.field"]
         winsField.tap()
         winsField.typeText("500003")
-        let winsPlayY = app.buttons["Play"].frame.midY
-        app.buttons["Play"].doubleTap()
+        let winsPlayY = app.buttons["wins.dealentry.play"].frame.midY
+        app.buttons["wins.dealentry.play"].doubleTap()
         RunLoop.current.run(until: Date().addingTimeInterval(1.5))
         XCTAssertTrue(confirm.exists, "route B: no confirmation after a double-tap on the Wins Play")
         XCTAssertEqual(moves.label, "1", "route B: the live game was touched")

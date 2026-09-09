@@ -41,8 +41,9 @@ final class RegressionWinOverlayNamesDayTests: XCTestCase {
         QA.finishFromPrompt(app)
 
         let expected = "Aug 14: 🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."
-        XCTAssertTrue(app.staticTexts[expected].waitForExistence(timeout: 5),
-                      "the overlay's daily line lost its 'Aug 14:' prefix (or its ⏰ clause) — on screen: \(overlayTexts(app))")
+        let line = app.staticTexts["win.dailyline"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "the overlay has no daily line (win.dailyline) — on screen: \(overlayTexts(app))")
+        XCTAssertEqual(line.label, expected, "the overlay's daily line lost its 'Aug 14:' prefix (or its ⏰ clause)")
         // UNGROUPED digits: the overlay goes through DealFormat.seed like the board pill
         // (bug/WF-4:win-overlay-seed-grouped, fixed 42b5f7e). "Deal #720,307" would be that bug back.
         XCTAssertTrue(dealLine(app).hasPrefix("Deal #720307 · 79 moves · "),
@@ -55,8 +56,9 @@ final class RegressionWinOverlayNamesDayTests: XCTestCase {
         QA.finishFromPrompt(app)
 
         let expected = "Aug 13: 🌟 Flawless! 🥉🥈🥇 all in a single run."
-        XCTAssertTrue(app.staticTexts[expected].waitForExistence(timeout: 5),
-                      "a past-day replay must read exactly 'Aug 13: 🌟 Flawless! …' with NO ⏰ clause — on screen: \(overlayTexts(app))")
+        let line = app.staticTexts["win.dailyline"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "the overlay has no daily line (win.dailyline) — on screen: \(overlayTexts(app))")
+        XCTAssertEqual(line.label, expected, "a past-day replay must read exactly 'Aug 13: 🌟 Flawless! …' with NO ⏰ clause")
     }
 
     /// ux/WF-14:win-overlay-omits-the-day — today's own win must stay UNPREFIXED.
@@ -65,8 +67,9 @@ final class RegressionWinOverlayNamesDayTests: XCTestCase {
         QA.finishFromPrompt(app)
 
         let expected = "🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."
-        XCTAssertTrue(app.staticTexts[expected].waitForExistence(timeout: 5),
-                      "today's win must not be prefixed with its own day — on screen: \(overlayTexts(app))")
+        let line = app.staticTexts["win.dailyline"]
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "the overlay has no daily line (win.dailyline) — on screen: \(overlayTexts(app))")
+        XCTAssertEqual(line.label, expected, "today's win must not be prefixed with its own day")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Aug 14:")).count, 0,
                        "winDayLabel's today-guard is gone: the overlay prefixed today's own win")
     }
@@ -80,7 +83,7 @@ final class RegressionWinOverlayNamesDayTests: XCTestCase {
     }
 
     private func dealLine(_ app: XCUIApplication) -> String {
-        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #")).allElementsBoundByIndex
-            .map { $0.label }.first { $0.contains("moves") } ?? "<no deal line>"
+        let line = app.staticTexts["win.dealline"]
+        return line.exists ? line.label : "<no deal line>"
     }
 }

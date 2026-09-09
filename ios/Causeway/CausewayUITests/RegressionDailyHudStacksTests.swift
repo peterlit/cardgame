@@ -49,19 +49,20 @@ final class RegressionDailyHudStacksTests: XCTestCase {
         let dealPill = app.buttons["toolbar.deal"]
         XCTAssertTrue(QA.wait(5) { dealPill.label.hasPrefix("Deal #608530") }, "today's challenge did not load: \(dealPill.label)")
 
-        let bronze = app.staticTexts["🥉·"], silver = app.staticTexts["🥈·"], gold = app.staticTexts["🥇·"]
-        XCTAssertTrue(gold.waitForExistence(timeout: 5), "no live Gold chip mark on the HUD")
-        XCTAssertTrue(bronze.exists && silver.exists, "the HUD is missing chip marks")
-        for label in ["Clear the deal", "Never move more than 2 cards in a single move", "Take at least 10 of every suit from the King end"] {
-            XCTAssertTrue(app.staticTexts[label].exists, "HUD chip label missing: \(label)")
+        let bronze = app.staticTexts["hud.chip.bronze"], silver = app.staticTexts["hud.chip.silver"], gold = app.staticTexts["hud.chip.gold"]
+        XCTAssertTrue(gold.waitForExistence(timeout: 5), "no Gold chip mark on the HUD")
+        XCTAssertEqual([bronze.label, silver.label, gold.label], ["🥉·", "🥈·", "🥇·"], "the HUD chip marks are not all live")
+        for (tier, label) in [("bronze", "Clear the deal"), ("silver", "Never move more than 2 cards in a single move"), ("gold", "Take at least 10 of every suit from the King end")] {
+            XCTAssertEqual(app.staticTexts["hud.chip.\(tier).label"].label, label, "HUD chip label wrong for \(tier)")
         }
 
         // Portrait: three rows.
         XCTAssertGreaterThan(silver.frame.minY, bronze.frame.maxY - 2, "portrait: Silver is not below Bronze — the chips are one-lined again")
         XCTAssertGreaterThan(gold.frame.minY, silver.frame.maxY - 2, "portrait: Gold is not below Silver — the chips are one-lined again")
         let window = app.windows.firstMatch
-        for label in ["Never move more than 2 cards in a single move", "Take at least 10 of every suit from the King end"] {
-            XCTAssertLessThanOrEqual(app.staticTexts[label].frame.maxX, window.frame.maxX + 0.5, "portrait: '\(label)' runs off the window")
+        for tier in ["silver", "gold"] {
+            let text = app.staticTexts["hud.chip.\(tier).label"]
+            XCTAssertLessThanOrEqual(text.frame.maxX, window.frame.maxX + 0.5, "portrait: '\(text.label)' runs off the window")
         }
 
         // Landscape: one row.

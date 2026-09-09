@@ -24,9 +24,8 @@
 //  Selector notes (mined from Views/WinsView.swift on 4f02d1d):
 //   - error line:  "wins.dealentry.problem" (accessibilityIdentifier, real)
 //   - toolbar:     "toolbar.wins" (ContentView.toolbar / landscapeRail)
-//   - the FIELD and the sheet's "Play" button carry NO identifier — queried by
-//     placeholder ("Number 1–1,000,000") and by label ("Play"). Follow-up filed
-//     in .qa-loop/fragments/round-2-regression.json.
+//   - field / Play:  "wins.dealentry.field" / "wins.dealentry.play" (landed 836434d;
+//     before that they were matched by placeholder and by the label "Play").
 //
 import XCTest
 
@@ -49,14 +48,11 @@ final class RegressionDealEntryRangeTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5),
                       "Wins sheet did not open")
 
-        // The entry field has no identifier — address it by its placeholder,
-        // which is "Number " + DealFormat.seedRangeHint (WinsView.dealEntry).
-        let field = app.textFields.matching(
-            NSPredicate(format: "placeholderValue BEGINSWITH %@", "Number")).firstMatch
+        let field = app.textFields["wins.dealentry.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "'Play a deal' field not found")
 
         let problem = app.staticTexts["wins.dealentry.problem"]
-        let play = app.buttons["Play"]
+        let play = app.buttons["wins.dealentry.play"]
 
         // --- empty field: quiet, and Play legitimately disabled ---------------
         XCTAssertFalse(problem.exists,

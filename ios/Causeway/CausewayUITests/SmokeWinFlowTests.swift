@@ -45,12 +45,14 @@ final class SmokeWinFlowTests: XCTestCase {
         let app = QA.launch(today: "2026-08-15", game: QA.day14Silver)
         QA.finishFromPrompt(app)   // asserts the prompt title/body and the "You solved it! 🎉" overlay
 
-        let deal = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #608530 · 97 moves · ")).firstMatch
-        XCTAssertTrue(deal.waitForExistence(timeout: 3), "overlay deal line is not 'Deal #608530 · 97 moves · M:SS' (ungrouped) — texts: \(texts(app))")
-        XCTAssertTrue(app.staticTexts["Daily challenge: 🥉 🥈 earned. ⏰ On time — 1-day same-day streak."].exists,
-                      "overlay daily line is wrong — texts: \(texts(app))")
-        for button in ["Play deal #608531", "Random", "Close"] {
-            XCTAssertTrue(app.buttons[button].exists, "overlay button missing: \(button)")
+        let deal = app.staticTexts["win.dealline"]
+        XCTAssertTrue(deal.waitForExistence(timeout: 3) && deal.label.hasPrefix("Deal #608530 · 97 moves · "),
+                      "overlay deal line is not 'Deal #608530 · 97 moves · M:SS' (ungrouped) — texts: \(texts(app))")
+        XCTAssertEqual(app.staticTexts["win.dailyline"].label, "Daily challenge: 🥉 🥈 earned. ⏰ On time — 1-day same-day streak.",
+                       "overlay daily line is wrong — texts: \(texts(app))")
+        for (id, label) in [("win.play", "Play deal #608531"), ("win.random", "Random"), ("win.close", "Close")] {
+            XCTAssertTrue(app.buttons[id].exists, "overlay button missing: \(id)")
+            XCTAssertEqual(app.buttons[id].label, label, "overlay button \(id) is mislabelled")
         }
         XCTAssertEqual(app.staticTexts["stat.won"].label, "1", "the header Won count did not become 1")
         XCTAssertEqual(app.buttons["toolbar.deal"].label, "Deal #608530 ✓", "the deal pill did not gain its won ✓")
@@ -63,12 +65,13 @@ final class SmokeWinFlowTests: XCTestCase {
         let app = QA.launch(today: "2026-08-14", game: QA.day13Flawless)   // day 13 IS today
         QA.finishFromPrompt(app)
 
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #720307 · 79 moves · ")).firstMatch.waitForExistence(timeout: 3),
+        let deal2 = app.staticTexts["win.dealline"]
+        XCTAssertTrue(deal2.waitForExistence(timeout: 3) && deal2.label.hasPrefix("Deal #720307 · 79 moves · "),
                       "overlay deal line is not 'Deal #720307 · 79 moves · M:SS' (ungrouped) — texts: \(texts(app))")
-        XCTAssertTrue(app.staticTexts["🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."].exists,
-                      "overlay flawless/on-time line wrong — texts: \(texts(app))")
-        app.buttons["Close"].tap()
-        XCTAssertTrue(QA.waitGone(app.staticTexts["You solved it! 🎉"], timeout: 3))
+        XCTAssertEqual(app.staticTexts["win.dailyline"].label, "🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak.",
+                       "overlay flawless/on-time line wrong — texts: \(texts(app))")
+        app.buttons["win.close"].tap()
+        XCTAssertTrue(QA.waitGone(QA.winOverlay(app), timeout: 3))
 
         QA.openDaily(app)
         for card in ["Play", "Same-day", "Silver", "Gold", "Flawless"] {
@@ -92,10 +95,11 @@ final class SmokeWinFlowTests: XCTestCase {
         let priorDaily = #"{"version":3,"days":{"2":{"bronze":true,"silver":true,"gold":true,"flawless":false,"onTime":false,"moves":200,"elapsed":30,"runs":[{"moves":200,"elapsed":30}]}}}"#
         let app = QA.launch(today: "2026-08-15", game: QA.day2Bronze, daily: priorDaily)
         QA.finishFromPrompt(app)   // run 2: 96 moves, bronze only, a past-day replay
-        XCTAssertTrue(app.staticTexts["Aug 3: Daily challenge: 🥉 earned."].waitForExistence(timeout: 3),
+        let daily2 = app.staticTexts["win.dailyline"]
+        XCTAssertTrue(daily2.waitForExistence(timeout: 3) && daily2.label == "Aug 3: Daily challenge: 🥉 earned.",
                       "run 2 should score bronze only for Aug 3 — texts: \(texts(app))")
-        app.buttons["Close"].tap()
-        XCTAssertTrue(QA.waitGone(app.staticTexts["You solved it! 🎉"], timeout: 3))
+        app.buttons["win.close"].tap()
+        XCTAssertTrue(QA.waitGone(QA.winOverlay(app), timeout: 3))
 
         QA.selectCalendarDay(app, 2)
         let lines = app.staticTexts.matching(identifier: "daily.clears").allElementsBoundByIndex.map { $0.label }

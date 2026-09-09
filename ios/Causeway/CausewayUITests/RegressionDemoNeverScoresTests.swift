@@ -34,9 +34,8 @@
 //                      (ContentView.stat), so tests read it directly
 //   - cards:           "card.<S><rank>", S ∈ S/H/D/C (CardView) — used for the
 //                      input-lock probe instead of raw coordinates
-//   - win overlay:     STILL no identifier — queried by its "You solved it! 🎉"
-//                      title label; follow-up filed in
-//                      .qa-loop/fragments/round-2-regression.json
+//   - win overlay:     "win.overlay" (ContentView.winOverlay; QA.winOverlay) — landed
+//                      836434d, replacing the "You solved it! 🎉" title match
 //
 //  Requires a simulator/device where the bundled daily pool has a baked solution
 //  for today (ships with the app; the "🥉 Clear" pill only renders when
@@ -120,7 +119,7 @@ final class RegressionDemoNeverScoresTests: XCTestCase {
         XCTAssertEqual(dealPill.label, demoSeedLabel, "Stop must re-deal the SAME seed")
         XCTAssertFalse(app.buttons["toolbar.undo"].isEnabled,
                        "fresh re-deal must leave Undo disabled (empty history)")
-        XCTAssertFalse(app.staticTexts["You solved it! 🎉"].exists)
+        XCTAssertFalse(QA.winOverlay(app).exists)
 
         // --- run the whole line, then Done (TC-6.4) ------------------------------
         openClearDemo(app)
@@ -131,7 +130,7 @@ final class RegressionDemoNeverScoresTests: XCTestCase {
         XCTAssertTrue(app.buttons["demo.done"].waitForExistence(timeout: 120),
                       "demo never reached its end-of-line Done banner")
         // The line just played to a fully-won board — the win overlay must NOT show.
-        XCTAssertFalse(app.staticTexts["You solved it! 🎉"].exists,
+        XCTAssertFalse(QA.winOverlay(app).exists,
                        "win overlay appeared for a demo run")
 
         app.buttons["demo.done"].tap()

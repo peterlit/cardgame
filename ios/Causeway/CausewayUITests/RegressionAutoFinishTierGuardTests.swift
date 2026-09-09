@@ -73,7 +73,7 @@ final class RegressionAutoFinishTierGuardTests: XCTestCase {
         cost.buttons["Keep playing"].tap()
         XCTAssertTrue(QA.waitGone(cost, timeout: 3))
         XCTAssertEqual(moves.label, "64", "Keep playing must not cascade")
-        XCTAssertFalse(app.staticTexts["You solved it! 🎉"].exists, "Keep playing must not finish the game")
+        XCTAssertFalse(QA.winOverlay(app).exists, "Keep playing must not finish the game")
     }
 
     /// bug/WF-4:autoplay-denies-daily-gold — Auto-play must refuse the send that would kill
@@ -89,9 +89,9 @@ final class RegressionAutoFinishTierGuardTests: XCTestCase {
         // Give the resumed safe-autoplay chain time to act (the harmless 6♠ send still happens).
         RunLoop.current.run(until: Date().addingTimeInterval(2.5))
 
-        XCTAssertFalse(app.staticTexts["🥇✗"].exists,
+        XCTAssertNotEqual(app.staticTexts["hud.chip.gold"].label, "🥇✗",
                        "Auto-play killed Gold with no player input (the 8♠ went DOWN) — the round-1 bug is back")
-        XCTAssertTrue(app.staticTexts["🥇·"].exists || app.staticTexts["🥇✓"].exists,
+        XCTAssertTrue(["🥇·", "🥇✓"].contains(app.staticTexts["hud.chip.gold"].label),
                       "the Gold chip is neither live nor secured — HUD chips on screen: \(marks(app))")
         let moves = Int(app.staticTexts["stat.moves"].label) ?? -1
         XCTAssertTrue((92...93).contains(moves),
@@ -101,9 +101,9 @@ final class RegressionAutoFinishTierGuardTests: XCTestCase {
         let finish = app.buttons["toolbar.finish"]
         XCTAssertTrue(finish.waitForExistence(timeout: 3), "the board must remain finishable after the refusal")
         finish.tap()
-        XCTAssertTrue(app.staticTexts["You solved it! 🎉"].waitForExistence(timeout: 40),
+        XCTAssertTrue(QA.winOverlay(app).waitForExistence(timeout: 40),
                       "Finish did not reach the win overlay — the refusal left the board stuck (or a cost dialog blocked it: \(app.alerts.allElementsBoundByIndex.map { $0.label }))")
-        XCTAssertTrue(app.staticTexts["🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."].waitForExistence(timeout: 5),
+        XCTAssertTrue(QA.wait(5) { app.staticTexts["win.dailyline"].label == "🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak." },
                       "the deal did not finish flawless from the refused position")
     }
 
@@ -126,13 +126,13 @@ final class RegressionAutoFinishTierGuardTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(2.0))
         XCTAssertEqual(moves.label, "92",
                        "turning Auto-play On played cards on the spot (Moves left 92) — the round-1 bug is back")
-        XCTAssertFalse(app.staticTexts["🥇✗"].exists, "the toggle cost the Gold tier")
+        XCTAssertNotEqual(app.staticTexts["hud.chip.gold"].label, "🥇✗", "the toggle cost the Gold tier")
     }
 
     // MARK: - helpers
 
     private func marks(_ app: XCUIApplication) -> String {
-        app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@ OR label BEGINSWITH %@", "🥉", "🥈", "🥇"))
+        app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND NOT identifier ENDSWITH %@", "hud.chip.", ".label"))
             .allElementsBoundByIndex.map { $0.label }.joined(separator: " ")
     }
 }

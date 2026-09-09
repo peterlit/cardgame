@@ -32,10 +32,10 @@ final class SmokeWinsScreenTests: XCTestCase {
         app.buttons["toolbar.wins"].tap()
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5), "the Wins sheet did not open")
         XCTAssertTrue(app.staticTexts["Play a deal"].exists, "the Play a deal row is missing")
-        let field = app.textFields.firstMatch
+        let field = app.textFields["wins.dealentry.field"]
         XCTAssertTrue(field.exists, "the deal-entry field is missing")
         XCTAssertEqual((field.value as? String) ?? "", "Number 1–1,000,000", "the empty field should show its range placeholder, got '\(field.value ?? "")'")
-        let play = app.buttons["Play"]
+        let play = app.buttons["wins.dealentry.play"]
         XCTAssertTrue(play.exists, "the Play button is missing")
         XCTAssertFalse(play.isEnabled, "Play must be disabled while the field is empty")
         XCTAssertTrue(app.staticTexts["No wins yet — go solve one!"].exists, "the empty-state line is missing")
@@ -59,10 +59,10 @@ final class SmokeWinsScreenTests: XCTestCase {
         // (a) typed deal → Play
         app.buttons["toolbar.wins"].tap()
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
-        let field = app.textFields.firstMatch
+        let field = app.textFields["wins.dealentry.field"]
         field.tap()
         field.typeText("500001")
-        app.buttons["Play"].tap()
+        app.buttons["wins.dealentry.play"].tap()
         let confirm = app.alerts[confirmTitle]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Wins ▸ Play replaced a live game with no confirmation")
         XCTAssertTrue(QA.alert(confirm, contains: body), "confirm body wrong, got: \(QA.alertText(confirm))")

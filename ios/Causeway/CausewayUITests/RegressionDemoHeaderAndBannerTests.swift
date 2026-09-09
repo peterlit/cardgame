@@ -87,7 +87,7 @@ final class RegressionDemoHeaderAndBannerTests: XCTestCase {
         // A full tableau, not the inert solved board: all 52 cards are back on the table.
         XCTAssertTrue(QA.wait(3) { QA.cards(app).count > 40 },
                       "Done left an emptied board (\(QA.cards(app).count) card elements) — the inert solved board is back")
-        XCTAssertFalse(app.staticTexts["You solved it! 🎉"].exists)
+        XCTAssertFalse(QA.winOverlay(app).exists)
     }
 
     // MARK: - helpers

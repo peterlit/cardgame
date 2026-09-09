@@ -57,9 +57,10 @@ final class RegressionBackupCancelNoteTests: XCTestCase {
                           "the Files picker never presented a Cancel button — system UI, not the app's")
         cancel.tap()
 
-        XCTAssertTrue(app.staticTexts["Import cancelled."].waitForExistence(timeout: 5),
-                      "a cancelled import is not acknowledged — the note is stuck on its progress text")
-        XCTAssertFalse(app.staticTexts["Opening Files…"].exists,
-                       "the 'Opening Files…' progress note survived the cancel")
+        let note = app.staticTexts["daily.backupnote"]
+        XCTAssertTrue(QA.wait(5) { note.exists && note.label == "Import cancelled." },
+                      "a cancelled import is not acknowledged — the note is stuck on its progress text: '\(note.label)'")
+        XCTAssertNotEqual(note.label, "Opening Files…",
+                          "the 'Opening Files…' progress note survived the cancel")
     }
 }

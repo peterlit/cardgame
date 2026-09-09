@@ -150,7 +150,7 @@ final class SmokeDailySheetTests: XCTestCase {
         XCTAssertFalse(app.alerts.firstMatch.exists, "a constraint violation must never be refused with a dialog")
         XCTAssertLessThan(three.frame.maxY, tableauTop, "3♦ did not leave the tableau for a free cell")
         XCTAssertTrue(QA.wait(2) { app.staticTexts["🥇✗"].exists }, "the Gold chip did not flip to ✗ on the cell use")
-        XCTAssertTrue(app.staticTexts["🥉·"].exists && app.staticTexts["🥈·"].exists, "Bronze/Silver must stay live")
+        XCTAssertTrue(app.staticTexts["hud.chip.bronze"].label == "🥉·" && app.staticTexts["hud.chip.silver"].label == "🥈·", "Bronze/Silver must stay live")
         XCTAssertTrue(app.staticTexts["Win without ever using a free cell"].exists, "the Gold label must not change with its mark")
 
         app.buttons["toolbar.undo"].tap()
