@@ -189,22 +189,7 @@ final class Game: ObservableObject {
         // showSolution re-arms demoing = true AFTER deal() returns, so this doesn't self-cancel it.
         stopDemo()
         self.seed = max(1, min(Game.maxSeed, seed))
-        var rng = Mulberry32(UInt32(truncatingIfNeeded: self.seed))
-        var deck: [Card] = []
-        for s in 0..<4 { for r in 1...13 { deck.append(Card(suit: Suit(rawValue: s)!, rank: r)) } }
-        // Fisher–Yates identical to the web build.
-        var i = deck.count - 1
-        while i > 0 { let j = rng.int(i + 1); deck.swapAt(i, j); i -= 1 }
-
-        tableau = Array(repeating: [], count: Game.colCount)
-        var k = 0
-        for c in 0..<Game.colCount {
-            let n = c < 4 ? 7 : 6   // 7,7,7,7,6,6,6,6 = 52
-            for _ in 0..<n { tableau[c].append(deck[k]); k += 1 }
-        }
-        cells = Array(repeating: nil, count: Game.cellCount)
-        up = Array(repeating: 0, count: 4)
-        down = Array(repeating: 14, count: 4)
+        layOutBoard()
         selection = nil
         history = []
         moveCount = 0
@@ -225,6 +210,28 @@ final class Game: ObservableObject {
         promptAutoFinish = false
         autoFinishDeferred = false
         persist()
+    }
+
+    /// The board's opening position for `seed` — tableau, cells and both foundation rows — and
+    /// nothing else. deal() wraps it with the full session reset; demoStepBack() uses it alone to
+    /// re-simulate a line from move 0 without tearing the demo down. Web twin: layoutBoard.
+    private func layOutBoard() {
+        var rng = Mulberry32(UInt32(truncatingIfNeeded: self.seed))
+        var deck: [Card] = []
+        for s in 0..<4 { for r in 1...13 { deck.append(Card(suit: Suit(rawValue: s)!, rank: r)) } }
+        // Fisher–Yates identical to the web build.
+        var i = deck.count - 1
+        while i > 0 { let j = rng.int(i + 1); deck.swapAt(i, j); i -= 1 }
+
+        tableau = Array(repeating: [], count: Game.colCount)
+        var k = 0
+        for c in 0..<Game.colCount {
+            let n = c < 4 ? 7 : 6   // 7,7,7,7,6,6,6,6 = 52
+            for _ in 0..<n { tableau[c].append(deck[k]); k += 1 }
+        }
+        cells = Array(repeating: nil, count: Game.cellCount)
+        up = Array(repeating: 0, count: 4)
+        down = Array(repeating: 14, count: 4)
     }
 
     func newRandomGame() { stopDemo(); deal(seed: randomSeed()) }
@@ -1101,6 +1108,29 @@ final class Game: ObservableObject {
     func demoStepOnce() {
         guard demoing, demoPaused else { return }
         demoAdvance()
+    }
+
+    /// Whether "Prev" has anything to rewind: paused, with at least one move shown.
+    var demoCanStepBack: Bool { demoing && demoPaused && demoIdx > 0 }
+
+    /// "Prev": show the position one move EARLIER. Re-simulates the line from the opening
+    /// position — never an Undo of the live board: the demo board is not playable, `history`
+    /// stays empty so Undo stays disabled, and nothing here touches commit()/telemetry. Without
+    /// it, re-watching move 44 of a 100-move line cost 46 taps (Stop, Daily, the pill, Next ×43)
+    /// (ux/WF-6:demo-has-no-step-back). The one animated state change is exactly the reverted
+    /// move, since every other card lands where it already is.
+    func demoStepBack() {
+        guard demoCanStepBack else { return }
+        let target = demoIdx - 1
+        withAnimation(.easeOut(duration: 0.22)) {
+            layOutBoard()
+            moveCount = 0
+            for i in 0..<target where !applyDemoToken(demoMoves[i]) {
+                restartDeal()   // the line no longer applies to its own board: same abort as demoAdvance
+                return
+            }
+            demoIdx = target
+        }
     }
 
     /// Leave a "how to win" demo — mid-line "Stop" or post-line "Done".

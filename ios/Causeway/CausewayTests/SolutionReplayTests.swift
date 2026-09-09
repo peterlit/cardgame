@@ -141,4 +141,38 @@ final class SolutionReplayTests: XCTestCase {
                      "the SECOND win must clear the save too — a relaunch must not resurrect a one-card-left board (R3)")
         XCTAssertTrue(g.winStore.isWon(seed))
     }
+
+    // MARK: - "Prev" re-simulates, it never undoes (ux/WF-6:demo-has-no-step-back)
+
+    func testDemoStepBackReSimulatesOneMoveShorterAndNeverArmsUndo() throws {
+        let seed = makeGame().pool[0].seed
+        // Reference: a demo stepped forward exactly twice.
+        let ref = makeGame()
+        ref.showSolution(seed, tier: "bronze")
+        ref.demoStepOnce(); ref.demoStepOnce()
+        // Subject: three steps, then one back.
+        let g = makeGame()
+        g.showSolution(seed, tier: "bronze")
+        XCTAssertFalse(g.demoCanStepBack, "nothing to rewind at move 0")
+        g.demoStepOnce(); g.demoStepOnce(); g.demoStepOnce()
+        XCTAssertTrue(g.demoCanStepBack)
+        g.demoStepBack()
+
+        XCTAssertEqual(g.demoProgress, ref.demoProgress, "Prev must land one move earlier")
+        XCTAssertEqual(g.tableau, ref.tableau, "Prev must show the same position a fresh two-step replay shows")
+        XCTAssertEqual(g.cells, ref.cells)
+        XCTAssertEqual(g.up, ref.up)
+        XCTAssertEqual(g.down, ref.down)
+        XCTAssertTrue(g.demoing, "Prev must not leave the demo")
+        XCTAssertTrue(g.demoPaused, "Prev must leave the demo paused")
+        XCTAssertFalse(g.canUndo, "Prev must never arm Undo — the demo board is not playable")
+        XCTAssertFalse(g.winStore.isWon(seed), "a demo never records anything")
+
+        // Back to the opening position, and Prev then has nothing left to do.
+        g.demoStepBack(); g.demoStepBack()
+        XCTAssertEqual(g.demoProgress, "0 / \(ref.demoProgress.split(separator: "/").last!.trimmingCharacters(in: .whitespaces))")
+        XCTAssertFalse(g.demoCanStepBack)
+        let fresh = makeGame(); fresh.deal(seed: seed)
+        XCTAssertEqual(g.tableau, fresh.tableau, "rewound to move 0 the board must be the opening position")
+    }
 }

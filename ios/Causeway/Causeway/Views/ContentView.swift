@@ -934,6 +934,12 @@ struct ContentView: View {
             Spacer(minLength: 6)
             if game.demoing {
                 if game.demoPaused {
+                    // Prev re-simulates the line one move shorter (Game.demoStepBack) — it is not
+                    // an Undo, and Undo stays disabled while the bar is up.
+                    if game.demoCanStepBack {
+                        demoPill("Prev") { game.demoStepBack() }
+                            .accessibilityIdentifier("demo.prev")
+                    }
                     demoPill("Next") { game.demoStepOnce() }
                         .accessibilityIdentifier("demo.next")
                 }

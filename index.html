@@ -344,7 +344,7 @@
     <button class="btn" id="dailyBtn" title="Daily challenges" disabled>Daily</button>
   </div>
   <div class="hud" id="dailyHud"></div>
-  <div class="demobar" id="demoBar"><span id="demoMsg">Showing a winning line…</span><span class="demobtns"><button class="btn" id="demoNext">Next</button><button class="btn" id="demoPause">Pause</button><button class="btn" id="demoStop">Stop</button></span></div>
+  <div class="demobar" id="demoBar"><span id="demoMsg">Showing a winning line…</span><span class="demobtns"><button class="btn" id="demoPrev">Prev</button><button class="btn" id="demoNext">Next</button><button class="btn" id="demoPause">Pause</button><button class="btn" id="demoStop">Stop</button></span></div>
 
   <div class="upper">
     <div>
@@ -501,6 +501,24 @@ function freshDeck(){
   return d;
 }
 
+// The opening position for `theSeed` — tableau, cells and both foundation rows — and nothing else.
+// deal() wraps it with the full session reset; demoStepBack() uses it alone to re-simulate a line
+// from move 0 without tearing the demo down. (iOS twin: Game.layOutBoard.)
+function layoutBoard(theSeed){
+  const rng = mulberry32(theSeed);
+  const deck = freshDeck();
+  for(let i=deck.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
+  const tableau = Array.from({length:NCOLS},()=>[]);
+  // columns 0-3 get 7, columns 4-7 get 6  (28+24 = 52)
+  let k=0;
+  for(let c=0;c<NCOLS;c++){ const n = c<4?7:6; for(let i=0;i<n;i++) tableau[c].push(deck[k++]); }
+  return {
+    tableau,
+    cells: Array(NCELLS).fill(null),
+    up:   [0,0,0,0],     // highest rank placed on the up pile (0 = empty)
+    down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
+  };
+}
 function deal(theSeed){
   // deal() is the single demo-teardown chokepoint: any path that lays out a fresh board
   // ('n' shortcut, seed modal goDeal/dealRandom, winsPlay, restartDeal, showSolution) must
@@ -512,19 +530,7 @@ function deal(theSeed){
   // showSolution sets demoing=true AFTER deal() returns, so this doesn't self-cancel it.
   stopDemo();
   seed = theSeed>>>0;
-  const rng = mulberry32(seed);
-  const deck = freshDeck();
-  for(let i=deck.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
-  const tableau = Array.from({length:NCOLS},()=>[]);
-  // columns 0-3 get 7, columns 4-7 get 6  (28+24 = 52)
-  let k=0;
-  for(let c=0;c<NCOLS;c++){ const n = c<4?7:6; for(let i=0;i<n;i++) tableau[c].push(deck[k++]); }
-  state = {
-    tableau,
-    cells: Array(NCELLS).fill(null),
-    up:   [0,0,0,0],     // highest rank placed on the up pile (0 = empty)
-    down: [14,14,14,14], // lowest rank placed on the down pile (14 = empty)
-  };
+  state = layoutBoard(seed);
   history=[]; moveCount=0; selection=null;
   resetTelem(); challengeDay=null; challengeStartDay=null; demoDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
@@ -1520,13 +1526,14 @@ function applyDemoToken(tok){
 function updateDemoBar(){
   const bar=document.getElementById("demoBar"); if(!bar) return;
   const msg=document.getElementById("demoMsg");
-  const next=document.getElementById("demoNext"), pause=document.getElementById("demoPause"), stop=document.getElementById("demoStop");
+  const prev=document.getElementById("demoPrev"), next=document.getElementById("demoNext"), pause=document.getElementById("demoPause"), stop=document.getElementById("demoStop");
   const total=demoMoves?demoMoves.length:0;
   const done = !demoing && bar.classList.contains("show");   // completed line: banner + Done only
   const TIER={bronze:'🥉 Clear the deal',silver:'🥈 Silver',gold:'🥇 Gold',flawless:'🌟 Flawless'};
   const tierName={bronze:'winning',silver:'Silver',gold:'Gold',flawless:'Flawless'}[demoTier]||'winning';
   if(done){
     if(msg) msg.textContent=`That's a ${tierName} line — tap Done to try it yourself.`;
+    if(prev) prev.style.display="none";
     if(next) next.style.display="none";
     if(pause) pause.style.display="none";
     if(stop) stop.textContent="Done";
@@ -1536,6 +1543,7 @@ function updateDemoBar(){
   const head = demoTier==='bronze' ? 'Winning line' : `${TIER[demoTier]}: ${demoLabel}`;
   const suffix = !demoPaused ? "…" : (demoStarted ? " (paused)" : "");   // initial (never started) = no suffix
   if(msg) msg.textContent=`${head} — move ${Math.min(demoIdx,total)} / ${total}${suffix}`;
+  if(prev) prev.style.display=(demoPaused && demoIdx>0)?"":"none";
   if(next) next.style.display=demoPaused?"":"none";
   // Toggle button: "Start" before the first play, "Pause" while playing, "Resume" once paused.
   if(pause){ pause.style.display=""; pause.textContent = !demoPaused ? "Pause" : (demoStarted ? "Resume" : "Start"); }
@@ -1586,6 +1594,17 @@ function demoTogglePause(){
 function demoStepOnce(){
   if(!demoing || !demoPaused) return;
   if(demoAdvance()) updateDemoBar();   // if it finished, finishDemo already refreshed the bar
+}
+// "Prev": show the position one move EARLIER by re-simulating the line from the opening position.
+// Never an undo of the live board: the demo board is not playable, `history` stays empty, and
+// nothing here touches commitMove/telemetry (ux/WF-6:demo-has-no-step-back; iOS twin: demoStepBack).
+function demoStepBack(){
+  if(!demoing || !demoPaused || demoIdx<=0) return;
+  const target=demoIdx-1;
+  state=layoutBoard(seed); moveCount=0; selection=null;
+  for(let i=0;i<target;i++){ if(!applyDemoToken(demoMoves[i])){ restartDeal(); return; } }
+  demoIdx=target;
+  setMoves(0); updateDemoBar(); render();
 }
 // The baked line for a seed+tier. Silver falls back to bronze when the day's Silver is a "universal"
 // objective (win in N moves / no undo) — the clear-the-deal line already satisfies it.
@@ -2112,6 +2131,7 @@ function endDemo(){
 }
 document.getElementById("demoPause").onclick=demoTogglePause;
 document.getElementById("demoNext").onclick=demoStepOnce;
+document.getElementById("demoPrev").onclick=demoStepBack;
 // Restart the CURRENT deal from scratch — re-deal the same seed, preserving the daily-challenge
 // context if one is active (so a challenge replay stays scored as that same challenge/day).
 function restartDeal(){
