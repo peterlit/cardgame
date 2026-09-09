@@ -119,8 +119,14 @@ final class RegressionDiscardConfirmTests: XCTestCase {
         let confirm = app.alerts[confirmTitle]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5),
                       "Deal ▸ Play re-dealt over a live game with no confirmation — the round-1 bug is back")
-        XCTAssertTrue(confirm.buttons["Play that deal"].exists,
-                      "the confirm must carry the deal-entry verb")
+        let destructive = confirm.buttons["Play that deal"]
+        XCTAssertTrue(destructive.exists, "the confirm must carry the deal-entry verb")
+        // bug/WF-7:deal-confirm-swallowed-by-double-tap — the destructive action is presented
+        // DISARMED for 0.5 s (a trailing tap under the finger must hit an inert button) and must
+        // then arm on its own; a confirm whose only destructive action never enables would be a
+        // wedged flow, not a fix.
+        let armed = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: destructive)
+        wait(for: [armed], timeout: 3)
         confirm.buttons["Keep playing"].tap()
         XCTAssertEqual(dealPill.label, liveSeed, "Keep playing must leave the live deal alone")
         XCTAssertEqual(moves.label, liveMoves, "Keep playing must leave the move count alone")

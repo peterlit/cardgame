@@ -123,6 +123,15 @@ struct ContentView: View {
     // never cued: its snap-back already answers.
     @State private var shakeSpot: Spot?
     @State private var shakeTrigger: CGFloat = 0
+    /// Whether the reset confirm's DESTRUCTIVE button accepts taps yet. A confirm raised from a
+    /// dismissing alert (Deal # ▸ Play, Wins ▸ row) appears 0.1 s later at nearly the same spot
+    /// the finger just tapped — with the software keyboard absent (hardware keyboard, or the
+    /// simulator after a key event) "Play that deal" materialised 12 pt from where Play had been,
+    /// and a double-tap silently destroyed the live game with the confirmation never seen
+    /// (bug/WF-7:deal-confirm-swallowed-by-double-tap). Layout nudges only masked it once; this
+    /// is the logic: for the first 0.5 s after such a presentation the destructive action is
+    /// disabled, so a trailing tap lands on an inert button. "Keep playing" is never gated.
+    @State private var resetConfirmArmed = true
     /// Height of the landscape rail's pill stack — see landscapeRail.
     @State private var railContentH: CGFloat = 0
     /// Height of one rail pill and the rail's current scroll offset — see landscapeRail.
@@ -331,11 +340,12 @@ struct ContentView: View {
         // already took (ux/WF-3:board-reset-pills-no-confirm).
         .alert(resetConfirmTitle, isPresented: Binding(
             get: { pendingReset != nil },
-            set: { if !$0 { pendingReset = nil } })
+            set: { if !$0 { pendingReset = nil; resetConfirmArmed = true } })
         ) {
             Button(resetConfirmVerb, role: .destructive) {
                 if let action = pendingReset { pendingReset = nil; performReset(action) }
             }
+            .disabled(!resetConfirmArmed)   // see resetConfirmArmed
             Button("Keep playing", role: .cancel) { pendingReset = nil }
         } message: {
             Text(resetConfirmMessage)
@@ -368,7 +378,8 @@ struct ContentView: View {
     /// to lose. `hasLiveGame` is false on an untouched board, a won board and mid-demo, so the
     /// one-tap cases stay one tap.
     private func requestReset(_ action: PendingReset) {
-        if game.hasLiveGame { pendingReset = action } else { performReset(action) }
+        // The pills sit nowhere near the confirm's buttons, so this path is armed at once.
+        if game.hasLiveGame { resetConfirmArmed = true; pendingReset = action } else { performReset(action) }
     }
     /// The same gate for a deal requested from a DISMISSING sheet or alert (the deal dialog, the
     /// Wins screen). Raising the confirmation from inside the dismissal transition swallows it,
@@ -378,7 +389,14 @@ struct ContentView: View {
     /// ⏰ grace (skeptical-review R4).
     private func requestDealFromDismissal(_ n: Int) {
         if game.hasLiveGame {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+            // Present disarmed, arm 0.5 s after presentation: the confirm can land under the
+            // finger that just tapped Play, and a second tap within that window must hit an
+            // inert button, not a live destructive one (see resetConfirmArmed).
+            resetConfirmArmed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                pendingReset = .deal(n)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { resetConfirmArmed = true }
+            }
         } else {
             withAnimation { game.deal(seed: n) }
         }

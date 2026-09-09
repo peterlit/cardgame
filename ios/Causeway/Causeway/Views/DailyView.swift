@@ -85,9 +85,13 @@ struct DailyView: View {
             return "\(lead). You began \(d)'s challenge on the day itself — starting over "
                  + "makes it an attempt begun today, and \(d) can never earn ⏰ Same-day again."
         }
+        // The casual tail names the CURRENT game, not "a challenge": with the .play cause this
+        // sentence used to read "Starting this challenge re-deals the board … This game is not a
+        // challenge" — the same word in two senses, thirteen words apart, at the moment of an
+        // irreversible action (ux/WF-7:live-game-confirm-challenge-two-senses).
         return game.challengeDay != nil
             ? "\(lead). You can replay the challenge afterwards."
-            : "\(lead). This game is not a challenge, so there is no way back to it."
+            : "\(lead). The game you're in is a casual deal, so there is no way back to it."
     }
     private var confirmVerb: String {
         if case .demo = pending { return "Show demo" }
