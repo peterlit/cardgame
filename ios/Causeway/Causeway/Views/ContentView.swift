@@ -997,42 +997,64 @@ struct ContentView: View {
     // MARK: "Show me how to win" status bar
 
     private var demoBar: some View {
-        HStack(spacing: 8) {
-            Text(demoHeadline)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(Color(hex: 0xF4EFE2))
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("demo.headline")
-            Spacer(minLength: 6)
-            // Prev re-simulates the line one move shorter (Game.demoStepBack) — it is not an
-            // Undo, and Undo stays disabled while the bar is up. Offered while paused mid-line AND
-            // from the completion banner, where it re-enters the paused demo at the last move.
-            if game.demoCanStepBack {
-                demoPill("Prev") { game.demoStepBack() }
-                    .accessibilityIdentifier("demo.prev")
+        // One row while the headline fits beside the pills on a single line; otherwise the
+        // headline takes the full width ABOVE the pill row. In a plain HStack the pills kept
+        // their row and the headline was squeezed into whatever was left — the longer the
+        // headline (🌟 Flawless names all three objectives) the narrower its column, until a
+        // paused Flawless demo wrapped 16 lines in 95 pt and the bar stood 224 pt tall, 26% of
+        // the screen (ux/WF-15:flawless-demo-banner-eats-quarter-screen). Same shape as
+        // DailyHUD's one-line-then-stacked ViewThatFits.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                demoHeadlineText.lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 6)
+                demoPills
             }
-            if game.demoing {
-                if game.demoPaused {
-                    demoPill("Next") { game.demoStepOnce() }
-                        .accessibilityIdentifier("demo.next")
+            VStack(alignment: .leading, spacing: 6) {
+                demoHeadlineText.fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    demoPills
                 }
-                // "Start" before the first play, "Pause" while playing, "Resume" once paused.
-                demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
-                    .accessibilityIdentifier("demo.start")   // one id for Start/Pause/Resume (same control)
             }
-            // Both mid-demo "Stop" and post-line "Done" re-deal the seed: a demo-touched board
-            // must never become playable (taking over the app's own solution moves and finishing
-            // would bank a genuine win/best-time). The player lands on a fresh board of the same
-            // deal, which they can still solve legitimately — and, when the demo came from a
-            // playable day's card, on that day's SCORED challenge rather than a casual deal of its
-            // seed (Game.endDemo, ux/WF-6:demo-exit-drops-challenge-binding).
-            demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.endDemo() } }
-                .accessibilityIdentifier(game.demoing ? "demo.stop" : "demo.done")
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x2A3B44).opacity(0.72)))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+    }
+    private var demoHeadlineText: some View {
+        Text(demoHeadline)
+            .font(.system(size: 12.5, weight: .semibold))
+            .foregroundStyle(Color(hex: 0xF4EFE2))
+            .accessibilityIdentifier("demo.headline")
+    }
+    /// The bar's controls, in this order: Prev · Next · Start/Pause/Resume · Stop/Done.
+    @ViewBuilder private var demoPills: some View {
+        // Prev re-simulates the line one move shorter (Game.demoStepBack) — it is not an
+        // Undo, and Undo stays disabled while the bar is up. Offered while paused mid-line AND
+        // from the completion banner, where it re-enters the paused demo at the last move.
+        if game.demoCanStepBack {
+            demoPill("Prev") { game.demoStepBack() }
+                .accessibilityIdentifier("demo.prev")
+        }
+        if game.demoing {
+            if game.demoPaused {
+                demoPill("Next") { game.demoStepOnce() }
+                    .accessibilityIdentifier("demo.next")
+            }
+            // "Start" before the first play, "Pause" while playing, "Resume" once paused.
+            demoPill(!game.demoPaused ? "Pause" : (game.demoStarted ? "Resume" : "Start")) { game.demoTogglePause() }
+                .accessibilityIdentifier("demo.start")   // one id for Start/Pause/Resume (same control)
+        }
+        // Both mid-demo "Stop" and post-line "Done" re-deal the seed: a demo-touched board
+        // must never become playable (taking over the app's own solution moves and finishing
+        // would bank a genuine win/best-time). The player lands on a fresh board of the same
+        // deal, which they can still solve legitimately — and, when the demo came from a
+        // playable day's card, on that day's SCORED challenge rather than a casual deal of its
+        // seed (Game.endDemo, ux/WF-6:demo-exit-drops-challenge-binding).
+        demoPill(game.demoing ? "Stop" : "Done") { withAnimation { game.endDemo() } }
+            .accessibilityIdentifier(game.demoing ? "demo.stop" : "demo.done")
     }
     /// The demo bar's status line — Bronze just clears the deal; Silver/Gold name their objective.
     private var demoHeadline: String {
