@@ -52,7 +52,13 @@ struct DailyView: View {
     /// daily-specific promise ("you can replay the challenge afterwards") must NOT be reused for a
     /// casual game, whose loss really is final.
     private var confirmTitle: String {
-        game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
+        // A live ⏰ grace is the one loss no replay can undo, so it leads the dialog — the SAME
+        // title the board's Replay / New game already use for the same action; the sheet's Play is
+        // the route a player is most likely to take, and it used to carry the least warning
+        // (ux/WF-14:grace-confirm-title-differs-by-control; ContentView.resetConfirmTitle, web
+        // confirmReset). Title only — what the button does is unchanged.
+        if game.graceLive, let day = game.challengeDay { return "Give up ⏰ Same-day for \(dayLabel(day))?" }
+        return game.challengeDay != nil ? "End your daily attempt?" : "Discard the game in progress?"
     }
     private var confirmMessage: String {
         let cause: String

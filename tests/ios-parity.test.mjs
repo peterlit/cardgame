@@ -916,3 +916,21 @@ test('turning Auto-play on does not move cards (no web↔iOS drift)', () => {
   assert.ok(html.includes(norm('if(!finishing && !finishPromptOpen) runAutoplay();')),
     'web commitMove no longer arms auto-play after a player move');
 });
+
+// ---- qa-loop round 1 (2026-09-09): copy and structure pins for that round's fixes ----
+
+// ux/WF-14:grace-confirm-title-differs-by-control — the same destructive action (re-dealing over a
+// live zero-move ⏰ grace) must carry the same title on every route: the board's Replay / New game
+// / Deal-number Play (ContentView), the Daily sheet's Play / demo pills (DailyView) and the web's
+// single confirmReset. The sheet used to say "End your daily attempt?" and bury the ⏰ stake at the
+// end of a 3-line body.
+test('a live ⏰ grace leads the confirm title on every route (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const title = 'Give up ⏰ Same-day for';
+  assert.ok(read('Views/ContentView.swift').includes(norm(`if game.graceLive, let day = game.challengeDay { return "${title} \\(dayLabel(day))?" }`)),
+    'ContentView reset confirm no longer leads with the ⏰ stake');
+  assert.ok(read('Views/DailyView.swift').includes(norm(`if game.graceLive, let day = game.challengeDay { return "${title} \\(dayLabel(day))?" }`)),
+    'DailyView confirm title no longer leads with the ⏰ stake — the sheet\'s Play is back to the least-warning dialog');
+  assert.ok(html.includes(norm('return confirm(`Give up ⏰ Same-day for ${d}?')),
+    'web confirmReset no longer leads with the ⏰ stake');
+});
