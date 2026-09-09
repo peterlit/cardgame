@@ -17,6 +17,17 @@ private struct RailContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
+/// Height of ONE rail pill (measured on the first), so the rail's viewport can be trimmed to end
+/// mid-pill — see landscapeRail.
+private struct RailPillHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+/// The rail content's top edge in the rail's own coordinate space (≤ 0 once scrolled).
+private struct RailOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
 private struct DropZonesKey: PreferenceKey {
     static var defaultValue: [DropZoneFrame] = []
     static func reduce(value: inout [DropZoneFrame], nextValue: () -> [DropZoneFrame]) {
@@ -79,8 +90,14 @@ struct ContentView: View {
     // deal the card size is monotone — a column crossing the threshold shrinks the board once
     // per new maximum, and a later move/undo that shortens the column can't grow it back (which
     // would make the whole board pulse and re-flow on single-card moves). Reset on every deal
-    // boundary (game.dealGeneration) and on a full undo back to move 0. Landscape ignores it:
-    // its cardW already re-sizes live.
+    // boundary (game.dealGeneration) and on a full undo back to move 0. Landscape feeds the SAME
+    // latch into its height-sizing: it used to size for the CURRENT tallest column, so every move
+    // that changed that column's height rescaled all 52 cards, the foundations and the free cells
+    // in both directions (34×57 → 36×60 and back on Undo, measured), exactly the pulse this latch
+    // exists to prevent (ux/WF-12:landscape-board-rescales-every-move). Being a card COUNT — not
+    // a pixel height measured in one orientation — it survives rotation correctly: after a
+    // rotate the landscape branch sizes for the tallest column seen this deal, the same contract
+    // portrait honours, never a stale height from the other geometry.
     @State private var shrinkLatchCount = 0
     // Portrait board-height latch — the same monotone-within-a-deal contract as
     // shrinkLatchCount, in the other direction: the SMALLEST portrait board height seen this
@@ -108,6 +125,9 @@ struct ContentView: View {
     @State private var shakeTrigger: CGFloat = 0
     /// Height of the landscape rail's pill stack — see landscapeRail.
     @State private var railContentH: CGFloat = 0
+    /// Height of one rail pill and the rail's current scroll offset — see landscapeRail.
+    @State private var railPillH: CGFloat = 0
+    @State private var railOffsetY: CGFloat = 0
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     /// The typed deal number, or nil when the field is empty / not a number / outside the range
@@ -149,10 +169,11 @@ struct ContentView: View {
             let landscapeBoardH = max(150, geo.size.height - 72 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
             let cardW: CGFloat = {
                 guard landscape else { return portraitCardW }
-                // Size for the CURRENT tallest column (min 8 so a fresh 7-card deal nearly fills the
-                // height and the cards are big); if play grows a column past that, cards shrink to keep
-                // it on-screen rather than clipping.
-                let reserve = max(8, game.tableau.map(\.count).max() ?? 7)
+                // Size for the tallest column seen THIS DEAL (min 8 so a fresh 7-card deal nearly
+                // fills the height and the cards are big); if play grows a column past that, cards
+                // shrink to keep it on-screen rather than clipping — and stay shrunk until the next
+                // deal boundary (shrinkLatchCount), so a single move can't pulse the whole board.
+                let reserve = max(8, game.tableau.map(\.count).max() ?? 7, shrinkLatchCount)
                 let units = 1 + landscapeFan * CGFloat(reserve - 1)          // tallest tableau column, card-heights
                 let heightCardW = floor(landscapeBoardH / (Theme.cardAspect * units))
                 // Width: left rail + 4 foundation columns + 8 tableau columns (= 12 card-widths).
@@ -413,66 +434,115 @@ struct ContentView: View {
     /// bar is showing (the rail holds no cards, so scrolling can't fight a card drag).
     private func landscapeRail(boardH: CGFloat) -> some View {
         // Does the pill stack overflow the viewport? With the daily HUD (or the demo bar) on screen
-        // the viewport drops to ~248 pt against a ~285 pt stack, and the clipped edge landed exactly
-        // on a pill boundary: the LAST pill ("How to play") was drawn 0% — no partial pill, no fade,
-        // and iOS hides the scroll indicator at rest, so the rules looked simply absent
-        // (ux/WF-12:rail-hides-howtoplay). When it overflows, give up 18 pt of the viewport to a
-        // persistent chevron cue that sits BELOW the scrolling area, so it can never cover a pill.
-        // No feedback loop: the stack's height depends only on the fixed rail width and the pill
-        // set, never on the viewport height, so shrinking the viewport cannot change `overflows`.
+        // the viewport drops to ~230 pt against a ~314 pt stack. Two things went wrong the first
+        // time this was handled (ux/WF-12:rail-hides-howtoplay, ux/WF-12:rail-more-hint-inert):
+        //   1. the clipped edge landed on a pill BOUNDARY — the next pill drew 0–4 pt, iOS hides the
+        //      scroll indicator at rest, and Daily / Wins / How to play looked simply absent;
+        //   2. the "⌄ more" cue below the viewport was allowsHitTesting(false), so the one thing
+        //      on screen saying "there is more" did nothing when tapped or swiped.
+        // Now: (1) when it overflows, the viewport is TRIMMED to end exactly halfway through a
+        // pill — pill pitch = measured pill height + the stack's 6 pt spacing, so the cut is
+        // deterministic and independent of how many pills the state adds (Finish, Daily) — and
+        // (2) the cue is a real control: tap scrolls to the end (or back to the top once there),
+        // a swipe on it scrolls the same way, and VoiceOver gets it as a button. No feedback loop:
+        // the stack's height and the pill height depend only on the fixed rail width and the pill
+        // set, never on the viewport, so trimming the viewport cannot change `overflows`.
         let overflows = railContentH > boardH
-        let cueH: CGFloat = 18
-        return VStack(spacing: 0) {
-            ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
-                VStack(spacing: 6) {
-                    // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
-                    // hierarchies exists at a time, so UI tests address either orientation uniformly.
-                    railPill("New game", primary: true) { requestReset(.newGame) }
-                        .accessibilityIdentifier("toolbar.newgame")
-                    railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
-                        .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
-                        .accessibilityIdentifier("toolbar.undo")
-                    railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
-                        .accessibilityIdentifier("toolbar.replay")
-                    railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-                        .accessibilityIdentifier("toolbar.autoplay")
-                    railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
-                        .accessibilityIdentifier("toolbar.autofinish")
-                    if game.canOfferFinish {
-                        railPill("Finish", primary: true) { requestFinish() }
-                            .accessibilityIdentifier("toolbar.finish")
+        let cueH: CGFloat = 24
+        let spacing: CGFloat = 6
+        let viewportH: CGFloat = {
+            guard overflows else { return boardH }
+            let avail = max(60, boardH - cueH)
+            let pitch = railPillH + spacing
+            guard railPillH > 0, pitch > 0 else { return avail }
+            // k full pitches, then half of the next pill: the fold cuts pill k in half.
+            let k = floor((avail - railPillH / 2) / pitch)
+            return k >= 1 ? k * pitch + railPillH / 2 : avail
+        }()
+        let atEnd = overflows && railOffsetY <= -(railContentH - viewportH) + 1
+        return ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
+                    VStack(spacing: spacing) {
+                        // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
+                        // hierarchies exists at a time, so UI tests address either orientation uniformly.
+                        railPill("New game", primary: true) { requestReset(.newGame) }
+                            .accessibilityIdentifier("toolbar.newgame")
+                            .background(GeometryReader { g in
+                                Color.clear.preference(key: RailPillHeightKey.self, value: g.size.height)
+                            })
+                            .id("rail.first")
+                        railPill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
+                            .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                            .accessibilityIdentifier("toolbar.undo")
+                        railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
+                            .accessibilityIdentifier("toolbar.replay")
+                        railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
+                            .accessibilityIdentifier("toolbar.autoplay")
+                        railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
+                            .accessibilityIdentifier("toolbar.autofinish")
+                        if game.canOfferFinish {
+                            railPill("Finish", primary: true) { requestFinish() }
+                                .accessibilityIdentifier("toolbar.finish")
+                        }
+                        railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
+                            dealText = "\(game.seed)"; showDeal = true
+                        }
+                        .accessibilityIdentifier("toolbar.deal")
+                        if !game.pool.isEmpty {
+                            railPill("Daily") { showDaily = true }
+                                .accessibilityIdentifier("toolbar.daily")
+                        }
+                        railPill("Wins") { showWins = true }
+                            .accessibilityIdentifier("toolbar.wins")
+                        railPill("How to play") { showRules = true }
+                            .accessibilityIdentifier("toolbar.howtoplay")
+                            .id("rail.last")
                     }
-                    railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                        dealText = "\(game.seed)"; showDeal = true
-                    }
-                    .accessibilityIdentifier("toolbar.deal")
-                    if !game.pool.isEmpty {
-                        railPill("Daily") { showDaily = true }
-                            .accessibilityIdentifier("toolbar.daily")
-                    }
-                    railPill("Wins") { showWins = true }
-                        .accessibilityIdentifier("toolbar.wins")
-                    railPill("How to play") { showRules = true }
-                        .accessibilityIdentifier("toolbar.howtoplay")
+                    .background(GeometryReader { g in
+                        Color.clear
+                            .preference(key: RailContentHeightKey.self, value: g.size.height)
+                            .preference(key: RailOffsetKey.self, value: g.frame(in: .named("rail")).minY)
+                    })
                 }
-                .background(GeometryReader { g in
-                    Color.clear.preference(key: RailContentHeightKey.self, value: g.size.height)
-                })
-            }
-            .frame(width: landscapeRailW, height: max(60, boardH - (overflows ? cueH : 0)))
-            .onPreferenceChange(RailContentHeightKey.self) { railContentH = $0 }
-            if overflows {
-                HStack(spacing: 3) {
-                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
-                    Text("more").font(.system(size: 10, weight: .semibold))
+                .coordinateSpace(name: "rail")
+                .frame(width: landscapeRailW, height: viewportH)
+                .onPreferenceChange(RailContentHeightKey.self) { railContentH = $0 }
+                .onPreferenceChange(RailPillHeightKey.self) { railPillH = $0 }
+                .onPreferenceChange(RailOffsetKey.self) { railOffsetY = $0 }
+                if overflows {
+                    railCue(atEnd: atEnd, height: cueH) { toEnd in
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            proxy.scrollTo(toEnd ? "rail.last" : "rail.first", anchor: toEnd ? .bottom : .top)
+                        }
+                    }
                 }
-                .foregroundStyle(Color(hex: 0xF4EFE2).opacity(0.9))
-                .frame(height: cueH)
-                .allowsHitTesting(false)          // purely a cue; the ScrollView above owns the gesture
-                .accessibilityHidden(true)        // VoiceOver already reports the rail as scrollable
             }
         }
         .frame(width: landscapeRailW, height: boardH, alignment: .top)
+    }
+    /// The rail's overflow cue — a full-rail-width control, not a 25×12 pt glyph. Tap toggles
+    /// end/top; a swipe on it scrolls in the swipe's direction (the ScrollView above owns swipes
+    /// that start inside the viewport; this owns the ones that start on the cue).
+    private func railCue(atEnd: Bool, height: CGFloat, scroll: @escaping (_ toEnd: Bool) -> Void) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: atEnd ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .bold))
+            Text(atEnd ? "top" : "more").font(.system(size: 11, weight: .semibold))
+        }
+        .foregroundStyle(Color(hex: 0xF4EFE2).opacity(0.9))
+        .frame(width: landscapeRailW, height: height)
+        .background(Capsule().fill(Color(hex: 0x2A3B44).opacity(0.3)))
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 0).onEnded { v in
+            let dy = v.translation.height
+            if abs(dy) < tapSlop { scroll(!atEnd) } else { scroll(dy < 0) }
+        })
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(atEnd ? "Back to the top of the controls" : "More controls")
+        .accessibilityHint("Scrolls the rail")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { scroll(!atEnd) }
+        .accessibilityIdentifier("toolbar.rail.more")
     }
     /// A rail button — like `pill` but filled to the rail width, left-aligned, compact.
     private func railPill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
@@ -767,8 +837,8 @@ struct ContentView: View {
     /// it (FOUNDATIONS label ~12 + its 4pt spacing + the 4pt gap between foundation rows + the
     /// 12pt VStack gap above the tableau) is ~32pt. A few points of estimate error are absorbed
     /// by column()'s per-column fan compression, which backstops the exact fit. Landscape never
-    /// calls this — its cardW already height-sizes live (fan 0.34·aspect ≈ 0.57·w > the 0.53
-    /// floor). The 30pt clamp matches the landscape minimum; the portrait caller passes the
+    /// calls this — its cardW height-sizes from the same shrinkLatchCount (fan 0.34·aspect ≈
+    /// 0.57·w > the 0.53 floor). The 30pt clamp matches the landscape minimum; the portrait caller passes the
     /// deal-scoped shrinkLatchCount AND a deal-scoped minimum-latched totalH (latchedBoardH),
     /// so BOTH inputs are monotone within a deal (no per-move or per-chrome-row board
     /// pulsing). totalH == 0 is a transient sizing pass: keep width-sized cards for that frame.
