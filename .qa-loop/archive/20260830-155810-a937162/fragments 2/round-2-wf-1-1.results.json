@@ -1,4 +1,0 @@
-{ "results": [
-  { "tc": "TC-1.1", "persona": "novice", "status": "passed", "reason": "Cold launch on 369c365: header subtitle, 'FOUNDATIONS · A↑ / K↓' + A/K slot ghosts and FREE CELLS all legible; How to play states both-ended goal, row order, tap-to-move and drag; tapping bottom A♦ on pinned deal #10011 sent it to the diamond UP foundation, Moves 0->1, clock started, Undo enabled. Well inside the ~1 min bar." },
-  { "tc": "TC-1.2", "persona": "novice", "status": "passed", "reason": "Tapped 10♣ (col4 bottom, deal #10011) whose only home was a free cell: smart-move parked it in free cell 1, Moves 1->2, no silent no-op. Control: tapping a buried card (K♦, col1 index 2) left Moves at 2 with no state change." }
-] }

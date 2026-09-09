@@ -1,7 +1,0 @@
-{
-  "results": [
-    { "tc": "TC-10.1", "persona": "novice", "status": "passed", "reason": "All five sections present and accurate: Goal names 52 cards and the dual up/down foundations meeting in the middle; Tableau states alternating colours, either direction, no reversing; Free cells = three parking spots; Controls covers tap=smart-move, run-moves-together, drag=specific. One tap from cold launch." },
-    { "tc": "TC-10.2", "persona": "novice", "status": "passed", "reason": "About block reads 'Causeway - v1.0 (1)', copyright 2026 Whimsical Distractions, tagline 'An original two-ended-foundation solitaire.' Visible without scrolling on iPhone 17 Pro; a confirming swipe showed no content below it." },
-    { "tc": "TC-10.3", "persona": "novice", "status": "passed", "reason": "Done (348,100) dismisses in one tap straight back to the board with deal #723811, moves 0 and clock 0:00 unchanged." }
-  ]
-}

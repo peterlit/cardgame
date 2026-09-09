@@ -866,3 +866,11 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     `.review-loop/REPORT.md` (read the WATCH LIST — the hidden-tab clock freeze is a shipped
     behavior change the loop decided on its own). Plugin feedback:
     `docs/review-loop-orchestrator-feedback.md`.
+
+93. Asked whether `.qa-loop`/`.review-loop` should be committed wholesale. Answer: no — the
+    durable outputs (reports, ledgers, coverage, rounds) were already tracked, and the ignored
+    remainder is 1.0 GB of screenshot evidence plus transient per-round scratch. Found and
+    cleaned one Finder-duplication artifact in the 20260830-155810 qa archive: `ledger 2.json`
+    renamed to `ledger.json` (the plain name never existed there), and the tracked
+    `fragments 2/` (38 files) renamed to `fragments/` so it falls under the standing ignore
+    rule like every sibling archive — untracked from git, nothing deleted from disk.
