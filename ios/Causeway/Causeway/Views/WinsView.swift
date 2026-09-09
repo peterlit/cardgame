@@ -143,7 +143,12 @@ struct WinsView: View {
                     .buttonStyle(.plain)
                 }
             } footer: {
-                Text("Tap a deal to play it again.")
+                // The row's two numbers are INDEPENDENT minima (WinRecord keeps no run count, and
+                // one cannot be added without a migration of every persisted record, so the row
+                // cannot say "Cleared N×" the way the Daily card does). Say the independence out
+                // loud instead, so "fewest 97 · fastest 0:32" is never read as one run
+                // (ux/WF-9:wins-row-no-run-count). Web twin: openWinsDetail's summary line.
+                Text("Tap a deal to play it again. Fewest moves and fastest time are separate bests — they may come from different runs of the deal.")
             }
         }
         .navigationTitle(DealFormat.rangeLabel(r))

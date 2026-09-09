@@ -993,3 +993,14 @@ test('the Replay confirm says the deal starts over, on both platforms (no web↔
   assert.ok(html.includes(norm(`document.getElementById("replayBtn").onclick=()=>requestDeal(restartDeal, 'replay');`)),
     'web Replay no longer tells confirmReset which control is asking');
 });
+
+// ux/WF-9:wins-row-no-run-count — a Wins row's "fewest N moves · fastest T" can describe a pair no
+// single run achieved. WinRecord carries no run count (adding one is a persisted-format migration),
+// so both platforms say the independence explicitly next to the rows instead.
+test('the Wins detail says fewest and fastest are separate bests, on both platforms (no web↔iOS drift)', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  assert.ok(read('Views/WinsView.swift').includes(norm('Fewest moves and fastest time are separate bests — they may come from different runs of the deal.')),
+    'iOS Wins footer no longer says fewest/fastest are separate bests');
+  assert.ok(html.includes(norm('tap to replay &nbsp;·&nbsp; fewest and fastest are separate bests, possibly from different runs')),
+    'web Wins detail summary no longer says fewest/fastest are separate bests');
+});

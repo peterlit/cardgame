@@ -1999,8 +1999,10 @@ function openWinsDetail(a,b){
   const rows=[];
   for(let n=a;n<=b;n++){ const w=wins[n]; if(w) rows.push({seed:n,...w}); }
   document.getElementById("winsTitle").textContent = a===b ? `Deal #${a}` : `Deals ${a}–${b}`;
+  // fewest/fastest are INDEPENDENT bests with no run count behind them — say so, so the pair is
+  // never read as one run (ux/WF-9:wins-row-no-run-count; iOS twin: WinsView's list footer).
   document.getElementById("winsSummary").innerHTML =
-    `<b>${rows.length}</b> deal${rows.length!==1?"s":""} &nbsp;·&nbsp; tap to replay`;
+    `<b>${rows.length}</b> deal${rows.length!==1?"s":""} &nbsp;·&nbsp; tap to replay &nbsp;·&nbsp; fewest and fastest are separate bests, possibly from different runs`;
   const list=document.getElementById("winsList");
   list.className="deal-list";
   list.innerHTML = rows.map(r=>{
