@@ -203,14 +203,21 @@ function selectMonth(recs, capPerFamily, want, prior) {
   // deadline is per-seed, so its key is always new) win every slot and the tier reads as one idea.
   const idUses = new Map(), keyUses = new Map();
   const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
-  // An extension inherits the published month's novelty debt: counters start from what those days
-  // already used, or the fresh days silently rerun August's puzzles across the seam.
+  // An extension inherits the published month's novelty debt: the SCORING counters start from what
+  // those days already used, or the fresh days silently rerun August's puzzles across the seam.
   for (const d of prior?.days ?? []) {
     bump(idUses, 'gold:' + d.gold.id); bump(keyUses, variantKey(d.gold.id, d.gold.param));
     bump(idUses, 'silver:' + d.silver.id);
     for (const k of publishedSilverKeys(d)) bump(keyUses, k);
   }
-  const capped = (tier, o) => (idUses.get(tier + ':' + o.id) || 0) >= capPerFamily;
+  // The CAP counters are separate and count only THIS run's picks: capPerFamily is sized for one
+  // selection (selectMonthBalanced tops out at 12), so charging the published days against it gave
+  // --extend a hard ceiling — with 61 days published, 9 of 12 slots were pre-spent on six silver
+  // families and NO extension past 23 days could ever fill, regardless of --candidates or --budget
+  // (round-2 blocker: extend-cap-starvation). History shapes the scores above; the cap governs
+  // variety within the days being selected now.
+  const capUses = new Map();
+  const capped = (tier, o) => (capUses.get(tier + ':' + o.id) || 0) >= capPerFamily;
   const novelty = (tier, o) => {
     const idN = idUses.get(tier + ':' + o.id) || 0, keyN = keyUses.get(o.key) || 0;
     let s = 150 / (1 + idN);                                // diminishing, never quite zero
@@ -256,6 +263,7 @@ function selectMonth(recs, capPerFamily, want, prior) {
       used.add(best.rec.seed);
       bump(idUses, 'gold:' + best.gold.id); bump(keyUses, best.gold.key);
       bump(idUses, 'silver:' + best.silver.id); bump(keyUses, best.silver.key);
+      bump(capUses, 'gold:' + best.gold.id); bump(capUses, 'silver:' + best.silver.id);
       chosen.push(best); placed = true;
     }
   }

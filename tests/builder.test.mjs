@@ -104,15 +104,20 @@ test('the builder can still PUBLISH: a fresh select-only run against the real ca
   }
 });
 
-test('--extend fills exactly the open slots, keeps every published day verbatim, and repeats no published challenge', () => {
+test('--extend fills a FULL MONTH of open slots, keeps every published day verbatim, and repeats no published challenge', () => {
   // R1 blocker: the selector was asked for nDays instead of the open slots, so 61 published +
   // nDays fresh always failed the candidate day-count validation — --extend could NEVER publish,
   // and --extend is the only sanctioned way to reseed the pool past 2026-09-30.
+  // R2 blocker (extend-cap-starvation): the R1 fix charged the published days against the
+  // per-family CAP (max 12), whose 61 days pre-spent 9 slots on six silver families — so any
+  // extension past 23 days failed closed forever, and this test's original +4 was the one size
+  // small enough to dodge the ceiling. The extension size below is the actual use case: a full
+  // 31-day month. Do not shrink it.
   const dir = mkdtempSync(join(tmpdir(), 'causeway-builder-'));
   const out = join(dir, 'pool.json');
   writeFileSync(out, realPool);
   const published = JSON.parse(realPool).days;
-  const want = published.length + 4;
+  const want = published.length + 31;
   const r = runBuilder(['--select-only', '--no-flawless-gate', '--extend', '--cache', REAL_CACHE,
                         '--days', String(want), '--out', out]);
   assert.equal(r.status, 0, 'extension failed:\n' + r.out);

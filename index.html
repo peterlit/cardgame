@@ -529,7 +529,7 @@ function deal(theSeed){
   resetTelem(); challengeDay=null; challengeStartDay=null; demoDay=null;   // a fresh deal is casual play until a challenge Play sets it
   startTime=null; stopTimer(); stopAutoplay(); stopFinish(); setMoves(0); setTime(0);
   autoFinishDeferred=false; hideFinishPrompt();
-  winRecorded=false; pendingWin=null; winStopAt=null;   // fresh game — allow the next win to record
+  winRecorded=false; pendingWin=null; winStopAt=null; hiddenAt=null;   // fresh game — allow the next win to record
   refreshHud();
   hideWin();
   render(false);
@@ -547,7 +547,9 @@ function saveGame(){
   // Never persist a mid-demo board: it's an auto-played casual line the user never played,
   // and restoreGame() would resume it on next launch. isWon() is false mid-demo, so guard here.
   if(!state || isWon() || demoing) return;
-  const elapsedSecs = startTime ? Math.floor((Date.now()-startTime)/1000) : 0;
+  // While hidden the clock is frozen at hiddenAt (background time is not play time — iOS parity),
+  // so a save written from a hidden tab must carry the frozen measurement, not the wall clock.
+  const elapsedSecs = startTime ? Math.floor(((hiddenAt??Date.now())-startTime)/1000) : 0;
   lsSet("causeway.game", JSON.stringify({
     seed, tableau: state.tableau, cells: state.cells, up: state.up, down: state.down,
     moveCount, elapsedSecs, started: !!startTime,
@@ -600,7 +602,10 @@ function restoreGame(){
   stopAutoplay(); stopFinish(); autoFinishDeferred=false; hideFinishPrompt(); hideWin();
   winRecorded=false; pendingWin=null; winStopAt=null;   // a restored in-progress board (saveGame blocks won boards) hasn't recorded
   const es = g.elapsedSecs||0;
-  if(g.started){ startTime = Date.now() - es*1000; startTimer(); } else { startTime=null; stopTimer(); }
+  // A tab restored in the background must not count its hidden wait as play: freeze immediately,
+  // exactly as if a visible game had just been hidden — the visibilitychange handler resumes it.
+  if(g.started){ startTime = Date.now() - es*1000; if(document.hidden){ stopTimer(); hiddenAt=Date.now(); } else startTimer(); }
+  else { startTime=null; stopTimer(); }
   setMoves(moveCount); setTime(es);
   refreshHud(); render(false);
   // A kill mid-autoplay-chain can leave more safe cards to send; runAutoplay() no-ops
@@ -1257,12 +1262,16 @@ function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
 
 /* ---------- win ---------- */
 let winRecorded=false, pendingWin=null, winStopAt=null;   // winStopAt: when recordWin froze the clock
+let hiddenAt=null;   // when hiding the tab froze the clock (iOS GameClock.pauseForBackground twin)
 // Durable win side effects — recorded exactly once, synchronously at the winning move so a tab
 // close during the deferred-overlay beat can't lose the win/best-time. Stashes the display data
 // (secs + prior best) for the deferred overlay, since wins[seed] gets overwritten here.
 function recordWin(){
   if(winRecorded) return;
   winRecorded=true;
+  // An autoplay cascade can win in a hidden tab: fold the hidden stretch out of the anchor first,
+  // so the recorded secs exclude it (background time is not play time — iOS parity).
+  if(hiddenAt){ if(startTime) startTime += Date.now()-hiddenAt; hiddenAt=null; }
   stopTimer();
   winStopAt=Date.now();   // if a post-win undo resumes play, overlay-dwell time is excluded (iOS parity)
   clearSavedGame();   // finished game — a reload should start fresh
@@ -2174,8 +2183,14 @@ document.addEventListener("keydown",e=>{
   if(e.key==="n"||e.key==="N"){ requestDeal(()=>deal(randomSeed())); }
 });
 
-// Capture the latest board + elapsed before the tab is hidden or closed.
-window.addEventListener("visibilitychange", ()=>{ if(document.hidden) saveGame(); });
+// Hidden tab: background time is not play time (iOS ContentView pauses GameClock when the scene
+// leaves .active). Freeze the clock BEFORE persisting — the same order as iOS, and the same
+// anchor-shift-on-resume the post-win undo performs — then capture the latest board + elapsed.
+// A clock recordWin already stopped (timerId null) stays stopped, mirroring pausedInBackground.
+window.addEventListener("visibilitychange", ()=>{
+  if(document.hidden){ if(timerId){ stopTimer(); hiddenAt=Date.now(); } saveGame(); }
+  else if(hiddenAt){ if(startTime) startTime += Date.now()-hiddenAt; hiddenAt=null; if(startTime) startTimer(); }
+});
 window.addEventListener("pagehide", saveGame);
 
 /* resume an in-progress game if one was saved, else deal fresh */

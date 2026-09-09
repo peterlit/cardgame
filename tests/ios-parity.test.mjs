@@ -471,6 +471,31 @@ test('R3: web undo resets the record-once latch and resumes the clock (twin of t
     'web undo no longer resumes the display clock re-anchored past the overlay dwell');
 });
 
+test('R2: background time is not play time on either platform (no web↔iOS drift)', () => {
+  // The shared semantic (owner policy, GameClock.swift): time while the app/tab is not in front
+  // does not count as play. iOS pauses the clock when the scene leaves .active; the web must
+  // freeze its startTime anchor while document.hidden and shift it past the hidden stretch on
+  // return — otherwise a tab hidden for ten minutes inflates the HUD, the win overlay, and the
+  // persisted best in wins[seed], and the platforms record different bests for the same play.
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const clock = read('Model/GameClock.swift');
+  const content = read('Views/ContentView.swift');
+  assert.ok(clock.includes(norm('func pauseForBackground()')) && clock.includes(norm('func resumeFromBackground()')),
+    'iOS GameClock lost its explicit background pause — background time would count as play');
+  assert.ok(content.includes(norm('game.clock.resumeFromBackground()')) &&
+            content.includes(norm('game.clock.pauseForBackground()')),
+    'iOS scene-phase hook no longer pauses/resumes the clock across backgrounding');
+  assert.ok(html.includes(norm('if(document.hidden){ if(timerId){ stopTimer(); hiddenAt=Date.now(); } saveGame(); }')),
+    'web no longer freezes the clock when the tab is hidden — a hidden tab inflates elapsed');
+  assert.ok(html.includes(norm('else if(hiddenAt){ if(startTime) startTime += Date.now()-hiddenAt; hiddenAt=null; if(startTime) startTimer(); }')),
+    'web no longer shifts the anchor past the hidden stretch on return');
+  // ...and the frozen measurement is what a hidden-tab save and a hidden-tab (autoplay) win read.
+  assert.ok(html.includes(norm('const elapsedSecs = startTime ? Math.floor(((hiddenAt??Date.now())-startTime)/1000) : 0;')),
+    'a save written from a hidden tab carries wall-clock time instead of the frozen measurement');
+  assert.ok(html.includes(norm('if(hiddenAt){ if(startTime) startTime += Date.now()-hiddenAt; hiddenAt=null; } stopTimer();')),
+    'recordWin no longer folds the hidden stretch out before recording secs');
+});
+
 // ---- R1 (skeptical review): the pool-readiness gate's WIRING (web only — iOS bundles its pool) ----
 // The predicate and the scoring/stash behaviour are executable-tested in web-behaviour.test.mjs;
 // what Node cannot run is the timer/DOM wiring, so these pin where the gate is consulted. Losing

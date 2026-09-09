@@ -834,3 +834,17 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (iOS parity, newly pinned), the deferred win overlay redraws when the pool lands, and the
     `--rebuild` gate's message stops claiming a client coupling that doesn't exist (the missing
     coupling is a new BACKLOG item). Suites: node 156/156 (3 new), native unit 11/11.
+
+90. Review-loop round 2: the round-1 fix itself shipped a fresh blocker. Seeding the novelty
+    counters from the published pool also fed the per-family CAP (max 12), and the 61 published
+    days pre-spent 9 of those 12 on six silver families — so `--extend` could never fill more
+    than 23 new days, ever, while its error message pointed at `--candidates`/`--budget`
+    (useless), and the round-1 extend test asked for +4 days, the one size that dodged the
+    ceiling. Fixed by splitting the counters: scoring still inherits the published history
+    (novelty debt across the seam), but the cap now counts only the run's own picks. Proven on a
+    scratch copy: `--extend --days 92` publishes all 31 new days, published 61 byte-identical,
+    zero published-pair repeats; the extend test now demands a full 31-day month. Also closed the
+    reviewer's minor: the web clock now freezes while the tab is hidden and re-anchors on return
+    (background time is not play time — the iOS `GameClock.pauseForBackground` semantic), covering
+    hidden-tab saves, autoplay wins in a hidden tab, and background-restored tabs, with a new
+    two-sided drift guard. Suites: node 157/157 (1 new); no Swift touched.

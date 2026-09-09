@@ -423,8 +423,9 @@ findings fixed:
   `FlowLayout`; give invalid input feedback instead of a silent no-op.
 
 ## Open — low / polish
-- **L4 — Win-time semantics differ** (iOS foreground `Timer` ticks vs web wall clock);
-  align, and reconcile with `ios/README.md`.
+- **L4 — CLOSED (2026-09-08, review-loop round 2)** — win-time semantics aligned: both platforms
+  measure banked wall-clock play time and exclude background/hidden stretches (iOS
+  `GameClock.pauseForBackground`; web freezes `startTime` on `document.hidden`), drift-guarded.
 - **L6 — No `deinit` timer invalidate; iPad multi-window hazard** (moot now that target is
   iPhone-only, but keep if iPad support returns).
 - **O2 — WinStore hardening is recovery, not prevention.** The `.unreadable` backup preserves
@@ -909,3 +910,22 @@ iOS 17/18 pass, I6 Release memory measurement).
   day-N challenge. The builder's refusal message now states this outright (bump = necessary, not
   sufficient). Only matters if a rebuild is ever chosen over `--extend`; the sanctioned reseed
   path is `--extend`, which is unaffected.
+
+## 2026-09-08 — review-loop round 2 on the round-1 fixes
+
+- **Blocker (introduced by round 1) FIXED — extend-cap-starvation.** Seeding the novelty counters
+  from the published pool also fed the per-family cap (max 12), and the 61 published days had
+  pre-spent 9 of those 12 on six silver families — so `--extend` could never fill more than 23
+  new days, while its failure message pointed at `--candidates`/`--budget` (which could never
+  help), and the round-1 extend test used +4 days, the one size that dodged the ceiling. Fix:
+  the SCORING counters still inherit the published history (novelty debt across the seam), but
+  the CAP counters now count only the current run's picks. Verified end-to-end on a scratch
+  copy: `--extend --days 92` publishes all 31 new days, the 61 published stay byte-identical,
+  zero published-pair repeats; the extend test now demands a full 31-day month (do not shrink it).
+- **Minor FIXED — web clock counted hidden-tab time.** iOS pauses `GameClock` when the scene
+  leaves `.active`; the web only saved on `visibilitychange`, so ten hidden minutes inflated the
+  HUD, the win overlay, and the persisted best. The web now freezes the anchor while
+  `document.hidden` and shifts it past the hidden stretch on return — covering saves written
+  from a hidden tab, autoplay wins in a hidden tab, and tabs restored in the background — with a
+  two-sided drift guard in ios-parity.test.mjs. This also closes **L4** (win-time semantics):
+  both platforms now measure banked wall-clock play time, excluding background/hidden stretches.
