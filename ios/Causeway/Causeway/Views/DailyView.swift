@@ -436,8 +436,13 @@ struct DailyView: View {
         .padding(.top, 4)
     }
 
+    /// Collision-free by construction: a date-only name guaranteed that the second export of a day
+    /// hit the system "Replace Existing Items?" alert, whose Replace path trashed the old backup
+    /// and (in the simulator) wedged the exporter without writing the new one — zero backups left
+    /// (bug/WF-11:export-replace-destroys-existing-backup). Down to the second, so every export
+    /// gets its own file and the Replace path is never offered. No web twin (the web has no export).
     private var exportFilename: String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"
         return "Causeway-Stats-\(f.string(from: Date()))"
     }
 
