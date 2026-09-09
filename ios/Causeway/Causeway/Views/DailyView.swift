@@ -268,8 +268,16 @@ struct DailyView: View {
                 Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+            // Three states, three channels: colour (green / red / grey), SHAPE (filled check /
+            // ring with a cross / plain ring) and an explicit accessibility label. The symbol
+            // defaults announced "Selected" for an earned tier and "circle" for both missed and
+            // never-attempted, and red-vs-grey was the only earned/missed cue a colour-blind
+            // player had (ux/WF-13:day-card-tier-state-unlabelled). Web twin: renderDailyCard's
+            // `icon` (✓ / ✕ / ○).
+            let missed = !done && attempted && !future
+            Image(systemName: done ? "checkmark.circle.fill" : (missed ? "xmark.circle" : "circle"))
                 .foregroundStyle(color)
+                .accessibilityLabel(done ? "earned" : (future ? "not yet available" : (missed ? "missed" : "not attempted")))
         }
     }
 
@@ -655,11 +663,30 @@ struct DailyView: View {
         // The cell is tappable, so it also announces AS a button.
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(locked ? "\(dayLabel(idx)), locked until that date" : dayLabel(idx))
+        .accessibilityLabel(calCellLabel(idx: idx, ti: ti, avail: avail, locked: locked, rec: rec, dots: dots))
         // The STABLE per-day locator the UI tests scroll toward. Labels shift with lock state and
         // wording; the identifier never does (skeptical-review R10; filed since round 2 as
         // bug/DailyView:calendar-cells-have-no-identifier).
         .accessibilityIdentifier("daily.cal.\(idx)")
+    }
+
+    /// Everything the cell DRAWS, said in words: today ring, selection fill, lock, the tier dots,
+    /// the 🌟 star and the ⏰ pip were shapes only, so VoiceOver heard every unlocked day as a bare
+    /// date (ux/WF-13:calendar-cells-no-state-in-a11y-label). "locked until that date" is the
+    /// phrase the calendar UI test keys on; keep it verbatim.
+    private func calCellLabel(idx: Int, ti: Int, avail: Bool, locked: Bool, rec: TierResult?, dots: [String]) -> String {
+        var parts = [dayLabel(idx)]
+        if idx == ti { parts.append("today") }
+        if idx == dayView { parts.append("selected") }
+        if locked { parts.append("locked until that date") }
+        if let r = rec, r.bronze {
+            if r.flawless { parts.append("Flawless, all three medals in one run") }
+            else { parts.append("earned " + dots.map { $0.capitalized }.joined(separator: ", ")) }
+            if r.onTime { parts.append("cleared on the day") }
+        } else if avail {
+            parts.append("not yet cleared")
+        }
+        return parts.joined(separator: ", ")
     }
 
     private func dotColor(_ tier: String) -> Color {

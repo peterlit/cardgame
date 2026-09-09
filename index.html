@@ -1718,9 +1718,16 @@ function renderDailyCard(){
     return;
   }
   const future=day>ti, isToday=day===ti;
-  const st=tier=>rec[tier]?'done':(future?'future':'miss'); const icon=tier=>rec[tier]?'✓':'○';
+  // Three states, three channels — colour (class), SHAPE (✓ / ✕ / ○) and an aria-label — so
+  // earned-vs-missed never rests on red-vs-green alone (ux/WF-13:day-card-tier-state-unlabelled;
+  // iOS twin: DailyView.tierRow). "Missed" means a cleared day that did not earn this tier; a
+  // never-cleared day gets the neutral ring, like a future day.
+  const st=tier=>rec[tier]?'done':(future?'future':'miss');
+  const missed=tier=>!rec[tier]&&rec.bronze&&!future;
+  const icon=tier=>rec[tier]?'✓':(missed(tier)?'✕':'○');
+  const stateLabel=tier=>rec[tier]?'earned':(future?'not yet available':(missed(tier)?'missed':'not attempted'));
   const row=(name,tier,text)=>`<div class="dtier ${st(tier)}"><span class="med">${MEDAL[tier]}</span>
-    <span class="tb"><span class="tn">${name}</span><span class="to">${text}</span></span><span class="ts">${icon(tier)}</span></div>`;
+    <span class="tb"><span class="tn">${name}</span><span class="to">${text}</span></span><span class="ts" role="img" aria-label="${stateLabel(tier)}">${icon(tier)}</span></div>`;
   const dstr=fmtDayLabel(day);
   let btn;
   // The button NAMES the day it will play: scrolled to the calendar, the card header that
