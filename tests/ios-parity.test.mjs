@@ -954,3 +954,10 @@ test('a day with all three medals banked across runs says "Not yet Flawless" on 
   assert.ok(html.includes(norm(`(rec.bronze&&rec.silver&&rec.gold&&!rec.flawless) ? \`<div class="dontime muted">${line}</div>\` : ''`)),
     'web day card lost its not-yet-Flawless line (or its exact three-banked-not-flawless gate)');
 });
+
+// ux/WF-5:par-has-no-legend — "par N" ends every solved day's clears line on both platforms; the
+// iOS streaks legend (no web twin) is the one place that defines it. Keep the definition.
+test('the iOS Daily legend defines par', () => {
+  assert.ok(read('Views/DailyView.swift').includes(norm('Par = the shortest winning line the solver certified for that deal.')),
+    'the iOS Daily legend lost its definition of par');
+});

@@ -7,6 +7,12 @@ import UniformTypeIdentifiers
 struct DailyView: View {
     @ObservedObject var game: Game
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// Every fixed size on this sheet goes through here so the sheet follows Dynamic Type
+    /// (ux/WF-5:daily-sheet-ignores-dynamic-type) — see Theme.scaled.
+    private func f(_ size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
+        .system(size: Theme.scaled(size, for: dynamicTypeSize), weight: weight, design: design)
+    }
 
     /// Which day the card is showing (defaults to today, clamped into the pool).
     @State private var dayView: Int = 0
@@ -167,20 +173,23 @@ struct DailyView: View {
              ("🥇", "Gold", s.gold), ("🌟", "Flawless", s.flawless)]
         return VStack(spacing: 6) {
             // Three columns, not one row of five: five cards across truncate their labels on a phone.
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+            // Three across at ordinary sizes; scaled captions need the width, so two (then one)
+            // at accessibility sizes rather than truncating "Same-day" and "day streak".
+            let streakCols = dynamicTypeSize >= .accessibility3 ? 1 : (dynamicTypeSize.isAccessibilitySize ? 2 : 3)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: streakCols), spacing: 8) {
                 ForEach(items, id: \.1) { ic, label, run in
                     VStack(spacing: 1) {
                         HStack(spacing: 3) {
-                            Text(ic).font(.system(size: 13))
-                            Text(label).font(.system(size: 11, weight: .semibold))
+                            Text(ic).font(f(13))
+                            Text(label).font(f(11, weight: .semibold))
                         }
                         .lineLimit(1).minimumScaleFactor(0.7)
-                        Text("\(run.current)").font(.system(size: 24, weight: .bold, design: .serif))
+                        Text("\(run.current)").font(f(24, weight: .bold, design: .serif))
                             .foregroundStyle(Theme.gold)
-                        Text("day streak").font(.system(size: 9, weight: .semibold))
+                        Text("day streak").font(f(9, weight: .semibold))
                             .foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
-                        Text("\(run.total) total").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                        Text("best \(run.best)").font(.system(size: 10)).foregroundStyle(.secondary.opacity(0.7))
+                        Text("\(run.total) total").font(f(10, weight: .semibold)).foregroundStyle(.secondary)
+                        Text("best \(run.best)").font(f(10)).foregroundStyle(.secondary.opacity(0.7))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -189,8 +198,10 @@ struct DailyView: View {
                     .accessibilityLabel("\(label): current streak \(run.current) days, \(run.total) days total, best \(run.best) days")
                 }
             }
-            Text("A streak counts consecutive days holding that medal. Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal. Same-day = the deal cleared on its own date — replaying a past day never earns it.")
-                .font(.system(size: 10)).foregroundStyle(.secondary)
+            // "par" appears on every solved day card and nowhere else explained it
+            // (ux/WF-5:par-has-no-legend). The web sheet has no legend twin.
+            Text("A streak counts consecutive days holding that medal. Flawless = 🥉🥈🥇 all three earned in a single run of that day's deal. Same-day = the deal cleared on its own date — replaying a past day never earns it. Par = the shortest winning line the solver certified for that deal.")
+                .font(f(10)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -204,16 +215,16 @@ struct DailyView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(dayView == ti ? "Today" : dayLabel(dayView))
-                        .font(.system(size: 16, weight: .bold))
+                        .font(f(16, weight: .bold))
                     if rec?.flawless == true {
-                        Text("🌟 Flawless").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.gold)
+                        Text("🌟 Flawless").font(f(12, weight: .bold)).foregroundStyle(Theme.gold)
                     }
                     Spacer()
                     // Ungrouped, through DealFormat.seed: `Text("Deal #\(c.seed)")` interpolates into a
                     // LocalizedStringKey, which GROUPS the digits, so this card said "Deal #691,039"
                     // while the board pill and every Wins surface said "691039" for the same deal
                     // (bug/WF-13:daily-card-seed-grouped).
-                    Text("Deal #" + DealFormat.seed(c.seed)).font(.system(size: 13)).foregroundStyle(.secondary).monospacedDigit()
+                    Text("Deal #" + DealFormat.seed(c.seed)).font(f(13)).foregroundStyle(.secondary).monospacedDigit()
                 }
                 VStack(spacing: 8) {
                     tierRow("Bronze", "bronze", "Clear the deal", rec, future: dayView > ti)
@@ -228,7 +239,7 @@ struct DailyView: View {
                 // Web twin: renderDailyCard's `flawlessPending`.
                 if let r = rec, r.bronze, r.silver, r.gold, !r.flawless {
                     Text("🌟 Not yet Flawless — these medals came from separate runs; earn 🥉🥈🥇 in one run.")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .font(f(12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("daily.flawless.pending")
                 }
@@ -243,11 +254,12 @@ struct DailyView: View {
                 // that day's objective. Demonstrations (assisted) — never count toward tiers.
                 if dayView <= ti, game.hasSolution(c.seed) {
                     Text("Show me how to win:")
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .font(f(12)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     // Two columns: with Flawless there are up to four pills, and one row of four
                     // truncates their labels on a narrow phone.
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6),
+                                             count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
                               spacing: 6) {
                         showPill(c.seed, "bronze", "🥉 Clear", "Clear the deal")
                         if game.hasSilverLine(c.seed) { showPill(c.seed, "silver", "🥈 Silver", c.silver.label) }
@@ -262,7 +274,7 @@ struct DailyView: View {
             .background(RoundedRectangle(cornerRadius: 14).fill(Color.gray.opacity(0.10)))
         } else {
             VStack(spacing: 6) {
-                Text(dayLabel(dayView)).font(.system(size: 16, weight: .bold))
+                Text(dayLabel(dayView)).font(f(16, weight: .bold))
                 Text("No challenge available yet").foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity).padding(24)
@@ -280,10 +292,10 @@ struct DailyView: View {
         let attempted = rec != nil
         let color: Color = done ? .green : (future || !attempted ? .secondary : Theme.red)
         return HStack(spacing: 10) {
-            Text(medal[tier] ?? "").font(.system(size: 18))
+            Text(medal[tier] ?? "").font(f(18))
             VStack(alignment: .leading, spacing: 1) {
-                Text(name).font(.system(size: 14, weight: .semibold))
-                Text(text).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(name).font(f(14, weight: .semibold))
+                Text(text).font(f(12)).foregroundStyle(.secondary)
             }
             Spacer()
             // Three states, three channels: colour (green / red / grey), SHAPE (filled check /
@@ -294,6 +306,7 @@ struct DailyView: View {
             // `icon` (✓ / ✕ / ○).
             let missed = !done && attempted && !future
             Image(systemName: done ? "checkmark.circle.fill" : (missed ? "xmark.circle" : "circle"))
+                .font(f(17))   // grows with the row's text, not ahead of it
                 .foregroundStyle(color)
                 .accessibilityLabel(done ? "earned" : (future ? "not yet available" : (missed ? "missed" : "not attempted")))
         }
@@ -323,10 +336,10 @@ struct DailyView: View {
         if let r = rec, r.bronze {
             VStack(alignment: .leading, spacing: 2) {
                 Text(clearsSummary(r, par: par))
-                    .font(.system(size: 12, weight: .semibold)).monospacedDigit()
+                    .font(f(12, weight: .semibold)).monospacedDigit()
                 if r.runs.count > 1 {
                     Text("Moves each run: " + r.runs.map { String($0.moves) }.joined(separator: " · "))
-                        .font(.system(size: 12)).foregroundStyle(.secondary).monospacedDigit()
+                        .font(f(12)).foregroundStyle(.secondary).monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)   // wrap a long history, never truncate
                 }
             }
@@ -338,7 +351,7 @@ struct DailyView: View {
     @ViewBuilder private func playButton(day: Int, ti: Int, rec: TierResult?) -> some View {
         if day > ti {
             Text("Unlocks \(dayLabel(day))")
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(.secondary)
+                .font(f(14, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity).padding(.vertical, 10)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.12)))
         } else {
@@ -357,7 +370,7 @@ struct DailyView: View {
                 // still on screen, so a mis-tapped 44x33 pt cell would otherwise start the wrong
                 // day's deal with nothing on screen to catch it (ux/WF-13:selected-day-invisible-at-play).
                 Text(replay ? "Replay\(daySuffix) to improve ↻" : "Play\(daySuffix)")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(f(15, weight: .bold))
                     .frame(maxWidth: .infinity).padding(.vertical, 11)
                     .background(RoundedRectangle(cornerRadius: 10).fill(replay ? Color.gray.opacity(0.18) : Theme.gold))
                     .foregroundStyle(replay ? Theme.ink : Color(hex: 0x3A2B00))
@@ -378,20 +391,20 @@ struct DailyView: View {
         let graceLive = game.challengeDay == day && game.challengeStartDay == day && ti == day + 1
         if rec?.onTime == true {
             Text("⏰ Cleared on the day")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.gold)
+                .font(f(12, weight: .semibold)).foregroundStyle(Theme.gold)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if day == ti {
             Text(run.current > 0 ? "⏰ Win today to keep your \(run.current)-day same-day streak"
                                  : "⏰ Win today to start a same-day streak")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                .font(f(12, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if graceLive {
             Text("⏰ Resume your attempt today and it still counts")
-                .font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary)
+                .font(f(12, weight: .semibold)).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             Text("⏰ Same-day is earned on the day itself")
-                .font(.system(size: 12)).foregroundStyle(.secondary.opacity(0.7))
+                .font(f(12)).foregroundStyle(.secondary.opacity(0.7))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -425,7 +438,7 @@ struct DailyView: View {
             }
         } label: {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(f(13, weight: .semibold))
                 .frame(maxWidth: .infinity).padding(.vertical, 9)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.gold.opacity(0.20)))
                 .foregroundStyle(Theme.ink)
@@ -438,7 +451,7 @@ struct DailyView: View {
 
     private var backupSection: some View {
         VStack(spacing: 8) {
-            Text("BACKUP").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+            Text("BACKUP").font(f(10, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
             // The FIRST UIDocumentPicker presentation in a process blocks the main thread for
             // ~1–1.8 s (system cost; recurs each cold launch, and pre-warming it would just move
             // the stall into the Daily sheet's open). So acknowledge the tap immediately — flip
@@ -462,11 +475,11 @@ struct DailyView: View {
                 }
                 .accessibilityIdentifier("daily.import")
             }
-            .font(.system(size: 14, weight: .semibold))
+            .font(f(14, weight: .semibold))
             .buttonStyle(.bordered)
             .tint(Theme.gold)
             Text(backupNote ?? "Save your streaks & solved deals to a file, or restore them. Importing merges — it never erases progress.")
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(f(11)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 4)
@@ -576,7 +589,7 @@ struct DailyView: View {
             // truncated "⏰ Same-day" to "Sam…" — the one marker the legend exists to name.
             HStack(spacing: 2) {
                 monthArrow("chevron.left", "Previous month", by: -1, enabled: shown > range.lowerBound)
-                Text(monthLabel(y, m)).font(.system(size: 14, weight: .semibold))
+                Text(monthLabel(y, m)).font(f(14, weight: .semibold))
                     .accessibilityIdentifier("daily.cal.month")
                 monthArrow("chevron.right", "Next month", by: 1, enabled: shown < range.upperBound)
                 Spacer()
@@ -594,7 +607,7 @@ struct DailyView: View {
                         Text("⏰ Same-day")
                     }
                 }
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(f(11)).foregroundStyle(.secondary)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 Spacer()
             }
@@ -607,13 +620,13 @@ struct DailyView: View {
                 //      ids (1...31) and silently blanked days 1-6 of EVERY month.
                 // Prefixed string ids keep the three spaces provably distinct.
                 ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { i, d in
-                    Text(d).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                    Text(d).font(f(10, weight: .semibold)).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .id("hdr-\(i)")
                 }
                 // Data-driven ForEach (not the constant-range ForEach(0..<Int)) so a month rollover
                 // that changes `first` re-diffs cleanly.
-                ForEach(Array(0..<first).map { "pad-\($0)" }, id: \.self) { _ in Color.clear.frame(height: 40) }
+                ForEach(Array(0..<first).map { "pad-\($0)" }, id: \.self) { _ in Color.clear.frame(minHeight: 40) }
                 ForEach(Array(1...dim).map { "day-\($0)" }, id: \.self) { key in
                     let d = Int(key.dropFirst(4)) ?? 1
                     calCell(idx: dayIndexFor(y, m, d), day: d, ti: ti)
@@ -623,7 +636,7 @@ struct DailyView: View {
             // the day card (which an unavailable day can never open).
             if let locked = lockedDay {
                 Text(lockedNote(locked, ti: ti))
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    .font(f(11, weight: .semibold)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("daily.lockednote")
             }
@@ -660,15 +673,15 @@ struct DailyView: View {
                     .padding(3)
             }
             VStack(spacing: 2) {
-                Text("\(day)").font(.system(size: 12, weight: .medium))
+                Text("\(day)").font(f(12, weight: .medium))
                     .foregroundStyle(avail ? Color.primary : Color.secondary.opacity(0.5))
                 // A flawless day shows a ⭐ in the marker slot (flawless implies all three tiers), so
                 // it never overlaps the date; other days show the earned-tier dots.
                 if rec?.flawless == true {
-                    Text("🌟").font(.system(size: 11)).frame(height: 6)   // same reserved height as the dots row → no date jitter
+                    Text("🌟").font(f(11)).frame(height: 6)   // same reserved height as the dots row → no date jitter
                 } else if locked {
                     // A standing affordance, so "not yet" is legible without tapping at all.
-                    Text("🔒").font(.system(size: 8)).frame(height: 6).opacity(0.55)
+                    Text("🔒").font(f(8)).frame(height: 6).opacity(0.55)
                 } else {
                     HStack(spacing: 2) {
                         ForEach(dots, id: \.self) { t in
@@ -678,7 +691,7 @@ struct DailyView: View {
                 }
             }
         }
-        .frame(height: 40)
+        .frame(minHeight: 40)   // min, not fixed: a Dynamic-Type-scaled date may need more
         .contentShape(Rectangle())
         .onTapGesture {
             // An unavailable cell now ANSWERS the tap instead of swallowing it.
@@ -749,7 +762,7 @@ struct DailyView: View {
             calMonth = min(r.upperBound, max(r.lowerBound, (calMonth == 0 ? monthNo(of: clampedToday) : calMonth) + delta))
             lockedDay = nil
         } label: {
-            Image(systemName: icon).font(.system(size: 13, weight: .semibold))
+            Image(systemName: icon).font(f(13, weight: .semibold))
                 .frame(width: 34, height: 32)          // a real tap target, not a 13pt glyph
                 .contentShape(Rectangle())
         }

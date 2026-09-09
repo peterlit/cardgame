@@ -41,3 +41,39 @@ enum Theme {
         }
     }
 }
+
+extension DynamicTypeSize {
+    /// The UIKit content-size category this SwiftUI size corresponds to.
+    var uiContentSizeCategory: UIContentSizeCategory {
+        switch self {
+        case .xSmall: return .extraSmall
+        case .small: return .small
+        case .medium: return .medium
+        case .large: return .large
+        case .xLarge: return .extraLarge
+        case .xxLarge: return .extraExtraLarge
+        case .xxxLarge: return .extraExtraExtraLarge
+        case .accessibility1: return .accessibilityMedium
+        case .accessibility2: return .accessibilityLarge
+        case .accessibility3: return .accessibilityExtraLarge
+        case .accessibility4: return .accessibilityExtraExtraLarge
+        case .accessibility5: return .accessibilityExtraExtraExtraLarge
+        @unknown default: return .large
+        }
+    }
+}
+
+extension Theme {
+    /// A fixed point size scaled for Dynamic Type. `Font.system(size:)` is deliberately fixed, and
+    /// the Daily sheet used it everywhere — at Accessibility XXXL its 11 pt objective text sat
+    /// beside 53 pt SF-Symbol checks that DO scale (ux/WF-5:daily-sheet-ignores-dynamic-type).
+    /// At the default size this returns `base` unchanged, so no layout moves for anyone who has
+    /// not asked for larger text; the board is intentionally NOT routed through this (its sizes
+    /// are geometry, not type). Small copy (< 13 pt) follows the caption curve, which grows
+    /// less steeply than body at accessibility sizes, so captions stay captions.
+    static func scaled(_ base: CGFloat, for size: DynamicTypeSize) -> CGFloat {
+        let style: UIFont.TextStyle = base < 13 ? .caption1 : .body
+        let traits = UITraitCollection(preferredContentSizeCategory: size.uiContentSizeCategory)
+        return UIFontMetrics(forTextStyle: style).scaledValue(for: base, compatibleWith: traits)
+    }
+}
