@@ -47,13 +47,16 @@ struct RulesView: View {
                     // each empty slot; this names it in words.
                     rule("Goal", "Move all 52 cards to the foundations. Each suit has two foundations — an up pile (A, 2, 3 …) and a down pile (K, Q, J …). They build toward each other and meet in the middle; you choose where each suit splits. On the board the TOP foundation row is the up pile and the row beneath it is the down pile: empty slots show a faint A or K to say which card starts there.")
                     rule("The catch", "The up and down halves of a suit can never cross. A 7 or 8 has no home until the ends climb to reach it — plan around it.")
-                    rule("Tableau", "Build in alternating colours, one rank at a time, in either direction — a pile can run down (red on black) or up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run as a group if you have enough free cells and empty columns.")
+                    rule("Tableau", "Build in alternating colours, one rank at a time, in either direction — a pile can run down (red on black) or up. Pick a direction when you start a pile; you can't reverse it partway. Move a tidy run — cards already stacked by that rule — as a group if you have enough free cells and empty columns.")
                     rule("Free cells", "Three single-card parking spots.")
                     // The old sentence promised "Tap a card to send it to its best spot" with no precondition,
                     // and on a fresh deal most cards are buried — a novice following it read the
                     // resulting silence as a broken tap (ux/WF-10:controls-overpromises-tap). Name the
-                    // precondition AND the refusal cue.
-                    rule("Controls", "Tap a card that heads a tidy run — or has nothing below it — to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. Tapping a card in a run moves the whole run. A card that can't move, or has nowhere to go, just wiggles. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
+                    // precondition AND the refusal cue. The precondition is the engine's exactly
+                    // (Game.smartMove → isSeqHead): the run below the tapped card must reach the
+                    // BOTTOM of its pile — "heads a tidy run" alone let a tap on a tidy pair with
+                    // unrelated cards beneath it wiggle against the copy's promise (round 2).
+                    rule("Controls", "Tap a card with nothing below it — or one whose tidy run reaches the bottom of its pile — to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell. The run beneath it moves with it. A card that can't move, or has nowhere to go, just wiggles. To place a card or run somewhere specific, drag it there instead. Everything is face-up — it's pure skill.")
                     // Both automation pills are ON by default and neither was documented anywhere
                     // in the app, so a novice met an unexplained mid-game "Ready to finish" prompt
                     // (ux/WF-10:automation-undocumented).

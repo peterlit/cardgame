@@ -43,12 +43,16 @@ final class SmokeNoviceTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Goal"].exists && app.staticTexts["Controls"].exists, "Goal / Controls sections missing")
         XCTAssertTrue(contains(app, "Each suit has two foundations — an up pile (A, 2, 3 …) and a down pile (K, Q, J …)"),
                       "the Goal no longer explains the both-ended foundations")
-        // Exact round-1 copy (Extras.swift `rule("Controls", …)`, 42b5f7e): the tap rule now says WHICH
-        // cards a tap lifts, and the wiggle sentence documents the refusal cue
-        // (ux/WF-2:unmovable-card-no-feedback). The pre-fix "Tap a card to send it to its best spot"
-        // must NOT satisfy this.
-        XCTAssertTrue(contains(app, "Tap a card that heads a tidy run — or has nothing below it — to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell."),
-                      "Controls no longer explain tap-to-move with the run-head wording")
+        // Exact round-2 copy (Extras.swift `rule("Controls", …)`): the tap rule says WHICH cards a
+        // tap lifts — the engine's precondition exactly: nothing below, or a tidy run that reaches
+        // the BOTTOM of the pile (ux/WF-10:controls-overpromises-tap) — and the wiggle sentence
+        // documents the refusal cue (ux/WF-2:unmovable-card-no-feedback). Neither the pre-fix
+        // "Tap a card to send it to its best spot" nor round 1's looser "heads a tidy run" must
+        // satisfy this.
+        XCTAssertTrue(contains(app, "Tap a card with nothing below it — or one whose tidy run reaches the bottom of its pile — to send it to its best spot: a foundation if it fits, otherwise onto another card, an empty column, or a free cell."),
+                      "Controls no longer state the engine's tap precondition (run reaches the bottom of the pile)")
+        XCTAssertTrue(contains(app, "Move a tidy run — cards already stacked by that rule — as a group"),
+                      "Tableau no longer defines 'tidy run' where it first appears")
         XCTAssertTrue(contains(app, "A card that can't move, or has nowhere to go, just wiggles."),
                       "Controls no longer document the wiggle refusal cue")
         XCTAssertTrue(contains(app, "To place a card or run somewhere specific, drag it there instead."), "Controls no longer explain drag")
