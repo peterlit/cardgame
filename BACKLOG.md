@@ -944,3 +944,13 @@ iOS 17/18 pass, I6 Release memory measurement).
   `selectMonthBalanced` ceiling) — for `--extend`, the fresh slice only, matching the round-2
   cap semantics. Measured headroom is ~5 uses per family, so the assertion cannot flake; a
   neutered `capped()` now has a test in its way.
+
+- **Open minor (closeout reviewer, `introduced_by_fix`) — real-clock default untested.**
+  `tests/GameClockTests:real-clock-default-untested`: every GameClock unit test goes through
+  `makeClock()`, which overwrites the injected `now`, so nothing exercises the production
+  default `now = { Date() }` (`GameClock.swift:32`). Freeze that default and all 5 unit tests
+  plus all 21 UI tests stay green while the shipped HUD sits at 0:00 and wins bank 0 seconds —
+  the only UI test touching the readout asserts `stat.time` *exists*, never its value.
+  Test-only fix, no shipped-behavior change: e.g.
+  `XCTAssertLessThan(abs(GameClock().now().timeIntervalSinceNow), 1)`. Filed from closeout
+  (no further loop cycle available); ledger id in `.review-loop/ledger.json`.
