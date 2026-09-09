@@ -20,4 +20,14 @@
 !TESTCASES.md
 !WORKFLOWS.md
 !tools/*
+# The scriptable XCUITest driver (source + client + launcher; the generated xcodeproj and
+# DerivedData are rebuilt by start.sh and stay on disk).
+!driver/
+!driver/project.yml
+!driver/qa.py
+!driver/start.sh
+!driver/stop.sh
+!driver/README.md
+!driver/Sources/
+!driver/Sources/*.swift
 __pycache__/

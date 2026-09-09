@@ -954,3 +954,39 @@ iOS 17/18 pass, I6 Release memory measurement).
   Test-only fix, no shipped-behavior change: e.g.
   `XCTAssertLessThan(abs(GameClock().now().timeIntervalSinceNow), 1)`. Filed from closeout
   (no further loop cycle available); ledger id in `.review-loop/ledger.json`.
+
+## 2026-09-09 — qa-loop v0.12.0 (autonomous, 4 rounds, 3 testers; stopped by the owner in round 4)
+
+Report: `.qa-loop/REPORT.md`. Decisions: `docs/qa-loop-2026-09-09-decisions.md`. Cost + plugin feedback:
+`docs/qa-loop-0.12.0-feedback.md`.
+
+- **FIXED and device-verified (24):** deal-alert double-tap discard (`bug/WF-7`, 0.5 s disarmed destructive
+  button); same-day second export trashing the only backup (`bug/WF-11`, `-HHmmss` filename); landscape
+  rail hiding Daily/Wins/How to play + inert "more" cue + per-move board rescale (`ux/WF-12` ×3); demo Prev
+  incl. from the completion banner (`ux/WF-6`); Daily sheet Dynamic Type + calendar-marker slot (`ux/WF-5`
+  ×2) + par legend; a11y state on calendar cells and tier rows (`ux/WF-13` ×2); grace-confirm title on the
+  sheet (`ux/WF-14`); 🌟 headline objectives + banked-tiers "Not yet Flawless" line + proportionate demo bar
+  (`ux/WF-15` ×3); win-overlay seed ungrouped (`bug/WF-4`); Replay confirm title/body (`ux/WF-3`);
+  How-to-play Controls precondition + "tidy run" definition (`ux/WF-10`); casual-tail copy (`ux/WF-7`);
+  fruitless-tap wiggle (`ux/WF-2`); identifiers on the win overlay, HUD chips, Wins, streak/day cards.
+- **OPEN minors (3):** `ux/WF-3:grace-newgame-body-describes-replay` (New game's grace body describes
+  Replay; one-line copy fix in `resetConfirmMessage`'s graceLive branch); `ux/DailyView:legend-paragraphs-addressable-only-by-copy`
+  and `ux/ContentView:demo-bar-container-has-no-identifier` (identifiers `daily.legend`, `daily.cal.legend`, `demo.bar`).
+- **OPEN proposals (5, owner decisions):** Daily sheet snaps to Today mid-attempt (WF-13, behaviour-change
+  trap); live ⏰ grace invisible from the sheet (WF-14, metric-integrity trap); landscape Daily sheet's Play
+  below the fold (WF-12); import has no confirm/undo (WF-11); the clock runs during the app's own modal
+  prompts (Main, metric-integrity trap). Plus one data decision: no 🥈 demo on universal-family days.
+- **WONTFIX:** `ux/WF-9:wins-row-no-run-count` (a run count is a persisted-format migration shared by iOS,
+  web and the backup; the footer states the independence instead).
+- **Doc drift to refresh in `.qa-loop/TESTCASES.md`** (expected text stale after the copy fixes): TC-1.1
+  step 4 (dev deal), TC-2.6 shrink size, TC-3.1/3.2 "one tap" on a live game, TC-4.4/4.7/14.3 grouped deal
+  numbers, TC-5.2/5.3/5.4 chip/xmark/fixture times, TC-6.2/6.6/6.7 demo bar text, TC-7.5/7.6 gate/copy,
+  TC-9.5 fixture times, TC-10.1 sections, TC-11.1/11.4 filename + sanitizer, TC-12.2, TC-14.7, TC-15.1.
+- **Round 4 unrun:** the confirmation pass stopped at 24/90 (WF-1…5 clean); WF-6…15 were last exercised
+  in rounds 2-3 with every fix verified and no regressions.
+- **Review loop not run** on the 22 app commits `1a63ce2..836434d` (CLAUDE.md standing rule; skipped per
+  decision D8 because this session was 4 MB). Start it fresh: `/review-loop-tools:review-loop 1a63ce2..836434d`.
+- **Plugin issues for the maintainer** (top three): worker names collide across sessions and the
+  provisioner deletes other sessions' devices; the MCP control tool's per-device grant blocks autonomous
+  runs (ship the driver); `notes-rotate` archives the largest section (it archived the driver section
+  three times).

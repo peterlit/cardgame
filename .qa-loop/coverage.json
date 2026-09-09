@@ -4,435 +4,541 @@
       "TC-1.1": {
         "novice": {
           "status": "passed",
-          "reason": "Cold launch: header 'build each suit from both ends', FOUNDATIONS A-up/K-down + FREE CELLS labels; How to play states both-ended foundations, tap-to-move, drag-to-place legibly; tapping the exposed A-spades sent it to the spades up-foundation, Moves 1, clock started, Undo enabled. Well inside the 1-minute bar."
+          "reason": "Header subtitle, FOUNDATIONS A up / K down and FREE CELLS labels present; How to play states both-ended foundations, the tap/drag controls and the automation pills; tapping 9 of hearts moved it onto 8 of clubs, Moves 0->1, clock started (0:02), Undo went enabled=false -> true. Cold deal #810129."
         }
       },
       "TC-1.2": {
         "novice": {
-          "status": "passed",
-          "reason": "Tapping the 7-hearts (no foundation step, no alternating-colour neighbour) parked it in free cell 1 as a last resort, Moves 2. A buried card tap is a silent no-op with no feedback, which the case explicitly permits."
-        }
-      },
-      "TC-6.7": {
-        "power": {
-          "status": "passed",
-          "reason": "Confirm 'End your daily attempt?' fires with Keep playing / Show demo; Keep playing left the attempt intact (A-hearts still home, HUD up, Undo enabled); Show demo re-dealt and opened the bar at 0/91. Note the case's 'known gap' is stale: a CASUAL game in progress now also gets its own 'Discard the game in progress?' confirm. Post-exit loss of challenge binding filed as ux/WF-6:demo-exit-drops-challenge-binding."
-        }
-      },
-      "TC-6.6": {
-        "novice": {
-          "status": "passed",
-          "reason": "Gold bar reads 'Gold: Split every suit exactly at the Eight - A-8 up, 9-K down - 0/92' and Silver 'Silver: Get all four Kings home within your first 9 moves - 0/84'; both totals match data/daily-solutions.json (gold 92, silver 84, bronze 91). Next stepped 0->1; the Silver line ran to a fully cleared board with Won still 0, and Done re-dealt to a fresh deal #551879."
+          "status": "failed",
+          "reason": "Smart-move DOES park a no-home card in a free cell (last resort works), but with the cells full a tap on a movable card with no destination gives zero feedback of any kind while a buried card wiggles - ux/WF-2:unmovable-card-no-feedback (reused id, prior fix covered only the buried half)."
         }
       },
       "TC-10.1": {
         "novice": {
           "status": "passed",
-          "reason": "How to play opens in 1 tap from the board; Goal explains 52 cards + up/down foundations meeting in the middle, plus The catch, Tableau (alternating colour, either direction, no reversing), Free cells, Controls (tap=smart-move incl. runs, drag=specific) and Automation. Both-ends foundations and tap/drag controls CONFIRMED. Evidence: tc10-1-howtoplay-top.png"
+          "reason": "All six expected sections present and legible (Goal/The catch/Tableau/Free cells/Controls/Automation); both-ends foundations and controls explained. Minor copy overpromise filed separately, not a case failure."
         }
       },
       "TC-10.2": {
         "novice": {
           "status": "passed",
-          "reason": "3 body swipes reach the bottom: About / 'Causeway - v1.0 (1)' / '(c) 2026 Whimsical Distractions. All rights reserved.' / 'An original two-ended-foundation solitaire.' Version string matches the installed bundle (CFBundleShortVersionString 1.0, CFBundleVersion 1). Evidence: tc10-2-about-bottom.png"
+          "reason": "About / 'Causeway - v1.0 (1)' / copyright / tagline all present at the bottom of the scroll; version matches MARKETING_VERSION 1.0 + CURRENT_PROJECT_VERSION 1."
         }
       },
       "TC-10.3": {
         "novice": {
           "status": "passed",
-          "reason": "Single obvious 'Done' pill top-right dismisses to the board; toolbar region pixel-identical to pre-open (imgcrop_diff MAD 0.000, 0.0% changed). Re-opening returns to the top (Goal), not the previous scroll offset. Evidence: tc10-3-dismissed.png"
-        }
-      },
-      "TC-12.1": {
-        "novice": {
-          "status": "blocked",
-          "reason": "Cannot rotate the device with the tools available. MCP control tool exposes no orientation action (schema enumerates attach/launch/screenshot/tap/swipe/touch_path/touch2_path/text/button/open_url/detach only); `xcrun simctl` has no rotate/orientation subcommand (full list checked; `simctl ui` offers appearance/contrast/content_size only); Simulator.app's Device>Rotate menu needs System Events, which returns 'osascript is not allowed assistive access (-1728)'; setting DevicePreferences.<udid>.SimulatorWindowOrientation=LandscapeLeft + RotationAngle=90 in ~/Library/Preferences/com.apple.iphonesimulator.plist and restarting Simulator.app did NOT rotate the device (Simulator overwrote the keys back to Portrait/0 on window open; framebuffer stayed 1206x2622 and the board was pixel-identical to portrait); no idb installed. Per dispatch, not inferring landscape behaviour from ContentView.swift."
-        }
-      },
-      "TC-12.2": {
-        "novice": {
-          "status": "blocked",
-          "reason": "Same environment gap as TC-12.1 - no way to put the device in landscape, so rail scrolling / bottom-pill reachability could not be exercised live."
-        }
-      },
-      "TC-12.3": {
-        "power": {
-          "status": "blocked",
-          "reason": "Same environment gap as TC-12.1 - landscape card size and drag could not be exercised live."
+          "reason": "Done button top-right dismisses to the board; swipe-down also dismisses; sheet reopens scrolled to the top."
         }
       },
       "TC-11.1": {
         "power": {
           "status": "passed",
-          "reason": "Exporter opened on On My iPhone; Save wrote Causeway-Stats-2026-08-30.json (835 bytes) and the note read 'Stats exported.'. NOTE: iOS 26's exporter shows no editable filename field before Save, so the suggested name can only be verified after saving."
+          "reason": "Exporter suggested Causeway-Stats-2026-09-09.json; Save -> 'Stats exported.', file on disk with correct stamps (version 2, dailyVersion 3, poolEpoch 20666, poolDays 61); Cancel -> 'Export cancelled.'. Repeat-export/Replace defect found beyond the script and filed as bug/WF-11:export-replace-destroys-existing-backup."
         }
       },
       "TC-11.2": {
         "power": {
           "status": "passed",
-          "reason": "Local set {days 5,6; deal 200} + import of the app's own export {days 25,26,27; deals 100,101} = union of all, nothing lost; note 'Imported \u2014 merged 3 days (3 new) and 2 deals (2 new).' with 0 skipped. flawless+onTime round-tripped intact on day 25 (evidence/export-2026-08-30.json, stats-after-merge.json)."
+          "reason": "Re-importing the app's own untouched export: 'Imported \u2014 merged 3 days (0 new) and 2 deals (0 new).' \u2014 ZERO entries skipped (the round-1 regression holds), Won stayed 2, nothing erased."
         }
       },
       "TC-11.3": {
         "power": {
           "status": "passed",
-          "reason": "qa2-notabackup.json ({\"hello\":\"world\",...}) rejected with 'That file isn't a Causeway stats backup.'; no crash and the store was byte-identical afterwards."
+          "reason": "Non-Causeway .json (had decoy daily/wins keys) rejected with 'That file isn't a Causeway stats backup.'; Won unchanged at 2, no crash."
         }
       },
       "TC-11.4": {
         "power": {
           "status": "passed",
-          "reason": "Note: 'Imported \u2014 merged 2 days (1 new) and 1 deal (1 new). Skipped 2 days and 3 deals this app can't have produced.' Day -8/9999 and seed 0/4294967296 dropped; a moves=0/secs=0 record did NOT poison the held win 100 (still 95/210); an all-false day-25 record did NOT un-earn gold/flawless/onTime; moves=-5/elapsed=-9 sanitised to nil. CAVEAT: the test case's rewritten 'valid' bounds (day -7..-1, seeds up to 4,294,967,295) are STALE \u2014 the pre-epoch sandbox is gone and Game.maxSeed is 1,000,000, so the app's narrower bounds (day 0..63, seed 1..1,000,000) are the correct ones for this build; TESTCASES.md TC-11.4 should be updated."
+          "reason": "Probes day -8/9999 and seed 0/4294967296/1000001, plus moves=0 and secs=0 deals and a moves=0/elapsed=-5 day: 'Imported \u2014 merged 2 days (2 new) and 2 deals (1 new). Skipped 3 days and 5 deals this app can't have produced.' NOTE the TC text is STALE \u2014 it asserts day -3 and seed 1000001 are legitimate, but this build has Game.maxSeed = 1_000_000 and pool v4 (no pre-epoch sandbox days), so both are correctly skipped."
         }
       },
       "TC-11.5": {
         "power": {
           "status": "passed",
-          "reason": "Import -> close X (311,110) yields 'Import cancelled.'; store unchanged."
+          "reason": "Import -> X in the Files picker -> note 'Import cancelled.'; no stats change."
+        }
+      },
+      "TC-12.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Also run as novice, both passed: frame 874x402, all 9 toolbar.* pills in one 118pt rail at x=68 in portrait order, header + Moves/Time/Won present, FOUNDATIONS/FREE CELLS labels with 8 slots + 3 cells, 52 cards in 8 columns, nothing clipped, rail scroll bar reports '1 page' (no scroll needed)."
+        }
+      },
+      "TC-12.2": {
+        "novice": {
+          "status": "failed",
+          "reason": "Power half passed (a swipe starting inside the viewport reveals all 10 pills and How to play opens). Novice half failed: Daily/Wins/How to play are 100% below the fold and the only cue ('\u2304 more') is inert \u2014 tapping it and swiping from it or from just below the last visible pill do nothing. Finding ux/WF-12:rail-hides-howtoplay (reopened)."
+        }
+      },
+      "TC-12.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Cards 45x75 (not floored to 30); tapid card.D1 smart-moved to the diamond foundation with Moves 0->1; drag onto a legal column landed at [496,239]; a 496-pt right-to-left drag to free cell 1 landed exactly at [196,254,45,75]. (A first drag of 7\u2660 onto the 7\u2663/8\u2666 ascending tail was refused BY DESIGN \u2014 direction-fixing rule, not a defect.)"
+        }
+      },
+      "TC-12.4": {
+        "power": {
+          "status": "passed",
+          "reason": "3 moves survive landscape->portrait->landscape: Moves 3, Won 0, clock kept running, Undo enabled, 52 cards, no re-deal; free-cell card mapped [196,254,45,75] <-> portrait [253,258,45,75] exactly, foundation and tableau cards restored to their documented grids."
+        }
+      },
+      "TC-12.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Alert 'Play a deal' prefilled 314345 with exactly Cancel@293,154 and Play@441,154 \u2014 both fully visible above the landscape number pad; the follow-on 'Discard the game in progress?' confirm (buttons y=233) is also fully visible after the pad dismisses; Play loaded Deal #500001, Moves 0, Time 0:00."
+        }
+      },
+      "TC-12.6": {
+        "novice": {
+          "status": "failed",
+          "reason": "Wins and How-to-play sheets pass in landscape (fill 874x402, Done at 766,28, no truncation, all sections readable, Wins empty state visible without scrolling). Daily FAILS the stated expectation: daily.play sits at y=557 with the visible window ending at y=340 (hittable=false, ~217 pt below the fold) -> ux/WF-12:daily-play-below-fold-landscape. Also run as power: same failure."
+        }
+      },
+      "TC-12.7": {
+        "power": {
+          "status": "passed",
+          "reason": "Win overlay in landscape reads 'You solved it! \ud83c\udf89' / 'Deal #608,530 \u00b7 97 moves \u00b7 2:52' / daily result line; Play deal #608531 + Random + Close all at y=227 and hittable; rotating to portrait, back to landscapeLeft and to landscapeRight re-lays it out without losing the result; Close returned to the solved board with stat.won 1 and the 'Deal #608530 \u2713' pill. Two rail findings filed from the starting state (CC-12A), but the case's own expectation allows scrolling the rail."
+        }
+      },
+      "TC-12.8": {
+        "power": {
+          "status": "failed",
+          "reason": "No clipping and no two-sizes-at-once at any depth 8/12/14/16/18/20 (lowest card bottom 314-364 of 402, hittable=true at every depth, uniform width). But the expectation 'shrinks ONCE to a single smaller uniform card size' is violated: landscape has no shrink latch, so the board rescales live in both directions on every move that changes the tallest column -> ux/WF-12:landscape-board-rescales-every-move."
         }
       },
       "TC-13.1": {
         "novice": {
           "status": "passed",
-          "reason": "Aug 3 card exact: header 'Aug 3', Deal #539,885, Bronze/Silver/Gold strings match derive_daily.py, clock line 'Same-day is earned on the day itself', 4 how-to-win pills, Aug 30 keeps the gold ring. Today's objectives appear nowhere. Discoverability cost: 1 swipe (the 'August 2026' header already peeks at the fold); selection confirmation costs a second swipe -> ux/WF-13:selected-day-invisible-at-play."
+          "reason": "Aug 3 card exact (Deal #539885, own bronze/silver/gold, 'Same-day is earned on the day itself', 'Play Aug 3'); no today leak, no par, daily.clears absent. Effort: 1 tap + 1 swipe + 1 tap (the sheet now needs ONE swipe, not two)"
         }
       },
       "TC-13.2": {
         "novice": {
           "status": "passed",
-          "reason": "Aug 31 tap is a correct no-op (card stays Aug 3, no tint on 31, Aug 30 alone has the gold ring); Aug 1 spot-check exact (Deal #691,039, Queens/29 moves, Split at the Three). The zero feedback on the future tap is filed as ux/WF-13:future-day-tap-no-feedback, not as a TC failure."
+          "reason": "daily.cal.15 label 'Aug 16, locked until that date'; tap left the card on Aug 3/Deal #539885 and revealed daily.lockednote at y720 (on screen); note clears when a playable day is selected; cells 15-30 and 31-60 all locked, cal.14 = Aug 15 selectable"
         }
       },
       "TC-13.3": {
         "power": {
           "status": "passed",
-          "reason": "3 taps + 1 swipe as budgeted; Deal #625648, Moves 0, Time 0:00, HUD titled 'Aug 4' in gold with all three bullets untruncated and neutral markers. Step 2 (re-open Daily mid-attempt) behaved as the case predicted -> ux/WF-13:daily-sheet-resets-to-today-midattempt."
+          "reason": "daily.cal.prev enabled=false in August and a tap left the month unchanged; next -> September 2026 then enabled=false; cells 31-60 all locked; card stayed Aug 6/Deal #983175; layout shift ~44pt confirmed. Also run as novice - same result"
         }
       },
       "TC-13.4": {
         "power": {
           "status": "passed",
-          "reason": "Auto-play set to Off first. Drag col0 3-of-diamonds -> free cell was ALLOWED (no alert, no snap-back, card sits in cell 1, Moves 1) and the gold marker flipped to a red X in the same frame while bronze/silver stayed neutral; Undo restored both the card and the neutral gold marker."
+          "reason": "Deal #625648, Moves 0, hud.day 'Aug 4', three untruncated chips exactly as specified; 0-move board replaced silently; live CASUAL game raised 'Discard the game in progress?' with Keep playing / Start over"
         }
       },
       "TC-13.5": {
         "power": {
           "status": "passed",
-          "reason": "Auto-play Off. Deal #983175, HUD 'Aug 6'. Ace-of-spades smart-move allowed, gold -> red X, silver neutral; Undo rolled gold back to neutral and flipped silver (no-undo) to red X; a further move left silver at red X. Also confirms the 3-pill (no silver pill) layout is correct on this no-undo day."
-        }
-      },
-      "TC-14.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Five streak cards (\ud83d\udd25/\u23f0/\ud83e\udd48/\ud83e\udd47/\ud83c\udf1f) all 0/0 total/best 0, no truncation; legend paragraph verbatim; Today card \u23f0 line = 'Win today to start a same-day streak'. Auto-play turned Off before the pass."
-        }
-      },
-      "TC-14.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "Aug 27 card reads '\u23f0 Same-day is earned on the day itself' (dimmed), Play unchanged; calendar legend has no \u23f0 entry -> ux/WF-14:calendar-pip-unlabelled."
-        }
-      },
-      "TC-14.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Auto-play Off. Overlay: 'Deal #551,879 \u00b7 96 moves \u00b7 1:50' + '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; all five cards 1/1 total/best 1; Today header 'Today \ud83c\udf1f Flawless', \u23f0 line 'Cleared on the day', button 'Replay to improve \u21bb'; Aug 30 cell = ring + \ud83c\udf1f + gold corner pip."
-        }
-      },
-      "TC-14.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Auto-play Off. Aug 27 flawless replay overlay had NO \u23f0 clause; \u23f0 card stayed 1 streak / 1 total while \ud83d\udd25/\ud83e\udd48/\ud83e\udd47/\ud83c\udf1f went to 2 total; calendar Aug 27 = \ud83c\udf1f with no pip, Aug 30 = \ud83c\udf1f + pip."
-        }
-      },
-      "TC-14.5": {
-        "power": {
-          "status": "passed",
-          "reason": "Grace branch reached via the save injector (challengeDay 28 / startDay 28 = 'began Aug 29's challenge on Aug 29'), not by wall-clock day passage \u2014 no date override exists. Aug 29 card read '\u23f0 Resume your attempt today and it still counts'; finishing it gave '\u23f0 On time \u2014 2-day same-day streak' and a corner pip on Aug 29. No midnight-deadline copy anywhere."
-        }
-      },
-      "TC-14.6": {
-        "power": {
-          "status": "passed",
-          "reason": "Path A: 'End your daily attempt?' alert reproduced verbatim incl. the false 'You can replay the challenge afterwards'; 'Keep playing' left the card pixel-identical (imgcrop_diff MAD 0.000). Path B: one Replay tap, no dialog, \u23f0 line silently fell back to 'Same-day is earned on the day itself' -> ux/WF-14:replay-forfeits-grace-silently."
-        }
-      },
-      "TC-15.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "2x2 pill grid with \ud83c\udf1f at (293,787); demo bar '\ud83c\udf1f Flawless: Both objectives in one run \u00b7 0 / 96' opens paused, Next -> 1/96, Stop re-deals #551879 clean. Copy contradiction filed as ux/WF-15:flawless-pill-both-vs-three."
-        }
-      },
-      "TC-15.2": {
-        "power": {
-          "status": "passed",
-          "reason": "\ud83c\udf1f pill present on Aug 3, 5, 6, 26, 29 and today (Aug 30); Aug 5/6/26 show exactly 3 pills (universal Silver, correct); Aug 3/29/30 show 4."
-        }
-      },
-      "TC-15.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; \ud83c\udf1f card 1/1 total/best 1; Today header \ud83c\udf1f Flawless, three green \u2713; calendar Aug 30 shows \ud83c\udf1f replacing the dots, date baseline level with 31 and with the row above (no jitter)."
-        }
-      },
-      "TC-15.4": {
-        "power": {
-          "status": "skipped",
-          "reason": "turn budget \u2014 spent on the in-app reproduction of CC-15-C (auto-finish denying Gold), which the dispatch prioritised. Needs a fresh wipe of causeway.daily plus two injected runs; not started."
-        }
-      },
-      "TC-15.5": {
-        "power": {
-          "status": "skipped",
-          "reason": "turn budget \u2014 stickiness of \ud83c\udf1f after a deliberately worse replay not walked."
-        }
-      },
-      "TC-2.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Deal #10004. One tap on the exposed A\u2666 (col2 bottom, 126,582) sent it to the DIAMONDS UP foundation, Moves 4\u21925, no mis-target, no confirmation. A second smart-move check from a non-tableau source also passed: tapping the free-cell 2\u2666 (274,296) homed it onto the A\u2666, Moves 5\u21926 (free cell emptied, MAD 48.0 vs prior frame)."
-        },
-        "power": {
-          "status": "passed",
-          "reason": "Effort bar met: exactly 1 tap, no press-and-hold, no confirmation."
-        }
-      },
-      "TC-2.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "Built J\u2663+10\u2665 at col0 bottom, tapped the RUN HEAD J\u2663 (28,620): the whole 2-card run relocated as a group onto Q\u2666 at col4 and counted as ONE move (Moves 1\u21922). Buried cards did not lift."
-        },
-        "power": {
-          "status": "passed",
-          "reason": "Run move is 1 tap / 1 move; direction of the 2-card descending tail preserved onto Q\u2666."
-        }
-      },
-      "TC-2.3": {
-        "novice": {
-          "status": "passed",
-          "reason": "Drag picked up with no press-and-hold (0.6 s swipe, no dwell) and dropped where released. Regression leg for ux/WF-2:drop-below-column-refused: on deal #10004, swipe 322,613 \u2192 28,700 (20 pt below col0's last-card bottom edge 680) landed 10\u2665 on col0 under J\u2663, Moves 0\u21921 \u2014 the inverted contract holds. Free-cell drop also lands where released (2\u2666 \u2192 cell 1 at 274,296). Negative control: swipe 224,620 \u2192 224,862 (past the tableau area) snapped back with the board pixel-identical (MAD 0.000 over the whole board rect) and no move counted."
-        },
-        "power": {
-          "status": "passed",
-          "reason": "Same evidence; pickup instant, drop lands where released. NOT run: the intermediate 120 pt-below leg (28,800) \u2014 the 20 pt leg and the out-of-board leg bracket it, and turn budget was tight."
-        }
-      },
-      "TC-2.4": {
-        "novice": {
-          "status": "passed",
-          "reason": "Buried A\u2665 (col0 index 2, tap 28,500) tapped 2\u00d7 while a host screenshot loop filmed 59 frames: card never lifted, Moves stayed 0 (Moves-counter crop MAD 0.000 across the run), final frame pixel-identical to rest frame (no stuck-zIndex artifact), and the acknowledgement wiggle WAS caught on 1 of 59 frames (f019: MAD 28.1, 21.6 % of the card rect changed). Drag-refusal of a buried card is covered by the same non-lift observation."
-        },
-        "power": {
-          "status": "passed",
-          "reason": "Same evidence; no move counted, no artifact."
-        }
-      },
-      "TC-2.6": {
-        "novice": {
-          "status": "skipped",
-          "reason": "turn budget \u2014 the case needs 13 scripted drags plus a screenshot after each add (~18 tool turns) and the 40-turn budget was consumed by TC-2.1/2.2/2.3/2.4 plus ~8 turns lost to the simulator-access grant and to building a PNG diff helper (no PIL/ImageMagick on the host). Not attempted; no partial state."
-        },
-        "power": {
-          "status": "passed",
-          "reason": "All four legs held on deal #10004: no clipping at any count (bottom card fully on screen with margin at 16 cards), no size change through 13 cards, one uniform board shrink at the 16th card (foundations + free cells + tableau together, single card size), and monotone - tapping the bottom card (36,800) parked 2D in a free cell (Moves 14) with the board still small, Undo restored 16 cards still small and left Undo enabled."
-        }
-      },
-      "TC-3.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "One tap; Deal #551879 -> #373534 -> #352264, Moves 0, clock 0:00, tableau fully reshuffled (verified card-by-card)."
-        }
-      },
-      "TC-3.2": {
-        "power": {
-          "status": "passed",
-          "reason": "One tap; Deal #551879 preserved, Moves 2->0, clock reset to 0:00, board pixel-identical to the fresh deal (imgcrop_diff MAD 0.000, 0.0% changed)."
-        }
-      },
-      "TC-3.3": {
-        "novice": {
-          "status": "passed",
-          "reason": "One tap; Moves 1->0, board pixel-identical to pre-move state, Undo re-greys at Moves 0."
-        }
-      },
-      "TC-3.4": {
-        "novice": {
-          "status": "passed",
-          "reason": "Undo is dimmed at Moves 0 and the tap is inert (0.0% pixel change across the whole board)."
-        }
-      },
-      "TC-3.5": {
-        "power": {
-          "status": "passed",
-          "reason": "5 moves, 5 undos: after 2 undos the board matched the move-3 snapshot exactly, after 5 it matched the initial deal exactly (MAD 0.000 both times), Moves 0, Undo disabled again - no over-undo."
-        }
-      },
-      "TC-4.1": {
-        "power": {
-          "status": "passed",
-          "reason": "Injected day-29 flawless save, relaunch: 'Ready to finish / Every remaining card can go home. Send them all now?' with Not yet/Finish; Finish cascaded to 'You solved it! ?' / 'Deal #551,879 - 96 moves - 2:31' / flawless + on-time lines / Play deal #551880 - Random - Close."
-        }
-      },
-      "TC-4.2": {
-        "power": {
-          "status": "passed",
-          "reason": "'Not yet' dismissed the prompt, it did not re-appear for the rest of the game, and the gold 'Finish' pill was present. Caveat recorded as a finding: the dismissal also resumes autoplay, so the board advanced 92 -> 94 moves with no user input."
-        }
-      },
-      "TC-4.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Leg (a) Close previously verified. (b) 'Play deal #551880' loaded deal #551880 at Moves 0 / Won 1. (c) 'Random' loaded deal #131614 at Moves 0. Won incremented on the first genuine win and the Deal # pill showed 'Deal #551879 \u2713'."
-        }
-      },
-      "TC-4.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Auto-finish cycled Ask -> Off with no prompt; the Finish pill ran the cascade to the win overlay ('You solved it! \ud83c\udf89', 'Deal #551,879 \u00b7 96 moves \u00b7 2:53', Play deal #551880 / Random / Close). TC-4.4's own expectations were met; the defect observed on the same board is filed separately as bug/WF-4:autoplay-denies-daily-gold."
-        }
-      },
-      "TC-5.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Sheet 'Daily Challenges'; five streak cards (\ud83d\udd25 Play / \u23f0 Same-day / \ud83e\udd48 Silver / \ud83e\udd47 Gold / \ud83c\udf1f Flawless) each 0 / 0 total / best 0; Today card 'Deal #551,879'; Bronze/Silver/Gold text matches derive_daily.py exactly, no truncation; gold Play; 4 how-to-win pills (Clear/Silver/Gold/Flawless) = derived set; Done present."
-        }
-      },
-      "TC-5.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "Play = one tap; sheet dismissed; Deal #551879, Moves 0, Time 0:00; portrait HUD is the stacked 3-chip box with FULLY wrapped labels and no ellipsis \u2014 candidate concern CC-1 (HUD truncates Silver/Gold) DISMISSED on b2ce1a4."
-        }
-      },
-      "TC-5.3": {
-        "power": {
-          "status": "passed",
-          "reason": "After the daily win the button reads 'Replay to improve \u21bb' in grey; \ud83d\udd25/\u23f0/\ud83e\udd48 cards all went 0 -> 1 / 1 total / best 1; Bronze \u2713 and Silver \u2713, Gold circle empty \u2014 the empty Gold correctly mirrors the tier the run actually got (see bug/WF-4:autoplay-denies-daily-gold for why it was lost)."
-        }
-      },
-      "TC-5.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Aug 1 (dayIndex 0) retitles the card to 'Aug 1' with deal #691,039 and the derived Aug-1 Silver/Gold, \u23f0 branch 'Same-day is earned on the day itself'; Aug 30 keeps the gold outline while Aug 1 gets the fill; tapping Aug 31 (future) produced a pixel-identical frame (imgcrop_diff MAD 0.000, 0.0% changed) i.e. dimmed+inert as documented; tapping Aug 30 restored 'Today'."
-        }
-      },
-      "TC-6.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "demo bar 'Winning line \u00b7 0 / 91', Next/Start/Stop at (236/297/357,263), does not auto-run, Undo disabled, Deal #551879, Moves/Time both em-dash, Won 0"
-        }
-      },
-      "TC-6.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "3x Next -> 0/3 exactly; Start auto-advances, hides Next, headline gains '\u2026'; Pause restores Next/Resume/Stop and headline wraps to '64 / 91 (paused)' with pills at y=266"
-        }
-      },
-      "TC-6.3": {
-        "novice": {
-          "status": "passed",
-          "reason": "Stop at 64/91 re-dealt the fresh #551879 layout: Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay"
-        }
-      },
-      "TC-6.4": {
-        "novice": {
-          "status": "passed",
-          "reason": "91/91 -> 'That's a winning line \u2014 tap Done to try it yourself' with a single Done pill; Done re-deals fresh; Won 0, Wins 'No wins yet', all five streak cards 0, today's tier circles empty"
-        }
-      },
-      "TC-6.5": {
-        "novice": {
-          "status": "passed",
-          "reason": "2.5s slow drag on col0 bottom card and a plain tap both left the board byte-identical (imgcrop_diff MAD 0.000, 0.0% changed over a 40-frame filmstrip); counter unchanged. Positive control: an identical filmstrip around a Next tap did register MAD 2.033 / 2.2%"
-        }
-      },
-      "TC-7.1": {
-        "power": {
-          "status": "passed",
-          "reason": "Deal # pill -> Select All -> 10003 -> Play loaded Deal #10003 at Moves 0 (evidence tc71-deal-10003.png). Chrome taps = 3 as budgeted; the pre-filled value still costs a real user 6 backspaces or a long-press+Select All plus 5 digit taps (~10-14 physical taps), which the round-1 test case explicitly accepted as within the bar, so not filed."
-        }
-      },
-      "TC-7.2": {
-        "power": {
-          "status": "passed",
-          "reason": "Alert has exactly Cancel (127,528) and Play (273,528), side by side; no Random action anywhere (evidence tc72-two-actions-cancel-play.png). Caveats: the number pad is NOT up on open (field is focused with a caret but no keyboard - a long-standing HARNESS_NOTES observation I could not separate from a simulator hardware-keyboard artifact, so not filed); step 2's New game re-deal was not exercised - it is covered by TC-3.x."
-        }
-      },
-      "TC-7.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Emptied the field (long-press -> Select All -> Cut): placeholder '1-1,000,000' shows and Play is greyed; tapping it at (275,529) does nothing, alert stays up, no crash (tc73-blank-play-disabled.png)."
-        }
-      },
-      "TC-7.4": {
-        "power": {
-          "status": "passed",
-          "reason": "0 -> Play disabled; 9999999 -> Play disabled; 20 nines -> Play disabled, no crash/layout break; non-numeric junk ('0&#8;\\b\\b...' forced in via the hardware keyboard) -> Play disabled; 1000000 -> Play enabled and Deal #1000000 loaded exactly as typed. DOC DRIFT: step 1's expectation ('9999999 loads', maxValidSeed 4,294,967,295) is stale - no maxValidSeed symbol exists on b2ce1a4; Game.maxSeed = 1,000,000 and the hint, the message and the enteredSeed gate all agree on 1-1,000,000, and every daily-pool seed (500001-1000000) is reachable. Behavior is self-consistent, so no finding."
-        }
-      },
-      "TC-7.5": {
-        "power": {
-          "status": "passed",
-          "reason": "With Deal #10003 at Moves 1, opening the alert and tapping Cancel (126,528) dismissed it with the deal and move count intact (tc75-after-cancel.png). Note: the sibling Play button in that same row is NOT safe - see ux/WF-7:deal-play-discards-live-game-no-confirm."
-        }
-      },
-      "TC-8.1": {
-        "power": {
-          "status": "passed",
-          "reason": "Auto-play pill flips On->Off->On immediately; causeway.autoplay written each time; Off and On both survive terminate+launch."
-        }
-      },
-      "TC-8.2": {
-        "power": {
-          "status": "failed",
-          "reason": "Off half passes (restored board sat at Moves 92, zero automatic moves). On half fails: one toggle played 2 cards and flipped the gold HUD chip to a red X, costing gold+flawless - bug/WF-4:autoplay-denies-daily-gold reproduced in-app."
-        }
-      },
-      "TC-8.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Ask -> Off -> On -> Ask, exactly one tap each, label and UserDefaults update immediately; Ask->Off never transits On; On persisted across terminate+launch."
-        }
-      },
-      "TC-8.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Fixture substituted (day-29 injected save instead of deal 10169 + 28 drags, to stay inside the turn budget): Ask prompted by itself; 'Not yet' left Moves 92 + Finish pill; one Auto-finish tap gave Off with no cascade (Moves 94, Won 0, Finish still offered); the next tap gave On and cascaded to the win overlay at Moves 96, Won 1, Deal pill gained a check."
-        }
-      },
-      "TC-9.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Deals won sheet, disabled Play, 'No wins yet - go solve one!', Done dismisses"
-        }
-      },
-      "TC-9.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "7 deals solved / 7 ranges, current seed chip gold-outlined, drill-in row '96 moves - 1:43 - Aug 30', row tap loads the deal and dismisses"
-        }
-      },
-      "TC-9.3": {
-        "power": {
-          "status": "passed",
-          "reason": "1234 loads and dismisses; Play disabled for empty/0; out-of-range rejected silently -> ux/WF-9:deal-entry-out-of-range-silent"
+          "reason": "drag of column-2 bottom card (jack of clubs) into a free cell was NOT refused, Moves 1, gold chip flipped to '\u00d7' in the same frame with 3rd/2nd chips unchanged, Undo restored Moves 0 and the gold chip to '.'"
         }
       },
       "TC-13.6": {
-        "novice": {
+        "power": {
           "status": "passed",
-          "reason": "Aug 5 and Aug 6 show exactly 3 pills with the Silver tier row still present; Aug 3 and Aug 4 show all 4 in a 2x2"
+          "reason": "Ace smart-move allowed, \ud83e\udd47\u2192\u2717, \ud83e\udd48 stayed \u00b7; Undo restored \ud83e\udd47\u2192\u00b7 and flipped \ud83e\udd48\u2192\u2717; \ud83e\udd48 stayed \u2717 across a further legal move AND across terminate+launch; Replay cleared it and restarted. Also verified beyond the case: Undo is disabled at 0 moves and does not flip \ud83e\udd48, and Silver is correctly WITHHELD at win time (overlay 'Aug 6: Daily challenge: \ud83e\udd49 earned.' on a line make_save certifies as silver=true when played undo-free)."
         }
       },
       "TC-13.7": {
         "power": {
           "status": "passed",
-          "reason": "Aug 1-7 all match derive_daily exactly; no truncation, no stale labels, correct per-day deal numbers; only defect is the grouped deal-number format (bug/WF-13:daily-card-seed-grouped)"
+          "reason": "All 7 days (idx 0-6) match derive_daily.py exactly \u2014 deal number, Silver and Gold label text and family; deal # distinct per day; \u23f0 line 'Same-day is earned on the day itself' on all seven; no truncation (long Golds wrap to 2 lines, frame h=28, max width 254pt of 304pt available); selecting a new day fully replaces the previous day's Silver/Gold text (exactly one Silver + one Gold line per dump)."
+        }
+      },
+      "TC-13.8": {
+        "power": {
+          "status": "passed",
+          "reason": "Also run as novice \u2014 both passed. idx 4 and 5 show exactly 3 pills (bronze/gold/flawless, no \ud83e\udd48 \u2014 correct per Fixture policy) with the Silver objective row still on the card; idx 2 and 3 show all 4 in a 2x2 grid. Swept the whole reachable range 0-14: 3 pills on idx 4, 5, 9 and nowhere else, exactly as expected; no reachable day is missing \ud83e\udd49/\ud83e\udd47/\ud83c\udf1f. Extra check: daily.demo.gold on Aug 6 runs THAT day's line (headline '\ud83e\udd47 Gold: Get every Ten \u2026 \u00b7 0 / 98', matching derive_daily gold len 98, not today's 97), and demo.stop returns to the live Aug 6 challenge with clean chips."
+        }
+      },
+      "TC-14.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Five streak cards 3+2 all 0/day streak/0 total/best 0; legend paragraph verbatim; header Today \u00b7 Deal #608530; \u23f0 line 'Win today to start a same-day streak' directly above daily.play. Novice bar: the legend paragraph does state what Same-day pays (cleared on its own date) and what it costs (replaying a past day never earns it), so a first-timer can decode it."
+        }
+      },
+      "TC-14.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 13 card, '\u23f0 Same-day is earned on the day itself', daily.play = 'Play Aug 13'; legend row is \ud83e\udd49 \ud83e\udd48 \ud83e\udd47 \ud83c\udf1f Flawless \u23f0 Same-day and the \u23f0 chip is prefixed by the same small GOLD DOT the calendar draws in a cell's corner, so the pip does decode \u2014 dismissed as a concern (evidence tc143-legend-row.png)."
+        }
+      },
+      "TC-14.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Overlay 'Deal #720,307 \u00b7 79 moves \u00b7 1:41' + '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.' with no day prefix; all five cards 1/1/best 1; card header 'Today \ud83c\udf1f Flawless' with three checkmark.circle.fill; '\u23f0 Cleared on the day'; Aug 14 cell has gold ring + \ud83c\udf1f + gold corner pip."
+        }
+      },
+      "TC-14.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Replay of day 12 (startDay 13) overlay reads 'Aug 13: \ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run.' \u2014 day named, no \u23f0 clause; \u23f0 Same-day stays 1 total while \ud83d\udd25/\ud83e\udd48/\ud83e\udd47/\ud83c\udf1f go to 2 total; calendar Aug 13 = \ud83c\udf1f no pip, Aug 14 = \ud83c\udf1f + pip."
+        }
+      },
+      "TC-14.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Real two-day walk: after terminate + relaunch on 2026-08-15 the board keeps hud.day 'Aug 14' with stat.moves 0; the Aug 14 card reads '\u23f0 Resume your attempt today and it still counts' with daily.play 'Play Aug 14'; Today's Aug 15 card still offers the start branch. Case assertions all held; the state surfaced findings ux/WF-14:grace-invisible-from-daily-sheet and ux/WF-14:grace-confirm-title-differs-by-control."
+        }
+      },
+      "TC-14.6": {
+        "power": {
+          "status": "passed",
+          "reason": "Overlay read exactly 'Aug 14: \ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; \u23f0 card 1/1/best 1; Today's card switched to the 'keep your 1-day same-day streak' branch."
+        }
+      },
+      "TC-14.7": {
+        "power": {
+          "status": "passed",
+          "reason": "All four controls confirmed on the zero-move grace, no 'your 0 moves' clause, grace fell back to '\u23f0 Same-day is earned on the day itself' after accepting New game. Also run as novice (same result). The title split between legs 1-2 and 3-4 reproduced -> filed minor ux/WF-14:grace-confirm-title-split."
+        }
+      },
+      "TC-14.8": {
+        "power": {
+          "status": "passed",
+          "reason": "Casual 0-move board: toolbar.replay and toolbar.newgame both 'no alert' \u2014 no hasLiveGame over-widening."
+        }
+      },
+      "TC-14.9": {
+        "novice": {
+          "status": "passed",
+          "reason": "Ran as specified; the expected-and-observed hidden grace reproduced -> reused proposal id ux/WF-14:grace-invisible-from-daily-sheet (open)."
+        }
+      },
+      "TC-14.10": {
+        "power": {
+          "status": "passed",
+          "reason": "\u23f0 1/1/best 1 while \ud83d\udd25/\ud83e\udd48/\ud83e\udd47/\ud83c\udf1f read 2/2/best 2; exactly one corner pip (Aug 14), \ud83c\udf1f on both Aug 13 and Aug 14; calendar legend carries the matching dot swatch."
+        }
+      },
+      "TC-15.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "2x2 demo grid; headline '\ud83c\udf1f Flawless: \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0 / 98'; paused (Start, not Pause); Next -> 1/98; Stop removes the bar and leaves no toolbar.finish. New minor filed on the headline omitting the day's objectives (does not fail the case's assertions)."
+        }
+      },
+      "TC-15.2": {
+        "power": {
+          "status": "passed",
+          "reason": "all 15 reachable days (0-14) show daily.demo.flawless; daily.demo.silver absent on exactly idx 4/5/9; daily.cal.15 label 'Aug 16, locked until that date', tapping it left the day card on Today and only rendered daily.lockednote. Also run and passed as novice."
+        }
+      },
+      "TC-15.3": {
+        "power": {
+          "status": "passed",
+          "reason": "overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; Flawless streak 1/1/best 1; day card 'Today \ud83c\udf1f Flawless' with 3x checkmark.circle.fill; Aug 14 cell shows the \u2b50 in the marker slot with the date baseline aligned to 9-13 and 15 (no jitter)."
+        }
+      },
+      "TC-15.4": {
+        "power": {
+          "status": "passed",
+          "reason": "banking silver then gold across two runs on day 12: overlays 'Aug 13: Daily challenge: \ud83e\udd49 \ud83e\udd48 earned.' then '\ud83e\udd49 \ud83e\udd47 earned.'; disk flush verified (silver:true) between injections; final streaks Play 1 / Silver 1 / Gold 1 / Flawless 0-0-best 0; Aug 13 day card has 3 checks and NO \ud83c\udf1f header, daily.play 'Replay Aug 13 to improve \u21bb', calendar cell shows three tier dots not a \u2b50. No OR-ing across attempts."
+        }
+      },
+      "TC-15.5": {
+        "power": {
+          "status": "passed",
+          "reason": "replayed Aug 14 after the flawless win, deliberately broke Gold (sent A\u2666 home before Q\u2666; HUD \ud83e\udd47\u2717 at move 4), abandoned via daily.play/'Start over': header still 'Today \ud83c\udf1f Flawless', Flawless streak still 1/1/best 1, all three checkmarks, Aug 14 calendar cell still \u2b50."
+        }
+      },
+      "TC-15.6": {
+        "novice": {
+          "status": "failed",
+          "reason": "The three named surfaces DO agree (streak card + legend 'Flawless = \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three earned in a single run of that day's deal'; pill '\ud83c\udf1f Flawless'; demo.headline '\ud83c\udf1f Flawless: \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0 / 98') and no surface says 'two/both objectives' \u2014 CC-15-A is fixed. The case's second clause fails: the day card of a day whose tiers were BANKED across two runs shows three green earned checks plus 'Replay to improve \u21bb' and no flawless state at all, which implies banking is enough \u2014 ux/WF-15:day-card-banked-tiers-read-as-flawless."
+        }
+      },
+      "TC-2.1": {
+        "power": {
+          "status": "passed",
+          "reason": "also passed as novice; deal #1793: tap A-spades (371,612) -> spades UP foundation, Moves 1; tap K-spades (28,642) -> spades DOWN foundation, Moves 2; 1 tap each, no confirmation"
+        }
+      },
+      "TC-2.2": {
+        "power": {
+          "status": "passed",
+          "reason": "also passed as novice; deal #1793 col2 run 6H/7C/8H, tap head at (126,560) relocated all three onto 5C in col6 in a single move (Moves 1), order preserved, 2S left behind as new bottom"
+        }
+      },
+      "TC-2.3": {
+        "power": {
+          "status": "passed",
+          "reason": "also passed as novice; deal #10004: drag 322,613->28,700 and ->28,800 both land 10H on JC (x=6,y=635, Moves +1); drag to 28,860 (out of board) and onto 10C (illegal) both snap back with Moves 0; zero-hold drag picks up instantly"
+        }
+      },
+      "TC-2.4": {
+        "power": {
+          "status": "passed",
+          "reason": "also passed as novice; deal #10004 buried A-hearts (28,500): drag and tap both leave Moves 0 and the card in place; 8-tap film caught the ack wiggle on 7 of 8 taps (MAD 32.0-46.8, 24.7-35.1% pixels changed over the card rect); no stuck zIndex after release. NOT re-verified: the 'movable-but-targetless card stays silent' non-goal and the demo-suppression non-goal (setup cost; no contrary evidence seen)"
+        }
+      },
+      "TC-2.6": {
+        "power": {
+          "status": "passed",
+          "reason": "also passed as novice; deal #10004, 13-drag sequence: pitch 30pt at 12 cards, 28pt at 13, 24pt at 15 with card size 45x75 unchanged and neighbours at 30pt; 16th card triggers one uniform shrink to 43x71 for tableau AND foundations (A/K glyphs 10x16 -> 9x15, foundation pitch 49 -> 47) with the tableau re-centred (x 6->15); bottom card fully on screen (y=763, bottom edge 834) and hittable; tapping it to a free cell and Undo both left the board small"
+        }
+      },
+      "TC-3.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Also passed as novice. Fresh 0-move board: New game is 1 tap, Deal #776854 -> #717633, Moves 0, Time 0:00, board reshuffled. On a live board it is tap + a correctly-worded confirm, then a new deal (#866924)."
+        }
+      },
+      "TC-3.2": {
+        "novice": {
+          "status": "failed",
+          "reason": "Also fails as power. Function is correct (same Deal #717633 reloads, Moves 0, board byte-identical to initial, Undo history cleared) but on a live game Replay costs 2 taps and the confirm is the verbatim New-game copy claiming 'there is no way back to it' \u2014 finding ux/WF-3:replay-confirm-copy-mismatch."
+        }
+      },
+      "TC-3.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Also passed as novice. tapid card.H11 -> Moves 1, Undo enabled; 1 tap Undo -> card back at 104,605, Moves 0, Undo disabled again."
+        }
+      },
+      "TC-3.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Also passed as novice. At Moves 0 toolbar.undo reports enabled=false, is visibly dimmed (screenshot r1-tc34-undo-disabled-moves0.png), and tapping it changes nothing."
+        }
+      },
+      "TC-3.5": {
+        "power": {
+          "status": "passed",
+          "reason": "5 moves (2 taps + 3 drags to free cells) then 5 Undos stepped 5-4-3-2-1-0; board diff vs the pre-move dump is empty and the 6th Undo is disabled. No over-undo, no corruption."
+        }
+      },
+      "TC-4.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Not yet dismissed the prompt, no second prompt in 16 s, gold Finish pill appeared at [139,159] between Auto-finish and Deal #, and completed to the win overlay (97 moves)"
+        }
+      },
+      "TC-4.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Close left the solved board with 'Deal #608530 \u2713' and Won 1; 'Play deal #608531' loaded 608531 at Moves 0 / 0:00 with no \u2713; Random loaded #146889 at Moves 0 \u2014 one tap each, no confirmation alert"
+        }
+      },
+      "TC-4.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Ask -> Off (one tap, no prompt, Finish pill the only route) -> On (one tap, cascade fired immediately with no prompt, ended on the win overlay at 97 moves)"
+        }
+      },
+      "TC-4.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Undo enabled post-win; Moves 97->96, Won stayed 1, \u2713 pill stayed, Finish returned; re-completion overlay had NO daily medal line and the day-14 daily record survived intact (Cleared \u00b7 fewest 97 moves \u00b7 fastest 2:20, plist tier bronze+silver+onTime, streaks 1/1/1)"
+        }
+      },
+      "TC-4.6": {
+        "power": {
+          "status": "passed",
+          "reason": "Time 1:42 -> home 20 s -> 1:43 on foreground (+1 s across a 21 s background), then +10 s of foreground -> 1:53. Clock pauses on background and resumes on activate"
+        }
+      },
+      "TC-4.7": {
+        "power": {
+          "status": "failed",
+          "reason": "Win overlay result line prints Deal #608,530 (comma-grouped) while its own button prints Play deal #608531, the toolbar pill Deal #608530 and the Wins row 608530 \u2014 CC-4A / bug/WF-4:win-overlay-seed-grouped reproduces."
+        }
+      },
+      "TC-4.8": {
+        "power": {
+          "status": "passed",
+          "reason": "Overlay: 'Daily challenge: \ud83e\udd49 \ud83e\udd48 earned. \u23f0 On time \u2014 1-day same-day streak.'; HUD showed \ud83e\udd47\u2717 pre-finish; Daily sheet: Play/Same-day/Silver streaks 1 (total 1, best 1), Gold/Flawless 0; Today card Bronze\u2713 Silver\u2713 Gold\u25cb; daily.clears 'Cleared \u00b7 fewest 97 moves \u00b7 fastest 1:52 \u00b7 par 87' matches the run."
+        }
+      },
+      "TC-5.1": {
+        "power": {
+          "status": "passed",
+          "reason": "also run as novice; both passed \u2014 5 streak cards, explainer, Today card Deal #608530, empty circles, no clears/par line, backup section all as specified. Separate Dynamic Type finding filed against this case."
+        }
+      },
+      "TC-5.2": {
+        "power": {
+          "status": "passed",
+          "reason": "also run as novice; one tap, sheet dismissed, Deal #608530, moves 0 / 0:00, three HUD chips with no ellipsis, hud.day absent on Today, chips at y=250; live casual game (1 move) raised 'Discard the game in progress?' before dealing."
+        }
+      },
+      "TC-5.3": {
+        "power": {
+          "status": "passed",
+          "reason": "also run as novice; overlay 'Deal #539,885 \u00b7 107 moves \u00b7 1:41' + 'Aug 3: Daily challenge: \ud83e\udd49 \ud83e\udd47 earned.'; card became 'Replay Aug 3 to improve \u21bb'; Bronze+Gold checked, Silver empty; Play 0/1/best 1, Same-day 0."
+        }
+      },
+      "TC-5.4": {
+        "power": {
+          "status": "passed",
+          "reason": "also run as novice; one clears element after run 1, two after run 2 ('Cleared 2\u00d7 \u00b7 fewest 96 moves \u00b7 fastest 1:41 \u00b7 par 86' + 'Moves each run: 107 \u00b7 96'); banked Gold check survived the bronze-only run. fastest reads 1:41 not the brief's 1:38 because make_save gave both runs elapsed=101 s \u2014 not a defect."
+        }
+      },
+      "TC-5.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 1 card: Deal #691039, Silver Queens-within-29, Gold split-at-Three, 'Play Aug 1'; cal.14 restored the Today card; today's ring and the selection tint coexist legibly."
+        }
+      },
+      "TC-6.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Demo bar 'Winning line \u00b7 0 / 100' (bronze line = 100 for seed 608530), Next/Start/Stop at y=263, Deal #608530, Moves/Time em-dash, Won 0, Undo disabled, no auto-run."
+        }
+      },
+      "TC-6.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Next advanced 0->1->2->3 exactly; Start hid Next, showed Pause + '\u2026'; Pause restored Next/Resume/Stop with '44 / 100 (paused)' wrapping to 2 lines, pills at y=252/265."
+        }
+      },
+      "TC-6.3": {
+        "novice": {
+          "status": "passed",
+          "reason": "Stop at 44/100 removed the bar and re-dealt #608530 to its initial layout (52 cards in the tableau, foundations/free cells empty), Moves 0, Time 0:00, Undo disabled, no Finish pill, no win overlay."
+        }
+      },
+      "TC-6.4": {
+        "novice": {
+          "status": "passed",
+          "reason": "Line ran to 100/100; banner 'That's a winning line \u2014 tap Done to try it yourself.' with a lone Done at (356,265); Done re-dealt fresh (Moves 0, 52 cards); Won 0, Wins 'No wins yet \u2014 go solve one!', all five streak cards 0/0/best 0, no clears line on the day card."
+        }
+      },
+      "TC-6.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "2.9 s slow drag on col 0's bottom card filmed over 40 host frames: MAD 0.000 / 0.0% changed on every frame (no lift, no ghost); three taps on bottom cards left the card frame dump byte-identical; counter still 44/100 and Moves still em-dash."
+        }
+      },
+      "TC-6.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "Gold and Silver demo lines both open with tier + derived objective + correct total (gold 0/97, silver 0/100, matching daily-solutions.json token counts for #608530); Next steps to 1/N; Stop re-deals the same seed to a fresh board (Moves 0, Time 0:00, Undo disabled, Deal #608530, no Finish pill)."
+        }
+      },
+      "TC-6.7": {
+        "novice": {
+          "status": "passed",
+          "reason": "Demo pill on a live daily attempt raises 'End your daily attempt?' with Keep playing / Show demo; Keep playing leaves Moves 1, clock running, Undo enabled, board untouched; Show demo dismisses the sheet, opens the bar at 0/97 and re-deals. The TC's 'known gap' (casual game re-dealt with no warning) does NOT reproduce on 1a63ce2 - a casual-specific confirm fires."
+        }
+      },
+      "TC-7.1": {
+        "power": {
+          "status": "passed",
+          "reason": "2 chrome taps + typing loads Deal #500001, Moves 0, no alert left. The trailing ' \u2713' sub-assertion was NOT exercised: a reset device has Won 0 and no won deal, and producing one needs a finishable-board fixture injection - carry it to the next round."
+        }
+      },
+      "TC-7.2": {
+        "power": {
+          "status": "passed",
+          "reason": "alert = title 'Play a deal', body exact, buttons exactly Cancel@57,368 / Play@205,368; 'btn Random' exists=false and 'tapbtn Random' -> ERR no button labelled Random."
+        }
+      },
+      "TC-7.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Play enabled=false for 9999999, 0 and blank; enabled=true for 1000000 and 1; 1000000 loads as Deal #1000000 (no clamping); Cancel left Deal #500001 / Moves 0 untouched."
+        }
+      },
+      "TC-7.4": {
+        "power": {
+          "status": "passed",
+          "reason": "With Moves 1, typing 424242 and tapping Cancel left Deal #1000000 and Moves 1, and no deferred confirm fired within 2 s."
+        }
+      },
+      "TC-7.5": {
+        "power": {
+          "status": "failed",
+          "reason": "Passes as written (both routes, doubletap and two-taps-0.15s, default and AX3XL text: confirm intact at y=493, Deal #500001, Moves 1) - but the guard is geometric only. With the software keyboard absent the deal alert re-centres and Play lands on top of the confirm's 'Play that deal'; the second tap then discarded the live game 2/2. bug/WF-7:deal-confirm-swallowed-by-double-tap stays open."
+        }
+      },
+      "TC-7.6": {
+        "power": {
+          "status": "passed",
+          "reason": "All assertions held: title, body copy with the move count matching stat.moves (verified at 1 and 2, correct singular/plural), Keep playing / Start over buttons, Keep playing leaves the board untouched, Start over deals deal #608530 with the challenge HUD, and a 0-move board (casual and daily) is replaced with no prompt. One minor copy ambiguity filed separately (ux/WF-7:live-game-confirm-challenge-two-senses)."
+        }
+      },
+      "TC-8.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Auto-play pill flips On->Off->On immediately; Off survives terminate+launch."
+        }
+      },
+      "TC-8.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Off: legal move at Moves 77->78 sent nothing home. On: injected day-14 line at move 51 auto-sent the safe K-hearts to the down foundation (Moves 51->52) and stopped there. Exposed aces (deal 866924 A-spades, and the finishable board's 2-hearts) are correctly NOT sent - isSafeAutoplay requires both opposite-colour neighbours resolved (Game.swift:674-682); the WF-3 tester's hypothesis is the documented rule, not a miss."
+        }
+      },
+      "TC-8.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Ask->Off->On->Ask, one tap each, label updates immediately; On persists across terminate+launch."
+        }
+      },
+      "TC-8.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Fixture SUBSTITUTED (brief's generator /private/tmp/qaw2r1wf8/gen2.mjs no longer exists): injected finishable casual board, seed 608530, Moves 77. Ask prompted by itself; Not yet left Moves 77 / Won 0 / Finish pill; one Auto-finish tap gave Off with zero board change (regression guard holds); the next tap gave On and cascaded to the win - Moves 100, Won 1, overlay 'You solved it! - Deal #608,530 - 100 moves - 2:08', Deal pill gained the check mark."
+        }
+      },
+      "TC-9.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Also run as novice (same steps, both passed): title 'Deals won', empty field, Play enabled=false, 'No wins yet \u2014 go solve one!', Done dismisses."
+        }
+      },
+      "TC-9.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Also run as novice (both passed). '1 deal solved \u00b7 1 range', chip 608530, row 'Deal #608530, fewest 97 moves \u00b7 fastest 1:42 \u00b7 Sep 9' + play glyph + 'Tap a deal to play it again.'; BackButton 'Deals won' then Done. Note: at the drilled-in level only Back is present (no Done) \u2014 exit is still obvious, not filed."
+        }
+      },
+      "TC-9.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Play disabled for empty / 0 / 02000000; wins.dealentry.problem 'Deal numbers run 1\u20131,000,000.' shown for both out-of-range values, absent when empty and when valid; 500001 enabled Play, loaded Deal #500001 and dismissed the sheet. No clamping."
+        }
+      },
+      "TC-9.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Both routes raised 'Discard the game in progress? / Your 1 move and your time will be discarded\u2026' with Keep playing / Play that deal. Keep playing returned to the board with Moves 1 intact; Play that deal loaded Deal #608530 at Moves 0. Time advanced 0:09->0:26 across the sheet, which is deliberate (GameClock pauses only for scenePhase background) \u2014 not filed; pausing on sheets is the metric-integrity trap."
+        }
+      },
+      "TC-9.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Independent minima confirmed over 4 wins of 608530: run1 97mv/1:42, run2 100mv/1:42, run3 100mv/0:32 -> row 'fewest 97 moves \u00b7 fastest 0:32'; run4 (post-win Undo + Auto-finish:On, 100mv/1:30) left both numbers unchanged. Presentation gap filed as ux/WF-9:wins-row-no-run-count."
+        }
+      },
+      "TC-9.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "From the won (non-live) 608533 board: toolbar.wins -> chip 608530-608531 -> tap the 608530 row => no alert, board shows Deal #608530, Moves 0, Time 0:00, sheet dismissed in that one tap"
+        }
+      },
+      "TC-9.7": {
+        "power": {
+          "status": "passed",
+          "reason": "4 wins (500001, 608530, 608531, 608533) => header '4 deals solved \u00b7 3 ranges', adjacent pair collapsed, gap seed own chip, every deal reachable exactly once; a 5th win of the bridging seed 608532 correctly re-compressed to '5 deals solved \u00b7 2 ranges' with chip 608530-608533 listing all four in order"
         }
       },
       "TC-2.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "Run for both personas (behaviour is persona-independent). Coordinate-tap latency, filmstrip at ~3 fps: smart-move tap -> first pixel change 0.22-0.50 s (board region px 0,700-1206,2100), board static by +0.50 s; instantaneous control (Auto-play pill @State flip) first change 0.09-0.65 s, i.e. the move is no slower than the plumbing floor. Deep-column landscape move: first change +0.25 s, settled +1.35 s. No >1 s no-response anywhere."
+        }
+      },
+      "TC-4.1": {
         "power": {
           "status": "passed",
-          "reason": "cold launch cmd -> painted board 0.89 s; smart-move tap on A-clubs (321,642) produced its first changed frame 267 ms after the last quiet frame (Moves 0->1 + clock start). Calibration against an instantaneous control (Auto-play toggle) put the card tap 244 ms = one film frame behind a pure state flip, so no >1 s dead time exists."
+          "reason": "Fixture make_save --day 14 --tier silver --challengeDay 14 --startDay 14; launch CAUSEWAY_TODAY_OVERRIDE=2026-08-15. Alert 'Ready to finish' / 'Every remaining card can go home. Send them all now?' with Not yet/Finish; Finish cascaded 19 cards and the win overlay read 'You solved it! \ud83c\udf89', 'Deal #608,530 \u00b7 97 moves \u00b7 3:23', 'Daily challenge: \ud83e\udd49 \ud83e\udd48 earned. \u23f0 On time \u2014 1-day same-day streak.' plus Play deal #608531 / Random / Close; stat.won=1; pill 'Deal #608530 \u2713'. Screen static (overlay readable) 4.34 s after the Finish tap."
         }
       }
     },
@@ -440,157 +546,549 @@
       "TC-1.1": {
         "novice": {
           "status": "passed",
-          "reason": "How to play states both-ended foundations, tap-to-move and drag; tapping A-diamond (175,650) on deal #915806 sent it to the up foundation, Moves 1, clock running, Undo enabled."
+          "reason": "Fresh install, pin 2026-08-15, deal #115524: header subtitle, FOUNDATIONS \u00b7 A\u2191 / K\u2193 and FREE CELLS labels all present; How to play states both-ended foundations + tap + drag; tapping 10 of spades stacked it on the jack of diamonds, Moves 1, clock running (0:02), Undo went enabled=false -> true. Well inside the 1-min effort bar."
+        }
+      },
+      "TC-1.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Two of spades (no foundation step, no red A/3 exposed) parked in free cell 1 as the documented last resort; and on deal #810129 with all cells full the stuck 8 of diamonds, the stuck free-cell 5 of spades and a buried card all now perform the refusal wiggle (15.6% / 27.7% / 19.1% pixel change), so the novice can tell the touch registered."
         }
       },
       "TC-3.1": {
         "power": {
           "status": "passed",
-          "reason": "One tap on an untouched board (#721394 -> #915806, no dialog) and one tap after a win (#191548). On a live board the new confirm adds the intended second tap."
+          "reason": "Cold launch Deal #147742 -> one tap toolbar.newgame -> Deal #373126, Moves 0, Time 0:00, all 52 card frames reshuffled, no confirm at 0 moves. Live-game variant also checked: 1 move -> New game raises the (correct) casual confirm and the second tap deals #933812 with Moves 0 / 0:00. NOTE the case text 'one tap' is stale for a live game \u2014 the confirm is 2 taps by design (WF-14 guard)."
         }
       },
-      "TC-5.1": {
+      "TC-3.2": {
+        "power": {
+          "status": "failed",
+          "reason": "Core behaviour correct (Deal #373126 before and after, Moves 0, board byte-identical, Undo re-disabled), but ux/WF-3:replay-confirm-copy-mismatch is only PARTIALLY fixed: the daily-attempt Replay confirm is titled 'End your daily attempt?' above a body reading 'This challenge starts over from the beginning.' \u2014 the attempt verifiably does not end (same deal, objectives HUD still live)."
+        }
+      },
+      "TC-4.7": {
+        "power": {
+          "status": "passed",
+          "reason": "Overlay line, its next-deal button, the toolbar pill and the Wins row all print the deal ungrouped on 3407a77; also verified at the max seed 1000000."
+        }
+      },
+      "TC-6.2": {
         "novice": {
           "status": "passed",
-          "reason": "Sheet correct against the CURRENT spec: FIVE streak cards (Play/Same-day/Silver/Gold/Flawless, all 0 / 0 total / best 0), Today card 'Deal #551879' UNGROUPED, Bronze/Silver/Gold text exactly matching derive_daily.py, four how-to-win pills, Play one tap. NOTE: the TESTCASES.md wording for this case is stale \u2014 it still expects four cards and a grouped 'Deal #10,005'; the app now matches WORKFLOWS.md WF-5 and the round-1 seed-format fix instead."
-        }
-      },
-      "TC-10.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Goal (52 cards, dual up/down foundations meeting in the middle), The catch, Tableau, Free cells, Controls (tap=smart-move/run, drag=specific) all present; no collateral damage from the eleven fix commits."
-        }
-      },
-      "TC-15.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "2x2 pill grid (Clear/Silver/Gold/Flawless); \ud83c\udf1f demo bar reads '\ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run \u00b7 0/96', paused; Next -> 1/96; Stop re-deals clean with the challenge still bound."
-        }
-      },
-      "TC-15.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; all five streak cards 1/1 total/best 1; header 'Today \ud83c\udf1f Flawless'; three green circles; Aug 30 cell shows \u2b50 + \u23f0 pip with ZERO date jitter (digit top pitch measured 132 px for every calendar row incl. the 30 row)."
-        }
-      },
-      "TC-15.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Aug 27 silver run then gold run: overlays 'Aug 27: Daily challenge: \ud83e\udd49\ud83e\udd48 earned' / '\ud83e\udd49\ud83e\udd47 earned'; Play/Silver/Gold 1 total each, \ud83c\udf1f Flawless 0 streak / 0 total / best 0; Aug 27 cell shows three tier dots (no \u2b50); Aug 27 card three green circles, no \ud83c\udf1f in header. Flawless is not OR-ed across attempts. (Coverage gap from round 1 now closed.)"
-        }
-      },
-      "TC-15.5": {
-        "power": {
-          "status": "passed",
-          "reason": "Ran a STRONGER variant than the written step 2: after the flawless win I injected and finished a real bronze-only run of the same day (day 29, --tier bronze --challengeDay 29). \ud83c\udf1f survived \u2014 header still 'Today \ud83c\udf1f Flawless', Flawless card still 1/1/best 1, Aug 30 cell still \u2b50, all three circles green. The manual mid-run Gold break was not walked (today's split-at Gold cannot be broken from the opening position \u2014 only Aces/Kings can go home). (Coverage gap from round 1 now closed.)"
-        }
-      },
-      "TC-13.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Aug 3 card correct: header 'Aug 3', Deal #539885 (now UNGROUPED \u2014 expectation text in TESTCASES still says 539,885 and needs updating), Silver max-run, Gold suit-sprint, \u23f0 'Same-day is earned on the day itself', 4 pills, button 'Play Aug 3'. No trace of today's objectives."
-        }
-      },
-      "TC-13.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "Aug 31 tap is a no-op on selection (card stays Aug 3) but is no longer silent: standing \ud83d\udd12 on the cell plus tint/border and '\ud83d\udd12 Aug 31 unlocks on the day itself \u2014 come back then.' under the grid. Aug 30 keeps the gold ring; Aug 1 spot-check selectable and correct."
-        }
-      },
-      "TC-13.3": {
-        "power": {
-          "status": "passed",
-          "reason": "Play Aug 4 \u2192 board pill Deal #625648, HUD titled 'Aug 4' in gold with all three objectives untruncated and neutral \u00b7 markers; 3 taps + 1 swipe as budgeted. Re-opening Daily mid-attempt still snaps to the Today card (known proposal ux/WF-13:daily-sheet-resets-to-today-midattempt, not re-filed)."
-        }
-      },
-      "TC-13.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Free-cell drag was ALLOWED (3\u2666 sits in cell 1, no alert/snap-back) and \ud83e\udd47 flipped to red \u2717 in the same frame with \ud83e\udd49/\ud83e\udd48 unchanged; Undo restored the card and returned \ud83e\udd47 to \u00b7. Auto-play was set Off first."
-        }
-      },
-      "TC-13.7": {
-        "power": {
-          "status": "skipped",
-          "reason": "turn budget \u2014 5 of 7 days verified string-exact against derive_daily.py (Aug 1 rank-rush/split-at, Aug 2 end-bias/big-move, Aug 3 max-run/suit-sprint, Aug 4 suit-balance/cells-le, plus Aug 7 cells-le/suit-top-first = 5 days). No truncation, no stale labels across selections, \u23f0 line right on all. Aug 5 (moves/ends-first) and Aug 6 (no-undo/before-ace) not read; deal numbers were legible only for Aug 3/Aug 4 at the scroll position used."
-        }
-      },
-      "TC-14.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "Five streak cards in a 3+2 grid, all 0/0 total/best 0, legend paragraph present; Today card shows '\u23f0 Win today to start a same-day streak'."
-        }
-      },
-      "TC-14.2": {
-        "novice": {
-          "status": "passed",
-          "reason": "Aug 27 card reads '\u23f0 Same-day is earned on the day itself'; the calendar legend now names the pip with a gold dot + '\u23f0 Same-day' (prior finding fixed)."
-        }
-      },
-      "TC-14.3": {
-        "power": {
-          "status": "skipped",
-          "reason": "turn budget"
-        }
-      },
-      "TC-14.4": {
-        "power": {
-          "status": "passed",
-          "reason": "Past-day replay (Aug 27, startDay=today) won flawless: overlay 'Aug 27: \ud83c\udf1f Flawless!...' with NO \u23f0 clause. Streak-card/calendar sub-step of step 3 not re-read (turn budget)."
-        }
-      },
-      "TC-14.5": {
-        "power": {
-          "status": "passed",
-          "reason": "Grace attempt (challengeDay 28/startDay 28) shows '\u23f0 Resume your attempt today and it still counts' and pays out on today's win: 'Aug 29: \ud83c\udf1f Flawless! ... \u23f0 On time \u2014 1-day same-day streak.' (1-day, not 2, because TC-14.3's Aug 30 win was not run first.)"
-        }
-      },
-      "TC-2.1": {
-        "novice": {
-          "status": "passed",
-          "reason": "one tap on the exposed A\u2666 sent it to the diamonds UP foundation, Moves 0->1, no confirmation, Undo enabled"
-        }
-      },
-      "TC-4.1": {
-        "power": {
-          "status": "passed",
-          "reason": "'Ready to finish' prompt fired on the day-29 restore; Finish ran the cascade to the win overlay (Deal #551,879 \u00b7 96 moves \u00b7 3:18 + tier lines + Play/Random/Close)"
-        }
-      },
-      "TC-6.4": {
-        "novice": {
-          "status": "passed",
-          "reason": "line ran to 91/91, banner + single Done pill, Done re-dealt fresh AND re-bound the day (HUD up, Moves 0, 0:00, empty telemetry, survives a kill)"
-        }
-      },
-      "TC-8.2": {
-        "power": {
-          "status": "passed",
-          "reason": "Auto-play Off made no automatic moves; On declined the unsafe exposed A\u2665 and the tier-breaking 8\u2660 but made the safe 6\u2660 send; the toggle itself no longer spends moves"
+          "reason": "Next x3 advanced 1/1/1 (0->3); Start auto-ran (~0.24 s/move), hid Prev/Next, showed Pause+Stop and a trailing '\u2026'; Pause restored Prev/Next/Resume/Stop with 'N / 100 (paused)'. Moves/Time read '\u2014' throughout and nothing was committed. Doc drift: the paused pill row sits at y\u2248260 (not 266) and the bronze headline now wraps to THREE lines, because the new Prev pill narrows the headline column."
         }
       },
       "TC-7.1": {
         "power": {
           "status": "passed",
-          "reason": "Deal #->Select All->10003->Play loads Deal #10003, Moves 0; no confirm on an untouched board"
+          "reason": "2 chrome taps + typing -> Deal #500001, Moves 0, no alert left. The 'also assert' won-deal ` \u2713` pill sub-assertion was NOT re-run (needs a win fixture; dropped for turn budget)."
         }
       },
       "TC-7.5": {
         "power": {
           "status": "passed",
-          "reason": "Cancel dismissed with Deal #10003 and Moves 1 intact; live-game Play confirm verified, but a double-tap on Play defeats it (new finding)"
+          "reason": "Confirm intact after a true doubletap on all three geometries (portrait keypad-down Play@205,505 over destructive@205,493, Wins route, landscape Play@441,245) - deal and 1 move preserved; Keep playing live throughout."
         }
       },
-      "TC-9.3": {
+      "TC-7.6": {
         "power": {
           "status": "passed",
-          "reason": "out-of-range shows the reason and stays disabled; 777 loads and dismisses"
+          "reason": "Expected body text in TESTCASES.md is STALE: the casual tail now reads 'The game you're in is a casual deal, so there is no way back to it.' Title, move count (1 = stat.moves), Keep playing, Start over and the 0-move no-prompt branch all correct."
         }
       },
-      "TC-11.2": {
+      "TC-2.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "deal #1793 under pin 2026-08-15: 1 tap on bottom A-spades -> spade UP foundation, K-spades -> spade DOWN, K-diamonds -> diamond DOWN; Moves 1/2/3, no confirmation, no press-and-hold"
+        },
         "power": {
           "status": "passed",
-          "reason": "round-trip merged 3 days (0 skipped) with flawless+onTime; legacy map refused with a stated reason; merge non-destructive and sticky"
+          "reason": "no regression from the smartMove-returns-Bool / cardGesture refactor: tap single card, 2- and 4-card run moves by tap AND by drag, free-cell drag, cell->tableau tap, drag-to-foundation, invalid drag snaps back with Moves unchanged, buried tap moves nothing and leaves no phantom undo snapshot, two immediate successive taps both register, zero-hold flick drag picks up"
+        }
+      },
+      "TC-5.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Five streak cards (3+2, all 0), whole-card a11y labels, legend now includes the par sentence, Today card Deal #608530, three unearned rows, plain Play, four demo pills, no clears line and no par on an unsolved day."
+        }
+      },
+      "TC-5.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Live casual game (1 move) raised 'Discard the game in progress?' (Keep playing / Start over), then one tap dealt #608530 at Moves 0 / 0:00 with the three full-text chips at y250/267/283 and no hud.day and no ellipsis."
+        }
+      },
+      "TC-5.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Gold fixture on Aug 3: overlay 'Deal #539885 - 107 moves - 1:40' + 'Aug 3: Daily challenge: BRONZE GOLD earned.', card flips to 'Replay Aug 3 to improve', Play streak 0/1/best 1, Same-day 0. Doc drift: overlay seed is now ungrouped and the missed Silver row is xmark.circle, not circle."
+        }
+      },
+      "TC-5.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Two daily.clears elements: 'Cleared 2x - fewest 96 moves - fastest 1:40 - par 86' and 'Moves each run: 107 - 96'; fewest came from run 2 and fastest from run 1 (independent minima), and the Gold check survived the worse bronze run."
+        }
+      },
+      "TC-5.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 1 card (Deal #691039, Queens/Three objectives, 'Play Aug 1') and back to Today (Deal #608530, plain Play, the win-today line); today's cell keeps the gold ring and the selection adds a gold fill, distinguishable when they coincide."
+        }
+      },
+      "TC-11.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Export produces a timestamped JSON (Causeway-Stats-2026-09-09-HHmmss), note 'Stats exported.' on save and 'Export cancelled.' on cancel; TESTCASES' expected filename (date-only) and cancel copy ('Export cancelled or failed.') are stale vs the round-2 fix."
+        }
+      },
+      "TC-9.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Empty Wins sheet: title 'Deals won', 'Play a deal' row with empty textfield, Play enabled=false, 'No wins yet \u2014 go solve one!', Done dismisses to the board."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same run; all expectations met."
+        }
+      },
+      "TC-9.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Both routes raise 'Discard the game in progress? / Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.' (a) Keep playing kept Moves 1 on deal #608530; (b) row tap -> sleep 0.6 -> 'Play that deal' loaded the deal at Moves 0 / 0:00. The 0.5 s destructive gate did not block the route."
+        }
+      },
+      "TC-9.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Run 1 = 97 moves/1:42, run 2 = 100 moves/0:33 -> row 'fewest 97 moves \u00b7 fastest 0:33'; third slower run (100 moves/1:19) changed neither number. Fixture times differ from the doc's 3:04/1:45 because elapsed is patched \u2014 the independence assertion is what the case tests."
+        }
+      },
+      "TC-10.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "All expected sections present (Goal with 52 cards + dual up/down foundations meeting in the middle, The catch, Tableau, Free cells, Controls, plus Automation and About with name/version/copyright); Done dismisses. Both-ends foundations and controls are explained. The residual copy gap is filed as ux/WF-10:controls-overpromises-tap (partial), not a case failure."
+        }
+      },
+      "TC-12.1": {
+        "power": {
+          "status": "passed",
+          "reason": "landscape 874x402, 9 pills at x=68 in portrait order all hittable, 52 cards uniform 45x75 in 8 columns, headers/labels present, nothing clipped"
+        }
+      },
+      "TC-12.2": {
+        "novice": {
+          "status": "failed",
+          "reason": "reachability and the half-peek affordance are fixed, but the '\u2304 more' cue is one-way: at the rail end it still reads 'more'/'More controls', a second tap does nothing and New game/Undo are off-screen (ux/WF-12:rail-more-hint-inert, partial)"
+        }
+      },
+      "TC-12.7": {
+        "power": {
+          "status": "passed",
+          "reason": "overlay text + Play deal #608531 / Random / Close at y=227 hittable; survives portrait<->landscape round trip; Close returns to the solved board with Won 1 and the Deal #608530 \u2713 pill"
+        }
+      },
+      "TC-12.8": {
+        "power": {
+          "status": "failed",
+          "reason": "sizing contract holds (uniform size, no clipping, bottom card hittable at 14/16/20-card columns) but the first move after a RESTORED deep-column game still rescales the whole board 34x57->36x60 (ux/WF-12:landscape-board-rescales-every-move, partial)"
+        }
+      },
+      "TC-13.1": {
+        "novice": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-13.2": {
+        "novice": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-13.4": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-13.5": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-13.6": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-14.3": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-14.5": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-14.7": {
+        "power": {
+          "status": "passed",
+          "reason": ""
+        },
+        "novice": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-15.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "2x2 demo grid, \ud83c\udf1f pill present, demo starts paused at 0/98, Next -> 1/98, Stop clears the bar and leaves no toolbar.finish; doc drift: the headline now also carries the day's \ud83e\udd48/\ud83e\udd47 objectives (round-1 fix)"
+        }
+      },
+      "TC-15.3": {
+        "power": {
+          "status": "passed",
+          "reason": "overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.', Flawless streak 1/1/best 1, header 'Today \ud83c\udf1f Flawless', 3x checkmark.circle.fill, Aug 14 cell shows the \u2b50 with no date-baseline shift vs 12/13"
+        }
+      },
+      "TC-15.6": {
+        "novice": {
+          "status": "passed",
+          "reason": "legend, streak card, pill, demo headline and the new daily.flawless.pending line all state 'in one run'; the banked-medal day now says why a replay did not earn \ud83c\udf1f"
+        }
+      },
+      "TC-4.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Ready to finish prompt on restore; cascade 4.46 s/19 cards; overlay text, daily line, 3 buttons, stat.won=1, Deal #608530 checkmark pill all as specified"
+        }
+      }
+    },
+    "3": {
+      "TC-1.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #578379: help copy read, Done, tap 2\u2660 (col0 bottom) -> stacks on 3\u2666; Moves 1, clock starts, Undo enables (disabled at 0 moves, verified after Replay). Changed Controls copy matched engine behaviour incl. run-head tap moving the run."
+        }
+      },
+      "TC-2.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Deal #1793: single tap on exposed bottom A-spades sent it to the spades UP foundation, Moves 0->1, no confirmation, no press-and-hold. Buried A-diamonds/Q-clubs taps correctly refused (wiggle, Moves unchanged)."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Three rapid taps (A-spades, K-diamonds, K-spades) -> Moves 3, each to the correct suit-fixed slot (S H D C order), 1 tap each; run-lifting tap on 9-hearts built onto 8-clubs. Still works after terminate+launch restore."
+        }
+      },
+      "TC-3.1": {
+        "power": {
+          "status": "passed",
+          "reason": "One tap at 0 moves, no confirm; Deal #815760 -> #764663, all 52 card frames differ, Moves 0, Time 0:00"
+        }
+      },
+      "TC-3.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Replay reloads the same deal (casual #738093, daily #608530), Moves 0, board byte-identical; 2 taps (confirm is the WF-14 guard, by design); confirm copy now matches the control"
+        }
+      },
+      "TC-4.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Alert title/body/buttons, cascade to overlay, deal line, daily line, stat.won=1 and Deal #608530 \u2713 all matched; 4.45 s / 19 cards = 0.234 s/card vs 4.46 s round-2 baseline"
+        }
+      },
+      "TC-5.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Five streak cards in a 3+2 grid with correct a11y labels (now also identified daily.streak.<key> with the headline number as accessibilityValue), explainer, day card 'Today' / Deal #608530, three tier rows with empty circles, '\u23f0 Win today to start a same-day streak', gold Play, four demo pills, calendar, BACKUP, Done. Negative held: unsolved day shows no daily.clears and no par. At accessibility-extra-extra-extra-large the streak grid drops to 1 column with nothing truncated, the day card / legend / calendar all scale, and the calendar markers no longer clip (see ledger)."
+        }
+      },
+      "TC-5.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Run 1 (day 2 gold, 107 moves): exactly one daily.clears = 'Cleared \u00b7 fewest 107 moves \u00b7 fastest 1:43 \u00b7 par 86', no '1x', no per-run list. Run 2 (day 2 bronze, 96 moves, elapsed patched to 200 s so it is the SLOWER run): two daily.clears elements = 'Cleared 2\u00d7 \u00b7 fewest 96 moves \u00b7 fastest 1:43 \u00b7 par 86' and 'Moves each run: 107 \u00b7 96' - fewest from run 2, fastest from run 1, i.e. genuinely independent minima. Regression check held: daily.tier.gold value=earned still after the bronze-only run 2. Doc drift only: TC-5.4's literal 'fastest 1:41 / 1:38' are rig-cascade-timing artefacts, not contract."
+        }
+      },
+      "TC-6.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "Next x3 advanced 0\u21921\u21922\u21923 one move each; Start ran at ~6 steps/s showing only Pause/Stop with the trailing \u2026; Pause restored Prev/Next/Resume/Stop and the (paused) headline; stats read \u2014 and nothing committed. Doc drift: the paused headline no longer wraps to two lines (ViewThatFits keeps it one line at y=250 with the pills on a row at y\u2248271, not y\u2248266)."
+        }
+      },
+      "TC-7.1": {
+        "power": {
+          "status": "passed",
+          "reason": "2 chrome taps (Deal pill + Play) -> Deal #500001, moves 0, no alert; won-deal pill reads 'Deal #500001 \u2713' and the toolbar reflows (Daily 262->275, Wins 326->339)"
+        }
+      },
+      "TC-7.5": {
+        "power": {
+          "status": "passed",
+          "reason": "double-tap guard holds on BOTH routes: confirm 'Discard the game in progress?' intact, Deal # unchanged, moves still 1; deliberate tap after sleep 0.6 completes the replace (500002 / 500003, moves 0)"
+        }
+      },
+      "TC-9.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Both personas: sheet 'Deals won', placeholder 'Number 1\u20131,000,000', wins.dealentry.play enabled=false, 'No wins yet \u2014 go solve one!', Done returns to the board; Wins pill discoverable in the toolbar."
+        }
+      },
+      "TC-9.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Both routes raised 'Discard the game in progress? / Your 1 move and your time will be discarded...'; Keep playing preserved Moves 1 on deal #637816; Play that deal (after sleep 1 for the 0.5 s gate) loaded #608530 at Moves 0 / 0:00."
+        }
+      },
+      "TC-9.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Row read 'fewest 97 moves \u00b7 fastest 0:31' \u2014 moves from run 1 (1:40), time from run 2 (100 moves); a third, slower win (100 moves / 1:20) changed neither. Doc's expected times (3:04 / 1:45) are stale fixture numbers, not a failure."
+        }
+      },
+      "TC-10.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "All expected sections present (Goal/The catch/Tableau/Free cells/Controls) plus Automation and About (Causeway v1.0 (1), copyright); Done dismisses. Both-ends foundations and controls explained; the Controls precondition now matches the engine and was verified on the board."
+        }
+      },
+      "TC-12.1": {
+        "power": {
+          "status": "passed",
+          "reason": "landscape frame 874x402; 9 toolbar pills at x=68 w=118 h=26 in portrait order; header + Moves/Time/Won; FOUNDATIONS/FREE CELLS labels; 52 cards, max x+w 786, max y+h 288, no clipping, no horizontal scroll bar (both personas)"
+        }
+      },
+      "TC-12.2": {
+        "power": {
+          "status": "passed",
+          "reason": "HUD rail = 10 pills + cue; Wins/How to play hittable=false until scrolled; cue tap scrolls to end and now reads 'Back to the top of the controls' (up chevron), second tap returns; a swipe flips it too; How to play tappable after the scroll (both personas)"
+        }
+      },
+      "TC-12.8": {
+        "power": {
+          "status": "passed",
+          "reason": "depth 20 restored: uniform 30x50, lowest bottom 354 < 402, bottom card hittable; growth 11->12 shrinks once uniformly 42x70 -> 39x65; restored deep board no longer rescales on the first move (14 and 20)"
+        }
+      },
+      "TC-13.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Aug 3 card exact: title 'Aug 3', Deal #539885, Bronze/Silver/Gold copy = derive_daily, daily.sameday value=past, daily.play 'Play Aug 3', 4 demo pills, no daily.clears, zero trace of Today (#608530). 3 actions (tap Daily, 1 swipe, tap cell)."
+        }
+      },
+      "TC-13.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Aug 4: sheet dismissed silently from a 0-move board, Deal #625648, Moves 0, hud.day 'Aug 4', 3 chips untruncated (silver label 279pt, no ellipsis); live 1-move casual game raises 'Discard the game in progress?' / Keep playing / Start over."
+        }
+      },
+      "TC-13.5": {
+        "power": {
+          "status": "passed",
+          "reason": "C11 (col2 deepest) dragged to free cell: no alert, Moves 1, hud.chip.gold '\ud83e\udd47\u00b7'->'\ud83e\udd47\u2717' with label unchanged, bronze/silver still '\u00b7'; Undo -> Moves 0, gold back to '\u00b7', card restored to col2 bottom."
+        }
+      },
+      "TC-14.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Flawless day-13 win pinned 2026-08-14: overlay 'Deal #720307 \u00b7 79 moves \u00b7 1:39' + unprefixed gold line with '\u23f0 On time \u2014 1-day same-day streak'; all five streak cards 1/1/1 (daily.streak.ontime value=1); card header 'Today \ud83c\udf1f Flawless' with daily.tier.bronze/silver/gold all value=earned; daily.sameday value=cleared; Aug 14 cell gold ring + \ud83c\udf1f + corner pip. Doc drift: TC text expects '#720,307' (deal numbers are ungrouped everywhere)."
+        }
+      },
+      "TC-14.7": {
+        "power": {
+          "status": "passed",
+          "reason": "Zero-move grace (zero_move_save day 13, pinned 08-14 then 08-15; moves 0, hud.day Aug 14): all four board-replacing controls raised a confirm titled 'Give up \u23f0 Same-day for Aug 14?' with verbs Start over / Show demo / Replay / New game and no '0 moves' clause; Keep playing left daily.sameday=grace each time; accepting New game dropped it to value=past. Doc drift: TC still expects 'End your daily attempt?' on legs 1-2 \u2014 since 42b5f7e the grace title overrides all four, and the new 836434d Replay-title branch correctly sits BELOW the grace branch."
+        }
+      },
+      "TC-15.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "2x2 demo grid; \ud83c\udf1f headline 'Flawless: \ud83e\udd49\ud83e\udd48\ud83e\udd47 all three in a single run (\u2026) \u00b7 0 / 98' paused (Start, no auto-run); Next \u2192 1/98; Stop removed the bar, no toolbar.finish, Moves 0"
+        }
+      },
+      "TC-15.3": {
+        "power": {
+          "status": "passed",
+          "reason": "overlay '\ud83c\udf1f Flawless! \ud83e\udd49\ud83e\udd48\ud83e\udd47 all in a single run. \u23f0 On time \u2014 1-day same-day streak.'; Won 1; all five streak cards 1/1/1; card header 'Today \ud83c\udf1f Flawless'; three checkmark.circle.fill earned; Aug 14 cell = \ud83c\udf1f marker, date dark-row range 36-60 px vs 35-60 px on Aug 12/13 (no baseline jitter)"
+        }
+      }
+    },
+    "4": {
+      "TC-1.1": {
+        "novice": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-1.2": {
+        "novice": {
+          "status": "passed",
+          "reason": ""
+        }
+      },
+      "TC-2.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #1793 (fixture, pin 2026-08-15): 1 tap on exposed A-spades -> spades UP foundation (frame 6,258), Moves 0->1, no confirmation/press-hold; then K-spades -> spades DOWN (6,338) and K-diamonds -> diamonds DOWN (104,338), Moves 3, one tap each, suit-fixed order correct. Same run covers the novice persona (no prior knowledge needed: exposed ace, single tap)."
+        }
+      },
+      "TC-2.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #646203: tap on Q-spades (tidy Q-spades+K-hearts run NOT reaching column bottom) refused - no lift, Moves stayed 0, both cards unmoved. After freeing col0 (tap 2-diamonds, 2-hearts) a tap on the run head Q-hearts relocated BOTH Q-hearts and K-spades onto J-spades at col0 in ONE move (Moves 2->3). Novice persona identical (Controls text describes it)."
+        }
+      },
+      "TC-2.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #10004: drag 322,613->28,700 and ->28,800 BOTH landed 10-hearts on col0 (x=6,y=635), Moves +1 each - regression check for ux/WF-2:drop-below-column-refused clean. Release at 28,860 (past tableau) and an illegal 10-on-10 at 77,642 both snapped back, Moves unchanged. Free-cell drop (->274,296) and foundation drop (A-diamonds ->126,296, lands 104,258) both land where released. Zero-hold flick (drag ... 0) picked up instantly - no press-and-hold delay. Novice persona same."
+        }
+      },
+      "TC-2.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #646203, filmed at ~4fps + imgcrop_diff: 8 taps on buried 8-hearts (col2 idx2) -> 6 displaced frames, MAD 13.2-17.6 / 11.6-16.0% px changed, all other frames MAD 0.000 (no stuck-elevated artifact); Moves unchanged. Drag on the same buried card did not lift it, no move counted. Per the brief's correction, the movable-but-targetless free-cell 2-hearts ALSO wiggles now: 7 displaced frames, MAD 26.0-35.7 / 20.3-27.9%, Moves unchanged - the old non-goal (silence) is obsolete and the current behaviour is correct. Novice persona same."
+        }
+      },
+      "TC-2.6": {
+        "power": {
+          "status": "passed",
+          "reason": "Deal #10004, brief's 13-drag sequence: col0 pitch 30 @12, 28 @13, 24 @15 with every other column at 30 and card size 45x75 throughout (leg b). On the 16th card the WHOLE board switched to a single 43x71 (brief said ~44; 43 measured) and the tableau re-centred to x=15+47c, margins 15/15 (leg c). Bottom card fully on screen at every count (bottomEdge 830/836/836/834 on an 874pt screen) and hit-testable: tap 36,800 on the 16-card column parked 2-diamonds in a free cell, Moves +1, and that free-cell card rendered 43x72 - one card size on screen (leg a+c). Board did NOT regrow after shortening, and Undo restored 16 cards still at 43x71 (leg d). Novice persona same."
+        }
+      },
+      "TC-3.1": {
+        "power": {
+          "status": "passed",
+          "reason": "Moves 0 casual: one tap, no confirm, Deal #439801 -> #25915, board reshuffled, Moves 0, clock 0:00. Live game (1 move): one tap + confirm 'Discard the game in progress?' as WORKFLOWS allows."
+        },
+        "novice": {
+          "status": "passed",
+          "reason": "Same run; New game pill is the leftmost control and self-describing."
+        }
+      },
+      "TC-3.2": {
+        "power": {
+          "status": "passed",
+          "reason": "3 moves then Replay: confirm 'Start this deal over?' / 'Your 3 moves and your time will be discarded. This deal starts over from the beginning.'; after confirm Deal #439801 unchanged, Moves 0, clock 0:00, all 52 card frames identical to the initial layout."
+        },
+        "novice": {
+          "status": "passed",
+          "reason": "Same run; confirm copy now names the correct outcome for Replay."
+        }
+      },
+      "TC-3.3": {
+        "power": {
+          "status": "passed",
+          "reason": "One move (Moves 1), one tap Undo -> Moves 0, all 52 card frames identical to pre-move, Undo enabled=false again."
+        },
+        "novice": {
+          "status": "passed",
+          "reason": "Same run."
+        }
+      },
+      "TC-3.4": {
+        "power": {
+          "status": "passed",
+          "reason": "At Moves 0 Undo reports enabled=false, tap does nothing (Moves stays 0, no alert), and renders visibly greyed against the adjacent New game/Replay pills."
+        },
+        "novice": {
+          "status": "passed",
+          "reason": "Dimmed state is obvious in the toolbar screenshot r4-tc34-undo-disabled-moves0.png."
+        }
+      },
+      "TC-3.5": {
+        "power": {
+          "status": "passed",
+          "reason": "5 moves, 5 Undo taps: Moves 5->4->3->2->1->0 and each board snapshot matched the corresponding forward snapshot exactly (all 52 frames); 6th Undo disabled. No corruption."
+        }
+      },
+      "TC-4.2": {
+        "power": {
+          "status": "passed",
+          "reason": "Not yet dismissed the prompt, left an enabled Finish pill (row 2, between Auto-finish and Deal #); no second prompt after 15 s idle, after a further real move (78->79), or after terminate+launch; the pill finished the deal to the win overlay (97 moves, 2:09)."
+        }
+      },
+      "TC-4.3": {
+        "power": {
+          "status": "passed",
+          "reason": "All three exits one tap: Close -> overlay gone, solved board, 'Deal #608530 \u2713' pill, Won 1; win.play -> Deal #608531 Moves 0 no \u2713; win.random -> Deal #618767 Moves 0."
+        }
+      },
+      "TC-4.4": {
+        "power": {
+          "status": "passed",
+          "reason": "Ask -> Off (one tap, no alert, Finish pill the only route) -> On fired the cascade immediately with no prompt, 78 -> 97 moves within ~3.5 s, ending on the win overlay."
+        }
+      },
+      "TC-4.5": {
+        "power": {
+          "status": "passed",
+          "reason": "Post-win Undo enabled; Moves 97->96, Won stayed 1, \u2713 pill stayed, Finish pill returned, daily HUD chips gone; re-completion gave a win overlay with win.dealline only (no win.dailyline) and the Aug 15 daily card kept \ud83e\udd49\ud83e\udd48 earned / \ud83e\udd47 missed and 'Cleared \u00b7 fewest 97 moves \u00b7 fastest 2:09' (the worse 2:18 did not overwrite it)."
+        }
+      },
+      "TC-4.6": {
+        "power": {
+          "status": "passed",
+          "reason": "1:40 before home; 20 s backgrounded; 1:41 on the first read after activate (delta 1 s); +11 s wall later 1:51 (+10 s) \u2014 clock paused in background and resumed on foreground."
+        }
+      },
+      "TC-4.7": {
+        "power": {
+          "status": "passed",
+          "reason": "All four deal-number surfaces agree, ungrouped: win.dealline \"Deal #608530\", win.play \"Play deal #608531\", toolbar.deal \"Deal #608530 \u2713\", Wins row \"608530\". TESTCASES expected text (grouped #608,530) is stale doc drift."
+        }
+      },
+      "TC-4.8": {
+        "power": {
+          "status": "passed",
+          "reason": "Injected day-14 silver save; pre-win HUD read \ud83e\udd49\u00b7 \ud83e\udd48\u00b7 \ud83e\udd47\u2717; overlay: \"Daily challenge: \ud83e\udd49 \ud83e\udd48 earned. \u23f0 On time \u2014 1-day same-day streak.\"; Daily sheet: Play/Same-day/Silver streaks 1, Gold/Flawless 0, daily.clears \"Cleared \u00b7 fewest 97 moves \u00b7 fastest 1:52 \u00b7 par 87\" matching the run (97 moves, 1:52)."
+        }
+      },
+      "TC-5.1": {
+        "novice": {
+          "status": "passed",
+          "reason": "Sheet: 5 streak cards all 0/0/best 0 with full a11y labels, explainer (now ending with the Par sentence), Today card Deal #608530, three tier rows all 'circle not attempted', no daily.clears and no par on the unsolved day, plain Play, 4 demo pills, calendar, BACKUP; gold objective wraps to 2 lines, no truncation; Done dismisses to the board."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Same run; streak/total/best visually distinct (28 pt number vs 11-12 pt captions)."
+        }
+      },
+      "TC-5.2": {
+        "novice": {
+          "status": "passed",
+          "reason": "One tap on daily.play deals Deal #608530 at Moves 0 / 0:00; stacked HUD at y=250/267/283 with full objective text in hud.chip.<tier>.label, no ellipsis; hud.day absent on Today."
+        },
+        "power": {
+          "status": "passed",
+          "reason": "Also-assert verified: with a live casual game (1 move) daily.play raises 'Discard the game in progress?' (Keep playing / Start over) and Start over then deals #608530 at Moves 0."
+        }
+      },
+      "TC-5.3": {
+        "power": {
+          "status": "passed",
+          "reason": "Gold fixture on day 2: overlay 'You solved it! \ud83c\udf89' / 'Deal #539885 \u00b7 107 moves \u00b7 1:43' / 'Aug 3: Daily challenge: \ud83e\udd49 \ud83e\udd47 earned.'; card shows checkmark.circle.fill on Bronze+Gold, xmark.circle 'missed' on Silver (current design), daily.play 'Replay Aug 3 to improve \u21bb', \ud83d\udd25 Play 0 streak / 1 total / best 1, \u23f0 0/0/0. Time 1:43 not 1:41 (cascade-dependent, brief-flagged)."
+        }
+      },
+      "TC-5.4": {
+        "power": {
+          "status": "passed",
+          "reason": "After run 1: one daily.clears 'Cleared \u00b7 fewest 107 moves \u00b7 fastest 1:43 \u00b7 par 86'. After the bronze run 2: two daily.clears elements \u2014 'Cleared 2\u00d7 \u00b7 fewest 96 moves \u00b7 fastest 1:43 \u00b7 par 86' and 'Moves each run: 107 \u00b7 96' \u2014 independent minima demonstrated (fewest from run 2, fastest from run 1), and the banked Gold check survived the worse run."
+        }
+      },
+      "TC-5.5": {
+        "novice": {
+          "status": "passed",
+          "reason": "daily.cal.0 \u2192 'Aug 1', Deal #691039, Silver 'Get all four Queens home within your first 29 moves', Gold 'Split every suit exactly at the Three \u2014 A-3 up, 4-K down', Play Aug 1, \u23f0 past branch; daily.cal.14 restores Today / #608530 / plain Play / \u23f0 today branch. Selected cell = gold fill, today = gold ring \u2014 distinguishable in one frame (evidence). Objectives+Play stay on screen across the round trip; only the card header line sits above the fold."
         }
       }
     }

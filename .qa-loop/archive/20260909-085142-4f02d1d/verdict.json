@@ -1,0 +1,18 @@
+{
+  "round": 2,
+  "pass_type": "targeted",
+  "blockers_open": 0,
+  "majors_open": 2,
+  "minors_open": 4,
+  "proposals_open": 6,
+  "closed": 14,
+  "new": 5,
+  "reopened": 0,
+  "promoted": 0,
+  "demoted": 0,
+  "net": 9,
+  "tokens": 715342,
+  "cumulative_tokens": 2483604,
+  "decision": "backstop",
+  "reason": "hit max_rounds"
+}

@@ -42,10 +42,10 @@ about. That is the tiebreaker for design questions.
 
 ## Verify before you claim
 
-- `npm test` → 161 tests, 0 skipped (as of 2026-09-09).
+- `npm test` → 167 tests, 0 skipped (as of 2026-09-09, after the qa loop).
 - iOS: `xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway
   -destination "id=<UDID>" -parallel-testing-enabled NO` runs BOTH targets — `CausewayTests`
-  (11 Swift unit tests, seconds) and `CausewayUITests` (21 UI tests, ~8 min) → 32 total,
-  0 skipped. Create your own simulator; parallel sessions on this Mac delete each other's.
+  (14 Swift unit tests, seconds) and `CausewayUITests` (67 UI test methods / 70 executions,
+  ~30 min; split into class groups if one xcodebuild call would exceed 10 min) → 0 skipped. Create your own simulator; parallel sessions on this Mac delete each other's.
 - The daily pool runs out **2026-09-30** (`data/daily-pool.json`, 61 days from 2026-08-01). Reseeding
   is deferred by the owner's decision, not forgotten.

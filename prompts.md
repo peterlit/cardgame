@@ -894,3 +894,21 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     verified counts by running the suite (161/161, 0 skipped), and added the owner's new
     standing rule — keep HANDOFF current, in the same commit as whatever invalidates it —
     to HANDOFF §1.5, CLAUDE.md, and assistant memory.
+
+96. Run a qa loop, max four rounds, three testers, autonomously; record the judgment calls; add as
+    many XCUITests as possible; collect feedback on the plugin. Ran `qa-loop-tools` 0.12.0 for ~8.5 h:
+    round 0 refreshed WORKFLOWS.md (28 commits stale — the date pin, month navigation and cell
+    identifiers had landed) and 8 workflows' test cases (90 cases); round 1 full (90 cases, 23
+    findings: 5 majors incl. the masked double-tap discard, an export that trashes the only backup,
+    and a landscape rail that hides three controls); round 2 targeted (13 verified fixed); round 3
+    targeted (7 more, 0 majors left); round 4 confirmation stopped by the owner at 24/90, all clean.
+    Two things the plan did not survive: the MCP simulator tool needs a per-device grant nobody was
+    there to click, so a scriptable XCUITest driver (`.qa-loop/driver/`) now drives the app and is a
+    superset (date pin, rotation, identifier queries); and the plugin's worker provisioner collided
+    with another session's loop and deleted my simulators (uniquely named devices by hand). 24
+    findings fixed and device-verified in 22 commits; 49 armed XCUITests written (21 → 67 methods,
+    all green; state seeded through launch arguments); Node 161 → 167, Swift unit 11 → 14. Open: 3
+    minors, 5 proposals. Cost 40.1 M effective tokens (ledger scale 5.8 M). Records:
+    `.qa-loop/REPORT.md`, `docs/qa-loop-2026-09-09-decisions.md` (18 decisions),
+    `docs/qa-loop-0.12.0-feedback.md`. The review loop was deliberately not run in this session.
+

@@ -53,7 +53,7 @@ the player can't reason about, or an unwinnable deal is against the grain of the
 Every command here was run and produced what it says (counts re-verified 2026-09-09).
 
 ```bash
-npm test                    # node --test "tests/**/*.test.mjs" → 161 tests, 161 pass, 0 skipped
+npm test                    # node --test "tests/**/*.test.mjs" → 167 tests, 167 pass, 0 skipped
 ```
 
 Web preview — a python http.server on port 8123 is configured in `.claude/launch.json` (config name
@@ -70,8 +70,9 @@ project is `ios/Causeway/Causeway.xcodeproj`, scheme `Causeway`, bundle id
 xcodebuild build -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination 'generic/platform=iOS Simulator'
 
-# ALL tests — CausewayTests (11 Swift unit tests, seconds) + CausewayUITests (21 UI
-# tests, ~8 min serially) → 32 pass, 0 skipped
+# ALL tests — CausewayTests (14 Swift unit tests, seconds) + CausewayUITests (67 UI test
+# methods / 70 executions, ~30 min serially; run class groups so no single xcodebuild call
+# exceeds a 10-min tool timeout) → 0 skipped
 xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination "id=<UDID>" -parallel-testing-enabled NO -derivedDataPath <scratch>/dd
 
@@ -138,6 +139,16 @@ Things worth knowing before you run one:
   `docs/loop-token-usage.md` plus a feedback doc per version —
   [`docs/review-loop-0.8.1-feedback.md`](docs/review-loop-0.8.1-feedback.md) is the most recent and
   the most useful to read first, because the owner maintains these plugins and acts on the feedback.
+- **The QA loop now drives the app through `.qa-loop/driver/` (an XCUITest server + `qa.py` client),
+  NOT the MCP simulator-control tool** — that tool needs a per-device human grant on every fresh
+  simulator, which an autonomous run cannot get. `bash .qa-loop/driver/start.sh <udid>` builds and
+  serves; `python3 .qa-loop/driver/qa.py <udid> launch CAUSEWAY_TODAY_OVERRIDE=2026-08-15` etc.
+  Fixture recipes moved to `.qa-loop/tools/README.md`. Never run the plugin's `provision_workers.sh`
+  while another session might be running a qa loop on this Mac: it deletes EVERY `qa-worker-*`
+  device regardless of owner (it happened on 2026-09-09; create uniquely named devices by hand).
+- **UI tests seed app state through launch arguments** (`CausewayUITests/QAFixtures.swift`:
+  `-causeway.game <hex plist>`), so they no longer depend on simulator state — and they all pin the
+  clock. Run the UI target in class groups; the whole thing is ~30 min now.
 - **A loop's conclusions are not proof.** Its convergence signal means two same-family agents agreed.
   Read its `FIX:` notes as hypotheses: the last blocker's remedy was necessary but not sufficient, and
   applying it verbatim left the tests just as red. The loop also once recorded the September calendar
@@ -146,8 +157,8 @@ Things worth knowing before you run one:
 
 ## 6. Where things stand (2026-09-09)
 
-**Green.** `npm test` 161/161; iOS 32/32 (`CausewayTests` 11 unit + `CausewayUITests` 21 UI), zero
-skips anywhere. `main` is clean.
+**Green.** `npm test` 167/167; iOS `CausewayTests` 14 unit + `CausewayUITests` 70 executions (67
+methods), zero skips anywhere, all ARMED (no XCTSkip guards) — verified at `0cd71fa`. `main` is clean.
 
 **The pool expires on 2026-09-30.** `data/daily-pool.json` holds 61 certified days from the
 2026-08-01 epoch. After that date there are no daily challenges at all, on either platform. The owner
@@ -165,6 +176,13 @@ section naming what it did not close. The former largest item (the missing Swift
 CLOSED; what's left open is medium/low: DV-1 (daily Play/solution can silently discard an in-progress
 casual game), L2 (web hotkeys fire while typing), L5 (chimera bests), L7/L8 (iOS polish), and one
 deliberately-open review-loop minor (the real-clock default in `GameClock` is untested).
+
+**The 2026-09-09 QA loop** (v0.12.0, autonomous, 4 rounds, 3 testers) fixed and device-verified 24
+findings — the deal-alert double-tap discard, the export-Replace backup loss, the landscape rail, demo
+step-back, Dynamic Type on the Daily sheet, a11y state on calendar cells and tier rows, identifiers on
+every scored surface — and left 3 minors + 5 proposals open (`.qa-loop/REPORT.md`, decisions in
+`docs/qa-loop-2026-09-09-decisions.md`, cost/feedback in `docs/qa-loop-0.12.0-feedback.md`). The
+review loop was NOT run on those 22 app commits (`1a63ce2..836434d`) — start it in a fresh session.
 
 **Recent history worth skimming:** the 2026-09-07 skeptical review (`docs/skeptical-review-2026-09-07.md`)
 and the pass that addressed it — the pool builder now publishes under a fail-closed contract, the

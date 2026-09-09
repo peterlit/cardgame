@@ -1,53 +1,48 @@
 # Loop report — .qa-loop
 
-**Stop condition:** `backstop` after round 2 — hit max_rounds
+**Stop condition:** `full_pass_required` after round 4 — the owner asked the loop to wrap up during round 4's full confirmation pass, after 24 of 90 cases (WF-1…WF-5) had run clean. Rounds 1-3 converged on their own terms: 0 blockers, 0 majors open; 24 auto findings fixed and verified on the device; 3 minors and 5 proposals open. The 66 unrun cases are listed under Coverage gaps; the 70 armed XCUITests (all green at `0cd71fa`) cover every fix the loop verified.
 
-**Subagent tokens:** 2,483,604 across 2 round(s) (budget 3,000,000)
+**Decisions the orchestrator made alone:** [`docs/qa-loop-2026-09-09-decisions.md`](../docs/qa-loop-2026-09-09-decisions.md). **Plugin feedback and cost:** [`docs/qa-loop-0.12.0-feedback.md`](../docs/qa-loop-0.12.0-feedback.md).
 
-**Findings by status:** fixed 14, open 12
+**Subagent tokens:** 5,801,043 across 5 round(s) (budget 7,500,000)
+
+**Findings by status:** fixed 24, open 8, wontfix 5
 
 ## Trend
 
 | Round | Pass | Blockers | Majors | Minors | Proposals | Closed | New | Reopened | Promoted | Net | Tokens | Decision |
 |-------|------|----------|--------|--------|-----------|--------|-----|----------|----------|-----|--------|----------|
-| 1 | full | 0 | 7 | 8 | 6 | 0 | 15 | 0 | 0 | -15 | 1768262 | continue |
-| 2 | targeted | 0 | 2 | 4 | 6 | 14 | 5 | 0 | 0 | +9 | 715342 | backstop |
+| 1 | full | 0 | 5 | 14 | 5 | 0 | 23 | 0 | 0 | -23 | 1708769 | continue |
+| 2 | targeted | 0 | 1 | 9 | 5 | 13 | 2 | 0 | 0 | +11 | 1152207 | continue |
+| 3 | targeted | 0 | 0 | 2 | 5 | 7 | 1 | 0 | 0 | +6 | 853026 | full_pass_required |
+| 4 | full | 0 | 0 | 3 | 5 | 0 | 0 | 0 | 0 | +0 | 365557 | full_pass_required |
+
+## Tokens (reported — measured 4-7x below billed effective)
+
+| Round | By role | Total |
+|---|---|---:|
+| 0 | audit 76,777; explore-w1 115,626; explore-w2 118,284; explore-w3 108,690 | 419,377 |
+| 1 | fix-reviewer 140,387; implementer 231,844; regression-writer 302,675; tester-perf 90,487; tester-wf-1-1 75,054; tester-wf-10-1 56,911; tester-wf-11-1 92,269; tester-wf-12-1 84,743; tester-wf-12-2 80,089; tester-wf-13-1 93,737; tester-wf-13-2 83,736; tester-wf-14-1 67,580; tester-wf-14-2 66,828; tester-wf-15-1 79,599; tester-wf-15-2 69,031; tester-wf-2-1 83,342; tester-wf-3-1 58,205; tester-wf-4-1 57,207; tester-wf-4-2 48,601; tester-wf-5-1 69,046; tester-wf-6-1 74,747; tester-wf-6-2 63,634; tester-wf-7-1 67,720; tester-wf-7-2 54,372; tester-wf-8-1 71,444; tester-wf-9-1 61,913; tester-wf-9-2 58,474 | 2,383,675 |
+| 2 | fix-reviewer 117,619; implementer 179,793; regression-fix 65,978; regression-writer 165,776; tester-perf 77,633; tester-wf-1-1 70,594; tester-wf-10-1 59,574; tester-wf-11-1 63,160; tester-wf-12-1 84,152; tester-wf-13-1 82,489; tester-wf-14-1 67,444; tester-wf-15-1 85,253; tester-wf-2-1 56,355; tester-wf-3-1 55,686; tester-wf-4-1 57,046; tester-wf-5-1 98,677; tester-wf-6-1 81,731; tester-wf-7-1 87,358; tester-wf-9-1 59,077 | 1,615,395 |
+| 3 | regression-writer 164,013; tester-perf 85,746; tester-wf-1-1 42,736; tester-wf-10-1 59,731; tester-wf-12-1 74,031; tester-wf-13-1 69,769; tester-wf-14-1 61,248; tester-wf-15-1 67,993; tester-wf-2-1 49,203; tester-wf-3-1 53,601; tester-wf-4-1 47,419; tester-wf-5-1 69,812; tester-wf-6-1 61,367; tester-wf-7-1 51,026; tester-wf-9-1 59,344 | 1,017,039 |
+| 4 | tester-wf-1-1 50,809; tester-wf-2-1 79,610; tester-wf-3-1 55,204; tester-wf-4-1 65,508; tester-wf-4-2 45,737; tester-wf-5-1 68,689 | 365,557 |
+| **all** | | **5,801,043** |
 
 ## Open findings by severity
 
-### major (2)
+### minor (3)
 
-- **ux/WF-14:replay-forfeits-grace-silently** — major, open; region `WF-14`; fix_risk `metric-integrity`
-  - The grace-aware confirm is still gated on hasLiveGame (moveCount > 0), so a ⏰ grace with ZERO moves made today — tapped Play yesterday, no move, returned today — is destroyed with no dialog at all by ALL FOUR board-replacing controls: Replay, New game, the Daily sheet's Play button, and a how-to-win demo pill. The app itself shows '⏰ Resume your attempt today and it still counts' on that state one tap earlier, then silently makes it unrecoverable.
-  - evidence: `.qa-loop/evidence/round-1/wf-14/tc145-aug29-grace-line.png`, `.qa-loop/evidence/round-1/wf-14/tc146-pathB-after-replay-board.png`, `.qa-loop/evidence/round-1/wf-14/tc146-pathB-after-replay-line.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-grace-line-aug29.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-dailyplay-nodialog.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-replay-nodialog.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-replay-grace-gone.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-newgame-nodialog.png`, `.qa-loop/evidence/round-2/wf-14/wf14-zeromove-demopill-nodialog.png`, `.qa-loop/evidence/round-2/wf-14/wf14-grace-confirm-replay-withmoves.png`
-  - measurements: `{"controls_that_destroy_silently": 4, "controls_tested": 4, "dialogs_shown_at_moveCount_0": 0, "dialogs_shown_at_moveCount_85": 1}`
-  - note: The round-1 fix's COPY is correct wherever it renders (verified with 85 moves on the board); only the gate is wrong. Bounded: all four controls, on both the board toolbar and the Daily sheet. TRAP (unchanged): do not fix by preserving challengeStartDay across a re-deal — that would mint ⏰ for a run begun on D+1. The gate is the fix: widen hasLiveGame's use at ContentView.swift:343-345, DailyView.swift:273-274,335-336 and index.html:1797,1804 to `hasLiveGame || graceLive`, leaving hasLiveGame itself alone so a fresh casual board keeps its one-tap controls. Note the zero-move case has nothing else to lose (0 moves, 0:00), so the dialog's 'your 0 moves and your time will be discarded' clause needs suppressing there or it undercuts the warning.
-- **bug/WF-7:deal-confirm-swallowed-by-double-tap** — major, open; region `WF-7`; introduced_by_fix
-  - The Deal # alert's confirmation is raised 0.1 s AFTER the alert dismisses, and its destructive 'Play that deal' button lands at (274,517) - 10 pt from the 'Play' the finger just hit at (275,527). A double-tap on Play (or any second tap in that strip within ~1 s) therefore confirms a discard the user never saw: the in-progress game, its moves and its clock are destroyed with the confirmation flashing past. Reproduced 2/2.
-  - evidence: `.qa-loop/evidence/round-2/wf-7-9-11/wf7-live-play-confirm.png`, `.qa-loop/evidence/round-2/wf-7-9-11/wf7-double-tap-play-result.png`, `.qa-loop/evidence/round-2/wf-7-9-11/wf7-double-tap-repro2.png`
-  - measurements: `{"confirm_button_center_pt": "274,517", "alert_play_button_center_pt": "275,527", "separation_pt": 10, "deferred_present_delay_s": 0.1, "moves_lost": 1, "repro_rate": "2/2"}`
-  - note: Caused by the DispatchQueue.main.asyncAfter(0.1) hop added in 9d4a4fc (ContentView.swift, deal alert Play). The confirm is a real dialog but offers no real protection while its destructive action materialises under the finger that just tapped. Cheapest safe fixes: present the confirm on the NEXT tap-eligible runloop turn but ignore touches for a short window, or make the confirmation a sheet/dialog whose destructive button is not co-located with the alert's Play (e.g. swap Keep playing to the right), or debounce pendingReset so a tap arriving <300 ms after it is raised is discarded. Do NOT solve it by dropping the confirmation.
-
-### minor (4)
-
-- **bug/WF-4:win-overlay-seed-grouped** — minor, open; region `WF-4`
-  - The win overlay prints the solved deal comma-grouped — 'Deal #551,879' — while its own 'Play deal #551880' button, the board pill and the Daily card all print the same class of number ungrouped; one dialog shows both formats at once, so a user cannot tell whether '#551,879' is the deal recorded as '551879' in Wins.
-  - evidence: `.qa-loop/evidence/round-2/wf-1-3-5/15-win-overlay.png`
-  - measurements: `{"overlay_result_line": "Deal #551,879", "overlay_button_label": "Play deal #551880", "board_pill_label": "Deal #551879", "source": "ios/Causeway/Causeway/Views/ContentView.swift:901 \u2014 Text(\"Deal #\\(game.seed) \u00b7 ...\") interpolates through LocalizedStringKey and auto-groups"}`
-  - note: Same root cause and same one-line remedy as bug/WF-13:daily-card-seed-grouped (route through DealFormat.seed), on a surface that fix did not cover. Pre-existing, not caused by round 1's fixes.
-- **ux/WF-3:replay-confirm-copy-mismatch** — minor, open; region `WF-3`; introduced_by_fix
-  - The new reset confirmation reuses New-game wording for Replay: tapping Replay on a live casual game warns 'This game is not a challenge, so there is no way back to it', but Replay reloads the very same deal, so the deal is not lost at all — the warning overstates the cost of the one control whose whole purpose is to restart this deal.
-  - evidence: `.qa-loop/evidence/round-2/wf-1-3-5/08-replay-live-confirm.png`, `.qa-loop/evidence/round-2/wf-1-3-5/09-after-replay.png`
-  - measurements: `{"replay_alert_message": "Your 1 move and your time will be discarded. This game is not a challenge, so there is no way back to it.", "deal_before": 915806, "deal_after": 915806}`
-  - note: Cheap fix: branch the message on the verb as well as on challengeDay, e.g. Replay -> 'Your N moves and your time will be discarded and this deal starts over.' CODE-LEVEL, NOT DEVICE-VERIFIED (out of turn budget): the title is chosen only by challengeDay (ContentView resetConfirmTitle), so Replay during a daily attempt should read 'End your daily attempt?' even though Game.restartDeal():236-239 deliberately re-binds challengeDay — i.e. the attempt is restarted, not ended. Worth one screenshot next round before acting on that half.
-- **bug/DailyView:calendar-cells-have-no-identifier** — minor, open; region `WF-13`
-  - Daily calendar cells cannot be addressed programmatically: calCell (Views/DailyView.swift:533-580) carries only .accessibilityLabel(dayLabel(idx)) — or "<day>, locked until that date" — applied to a ZStack that is never marked as a single accessibility element (.accessibilityElement(children: .combine)), and no .accessibilityIdentifier at all. Every other tappable surface in the app got identifiers on 5447237; the calendar grid was missed. Two round-2 regression guards (ux/WF-13:future-day-tap-no-feedback and ux/WF-13:selected-day-invisible-at-play) can only reach a cell through a label match against text that also appears in the day-card header and in the 'Unlocks <day>' placeholder, disambiguated by frame height — a brittle query for the one control whose mis-tap the second fix exists to prevent. The same gap hits VoiceOver: the label is attached to a container whose children (the date number, the 🌟/🔒/dot markers) are their own elements, so the cell may be announced as loose fragments rather than one 'Aug 3, gold' cell.
-  - measurements: `{"cells_per_month": 31, "cell_hit_target_pt": "44x40", "guards_weakened": 2}`
-  - note: Recommended fix: .accessibilityIdentifier("daily.cal.\(idx)") plus .accessibilityElement(children: .combine) on calCell's ZStack. That makes both round-2 calendar guards deterministic (RegressionDailyCalendarTests.swift) and gives VoiceOver one element per day. Filed by the regression-test pass, not observed as a user-visible defect this round.
-- **bug/Main:scored-surfaces-addressable-only-by-copy** — minor, open; region `Main`
-  - Four surfaces that regression guards must assert on have no accessibilityIdentifier, so the tests have to match visible copy — which makes a wording change look like a regression and a real regression look like a wording change. (1) The daily objectives HUD chips (Views/DailyView.swift:642-680) carry none; hud.day only renders when the challenge is NOT today, so the metric-integrity guard for ux/WF-6:demo-exit-drops-challenge-binding has to prove the HUD exists by querying the literal text 'Clear the deal'. (2) The win overlay (Views/ContentView.swift:895-905) is addressed by its 'You solved it! 🎉' title — which also blocks a guard for ux/WF-14:win-overlay-omits-the-day, whose whole content is the overlay's day prefix. (3) The Wins 'Play a deal' TextField and its Play button (Views/WinsView.swift:45-55) are reachable only by placeholder/label, though the error line beside them does have wins.dealentry.problem. (4) The BACKUP note Text (Views/DailyView.swift:383) has none, so the archived bug/WF-11:cancel-note-not-updated guard matches 'Import cancelled.' verbatim.
-  - measurements: `{"surfaces_without_identifier": 4, "guards_forced_onto_copy_matching": 4}`
-  - note: Recommended identifiers: hud.objectives (or hud.chip.<tier>), win.overlay + win.dailyline, wins.dealentry.field / wins.dealentry.play, daily.backupnote. Cheap, and each one converts a copy-coupled assertion in ios/Causeway/CausewayUITests/Regression*.swift into a structural one. The win-overlay case is the one that actually blocked a guard this round: ux/WF-14:win-overlay-omits-the-day needs an injected save AND a stable handle on the overlay's daily line, and has neither.
+- **ux/DailyView:legend-paragraphs-addressable-only-by-copy** — minor, open; region `DailyView`
+  - The Daily sheet's two legend paragraphs carry no accessibilityIdentifier: the streak legend (DailyView.swift:212, the sentence that now defines Par for ux/WF-5:par-has-no-legend) and the calendar legend row (DailyView.swift:627-636, the 🌟 Flawless / ⏰ Same-day entries ux/WF-14:calendar-pip-unlabelled added). Every other surface the round-2 fixes touched gained an identifier (daily.streak.*, daily.tier.*, daily.clears, daily.sameday, daily.backupnote), but the two paragraphs that EXPLAIN those surfaces can only be found by their copy, so RegressionDailyCardCopyTests.testLegendDefinesTheParTheClearsLineQuotes matches the streak legend with a CONTAINS predicate on its par sentence and RegressionDailyCalendarTests matches the calendar legend by the literals "🌟 Flawless" / "⏰ Same-day" — a rewording of either paragraph reads as a regression, and VoiceOver users get an unlabelled block of small grey text with no landmark.
+  - note: Recommended: `.accessibilityIdentifier("daily.legend")` on the streak legend Text (DailyView.swift:212) and `.accessibilityElement(children: .contain).accessibilityIdentifier("daily.cal.legend")` on the calendar legend row (627-636). Both tests are written so the swap is a one-line query change; keep the copy assertions where the copy is the contract (the par sentence itself).
+- **ux/WF-3:grace-newgame-body-describes-replay** — minor, open; region `WF-3`
+  - On a live ⏰ grace, the New game confirmation shows the grace body verbatim — 'Starting over makes it an attempt begun today, and Aug 14 can never earn ⏰ again.' — but New game does not start the challenge over: it abandons the challenge and deals a random casual game (round 4: Deal #120220, zero HUD chips). resetConfirmMessage's graceLive branch is still the one branch that never consults pendingReset, so the body under the destructive 'New game' button describes Replay's outcome.
+  - evidence: `.qa-loop/evidence/round-3/wf-3-1/r3-grace-newgame-body-says-starting-over.png`, `.qa-loop/evidence/round-3/wf-3-1/r3-tc32-replay-confirm-grace-precedence.png`, `.qa-loop/evidence/round-4/wf-3-1/r4-grace-newgame-body-describes-replay.png`
+  - measurements: `{"grace_body_newgame": "You began Aug 14's challenge on the day itself, so finishing it today still earns \u23f0 Same-day. Starting over makes it an attempt begun today, and Aug 14 can never earn \u23f0 again.", "grace_body_replay": "You began Aug 14's challenge on the day itself, so finishing it today still earns \u23f0 Same-day. Starting over makes it an attempt begun today, and Aug 14 can never earn \u23f0 again.", "deal_after_newgame": 120220, "hud_chips_after_newgame": 0}`
+  - note: Round 4 re-verified on 0cd71fa, unchanged and byte-identical to round 3 — no code touched this string. Fix is the same one-line pendingReset branch in the graceLive body's second sentence (Replay: 'Starting over makes it an attempt begun today'; New game: something like 'Leaving it makes any later attempt one begun today'). TRAP UNCHANGED: do not weaken or drop the grace confirm, and do not touch the grace TITLE ('Give up ⏰ Same-day for …?') — round 4 re-confirmed it correctly takes precedence over BOTH new titles ('Start this deal over?' / 'Restart your daily attempt?'). The warning's consequence ('Aug 14 can never earn ⏰ again') is TRUE for New game too, so this is a wording mismatch, not a false promise — severity minor on purpose.
+- **ux/ContentView:demo-bar-container-has-no-identifier** — minor, open; region `WF-15`
+  - The demo status bar (ContentView.demoBar, the ViewThatFits that ux/WF-15:flawless-demo-banner-eats-quarter-screen reshaped) carries no accessibilityIdentifier of its own: its headline (demo.headline) and its pills (demo.prev / demo.next / demo.start / demo.stop / demo.done) are addressable, but the bar's frame — the very thing the round-2 finding measured (224 pt on 9ab79f1, 108 pt on de5e5d0) — is not. RegressionFlawlessDemoBarHeightTests therefore reconstructs the bar height from the headline's top, the lowest pill's bottom and the 8 pt vertical padding it knows from the source, so a padding or corner change in the bar reads as a height regression, and VoiceOver has no landmark for the bar as a whole.
+  - note: Recommended: `.accessibilityElement(children: .contain).accessibilityIdentifier("demo.bar")` on demoBar's ViewThatFits (after its background/overlay so the frame is the drawn card). The test is written so the swap is a one-line change: read app.otherElements["demo.bar"].frame.height instead of reconstructing it, and keep the headline-width assertion (that is the ViewThatFits contract itself).
 
 ## Disputed (agree-to-disagree)
 
@@ -56,67 +51,53 @@ _none_
 ## UX proposals (human decisions — flip routing to "auto" to accept)
 
 - **ux/WF-11:import-has-no-confirm-or-undo** — minor, open; region `WF-11`
-  - Import merges the picked file into the live stores the instant it is selected — no preview of what is about to be merged, no confirmation, no undo — and since the app has no stats reset, one wrong file permanently pollutes streaks and the calendar.
-  - evidence: `.qa-loop/evidence/round-1/wf-11/08-legacy-import-note.png`, `.qa-loop/evidence/round-1/wf-11/11-streaks-after-legacy.png`
-  - measurements: `{"taps_from_picker_to_irreversible_merge": 1, "confirmations": 0, "undo_affordances": 0, "in_app_reset": "none (harness notes: reset requires uninstall/reinstall)"}`
-  - note: Design call for the human, not a defect on its own: a 'this backup holds 10 days and 1 deal, exported 2026-07-02 — merge?' confirm step (or a one-shot 'Undo this import' on the note line) would make the destructive-by-accident case recoverable. Only worth doing if bug/WF-11:legacy-backup-defeats-daily-v3-wipe is not fully closed by stamping.
-- **ux/WF-13:calendar-month-locked-no-nav** — major, open; region `WF-13`
-  - The Daily month calendar renders only the CURRENT calendar month and has no prev/next control, so from 2026-09-01 every August day (dayIndex 0-30, the entire catch-up backlog) becomes impossible to select or play in-app even though dailyChallenge(idx, pool) still returns them.
-  - evidence: `.qa-loop/evidence/round-1/wf-13/tc13-1-calendar-nomonthnav.png`, `.qa-loop/evidence/round-1/wf-13/tc13-3-calendar-no-inprogress-marker.png`
-  - measurements: `{"months_rendered": 1, "month_nav_controls": 0, "playable_days_today": 30, "playable_days_unreachable_after_2026_09_01": 31, "code": "DailyView.swift:422-426 builds the grid from Calendar.current.dateComponents([.year,.month], from: Date()) only; calCell L462/L493 gates selection on idx <= todayIndex()"}`
-  - note: SUSPECTED, not confirmed, only because the simulator clock cannot be advanced with this toolset (no simctl date subcommand; the MCP control tool has no clock action) -- the missing month navigation itself IS observed. The failure is date-triggered and lands in 2 days (2026-09-01). Structural navigation change, so proposal-routed: options are prev/next month arrows, or scoping the grid to the pool epoch range rather than the wall-clock month.
+  - Import still merges into the live stores the instant a file icon is tapped in the Files picker — no preview of what is about to be merged, no confirmation, no undo — and with no in-app stats reset, one wrong file permanently pollutes streaks, the calendar and best scores. Confirmed again on 1a63ce2: a hand-edited backup planted a 1-move/1-second 'best' on deal 123456 and two new medal days with a single tap and zero prompts.
+  - evidence: `.qa-loop/evidence/round-1/wf-11-1/tc11-5-picker.png`, `.qa-loop/evidence/round-1/wf-11-1/tc11-4-skip-note.png`
+  - measurements: `{"taps_from_picker_to_irreversible_merge": 1, "confirmation_steps": 0, "undo_affordances": 0, "won_before": 2, "won_after": 3}`
+  - note: Carried over from the archived prior-loop ledger (20260909-085142-4f02d1d) under the same id; re-verified on this build, still open. Design call for the human, not a defect on its own: a 'this backup holds N days and M deals, exported <date> — merge?' confirm, or a one-shot 'Undo this import' on the note line, would make the destructive-by-accident case recoverable. Now weightier because bug/WF-11:export-replace-destroys-existing-backup can leave the player with no backup file to re-import from. fix_risk: state-migration — an undo needs a snapshot of causeway.daily/causeway.wins taken before the merge, and a half-written snapshot is worse than no undo; the merge itself must stay non-destructive.
+- **ux/WF-12:daily-play-below-fold-landscape** — major, open; region `WF-12`
+  - In landscape the Daily sheet opens with its primary action off screen: the visible content window is y 78-340 but daily.play sits at y=557 (hittable=false), ~217 pt below the fold. A landscape user who opens Daily sees five streak cards and an explanatory paragraph and no Play button, no Today card, no deal number, no calendar.
+  - evidence: `.qa-loop/evidence/round-1/wf-12-2/tc126-daily-landscape.png`
+  - measurements: `{"visible_window_pt": "y 78-340 (262 pt)", "daily_play_y_pt": 557, "pt_below_fold": 217, "pages_of_content": 4, "controls_below_fold": ["daily.play", "daily.cal.prev/next/month", "daily.export", "daily.import", "Today day card"]}`
+  - note: CC-12B reproduced. Structural: the five streak cards (2 rows, y 104-286) consume the whole landscape first screen. Portrait is unaffected.
 - **ux/WF-13:daily-sheet-resets-to-today-midattempt** — major, open; region `WF-13`; fix_risk `behavior-change`
-  - Re-opening the Daily sheet during a live PAST-day attempt snaps it back to Today (DailyView.swift:82 `.onAppear { dayView = clampedToday }`): the card shows today's deal and objectives, the calendar marks the in-progress day in no way at all, and the one gold Play button on screen starts TODAY's deal -- the only route back to the day you are playing is to re-find it in the calendar, and Play restarts rather than resumes.
-  - evidence: `.qa-loop/evidence/round-1/wf-13/tc13-3-aug4-board-hud.png`, `.qa-loop/evidence/round-1/wf-13/tc13-3-daily-resets-to-today-midattempt.png`, `.qa-loop/evidence/round-1/wf-13/tc13-3-calendar-no-inprogress-marker.png`, `.qa-loop/evidence/round-1/wf-13/tc13-3-play-today-confirm-alert.png`
-  - measurements: `{"in_progress_markers_on_sheet": 0, "taps_to_return_from_sheet_to_the_live_day": "swipe + tap day + tap Play, and Play restarts the attempt (no resume affordance exists)"}`
-  - note: TRAP: any 'remember the last viewed day' fix must not let the sheet open on a stale day after midnight -- WF-14's four clock-line branches are all date-driven off dayView vs todayIndex(). Marking the live day (a badge on the cell / 'Attempt in progress' on the card) is the lower-risk half. CAVEAT on the last repro step: my Aug 4 attempt had 0 NET moves at that point (one move + Undo), so I cannot claim the discard-confirmation alert is suppressed at real progress -- the finding is the missing day identity, not the missing confirm (ux/WF-7:deal-play-discards-live-game-no-confirm covers that ground). Reproduces CC-13-D.
-- **ux/WF-13:par-never-surfaced** — minor, open; region `WF-13`
-  - Every pool day carries a certified `par` move count (Aug 3 = 86, today = 84) that is decoded into PoolDay.par / Challenge.par but rendered nowhere in the app -- no view file references it -- while WF-13's expectation states a selected past day shows its own objectives AND par.
-  - evidence: `.qa-loop/evidence/round-1/wf-13/tc13-1-aug3-card.png`, `.qa-loop/evidence/round-1/wf-13/tc13-5-aug6-board-fresh.png`
-  - measurements: `{"par_render_sites_in_views": 0, "par_aug3": 86, "par_today_dayindex29": 84}`
-  - note: Reproduces CC-13-E as a doc-vs-app gap, NOT a defect: par is a pool-generation/certification field and the app has simply never shown it. Human decision either way -- surface it on the day card ('Target: 86 moves', genuinely useful next to the moves-family Silver objectives) or strike 'and par' from WF-13's expectation sentence in WORKFLOWS.md. Do not auto-fix.
-- **ux/WF-14:grace-invisible-from-daily-sheet** — major, open; region `WF-14`
-  - A live ⏰ grace is not surfaced anywhere a player would look: the Daily sheet always opens on Today, the calendar puts no in-progress mark on the graced day, and the only place the promise exists is that day's card, two gestures away (swipe to calendar + tap the right cell). The one screen the player does see instead offers Today's `Play`, whose confirm destroys the grace — so the feature's headline case ('you can still save yesterday') is reachable mostly by accident.
-  - evidence: `.qa-loop/evidence/round-1/wf-14/tc145-sheet-first-screen-grace-live.png`, `.qa-loop/evidence/round-1/wf-14/tc145-calendar-no-inprogress-mark.png`, `.qa-loop/evidence/round-1/wf-14/tc145-aug29-grace-line.png`
-  - measurements: `{"gestures_from_sheet_open_to_the_grace_promise": 3, "hints_on_the_first_screen": 0}`
-  - note: Structural (where the state is surfaced) so routed proposal; related to the DailyView onAppear snap-to-today behaviour also flagged in WF-13, but the cost here is a lost streak rather than lost context. Cheapest candidate fixes for the human to weigh: an in-progress dot on the graced calendar cell, or a one-line banner above the Today card while graceLive.
+  - Re-opening the Daily sheet during a live PAST-day attempt silently switches it back to Today: the card reads 'Today / Deal #608530' with today's objectives, the calendar marks the in-progress day in no way at all, and the single gold button (bare 'Play') re-deals TODAY over the live attempt behind a confirm whose copy ('Starting this challenge re-deals the board...') never names which day it is starting or which one it is discarding. There is no resume anywhere: re-selecting the very day you are playing and tapping 'Play Aug 4' offers only Keep playing / Start over.
+  - evidence: `.qa-loop/evidence/round-1/wf-13-1/wf13-sheet-resets-to-today-midattempt.png`, `.qa-loop/evidence/round-1/wf-13-1/wf13-calendar-no-inprogress-marker.png`
+  - measurements: `{"live_attempt_moves": 1, "day_shown_on_reopen": "Today (Deal #608530)", "day_actually_live": "Aug 4 (Deal #625648)", "in_progress_markers_on_sheet": 0, "actions_to_get_back_to_the_live_day_card": 3, "resume_paths": 0}`
+  - note: Reuses the prior loop's open proposal id; reproduces verbatim on 1a63ce2 (DailyView.swift onAppear resets dayView to clampedToday) with two NEW aggravating observations: (a) the guard-rail alert names no day, so 'Starting this challenge' reads as the challenge the player thinks they are in; (b) there is no resume path even for the same day. fix_risk behavior-change. TRAP (carried over): a naive 'remember the last viewed day' fix must not let the sheet open on a stale day after midnight - WF-14's four onTimeLine branches are all driven by dayView vs todayIndex(), and graceLive keys on challengeDay == day. The lower-risk half is marking the live attempt (a badge on the calendar cell + an 'Attempt in progress' line on the card) and naming the day in the confirm, without changing which day the sheet opens on.
+- **ux/WF-14:grace-invisible-from-daily-sheet** — major, open; region `WF-14`; fix_risk `metric-integrity`
+  - Human-routed proposal, unchanged: with a live ⏰ grace nothing a player sees first mentions it — the Daily sheet opens on the Today card and the Aug 14 calendar cell renders like any unplayed day.
+  - evidence: `.qa-loop/evidence/round-1/wf-14-1/tc145-sheet-opens-on-today-grace-hidden.png`, `.qa-loop/evidence/round-1/wf-14-1/tc145-cal-no-inprogress-mark-aug14.png`, `.qa-loop/evidence/round-1/wf-14-1/cc14a-confirm-dailysheet-endattempt.png`, `.qa-loop/evidence/round-1/wf-14-2/wf14-sheet-opens-on-today-grace-hidden.png`, `.qa-loop/evidence/round-1/wf-14-2/wf14-crop-cal-no-inprogress-mark.png`
+  - note: Left for the human per dispatch. NOT re-driven this round (TC-14.9 was not in this chunk) — status carried forward, not re-verified; the 42b5f7e diff contains no change to calendar-cell or day-card grace affordances, only the confirm title.
 - **ux/Main:clock-runs-during-modal-sheets** — minor, open; region `WF-4`; fix_risk `metric-integrity`
-  - The solve clock keeps ticking while the app's OWN auto-raised 'Ready to finish' modal blocks play, so a recorded best time silently absorbs however long the user takes to answer a prompt they never asked for (measured: Time advanced 1:35 -> 1:39 across 3.5 s in which the counter was the only pixel on screen that changed). Previously filed against user-opened sheets (Daily/Wins/How to play) in the 342e3c0 loop and never resolved; this is the sharper, app-initiated instance.
-  - evidence: `.qa-loop/evidence/round-1/perf/r1-clock-prompt-t0.png`, `.qa-loop/evidence/round-1/perf/r1-clock-prompt-t+3.5s.png`, `.qa-loop/evidence/round-1/perf/r1-finishprompt-full-t0.png`, `.qa-loop/evidence/round-1/perf/r1-perf-measurements.txt`
-  - measurements: `{"counter_region_raw_px": "820,250 - 980,350", "counter_region_MAD_over_3.5s": [10.131, 7.656, 7.656], "counter_region_pct_pixels_changed": [8.1, 6.6, 6.6], "rest_of_screen_region_raw_px": "0,800 - 1206,1800", "rest_of_screen_MAD_same_frames": [0.0, 0.0, 0.0], "clock_reading_t0": "1:35", "clock_reading_t_plus_3.5s": "1:39", "modal_up_before_answer_seconds_observed": [6.7, 4.4], "film_sampling_interval_ms": 230}`
-  - note: TRAP: the obvious fix (pause GameClock while any sheet/alert is presented) turns every sheet into a free pause button and corrupts recorded best times in the other direction - a player could stop the clock indefinitely by opening How to play. Any fix must distinguish app-initiated modality (this prompt) from user-initiated sheets, or leave the clock alone and instead not raise the prompt unbidden. Reuses the id filed in the 342e3c0 archive loop (routing proposal, still open there); no re-decision by a human has happened since.
+  - The solve clock keeps ticking while the app's OWN auto-raised 'Ready to finish' modal blocks the board, so a recorded best time silently absorbs however long the user takes to answer a prompt they never asked for. Measured on build 1a63ce2: identical injected save, dismissing the prompt after ~5 s banked Time 1:37; leaving the same prompt up 20 s longer banked 1:58 (+21 s), and a header crop-diff shows the Time digits are the only pixels changing while the modal is up.
+  - evidence: `.qa-loop/evidence/round-1/wf-4-1/clock-runs-during-prompt-t0.png`, `.qa-loop/evidence/round-1/wf-4-1/clock-runs-during-prompt-t20.png`
+  - measurements: `{"time_after_5s_prompt": "1:37", "time_after_25s_prompt": "1:58", "delta_s": 21, "modal_up_s": 20, "header_crop_diff_changed_pct": 3.5}`
+  - note: Reused id from the archived ledger; still reproduces on 1a63ce2. TRAP: the obvious fix (pause GameClock whenever a sheet/alert is presented) turns every sheet into a free pause button and corrupts recorded best times the other way — a player could stop the clock indefinitely by opening How to play. Any fix must distinguish app-initiated modality (this prompt) from user-initiated sheets, or leave the clock alone and stop raising the prompt unbidden. Note backgrounding IS already handled correctly (TC-4.6: 20 s in the background cost 1 s of banked time), so the pause plumbing exists.
 
 ## Fix review rejections
 
-_none_
+- **ux/WF-5:daily-sheet-ignores-dynamic-type** (fixed) — round 1: Theme.scaled applied to the calendar marker text but the containing frame stayed a hardcoded height: 6, reintroducing the same class of clipping the finding was filed to remove, in three specific spots the fix's own claim ('all 36 fixed font sites') implied were covered.
+- **bug/Main:scored-surfaces-addressable-only-by-copy** (fixed) — round 2: identifiers added to views but the seven regression/smoke test files named in the finding still match copy verbatim; the copy-coupling harm the finding describes is unresolved.
+- **bug/DailyView:day-card-and-streak-cards-addressable-only-by-label** (fixed) — round 2: identifiers/values added to DailyView but SmokeDailySheetTests, RegressionGraceForfeitConfirmTests and SmokeWinFlowTests still match the streak-card sentence, the ⏰ line text, and the checkmark.circle.fill image name verbatim; the label-only-addressability harm the finding describes is unresolved.
 
 ## Severity changes
 
-_none_
+- round 2: **ux/WF-12:landscape-board-rescales-every-move** demoted major → minor
 
-## Persona matrix (round 2)
+## Persona matrix (round 4)
 
 | Workflow | novice | power |
 |---|---|---|
-| WF-1 | 1✓ | — |
-| WF-2 | 1✓ | — |
-| WF-3 | — | 1✓ |
-| WF-4 | — | 1✓ |
-| WF-5 | 1✓ | — |
-| WF-6 | 1✓ | — |
-| WF-7 | — | 2✓ |
-| WF-8 | — | 1✓ |
-| WF-9 | — | 1✓ |
-| WF-10 | 1✓ | — |
-| WF-11 | — | 1✓ |
-| WF-13 | 2✓ | 2✓ 1… |
-| WF-14 | 2✓ | 2✓ 1… |
-| WF-15 | 1✓ | 3✓ |
+| WF-1 | 2✓ | — |
+| WF-2 | — | 5✓ |
+| WF-3 | 4✓ | 5✓ |
+| WF-4 | — | 7✓ |
+| WF-5 | 3✓ | 4✓ |
 
 ## Coverage gaps
 
-- TC-13.7 (power): skipped — turn budget — 5 of 7 days verified string-exact against derive_daily.py (Aug 1 rank-rush/split-at, Aug 2 end-bias/big-move, Aug 3 max-run/suit-sprint, Aug 4 suit-balance/cells-le, plus Aug 7 cells-le/suit-top-first = 5 days). No truncation, no stale labels across selections, ⏰ line right on all. Aug 5 (moves/ends-first) and Aug 6 (no-undo/before-ace) not read; deal numbers were legible only for Aug 3/Aug 4 at the scroll position used.
-- TC-14.3 (power): skipped — turn budget
+_none_
 
 ## Closeout
 
@@ -124,42 +105,51 @@ _no closeout cycle ran_
 
 ## Wontfix / resolved
 
-_none_
+- **ux/WF-12:daily-sheet-play-below-fold-landscape** — Structural (content order / landscape-specific layout), so the human decides — kept at MINOR because one ordinary swipe anywhere inside the sheet reveals Play and the 'Today' section header peeks at the bottom edge. The substance is that in landscape the entire first screen is five zero-valued streak counters before any action; a landscape-only compact streak row, or putting Today+Play above the streak cards, would fix it. Related but distinct from ux/WF-5:streak-card-headline-unlabelled (archived). | RESOLVED (round 1): DUPLICATE of ux/WF-12:daily-play-below-fold-landscape (sibling chunk filed the fuller claim; that one stays open as the proposal). Orchestrator dedupe.
+- **ux/WF-12:landscape-rail-clipped-with-hud** — CC-12A reproduced. In a CASUAL landscape game (9 pills, no HUD) all three are hittable=true — the clip only appears once the challenge HUD pushes the rail down. See the companion auto-routed finding ux/WF-12:rail-more-hint-inert for the cheap half of the fix. | RESOLVED (round 1): DUPLICATE of ux/WF-12:rail-hides-howtoplay (same evidence from the sibling WF-12 chunk; the archived id with history is kept as canonical and stays open, auto-routed). Orchestrator dedupe, not a product decision.
+- **ux/WF-13:silver-demo-missing-on-16-of-61-days** — 26% of days. Two candidate fixes, both cheap: fall back to the flawless line for the Silver demo when hasSilverLine is false (flawless is a superset by the app's own explainer), or regenerate the missing silver lines in data/daily-solutions.json. Doing neither leaves an unexplained hole in a 4-pill grid next to an objective the same card promises. Not a scoring surface - demos are assisted and unscored - so no metric risk. | RESOLVED (round 1): Contradicts the signed-off Fixture policy in WORKFLOWS.md (a day whose Silver is a universal family has no distinct silver line, so no 🥈 pill — by design, re-verified by the round-0 audit). Adding a fallback line is a data/design decision for the owner; recorded in the report's proposals section rather than auto-fixed.
+- **ux/WF-14:grace-confirm-title-split** — Left wontfix — a human already decided this id. Not re-litigated; the equivalent issue landed as fixed under the -differs-by-control id.
+- **ux/WF-9:wins-row-no-run-count** — WONTFIX accepted on the merits, round 3, verified on de5e5d0. WinRecord (WinStore.swift:4) is a Codable struct of three NON-optional fields persisted as JSON under "causeway.wins", shared with the web build and with the stats-backup file, and both record() and merge() combine records field-wise by min() — a run count has no correct merge (sum double-counts a deal synced to two devices, max under-counts), so the implementer's "third persisted field with a lossy merge" objection is accurate, not a dodge, for a minor. Behaviour re-verified this round: footer still present, still directly under the numbers and unchanged by the identifier commit; the independence itself is correct (fewest from run 1, fastest from run 2, a third slower run changed neither). Residual, accepted: one win and three wins render byte-identical rows. Do NOT reopen without a product decision; if it is ever revisited, an OPTIONAL count with a fallback (as DailyStore does for runs == []) is the only safe shape.
 
 ## WATCH LIST
 
-_The part a human should actually read. The fix-reviewer decorrelates the loop's blind spots but cannot eliminate them, and this round proved it: a fix it explicitly cleared was later broken open by a tester on the device._
+_The part a human should actually read. Convergence means two same-family agents agreed — not that the change is correct._
 
-### Read these two first — both still open, both can lose a player's work
+**Shipped behaviour changes to eyeball first**
+- **`bug/WF-7:deal-confirm-swallowed-by-double-tap`** (fixed, `b035caa`/`117a212`) — look here because: the fix is a 0.5 s window in which the discard confirm's destructive button is DISABLED after a dismissal-raised present (`resetConfirmArmed`, ContentView). Verified 3/3 on device in the exact failing geometry, but a deliberate tap inside that window is silently swallowed; a tester measured the arm at 0.7-0.85 s through the driver. If that ever feels laggy on hardware, the alternative is presenting the confirm synchronously.
+- **`ux/WF-6:demo-has-no-step-back`** (fixed, `c6b0f70` + `9d51711…`) — look here because: Prev re-simulates the line from the opening position and, from the completion banner, re-enters a paused demo at N-1. Two adversarial passes proved the board stays inert and nothing banks (`SolutionReplayTests` pin it; web twin added), but it is the one fix that touches the demo/scoring boundary WF-6 guards.
+- **`ux/WF-12:rail-hides-howtoplay` / `rail-more-hint-inert` / `landscape-board-rescales-every-move`** (fixed, `fb45f4b` + round-2 `836434d`) — look here because: the rail viewport is now trimmed to half a pill, the cue reads scroll geometry via `onScrollGeometryChange` (iOS 18+; the iOS 17 `RailOffsetKey` fallback is UNTESTED — only 18.5 and 26.5 runtimes exist here), and landscape shares portrait's shrink latch, now seeded on appear.
+- **`ux/WF-5:daily-sheet-ignores-dynamic-type`** (fixed, `344c1d1`; rejected once, then `836434d`) — look here because: 36 font sites on the Daily sheet now scale through `Theme.scaled`; the fix-reviewer predicted and the device confirmed marker clipping at AX sizes, fixed in round 2 by scaling the marker slot. At AX-XXXL every calendar cell is 92 pt tall (grid ~2.5× taller) — a tester noted it, nobody filed it; judge on a real device.
+- **`bug/WF-11:export-replace-destroys-existing-backup`** (fixed, `f63211a`) — look here because: the export filename gained `-HHmmss`. Five exports in one session produced five files; the system "Replace" path is unreachable. The `DateFormatter` has no `en_US_POSIX` locale (pre-existing, unobserved).
 
-- **`bug/WF-7:deal-confirm-swallowed-by-double-tap`** (major, **introduced by a fix**, commit `9d4a4fc`) — look here because **this is the loop's own regression, and the fix reviewer waved it through.** Round 1 filed "Deal # Play silently discards a live game". The implementer added a confirm raised `0.1 s` later via `asyncAfter` so the dismissing alert would not swallow it. The code reviewer called that runloop hop "a minor pattern smell but functions correctly." It does not: the hop lands the destructive **"Play that deal"** button at (274,517), **10 pt** from the alert's own **"Play"** at (275,527), so an ordinary double-tap confirms a discard the player never reads — live game and clock gone, Moves 1 → 0, Undo greyed. Reproduced 2/2. Do not fix by removing the confirm; fix the geometry or the timing.
+**Proposals awaiting your decision** (the loop never implements these; flip routing to "auto" and re-run to accept)
+- **`ux/WF-13:daily-sheet-resets-to-today-midattempt`** (major, fix_risk behavior-change) — reproduced in rounds 0, 1 and 2 with two new aggravators: the discard alert names no day, and re-selecting the day you are playing offers only Start over. Trap: any "remember last viewed day" fix must not open on a stale day after midnight.
+- **`ux/WF-14:grace-invisible-from-daily-sheet`** (major, fix_risk metric-integrity) — a live ⏰ grace is invisible on the sheet's first screen; the grace-destroying Play is one tap away, the promise three gestures away. Still exactly as filed last loop.
+- **`ux/WF-12:daily-play-below-fold-landscape`** (major) — the landscape Daily sheet shows five streak cards and no Play (217 pt below a 262 pt fold).
+- **`ux/WF-11:import-has-no-confirm-or-undo`** (minor) — import merges on pick with no preview/confirm/undo; carried over from last loop.
+- **`ux/Main:clock-runs-during-modal-sheets`** (minor, fix_risk metric-integrity) — the app's own Auto-finish prompt costs clock time (+21 s measured). Trap: pausing on sheets makes every sheet a pause button.
+- Not a ledger proposal but a design call the loop refused to auto-fix: **no 🥈 demo on the 16 days whose Silver is a universal family** (`ux/WF-13:silver-demo-missing-on-16-of-61-days`, resolved wontfix per the Fixture policy) — a fallback line would be a data change.
 
-- **`ux/WF-14:replay-forfeits-grace-silently`** (major, `fix_risk: metric-integrity`, commit `c74fa96`) — look here because it is **the one fix the reviewer rejected, and a tester then proved the hole is total.** The grace-aware copy is right wherever it shows; *showing* it is gated on the pre-existing `hasLiveGame` (`moveCount > 0`), which was never widened. With a zero-move grace attempt (tapped Play yesterday, made no moves, returned today) **all four controls destroy it with no dialog at all** — Daily-sheet Play, Replay, New game, and a how-to-win demo pill, 4/4 silent. The fix is the gate, not the copy: `hasLiveGame || graceLive` at the four call sites (`Game.swift:432`, `ContentView.swift:343-345`, `DailyView.swift:273-274,335-336`, `index.html:1797,1804`). One trap the tester flagged: the zero-move dialog would otherwise read "your 0 moves and your time will be discarded" — suppress that clause.
+**Open minors the loop ran out of rounds for**
+- `ux/WF-3:grace-newgame-body-describes-replay` — on a live ⏰ grace the New game confirm's BODY describes starting the challenge over, but New game deals a random casual game (`ContentView.resetConfirmMessage`'s graceLive branch never consults `pendingReset`). One-line copy fix.
+- `ux/DailyView:legend-paragraphs-addressable-only-by-copy` and `ux/ContentView:demo-bar-container-has-no-identifier` — two identifiers the regression tests would like (`daily.legend`, `daily.cal.legend`, `demo.bar`).
 
-### The four metric-integrity fixes — verified, but this is where a silent regression would hide
+**Fix-review rejections** (both later resolved — see decisions D14/D15): the Dynamic Type sweep (harmful → fixed in round 2, verified), and the two identifier fixes (rejected because the copy-matching tests were not converted; the regression writer converted them the same hour in `de5e5d0`).
 
-All four shared one root cause: **the app changed a scored outcome with no player input.** The implementer's principle — *"the app may withhold an automatic action, but it may never re-choose one"* — is sound and was upheld on the device. They are here because the failure mode is invisible: a player only finds out when a medal is missing.
+**Diffs**
+- **round 1** `1a63ce2..3407a77` (14 app commits + 3 test commits) — look here because: 19 findings addressed in one afternoon across ContentView/DailyView/Game/index.html, plus `QAFixtures.swift`, which seeds app state through `-causeway.game <hex plist>` launch arguments — it makes the UI tests independent of simulator state and is the enabler for every fixture-based test.
+- **round 2** `3407a77..de5e5d0` — look here because: identifiers were added to nearly every scored surface (win overlay, HUD chips, streak/day cards, Wins rows); label queries in 12 test files were converted to them. The `daily.tier.<tier>`/`daily.sameday` VALUES carry state — a UI change that forgets to update the value now fails a test.
+- **round 3** `de5e5d0..0cd71fa` — tests only.
 
-- **`bug/WF-4:autoplay-denies-daily-gold`** (`f7c4788`) — Auto-play is **On by default**; its greedy send put 8♠ on the *down* foundation at day 29's certified-flawless position and killed 🥇 and 🌟 outright. Now `autoSendWouldBreakTier` declines such a send. Verified: auto-play left the 8♠ alone and the deal finished 🌟 Flawless; manual play stays ungated, so the player can still make the tier-breaking move deliberately.
-- **`bug/WF-4:autofinish-cascade-can-deny-gold`** (`f7c4788`) — the "Ready to finish" prompt fired at move 64 of day 21's 87-move flawless line and Finish then paid out 🥉🥈 only. Measured to cost a medal on **19 of 30 reachable days, today included.** **The riskiest change in the whole loop rides along with it:** the win-detection predicate was rewritten (`autoFinishWouldWin` → `simulateAutoFinish().won`), and a false negative there would silently strip the Finish affordance from winnable boards. A tester differentially compared old and new across **21,956 prefix positions with zero disagreements**, and `tests/autofinish-tiers.test.mjs` now guards that property permanently (observed failing when the predicate is mutated). That is as verified as this loop can make it — but it is still a rewritten win predicate.
-- **`ux/WF-6:demo-exit-drops-challenge-binding`** (`e70b251`) — the novice path banked nothing: after the demo said "tap Done to try it yourself", Done landed on a HUD-less casual deal. Now re-binds through `playChallenge` → `deal()` with Moves 0 / 0:00 / empty telemetry, surviving a hard kill.
-- **`ux/WF-8:autoplay-toggle-mutates-scored-game`** (`b7edbde`) — one tap on a *setting* played two cards and flipped 🥇 to ✗. Now arms on the next move instead. **Note the regression writer deliberately wrote no UI guard here**: on a fresh deal almost nothing is safe under `isSafeAutoplay`, so "Moves unchanged after toggling" passes with the fix reverted. A non-discriminating test is worse than none — this one rests on the parity pin alone.
+**Rig and hygiene**
+- The QADriver (`.qa-loop/driver/`) is now the way testers drive this app; the MCP control tool needs a per-device human grant that autonomous runs cannot obtain. `tools/README.md` holds the fixture recipes that used to bloat HARNESS_NOTES.
+- `.qa-loop/evidence/loops-before-20260909/` holds the 1,117 evidence files of earlier loops, moved out of `round-N/` so this loop's testers stopped tripping over them. Archived reports' evidence links point at the old paths.
+- Hygiene check at closeout: see the line the orchestrator appends below.
 
-### State migration — the fix that can destroy real data
+## Material WORKFLOWS.md edits made during the loop
 
-- **`bug/WF-11:legacy-backup-defeats-daily-v3-wipe`** (`be67947`, `fix_risk: state-migration`) — a pre-recut backup imported with **0 entries skipped** and fabricated medals (Gold 1 → 11 total, Aug 11-20 all lit), defeating exactly what the v2→v3 wipe exists to prevent. The importer now drops a daily map it cannot prove came from this calendar, **treating a missing stamp as NO**. Verified on all four legs, including that `wins` still imports and the user is told why. Watch it because the safe direction here is also the destructive one: any legitimate pre-stamp backup loses its daily history by design.
-
-### Decisions that are yours, not the loop's
-
-Six proposals are awaiting you and are excluded from convergence by design. The two with teeth: **`ux/WF-13:daily-sheet-resets-to-today-midattempt`** (`behavior-change` — the sheet opens on Today with no sign of a live attempt on another day, and the visible Play swaps the board) and **`ux/Main:clock-runs-during-modal-sheets`** (`metric-integrity` — the solve clock ticks under the app's *own* auto-raised "Ready to finish" modal; measured at 1 Hz with the rest of the screen static). Also open: `ux/WF-13:calendar-month-locked-no-nav`, `ux/WF-13:par-never-surfaced`, `ux/WF-14:grace-invisible-from-daily-sheet`, `ux/WF-11:import-has-no-confirm-or-undo`.
-
-### Most invasive diffs
-
-- **`b2ce1a4..4f02d1d`** (round 1 fixes, eleven commits) — `index.html` +231/-67, `ios/Causeway/Causeway/Model/Game.swift`, `Views/ContentView.swift`, `Views/DailyView.swift`, `Model/StatsBackup.swift`. This is where all fourteen fixes live, and where the two regressions above were born.
-- **`4f02d1d..HEAD`** (regression tests, `1241c08`) — eight new XCUITest files, +794 lines. **They are all `XCTSkipIf(true)`-guarded and have never run on a device**; they are tripwires you must arm (see Closeout).
-- **A latent web bug was found inside the blast radius, not by a test:** `index.html`'s `objViolated`/`objSecured` were still switching on **pre-parameterised objective ids** (`'aces-first'`, `'split-even'`, `'cells-le-1'`), so every current objective fell through to `default: false` — the web HUD never showed a ✗, and the new WF-4 guards would have been inert there. Now ported from the canonical Swift. Nothing in the loop was looking for this; the implementer volunteered it.
-
-### Environment gaps you should know about
-
-- **WF-12 (landscape) is entirely unverified.** Rotation is unreachable from this toolset — four routes were exhausted (no MCP orientation action; no `simctl` rotate; Simulator's Device ▸ Rotate needs assistive access, `osascript` returns -1728; the `com.apple.iphonesimulator` orientation defaults are silently reverted on window open). All three WF-12 cases are `blocked`, and the landscape rail call sites of the new WF-3/WF-7 confirms were never exercised.
-- **The ⏰ grace needs a two-day sequence and there is no date override**, so parts of WF-14 are only reachable by injecting saves. A debug date override remains the highest-value testability change available.
+- Fixture policy rewritten around the `CAUSEWAY_TODAY_OVERRIDE` date pin (pinned date 2026-08-15 / dayIndex 14; two-day ⏰ sequences via terminate + relaunch on the next pin); the old "no launch arguments / day boundaries untestable" claims removed.
+- WF-13 updated for calendar month navigation and `daily.cal.<idx>` identifiers; "par appears only on a solved day" recorded as the design.
+- WF-14's "known-open trap" replaced by the claimed-then-verified zero-move grace confirm; WF-4 (post-win Undo is casual by owner decision; background pauses the clock); WF-7 (the 0.1 s hop, then its fix); WF-9 (independent minima; Wins Play routes through the confirm); WF-15 reachable range under the pin; the no-Silver-line day list (idx 4, 5, 9, 15, 20, 22, 25, 36, 38); make_save's day-14 flawless limitation.
+- TESTCASES.md: 90 cases (WF-4/5/7/9/12/13/14/15 rewritten in round 0); expected text in ~15 cases is now stale where this loop's fixes changed copy — listed in BACKLOG for the next refresh.
+- hygiene: hygiene(.qa-loop): clean
