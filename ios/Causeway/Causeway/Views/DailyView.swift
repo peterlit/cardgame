@@ -676,22 +676,33 @@ struct DailyView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(3)
             }
+            // The marker slot under the date is the SAME height in every cell (star, lock or
+            // dots), so the date never jitters between neighbours. At ordinary sizes it is 6 pt —
+            // the 11 pt star overflows it symmetrically into the cell's minHeight slack, which is
+            // the original design. At accessibility sizes the star and lock scale with the date
+            // (Theme.scaled) while a 6 pt slot did not, so a ~28 pt 🌟 drew over its own date and
+            // hung below the cell into the next row, and every 🔒 spilled out of its chip
+            // (ux/WF-5:calendar-marker-clips-at-accessibility-size). There the slot is the scaled
+            // glyph's own line height and the cell grows to hold it; the tier dots are 5 pt at
+            // every size and simply centre in it.
+            let markerH: CGFloat = dynamicTypeSize.isAccessibilitySize
+                ? ceil(Theme.scaled(11, for: dynamicTypeSize) * 1.25) : 6
             VStack(spacing: 2) {
                 Text("\(day)").font(f(12, weight: .medium))
                     .foregroundStyle(avail ? Color.primary : Color.secondary.opacity(0.5))
                 // A flawless day shows a ⭐ in the marker slot (flawless implies all three tiers), so
                 // it never overlaps the date; other days show the earned-tier dots.
                 if rec?.flawless == true {
-                    Text("🌟").font(f(11)).frame(height: 6)   // same reserved height as the dots row → no date jitter
+                    Text("🌟").font(f(11)).frame(height: markerH)
                 } else if locked {
                     // A standing affordance, so "not yet" is legible without tapping at all.
-                    Text("🔒").font(f(8)).frame(height: 6).opacity(0.55)
+                    Text("🔒").font(f(8)).frame(height: markerH).opacity(0.55)
                 } else {
                     HStack(spacing: 2) {
                         ForEach(dots, id: \.self) { t in
                             Circle().fill(dotColor(t)).frame(width: 5, height: 5)
                         }
-                    }.frame(height: 6)
+                    }.frame(height: markerH)
                 }
             }
         }
