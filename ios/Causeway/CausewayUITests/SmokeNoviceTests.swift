@@ -121,7 +121,7 @@ final class SmokeNoviceTests: XCTestCase {
         XCTAssertTrue(contains(app, "The up and down halves of a suit can never cross."), "The catch lost its statement")
         XCTAssertTrue(contains(app, "Build in alternating colours, one rank at a time, in either direction"), "Tableau lost its rule")
         XCTAssertTrue(contains(app, "Three single-card parking spots."), "Free cells lost its rule")
-        XCTAssertTrue(contains(app, "Tapping a card in a run moves the whole run."), "Controls lost the run rule")
+        XCTAssertTrue(contains(app, "The run beneath it moves with it."), "Controls lost the run rule")
         app.buttons["Done"].tap()
         XCTAssertTrue(QA.waitGone(app.navigationBars["How to play"], timeout: 3))
     }
