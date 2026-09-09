@@ -929,3 +929,18 @@ iOS 17/18 pass, I6 Release memory measurement).
   from a hidden tab, autoplay wins in a hidden tab, and tabs restored in the background — with a
   two-sided drift guard in ios-parity.test.mjs. This also closes **L4** (win-time semantics):
   both platforms now measure banked wall-clock play time, excluding background/hidden stretches.
+
+## 2026-09-08 — review-loop closeout (converged round 2; both open minors CLOSED)
+
+- **Minor FIXED — GameClockTests wall-clock flake.** The suite slept ~5.7 real seconds and
+  asserted loose bounds (`elapsed <= 3` after a 2.3s sleep with `Int()` truncation), so 0.7s of
+  scheduler overshoot on a loaded Mac turned a correct clock red. `GameClock` now takes an
+  injectable `now: () -> Date` (production default: the real clock; three call sites), and the
+  tests advance a fake date by hand — exact-equality assertions, zero sleeps, and the
+  delivery-counting regression stays pinned (a synchronous test services no run loop, so a
+  counter would read 0 where the measurement reads 2). Unit suite: 11/11 in ~2.5s.
+- **Minor FIXED — per-family cap never asserted.** Both builder publish tests now assert that no
+  silver and no gold family occupies more than 12 of the days the run selects (the
+  `selectMonthBalanced` ceiling) — for `--extend`, the fresh slice only, matching the round-2
+  cap semantics. Measured headroom is ~5 uses per family, so the assertion cannot flake; a
+  neutered `capped()` now has a test in its way.

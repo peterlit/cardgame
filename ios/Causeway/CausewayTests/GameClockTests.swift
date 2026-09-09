@@ -3,48 +3,63 @@ import XCTest
 
 /// R9 (skeptical review): elapsed time is a MEASUREMENT, not a count of timer deliveries. The old
 /// clock did `elapsed += 1` per delivery, so a stalled main thread undercounted — the review's
-/// probe recorded 1 second for 2.26 blocked seconds. These tests block the run loop on purpose:
-/// no timer fires, and the measurement must be right anyway.
+/// probe recorded 1 second for 2.26 blocked seconds.
+///
+/// Closeout (wall-clock-upper-bounds-can-flake): these tests used to Thread.sleep for real wall
+/// time and assert loose bounds, which spent ~5.7s per run and went red under 0.7s of scheduler
+/// overshoot on a loaded Mac. They now advance an injected `now` by hand: the run loop of a
+/// synchronous test still delivers ZERO timer ticks (so a delivery-counting clock would read 0
+/// and fail), but the measurement is exact, instant, and cannot be descheduled into a failure.
 final class GameClockTests: XCTestCase {
 
-    func testBlockedRunLoopStillMeasuresWallTime() {
+    /// Hand-advanced wall clock injected into every clock under test.
+    private var fakeNow = Date(timeIntervalSinceReferenceDate: 0)
+
+    private func makeClock() -> GameClock {
         let clock = GameClock()
+        clock.now = { self.fakeNow }
+        return clock
+    }
+
+    func testZeroTimerDeliveriesStillMeasuresWallTime() {
+        let clock = makeClock()
         clock.start()
-        Thread.sleep(forTimeInterval: 2.3)   // no run loop service — zero timer deliveries
+        fakeNow += 2.3   // wall time passes; the unserviced run loop delivers no timer ticks
         clock.stop()
-        XCTAssertGreaterThanOrEqual(clock.elapsed, 2,
-            "2.3 blocked seconds must record as at least 2 — delivery-counting recorded 1")
-        XCTAssertLessThanOrEqual(clock.elapsed, 3, "and not wildly more")
+        XCTAssertEqual(clock.elapsed, 2,
+            "2.3 wall-clock seconds with zero timer deliveries must record as exactly 2 — delivery-counting reads 0")
     }
 
     func testSetSeedsTheMeasurementAcrossRestore() {
-        let clock = GameClock()
+        let clock = makeClock()
         clock.set(41)
         XCTAssertEqual(clock.elapsed, 41)
         clock.start()
-        Thread.sleep(forTimeInterval: 1.1)
+        fakeNow += 1.5
         clock.stop()
-        XCTAssertGreaterThanOrEqual(clock.elapsed, 42, "restored seconds + the new stretch must add")
+        XCTAssertEqual(clock.elapsed, 42, "restored seconds + the new stretch must add")
     }
 
     func testBackgroundPauseFreezesAndResumeContinues() {
-        let clock = GameClock()
+        let clock = makeClock()
         clock.start()
-        Thread.sleep(forTimeInterval: 1.1)
+        fakeNow += 1.5
         clock.pauseForBackground()
         let atPause = clock.elapsed
+        XCTAssertEqual(atPause, 1)
         XCTAssertFalse(clock.isRunning)
-        Thread.sleep(forTimeInterval: 1.2)   // "backgrounded" — must not count
+        fakeNow += 3600   // an hour "backgrounded" — must not count
         XCTAssertEqual(clock.elapsed, atPause, "background time is not play time")
         clock.resumeFromBackground()
         XCTAssertTrue(clock.isRunning)
+        fakeNow += 1.5
         clock.stop()
-        XCTAssertLessThanOrEqual(clock.elapsed, atPause + 1,
-            "the paused stretch leaked into the measurement")
+        XCTAssertEqual(clock.elapsed, atPause + 1,
+            "resume must continue the measurement exactly where the pause froze it")
     }
 
     func testResumeDoesNotRestartAClockTheGameStopped() {
-        let clock = GameClock()
+        let clock = makeClock()
         clock.start()
         clock.stop()                    // a win/reset stopped it — not backgrounding
         clock.resumeFromBackground()
@@ -53,7 +68,7 @@ final class GameClockTests: XCTestCase {
     }
 
     func testResetZeroesEverything() {
-        let clock = GameClock()
+        let clock = makeClock()
         clock.set(30)
         clock.start()
         clock.reset()

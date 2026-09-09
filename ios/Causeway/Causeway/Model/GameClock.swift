@@ -27,12 +27,15 @@ final class GameClock: ObservableObject {
     /// True only between pauseForBackground() and resumeFromBackground(): a clock the PLAYER's
     /// game stopped (win, reset) must not restart just because the app came foreground.
     private var pausedInBackground = false
+    /// The wall-clock source. Production always reads the real clock; tests inject a hand-advanced
+    /// date so the measurement is exercised exactly, without real sleeps that flake under load.
+    var now: () -> Date = { Date() }
 
     var isRunning: Bool { runStart != nil }
 
     func start() {
         guard runStart == nil else { return }
-        runStart = Date()
+        runStart = now()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.publish()
         }
@@ -52,7 +55,7 @@ final class GameClock: ObservableObject {
     }
     func set(_ value: Int) {
         banked = value
-        if runStart != nil { runStart = Date() }
+        if runStart != nil { runStart = now() }
         publish()
     }
 
@@ -69,7 +72,7 @@ final class GameClock: ObservableObject {
         start()
     }
 
-    private var current: Int { banked + (runStart.map { max(0, Int(Date().timeIntervalSince($0))) } ?? 0) }
+    private var current: Int { banked + (runStart.map { max(0, Int(now().timeIntervalSince($0))) } ?? 0) }
     private func publish() {
         let c = current
         if c != elapsed { elapsed = c }

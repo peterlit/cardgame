@@ -25,6 +25,21 @@ const canon = o => JSON.stringify(o, (k, v) =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 const pairOf = d => canon([d.silver.id, d.silver.param, d.gold.id, d.gold.param]);
+// The per-family variety cap (closeout: cap-variety-never-asserted). selectMonthBalanced tops out
+// at capPerFamily = 12 (build-month.mjs), and capped() is the only mechanism keeping a tier from
+// reading as one idea. The cap governs the days selected by THIS run (an extension's published
+// days are history, not cap charges — round-2 blocker), so `days` here is the selected slice.
+// Real headroom is ~5 uses per family, so >12 cannot flake.
+const CAP_CEILING = 12;
+const assertFamilyCap = (days, label) => {
+  for (const tier of ['silver', 'gold']) {
+    const uses = new Map();
+    for (const d of days) uses.set(d[tier].id, (uses.get(d[tier].id) || 0) + 1);
+    for (const [id, n] of uses)
+      assert.ok(n <= CAP_CEILING,
+        `${label}: ${tier} family "${id}" fills ${n} of ${days.length} selected days — the per-family cap (max ${CAP_CEILING}) is not being enforced`);
+  }
+};
 
 function runBuilder(args) {
   try {
@@ -102,6 +117,7 @@ test('the builder can still PUBLISH: a fresh select-only run against the real ca
     assert.ok(d.silver?.id && d.gold?.id && Number.isFinite(d.par), 'every day must be complete');
     assert.notEqual(d.silver.id, d.gold.id, 'a day must never pair a family with itself');
   }
+  assertFamilyCap(pool.days, 'fresh publish');
 });
 
 test('--extend fills a FULL MONTH of open slots, keeps every published day verbatim, and repeats no published challenge', () => {
@@ -132,6 +148,7 @@ test('--extend fills a FULL MONTH of open slots, keeps every published day verba
   for (let i = published.length; i < pool.days.length; i++)
     assert.ok(!publishedPairs.has(pairOf(pool.days[i])),
       `fresh day ${i} repeats a published (silver, gold) challenge pair`);
+  assertFamilyCap(pool.days.slice(published.length), '--extend fresh days');
 });
 
 test('--extend refuses to shrink or stand still: --days must exceed the published count', () => {

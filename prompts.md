@@ -848,3 +848,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     (background time is not play time — the iOS `GameClock.pauseForBackground` semantic), covering
     hidden-tab saves, autoplay wins in a hidden tab, and background-restored tabs, with a new
     two-sided drift guard. Suites: node 157/157 (1 new); no Swift touched.
+
+91. Review-loop closeout (converged after round 2): the two open minors, both test-hardening.
+    (1) GameClockTests slept 5.7 real seconds and asserted loose wall-clock bounds that a busy
+    scheduler could flake; `GameClock` gained an injectable `now` provider (three call sites,
+    production unchanged) and the tests now advance a fake clock — exact assertions, instant,
+    and the delivery-counting regression still pinned. (2) The builder suite never asserted the
+    per-family variety cap it exists to enforce; both publish tests now check that no silver or
+    gold family exceeds 12 of the selected days (fresh slice for `--extend`). Suites: node
+    157/157, native unit 11/11.
