@@ -707,7 +707,8 @@ test('board reset controls confirm only when there is a live game to lose (no we
     'landscape New game pill no longer routes through requestReset');
   assert.ok(content.includes(norm('railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
     'landscape Replay pill no longer routes through requestReset');
-  assert.ok(content.includes(norm('if game.hasLiveGame { pendingReset = action } else { performReset(action) }')),
+  // (`resetConfirmArmed = true` is qa-loop round 1's bug/WF-7 arming — the pill path arms at once.)
+  assert.ok(content.includes(norm('if game.hasLiveGame { resetConfirmArmed = true; pendingReset = action } else { performReset(action) }')),
     'iOS reset confirmation is no longer gated on hasLiveGame (an untouched board must stay one tap)');
   // web: same gate, same two-branch copy.
   assert.ok(html.includes(norm('function hasLiveGame(){ return (moveCount>0 || graceLiveNow()) && !isWon() && !demoing; }')),
@@ -776,14 +777,24 @@ test('board reset controls confirm only when there is a live game to lose (no we
 test('the deal-number entry confirms before discarding a live game (no web↔iOS drift)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   const content = read('Views/ContentView.swift');
+  // The confirm is presented DISARMED and arms 0.5 s later: it can land under the finger that
+  // just tapped Play, and a trailing tap must hit an inert destructive button
+  // (bug/WF-7:deal-confirm-swallowed-by-double-tap). Pinned with the gate because it IS the fix —
+  // an earlier layout nudge only masked the double-tap while the software keyboard was up.
   assert.ok(content.includes(norm(`private func requestDealFromDismissal(_ n: Int) {
         if game.hasLiveGame {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { pendingReset = .deal(n) }
+            resetConfirmArmed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                pendingReset = .deal(n)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { resetConfirmArmed = true }
+            }
         } else {
             withAnimation { game.deal(seed: n) }
         }
     }`)),
-    'the iOS dismissal-safe deal gate no longer confirms (or no longer state-gates) its re-deal');
+    'the iOS dismissal-safe deal gate no longer confirms (or no longer state-gates / disarms) its re-deal');
+  assert.ok(content.includes(norm('.disabled(!resetConfirmArmed)   // see resetConfirmArmed')),
+    'the reset confirm\'s destructive button is no longer gated on resetConfirmArmed');
   assert.ok(html.includes(norm('requestDeal(()=>{ closeDeal(); deal(n); });')),
     'the web deal modal no longer confirms its re-deal');
 });

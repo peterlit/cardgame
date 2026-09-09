@@ -387,11 +387,11 @@ struct ContentView: View {
     /// Every user-triggered board replacement must route through requestReset or this — WinsView
     /// used to call game.deal directly, which silently ended a live attempt and forfeited a live
     /// ⏰ grace (skeptical-review R4).
+    /// Presented DISARMED, armed 0.5 s after presentation: the confirm can land under the finger
+    /// that just tapped Play, and a second tap within that window must hit an inert button, not a
+    /// live destructive one (see resetConfirmArmed).
     private func requestDealFromDismissal(_ n: Int) {
         if game.hasLiveGame {
-            // Present disarmed, arm 0.5 s after presentation: the confirm can land under the
-            // finger that just tapped Play, and a second tap within that window must hit an
-            // inert button, not a live destructive one (see resetConfirmArmed).
             resetConfirmArmed = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 pendingReset = .deal(n)
