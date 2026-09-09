@@ -100,4 +100,38 @@ final class CausewayModelTests: XCTestCase {
             "0.13,0.2,2.11,2.12,1.13,3.9|0.3,1.5,3.1,0.10,1.3,0.6|" +
             "1.8,1.7,3.4,1.6,3.13,2.3|1.1,3.8,3.10,2.1,0.1,2.7")
     }
+
+    // MARK: - smartMove reports whether it moved (ux/WF-2:unmovable-card-no-feedback)
+
+    /// The bottom-of-column spot holding `card`, if it is exposed.
+    private func exposedSpot(_ g: Game, _ suit: Suit, _ rank: Int) -> Spot? {
+        for (col, pile) in g.tableau.enumerated() where pile.last == Card(suit: suit, rank: rank) {
+            return .tableau(col: col, idx: pile.count - 1)
+        }
+        return nil
+    }
+
+    /// The tester's exact repro on deal #810129: park 5♠, 5♣, Q♥ (all three cells full), then
+    /// tap the exposed 8♦ — no foundation step, no black 7/9 exposed, no empty column. The tap
+    /// must report `false` and leave the board byte-identical, which is what the view keys the
+    /// refusal wiggle on. The three parking moves must report `true` (the same signal is what a
+    /// successful tap returns).
+    func testSmartMoveReportsAFruitlessTapAndLeavesTheBoardAlone() throws {
+        let g = makeGame(seed: 810129)
+        for (suit, rank) in [(Suit.spade, 5), (Suit.club, 5), (Suit.heart, 12)] {
+            let spot = try XCTUnwrap(exposedSpot(g, suit, rank), "\(suit) \(rank) is not exposed on deal 810129")
+            XCTAssertTrue(g.smartMove(spot), "parking \(suit) \(rank) must report a move")
+        }
+        XCTAssertEqual(g.moveCount, 3)
+        XCTAssertTrue(g.cells.allSatisfy { $0 != nil }, "the repro needs every free cell full")
+
+        let d8 = try XCTUnwrap(exposedSpot(g, .diamond, 8))
+        let tableauBefore = g.tableau, cellsBefore = g.cells, upBefore = g.up, downBefore = g.down
+        XCTAssertFalse(g.smartMove(d8), "8♦ has nowhere to go — the tap must say so")
+        XCTAssertEqual(g.moveCount, 3)
+        XCTAssertEqual(g.tableau, tableauBefore)
+        XCTAssertEqual(g.cells, cellsBefore)
+        XCTAssertEqual(g.up, upBefore)
+        XCTAssertEqual(g.down, downBefore)
+    }
 }

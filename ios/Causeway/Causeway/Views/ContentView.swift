@@ -97,11 +97,13 @@ struct ContentView: View {
     // chrome wobble it guards against (Finish pill row, demo headline wrap) never changes the
     // root size, so this reset can't reintroduce the pulse.
     @State private var latchedBoardH: CGFloat = 0
-    // Refusal cue for touching a card that cannot move (not a run head): which spot is
-    // shaking and a monotone trigger the ShakeEffect animates on. Deliberately NOT fired for
-    // movable cards whose smart-move finds no target — tap is the primary control and cueing
-    // every fruitless tap would be noise; the cue answers only "did the app register my touch
-    // on this un-liftable card?".
+    // Refusal cue for a tap that moves nothing: which spot is shaking and a monotone trigger
+    // the ShakeEffect animates on. Fired for BOTH halves of "nothing happened" — a card that
+    // cannot lift (buried / not a run head) and a liftable card whose smart-move finds no
+    // destination. The second half used to stay silent on purpose ("cueing every fruitless
+    // tap would be noise"), but with no sound or haptic anywhere in the app that silence was
+    // indistinguishable from a dropped touch (ux/WF-2:unmovable-card-no-feedback). A drag is
+    // never cued: its snap-back already answers.
     @State private var shakeSpot: Spot?
     @State private var shakeTrigger: CGFloat = 0
     /// Height of the landscape rail's pill stack — see landscapeRail.
@@ -661,24 +663,34 @@ struct ContentView: View {
                 // it would fire a stray smartMove and clear `drag`, snapping the in-flight drag
                 // back. Only the owning card (or a fresh tap, drag == nil) may resolve here.
                 guard drag == nil || drag?.source == spot else { return }
-                if !canDrag, !game.demoing {
+                if !canDrag {
                     // The touch landed on a card that cannot move (buried / not a run head):
                     // acknowledge it with a shake so silence never reads as a dropped touch.
-                    // Suppressed while demoing (ALL input is locked then, not just this card).
-                    shakeSpot = spot
-                    withAnimation(.linear(duration: 0.3)) { shakeTrigger += 1 }
+                    refuse(spot)
                     return
                 }
                 let travelled = hypot(v.translation.width, v.translation.height)
-                withAnimation(.easeOut(duration: 0.18)) {
-                    if travelled < tapSlop {
-                        game.smartMove(spot)                                   // tap
-                    } else if canDrag, let t = dropTarget(at: v.location) {
-                        game.drop(spot, to: t)                                 // drop onto target under finger
+                if travelled < tapSlop {
+                    var moved = false
+                    withAnimation(.easeOut(duration: 0.18)) { moved = game.smartMove(spot); drag = nil }   // tap
+                    // Liftable but with nowhere to go (cells full, no foundation step, no
+                    // alternating-colour neighbour, no empty column): same cue as a buried card.
+                    if !moved { refuse(spot) }
+                } else {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        if let t = dropTarget(at: v.location) { game.drop(spot, to: t) }   // drop onto target under finger
+                        drag = nil                                                          // else: snaps back
                     }
-                    drag = nil                                                 // else: snaps back
                 }
             }
+    }
+
+    /// The refusal wiggle. Suppressed while demoing — ALL input is locked then, not just this
+    /// card, and a demo board must stay visibly inert.
+    private func refuse(_ spot: Spot) {
+        guard !game.demoing else { return }
+        shakeSpot = spot
+        withAnimation(.linear(duration: 0.3)) { shakeTrigger += 1 }
     }
 
     /// Which drop target a release at `p` resolves to. Tableau columns deliberately overhang each
@@ -705,6 +717,8 @@ struct ContentView: View {
                 CardView(card: c, width: cardW)
                     .matchedGeometryEffect(id: c.id, in: ns)
                     .offset(runOffset(.cell(i)))
+                    // Same refusal wiggle as a tableau card (a parked card with no landing spot).
+                    .modifier(ShakeEffect(shakes: shakeTrigger, amplitude: shakeSpot == .cell(i) ? 4 : 0))
                     .gesture(cardGesture(for: .cell(i), canDrag: !game.demoing))
             } else {
                 SlotView(width: cardW)

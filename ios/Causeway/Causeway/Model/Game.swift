@@ -610,20 +610,23 @@ final class Game: ObservableObject {
         return true
     }
 
-    /// Double-tap: foundation → onto another card → empty column → free cell.
-    /// Double-tap. Works on any card heading a valid run (the card plus the
-    /// sub-stack below it), moving the whole run. Priority: foundation → onto
-    /// another card → empty column → free cell (foundation/free cell single-card only).
-    func smartMove(_ spot: Spot) {
-        if demoing { return }   // input is locked while a "how to win" line plays
+    /// Tap. Works on any card heading a valid run (the card plus the sub-stack below it), moving
+    /// the whole run. Priority: foundation → onto another card → empty column → free cell
+    /// (foundation/free cell single-card only). Returns whether anything moved, so the view can
+    /// acknowledge a fruitless tap — a liftable card with nowhere to go used to answer with
+    /// nothing at all, which a novice reads as a dropped touch
+    /// (ux/WF-2:unmovable-card-no-feedback). The web twin has no refusal cue on either half.
+    @discardableResult
+    func smartMove(_ spot: Spot) -> Bool {
+        if demoing { return false }   // input is locked while a "how to win" line plays
         let run: [Card]
         switch spot {
-        case .cell(let i): guard let c = cells[i] else { return }; run = [c]
+        case .cell(let i): guard let c = cells[i] else { return false }; run = [c]
         case .tableau(let col, let idx):
-            guard isSeqHead(col: col, idx: idx) else { return }   // card + cards below must form a run
+            guard isSeqHead(col: col, idx: idx) else { return false }   // card + cards below must form a run
             run = Array(tableau[col][idx...])
         }
-        guard let head = run.first else { return }
+        guard let head = run.first else { return false }
         let n = run.count
 
         // 1) foundation (single card only)
@@ -631,14 +634,14 @@ final class Game: ObservableObject {
             snapshot(); removeRun(spot)
             if canFoundationUp(head) { up[head.suit.rawValue] = head.rank }
             else { down[head.suit.rawValue] = head.rank }
-            commit(); return
+            commit(); return true
         }
         // 2) onto another (non-empty) column
         for col in 0..<Game.colCount {
             if case .tableau(let sc, _) = spot, sc == col { continue }
             if !tableau[col].isEmpty, canStackTableau(run, onto: col), n <= maxMovable(targetEmpty: false) {
                 snapshot(); removeRun(spot); tableau[col].append(contentsOf: run)
-                telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return
+                telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return true
             }
         }
         // 3) an empty column (skip if the run is already the whole source column)
@@ -647,16 +650,17 @@ final class Game: ObservableObject {
             for col in 0..<Game.colCount where tableau[col].isEmpty {
                 if n <= maxMovable(targetEmpty: true) {
                     snapshot(); removeRun(spot); tableau[col].append(contentsOf: run)
-                    telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return
+                    telem.maxRunMoved = max(telem.maxRunMoved, n); commit(); return true
                 }
             }
         }
         // 4) a free cell (single card, and not already in a cell)
         if n == 1, case .tableau = spot {
             for i in 0..<Game.cellCount where cells[i] == nil {
-                snapshot(); cells[i] = head; telem.cellUses += 1; removeRun(spot); commit(); return
+                snapshot(); cells[i] = head; telem.cellUses += 1; removeRun(spot); commit(); return true
             }
         }
+        return false
     }
 
     private func removeRun(_ spot: Spot) {
