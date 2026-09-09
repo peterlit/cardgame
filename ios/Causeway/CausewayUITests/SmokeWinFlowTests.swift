@@ -12,9 +12,11 @@
 //
 //  Determinism: every number below is the harness's prediction for the fixture
 //  (make_save.mjs prints "finish → won … finalMoves=N") and derive_daily.py's par:
-//    day 14 silver   → 97 moves, 🥉🥈, deal #608,530 (par 87)
-//    day 13 flawless → 79 moves, 🌟, deal #720,307 (par 78)
-//    day 2 bronze    → 96 moves, 🥉 only, deal #539,885 (par 86)
+//    day 14 silver   → 97 moves, 🥉🥈, deal #608530 (par 87)
+//    day 13 flawless → 79 moves, 🌟, deal #720307 (par 78)
+//    day 2 bronze    → 96 moves, 🥉 only, deal #539885 (par 86)
+//  Deal numbers on the overlay are UNGROUPED (DealFormat.seed; bug/WF-4:win-overlay-seed-grouped,
+//  fixed 42b5f7e) — a grouped "Deal #608,530" on the overlay is that bug back.
 //  Time readouts are NOT asserted exactly (the cascade's wall time varies): TC-5.4 seeds
 //  the prior run as 200 moves in 0:30 so "fewest" (96, run 2) and "fastest" (0:30, run 1)
 //  provably come from DIFFERENT runs, and both are exact.
@@ -43,8 +45,8 @@ final class SmokeWinFlowTests: XCTestCase {
         let app = QA.launch(today: "2026-08-15", game: QA.day14Silver)
         QA.finishFromPrompt(app)   // asserts the prompt title/body and the "You solved it! 🎉" overlay
 
-        let deal = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #608,530 · 97 moves · ")).firstMatch
-        XCTAssertTrue(deal.waitForExistence(timeout: 3), "overlay deal line is not 'Deal #608,530 · 97 moves · M:SS' — texts: \(texts(app))")
+        let deal = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #608530 · 97 moves · ")).firstMatch
+        XCTAssertTrue(deal.waitForExistence(timeout: 3), "overlay deal line is not 'Deal #608530 · 97 moves · M:SS' (ungrouped) — texts: \(texts(app))")
         XCTAssertTrue(app.staticTexts["Daily challenge: 🥉 🥈 earned. ⏰ On time — 1-day same-day streak."].exists,
                       "overlay daily line is wrong — texts: \(texts(app))")
         for button in ["Play deal #608531", "Random", "Close"] {
@@ -61,8 +63,8 @@ final class SmokeWinFlowTests: XCTestCase {
         let app = QA.launch(today: "2026-08-14", game: QA.day13Flawless)   // day 13 IS today
         QA.finishFromPrompt(app)
 
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #720,307 · 79 moves · ")).firstMatch.waitForExistence(timeout: 3),
-                      "overlay deal line wrong — texts: \(texts(app))")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Deal #720307 · 79 moves · ")).firstMatch.waitForExistence(timeout: 3),
+                      "overlay deal line is not 'Deal #720307 · 79 moves · M:SS' (ungrouped) — texts: \(texts(app))")
         XCTAssertTrue(app.staticTexts["🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."].exists,
                       "overlay flawless/on-time line wrong — texts: \(texts(app))")
         app.buttons["Close"].tap()

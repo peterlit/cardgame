@@ -176,7 +176,9 @@ final class SmokeDailySheetTests: XCTestCase {
 
         let headline = app.staticTexts["demo.headline"]
         XCTAssertTrue(headline.waitForExistence(timeout: 5), "no demo headline")
-        XCTAssertTrue(headline.label.hasPrefix("🌟 Flawless: 🥉🥈🥇 all three in a single run · 0 / "),
+        // The 🌟 headline names the day's 🥈/🥇 objectives in parentheses (DailyView.flawlessDemoLabel,
+        // ux/WF-15 round-1 fix): day 14 is max-run 2 / end-bias down 10 (data/daily-pool.json).
+        XCTAssertTrue(headline.label.hasPrefix("🌟 Flawless: 🥉🥈🥇 all three in a single run (🥈 Never move more than 2 cards in a single move; 🥇 Take at least 10 of every suit from the King end) · 0 / "),
                       "unexpected flawless headline: \(headline.label)")
         XCTAssertEqual(app.buttons["demo.start"].label, "Start", "the demo must open paused (Start, not Pause)")
         XCTAssertTrue(app.buttons["demo.next"].exists && app.buttons["demo.stop"].exists)

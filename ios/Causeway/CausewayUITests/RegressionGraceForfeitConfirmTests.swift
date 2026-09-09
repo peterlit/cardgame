@@ -30,6 +30,11 @@
 //   - "daily.cal.13" (Aug 14), "daily.play", "daily.demo.bronze"
 //   - the alerts have NO identifiers (SwiftUI .alert): queried by title and button
 //     labels, and the bodies are asserted on purpose — the copy IS the fix.
+//   - round 2 (ux/WF-14:grace-confirm-title-differs-by-control, 42b5f7e): on a LIVE grace
+//     the Daily sheet's confirm carries the SAME title as the board's Replay / New game —
+//     "Give up ⏰ Same-day for Aug 14?" (DailyView.confirmTitle branches on graceLive).
+//     "End your daily attempt?" is now the non-grace title only; matching it here would
+//     miss the fix, so all four legs query the grace title.
 //   - the ⏰ line on the day card has no identifier: matched by its exact text.
 //
 import XCTest
@@ -58,9 +63,11 @@ final class RegressionGraceForfeitConfirmTests: XCTestCase {
         // --- leg 1: the Daily card's Play -----------------------------------------
         QA.selectCalendarDay(app, 13)
         app.buttons["daily.play"].tap()
-        let dailyAlert = app.alerts["End your daily attempt?"]
+        let dailyAlert = app.alerts["Give up ⏰ Same-day for Aug 14?"]
         XCTAssertTrue(dailyAlert.waitForExistence(timeout: 3),
-                      "Daily ▸ Play re-dealt over a zero-move grace with NO dialog — the round-1 bug is back")
+                      "Daily ▸ Play over a zero-move grace showed NO dialog titled 'Give up ⏰ Same-day for Aug 14?' — either the round-1 bug is back or the sheet fell back to the non-grace title (visible alerts: \(app.alerts.allElementsBoundByIndex.map(\.label)))")
+        XCTAssertFalse(app.alerts["End your daily attempt?"].exists,
+                       "the Daily sheet's confirm dropped the ⏰ grace from its title (ux/WF-14:grace-confirm-title-differs-by-control)")
         XCTAssertTrue(QA.alert(dailyAlert, contains: "Starting this challenge re-deals the board. You began Aug 14's challenge on the day itself"),
                       "the Play dialog must name the grace it forfeits, got: \(QA.alertText(dailyAlert))")
         XCTAssertTrue(QA.alert(dailyAlert, contains: "Aug 14 can never earn ⏰ Same-day again"),

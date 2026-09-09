@@ -83,8 +83,16 @@ final class SmokeWinsScreenTests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5), "the range detail did not list Deal #500001")
         row.tap()
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Wins ▸ row replaced a live game with no confirmation")
-        confirm.buttons["Play that deal"].tap()
-        XCTAssertTrue(QA.waitGone(confirm, timeout: 3))
+        // bug/WF-7:deal-confirm-swallowed-by-double-tap (fixed 42b5f7e): a confirm raised from a
+        // dismissing sheet/alert presents its destructive action DISARMED for 0.5 s so a trailing
+        // tap under the finger hits an inert button. Tapping inside that window leaves the alert
+        // up (seen once in the round-2 whole-target run), so wait for it to arm — and a button
+        // that never arms is a wedged flow, which this wait also catches.
+        let playThatDeal = confirm.buttons["Play that deal"]
+        let armed = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: playThatDeal)
+        wait(for: [armed], timeout: 3)
+        playThatDeal.tap()
+        XCTAssertTrue(QA.waitGone(confirm, timeout: 3), "Play that deal was tapped while armed but the confirm stayed up")
         XCTAssertTrue(QA.wait(5) { dealPill.label == "Deal #500001 ✓" }, "Play that deal did not load #500001 (with its ✓): \(dealPill.label)")
         XCTAssertEqual(moves.label, "0", "the chosen deal must start at Moves 0")
     }

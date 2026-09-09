@@ -43,8 +43,10 @@ final class RegressionWinOverlayNamesDayTests: XCTestCase {
         let expected = "Aug 14: 🌟 Flawless! 🥉🥈🥇 all in a single run. ⏰ On time — 1-day same-day streak."
         XCTAssertTrue(app.staticTexts[expected].waitForExistence(timeout: 5),
                       "the overlay's daily line lost its 'Aug 14:' prefix (or its ⏰ clause) — on screen: \(overlayTexts(app))")
-        XCTAssertTrue(app.staticTexts["Deal #720,307 · 79 moves"].exists || dealLine(app).hasPrefix("Deal #720,307 · 79 moves"),
-                      "the overlay's deal line is not the fixture's deal / move count: \(dealLine(app))")
+        // UNGROUPED digits: the overlay goes through DealFormat.seed like the board pill
+        // (bug/WF-4:win-overlay-seed-grouped, fixed 42b5f7e). "Deal #720,307" would be that bug back.
+        XCTAssertTrue(dealLine(app).hasPrefix("Deal #720307 · 79 moves · "),
+                      "the overlay's deal line is not 'Deal #720307 · 79 moves · M:SS' (ungrouped, the fixture's deal / move count): \(dealLine(app))")
     }
 
     /// ux/WF-14:win-overlay-omits-the-day — a past-day REPLAY names the day and carries no ⏰.
