@@ -1,3 +1,15 @@
-fragments/
-briefs/
-.phase
+# Conclusions in git; evidence and scratch stay on disk.
+# Allowlist: nothing in .review-loop/ is tracked unless named below. A new
+# durable output type gets its exact name added here, deliberately — never
+# `git add -f` around this file. Patterns are exact/dash-prefixed on purpose,
+# so Finder duplicates ("REPORT 2.md") and stray scratch stay untracked.
+*
+!*/
+!.gitignore
+!REPORT.md
+!REPORT-*.md
+!rounds.md
+!rounds-*.md
+!ledger.json
+!ledger-*.json
+!verdict.json

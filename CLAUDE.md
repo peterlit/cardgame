@@ -15,6 +15,10 @@ that apply to *every* task, so they live here.
 - **Run the review loop after any non-trivial change** (`review-loop-tools:review-loop`), unless the
   owner says otherwise or the change is genuinely trivial. It is part of the definition of done.
   Start it in a *fresh session* — it costs ~3× more in a large one.
+- **Loop directories: conclusions in git, evidence and scratch on disk.** The nested
+  `.gitignore` allowlists in `.qa-loop/` and `.review-loop/` are the definition of
+  "conclusion". To track a new durable output type, add its exact name to the allowlist;
+  never `git add -f` around it. `tests/repo-hygiene.test.mjs` enforces this.
 - **Web and iOS must stay in sync.** `index.html` and `ios/Causeway/Causeway/Model/*.swift` are
   parallel implementations of the same rules, held together by drift-guard tests. Change a rule on
   one platform, change it on the other, and make a test prove it.

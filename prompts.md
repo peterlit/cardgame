@@ -874,3 +874,15 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     renamed to `ledger.json` (the plain name never existed there), and the tracked
     `fragments 2/` (38 files) renamed to `fragments/` so it falls under the standing ignore
     rule like every sibling archive — untracked from git, nothing deleted from disk.
+
+94. Codify "conclusions in git, evidence and scratch on disk" (follow-up to 93). Three layers:
+    (1) `.qa-loop/.gitignore` and `.review-loop/.gitignore` flipped from denylist to allowlist
+    — `*` then `!` per known conclusion name, exact/dash-prefixed so Finder dups never match;
+    validated that all tracked files stay tracked and 11 scratch/dup shapes are ignored.
+    (2) CLAUDE.md standing instruction: the allowlists are the definition of "conclusion";
+    add to them, never `git add -f` around them. (3) `tests/repo-hygiene.test.mjs` (4 tests):
+    index has no scratch paths, no Finder-dup names, no blob >256 KB, and the gitignores stay
+    default-closed. Also untracked the stray `.qa-loop/tools/__pycache__/*.pyc`. Suites: node
+    161/161 (4 new). Plus an untracked-by-design `plugin-feedback-conclusions-in-git.md` for
+    the loop-plugin maintainer: ship the allowlist at bootstrap, stage by explicit path,
+    preflight/closeout hygiene checks, Finder-dup awareness, optional out-of-tree evidence.

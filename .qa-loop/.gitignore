@@ -1,5 +1,23 @@
-evidence/
-fragments/
-briefs/
-scratch/
-.phase
+# Conclusions in git; evidence and scratch stay on disk.
+# Allowlist: nothing in .qa-loop/ is tracked unless named below. A new durable
+# output type gets its exact name added here, deliberately — never `git add -f`
+# around this file. Patterns are exact/dash-prefixed on purpose, so Finder
+# duplicates ("REPORT 2.md") and stray scratch stay untracked by default.
+*
+!*/
+!.gitignore
+!REPORT.md
+!REPORT-*.md
+!rounds.md
+!rounds-*.md
+!ledger.json
+!ledger-*.json
+!coverage.json
+!verdict.json
+!HARNESS_NOTES.md
+!HARNESS_NOTES-*.md
+!harness-notes-*.md
+!TESTCASES.md
+!WORKFLOWS.md
+!tools/*
+__pycache__/
