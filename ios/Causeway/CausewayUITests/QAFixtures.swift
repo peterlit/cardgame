@@ -141,7 +141,9 @@ enum QA {
     @discardableResult
     static func makeOneMove(_ app: XCUIApplication) -> Bool {
         let moves = app.staticTexts["stat.moves"]
-        let sorted = cards(app).sorted { $0.frame.maxY > $1.frame.maxY }
+        // Read each frame ONCE: a comparator that re-queries `frame` costs a round trip per
+        // comparison (hundreds per sort) and made this helper take a minute per call.
+        let sorted = cards(app).map { ($0, $0.frame.maxY) }.sorted { $0.1 > $1.1 }.map { $0.0 }
         for card in sorted.prefix(16) {
             guard card.isHittable else { continue }
             card.tap()
@@ -149,6 +151,25 @@ enum QA {
             if moves.label != "0" && moves.label != "—" { return true }
         }
         return false
+    }
+
+    /// Smart-move tap on one card by id, robust to the deal animation: waits until the card
+    /// is hittable, lets the board settle, taps, and re-taps once if the move count did not
+    /// change (a tap landing mid-animation hits where the card WAS). Returns the new Moves.
+    @discardableResult
+    static func tapCard(_ app: XCUIApplication, _ id: String) -> String {
+        let card = app.descendants(matching: .any)[id]
+        let moves = app.staticTexts["stat.moves"]
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "no \(id) on the board")
+        _ = wait(3) { card.isHittable }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        let before = moves.label
+        card.tap()
+        if !wait(2, until: { moves.label != before }) {
+            card.tap()
+            _ = wait(2) { moves.label != before }
+        }
+        return moves.label
     }
 
     /// True when `alert` carries a static text containing `fragment` (the message body).
