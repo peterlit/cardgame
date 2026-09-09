@@ -24,9 +24,29 @@ private struct RailPillHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 /// The rail content's top edge in the rail's own coordinate space (≤ 0 once scrolled).
+/// iOS 17 only — see ContentView.railAtEnd.
 private struct RailOffsetKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+/// Tracks whether a ScrollView is scrolled to its end, from the scroll geometry itself (iOS 18+;
+/// a no-op on iOS 17, where the RailOffsetKey preference stands in). Applied to the rail's
+/// ScrollView so the "⌄ more" / "⌃ top" cue follows EVERY scroll path — its own tap, a swipe on
+/// it, or a swipe inside the viewport — not just the ones the cue initiates.
+private struct RailEndTracker: ViewModifier {
+    @Binding var atEnd: Bool
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.onScrollGeometryChange(for: Bool.self) { g in
+                // visibleRect accounts for content insets; ±1 pt absorbs rounding.
+                g.visibleRect.maxY >= g.contentSize.height - 1
+            } action: { _, end in
+                atEnd = end
+            }
+        } else {
+            content
+        }
+    }
 }
 private struct DropZonesKey: PreferenceKey {
     static var defaultValue: [DropZoneFrame] = []
@@ -134,9 +154,16 @@ struct ContentView: View {
     @State private var resetConfirmArmed = true
     /// Height of the landscape rail's pill stack — see landscapeRail.
     @State private var railContentH: CGFloat = 0
-    /// Height of one rail pill and the rail's current scroll offset — see landscapeRail.
+    /// Height of one rail pill — see landscapeRail.
     @State private var railPillH: CGFloat = 0
-    @State private var railOffsetY: CGFloat = 0
+    /// Whether the rail is scrolled to its end — the cue's "⌄ more" / "⌃ top" state. Sourced
+    /// from the ScrollView's own geometry on iOS 18+ (onScrollGeometryChange: every scroll path,
+    /// cue tap, cue swipe or a swipe inside the viewport), and set directly by the cue's action
+    /// as well so the flip never waits on a layout pass. The RailOffsetKey preference this used
+    /// to be derived from was measured on device to never update after a programmatic scroll,
+    /// which left the cue reading "more" at the end and made its second tap a silent no-op
+    /// (ux/WF-12:rail-more-hint-inert); it survives only as the iOS 17 fallback.
+    @State private var railAtEnd = false
     private let tapSlop: CGFloat = 8   // finger travel under this = a tap, not a drag
 
     /// The typed deal number, or nil when the field is empty / not a number / outside the range
@@ -296,6 +323,17 @@ struct ContentView: View {
             // boundary: a deal→deal hop with no move in between writes 0 over 0 and onChange
             // (value comparison) never fires.
             shrinkLatchCount = 0; latchedBoardH = 0
+        }
+        .onAppear {
+            // Seed the count latch from the board as it stands. A game RESTORED at launch arrives
+            // with its columns already deep and no moveCount change to seed the latch, so it sat
+            // at 0 and the first move that shortened the tallest column rescaled the whole
+            // landscape board once (34×57 → 36×60, measured) — exactly the pulse the latch
+            // exists to prevent; every later move was monotone
+            // (ux/WF-12:landscape-board-rescales-every-move). On a fresh deal this records 7,
+            // below the landscape reserve floor of 8 and equal to portrait's live tallest, so
+            // nothing moves for anyone who did not restore.
+            shrinkLatchCount = max(shrinkLatchCount, game.tableau.map(\.count).max() ?? 0)
         }
         .onChange(of: game.moveCount) { _, count in
             // Maintain the portrait shrink latches (every board mutation changes moveCount).
@@ -488,7 +526,9 @@ struct ContentView: View {
             let k = floor((avail - railPillH / 2) / pitch)
             return k >= 1 ? k * pitch + railPillH / 2 : avail
         }()
-        let atEnd = overflows && railOffsetY <= -(railContentH - viewportH) + 1
+        let atEnd = overflows && railAtEnd
+        // iOS 17 fallback for the end state: the content's top edge in the rail's space.
+        let endOffset = -(railContentH - viewportH) + 1
         return ScrollViewReader { proxy in
             VStack(spacing: 0) {
                 ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
@@ -538,9 +578,16 @@ struct ContentView: View {
                 .frame(width: landscapeRailW, height: viewportH)
                 .onPreferenceChange(RailContentHeightKey.self) { railContentH = $0 }
                 .onPreferenceChange(RailPillHeightKey.self) { railPillH = $0 }
-                .onPreferenceChange(RailOffsetKey.self) { railOffsetY = $0 }
+                .onPreferenceChange(RailOffsetKey.self) { y in
+                    // iOS 18+ reads the end state from the scroll geometry below; this preference
+                    // was measured not to update after a scrollTo on device, so it must not be
+                    // allowed to overwrite that reading with a stale value.
+                    if #unavailable(iOS 18) { railAtEnd = y <= endOffset }
+                }
+                .modifier(RailEndTracker(atEnd: $railAtEnd))
                 if overflows {
                     railCue(atEnd: atEnd, height: cueH) { toEnd in
+                        railAtEnd = toEnd   // flip the cue at once; the geometry confirms it as the scroll lands
                         withAnimation(.easeOut(duration: 0.25)) {
                             proxy.scrollTo(toEnd ? "rail.last" : "rail.first", anchor: toEnd ? .bottom : .top)
                         }
