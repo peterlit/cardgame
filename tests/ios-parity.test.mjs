@@ -628,10 +628,17 @@ test('the 🌟 Flawless demo label says "all three" on both platforms (no web↔
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   const daily = read('Views/DailyView.swift');
   const label = '🥉🥈🥇 all three in a single run';
-  assert.ok(daily.includes(norm(`showPill(c.seed, "flawless", "🌟 Flawless", "${label}")`)),
-    'iOS 🌟 pill no longer labels Flawless as all three tiers in one run');
-  assert.ok(html.includes(norm(`b('flawless','${label}','🌟 Flawless')`)),
-    'web 🌟 pill no longer labels Flawless as all three tiers in one run');
+  // Since qa-loop round 1 (ux/WF-15:flawless-demo-headline-omits-objectives) the pill's label is
+  // built by a helper that appends the day's 🥈 and 🥇 objectives — same definition, same helper
+  // shape, on both platforms.
+  assert.ok(daily.includes(norm(`showPill(c.seed, "flawless", "🌟 Flawless", flawlessDemoLabel(c))`)),
+    'iOS 🌟 pill no longer routes through flawlessDemoLabel');
+  assert.ok(daily.includes(norm(`"${label} (🥈 \\(c.silver.label); 🥇 \\(c.gold.label))"`)),
+    'iOS 🌟 demo label no longer says "all three" plus the day\'s two objectives');
+  assert.ok(html.includes(norm(`b('flawless', flawlessDemoLabel(c), '🌟 Flawless')`)),
+    'web 🌟 pill no longer routes through flawlessDemoLabel');
+  assert.ok(html.includes(norm(`return \`${label} (🥈 \${c.silver.label}; 🥇 \${c.gold.label})\`;`)),
+    'web 🌟 demo label no longer says "all three" plus the day\'s two objectives');
   for (const [name, src] of [['index.html', html], ['DailyView.swift', daily]]) {
     assert.ok(!src.includes('Both objectives in one run'),
       `${name}: the 🌟 pill is back to "Both objectives in one run", which contradicts the legend/day card/win overlay`);
@@ -933,4 +940,17 @@ test('a live ⏰ grace leads the confirm title on every route (no web↔iOS drif
     'DailyView confirm title no longer leads with the ⏰ stake — the sheet\'s Play is back to the least-warning dialog');
   assert.ok(html.includes(norm('return confirm(`Give up ⏰ Same-day for ${d}?')),
     'web confirmReset no longer leads with the ⏰ stake');
+});
+
+// ux/WF-15:day-card-banked-tiers-read-as-flawless — three banked checks with no 🌟 must SAY that
+// Flawless is still open, on both day cards. The checks themselves stay the cumulative per-day
+// record (re-scoping them to the best single run would redefine the 🥈/🥇 streak cards).
+test('a day with all three medals banked across runs says "Not yet Flawless" on both platforms', () => {
+  const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
+  const daily = read('Views/DailyView.swift');
+  const line = '🌟 Not yet Flawless — these medals came from separate runs; earn 🥉🥈🥇 in one run.';
+  assert.ok(daily.includes(norm(`if let r = rec, r.bronze, r.silver, r.gold, !r.flawless { Text("${line}")`)),
+    'iOS day card lost its not-yet-Flawless line (or its exact three-banked-not-flawless gate)');
+  assert.ok(html.includes(norm(`(rec.bronze&&rec.silver&&rec.gold&&!rec.flawless) ? \`<div class="dontime muted">${line}</div>\` : ''`)),
+    'web day card lost its not-yet-Flawless line (or its exact three-banked-not-flawless gate)');
 });

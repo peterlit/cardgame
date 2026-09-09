@@ -220,6 +220,18 @@ struct DailyView: View {
                     tierRow("Silver", "silver", c.silver.label, rec, future: dayView > ti)
                     tierRow("Gold", "gold", c.gold.label, rec, future: dayView > ti)
                 }
+                // The three checks are the BANKED per-day record — 🥉🥈 in one run and 🥉🥇 in
+                // another shows three green checks with no 🌟, and nothing said why, so a novice
+                // who had just read the legend concluded Flawless was done
+                // (ux/WF-15:day-card-banked-tiers-read-as-flawless). Display only: the checks stay
+                // cumulative (re-scoping them to one run would silently redefine the 🥈/🥇 streaks).
+                // Web twin: renderDailyCard's `flawlessPending`.
+                if let r = rec, r.bronze, r.silver, r.gold, !r.flawless {
+                    Text("🌟 Not yet Flawless — these medals came from separate runs; earn 🥉🥈🥇 in one run.")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("daily.flawless.pending")
+                }
                 // What the day has cost so far — the banked best against the solver's par, and the
                 // moves of every clear behind it.
                 clearsLine(rec, par: c.par)
@@ -241,7 +253,7 @@ struct DailyView: View {
                         if game.hasSilverLine(c.seed) { showPill(c.seed, "silver", "🥈 Silver", c.silver.label) }
                         if game.hasGoldLine(c.seed) { showPill(c.seed, "gold", "🥇 Gold", c.gold.label) }
                         if game.hasFlawlessLine(c.seed) {
-                            showPill(c.seed, "flawless", "🌟 Flawless", "🥉🥈🥇 all three in a single run")
+                            showPill(c.seed, "flawless", "🌟 Flawless", flawlessDemoLabel(c))
                         }
                     }
                 }
@@ -389,6 +401,16 @@ struct DailyView: View {
     /// made, not yet won) it must CONFIRM before silently throwing it away. Deliberately no
     /// restore-the-attempt-after-the-demo: resuming a demo-touched flow is exactly the
     /// "finish the app's own line" scoring hole the demo teardown exists to close.
+    /// The 🌟 demo's headline: the tier's definition PLUS the day's two objectives. The 🥈 and 🥇
+    /// demos spell their objective into the bar, and tapping a pill dismisses this sheet, so a
+    /// Flawless demo used to run ~100 moves with nothing on screen naming the constraints it was
+    /// honouring (ux/WF-15:flawless-demo-headline-omits-objectives). Parentheses + semicolon, not
+    /// an em dash: several objective labels embed an em dash of their own. Web twin:
+    /// flawlessDemoLabel in index.html.
+    private func flawlessDemoLabel(_ c: Challenge) -> String {
+        "🥉🥈🥇 all three in a single run (🥈 \(c.silver.label); 🥇 \(c.gold.label))"
+    }
+
     private func showPill(_ seed: Int, _ tier: String, _ title: String, _ label: String) -> some View {
         // `dayView` rides along so leaving the demo can re-bind THAT day's challenge instead of
         // dropping the player on a casual deal of its seed (Game.endDemo,

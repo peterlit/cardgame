@@ -1708,6 +1708,10 @@ function renderDaily(){
       `<div class="dstreak"><div class="ic">${ic}</div><div class="cur">${v.current}</div><div class="l">${l}</div><div class="t">${v.total} total</div><div class="b">best ${v.best}</div></div>`).join('');
   renderDailyCard(); renderDailyCal();
 }
+// The 🌟 demo's headline: the tier's definition PLUS the day's two objectives, so a Flawless demo
+// never runs with nothing on screen naming what it honours (ux/WF-15:flawless-demo-headline-omits-objectives;
+// iOS twin: DailyView.flawlessDemoLabel). Parentheses + semicolon: objective labels embed em dashes.
+function flawlessDemoLabel(c){ return `🥉🥈🥇 all three in a single run (🥈 ${c.silver.label}; 🥇 ${c.gold.label})`; }
 function renderDailyCard(){
   const day=dailyView, ti=todayIndex();
   const c=dailyChallenge(day,dailyPool); const rec=dailyStore.days[day]||{};
@@ -1749,7 +1753,7 @@ function renderDailyCard(){
     if(sol.silver) parts.push(b('silver',c.silver.label,'🥈 Silver'));   // distinct only when Silver is certified
     if(sol.gold)   parts.push(b('gold',c.gold.label,'🥇 Gold'));
     // 🌟 the line the Flawless tier actually asks for: both objectives satisfied in ONE run.
-    if(sol.flawless) parts.push(b('flawless','🥉🥈🥇 all three in a single run','🌟 Flawless'));
+    if(sol.flawless) parts.push(b('flawless', flawlessDemoLabel(c), '🌟 Flawless'));
     showBtn = `<div class="dshowlbl">Show me how to win:</div><div class="dshowrow">${parts.join('')}</div>`;
   }
   // ⏰ is earned by clearing the day on its own date — say so where the player decides to play,
@@ -1785,9 +1789,15 @@ function renderDailyCard(){
       +(runs.length>1?`<div class="dclrow">Moves each run: ${runs.map(r=>r.moves).join(' · ')}</div>`:'')
       +`</div>`;
   }
+  // The three checks are the BANKED per-day record — 🥉🥈 in one run and 🥉🥇 in another shows
+  // three ✓ with no 🌟 and nothing said why (ux/WF-15:day-card-banked-tiers-read-as-flawless).
+  // Display only: the checks stay cumulative. (iOS twin: DailyView.dayCard.)
+  const flawlessPending = (rec.bronze&&rec.silver&&rec.gold&&!rec.flawless)
+    ? `<div class="dontime muted">🌟 Not yet Flawless — these medals came from separate runs; earn 🥉🥈🥇 in one run.</div>` : '';
   document.getElementById("dailyCard").innerHTML=
     `<div class="dhd"><span class="dday">${isToday?'Today':dstr}${rec.flawless?' <span class="dstar">🌟 Flawless</span>':''}</span><span class="ddeal">Deal #${c.seed}</span></div>
      <div class="dtiers">${row('Bronze','bronze','Clear the deal')}${row('Silver','silver',c.silver.label)}${row('Gold','gold',c.gold.label)}</div>
+     ${flawlessPending}
      ${clearsLine}
      ${onTimeLine}
      <div class="dauto">Your call: <span class="dpill">Auto-play: ${autoplayOn?'On':'Off'}</span><span class="dpill">Auto-finish: ${autoFinishMode.charAt(0).toUpperCase()+autoFinishMode.slice(1)}</span></div>
