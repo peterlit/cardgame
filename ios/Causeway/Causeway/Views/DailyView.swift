@@ -519,9 +519,25 @@ struct DailyView: View {
     /// and (in the simulator) wedged the exporter without writing the new one — zero backups left
     /// (bug/WF-11:export-replace-destroys-existing-backup). Down to the second, so every export
     /// gets its own file and the Replace path is never offered. No web twin (the web has no export).
-    private var exportFilename: String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return "Causeway-Stats-\(f.string(from: Date()))"
+    private var exportFilename: String { Self.exportFilename(at: Date()) }
+
+    /// The name's shape is a promise, not a locale default: a fixed-format DateFormatter left on
+    /// the device locale follows the region's calendar (Buddhist 2569, Japanese 令和), its digits
+    /// (Arabic-Indic), and — under a 12-hour region preference — rewrites "HH" to 12-hour, so
+    /// 01:30:05 and 13:30:05 could name the SAME file and reopen the Replace path above
+    /// (security/DailyView.swift:export-filename-locale; Apple QA1480). en_US_POSIX + Gregorian
+    /// pins the digits and the 24-hour clock everywhere; the zone stays local so the name reads
+    /// as the player's own clock.
+    static func exportFilename(at date: Date, timeZone: TimeZone = .current) -> String {
+        "Causeway-Stats-\(exportFormatter(timeZone: timeZone).string(from: date))"
+    }
+    static func exportFormatter(timeZone: TimeZone = .current) -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = timeZone
+        f.dateFormat = "yyyy-MM-dd-HHmmss"
+        return f
     }
 
     private func pl(_ n: Int, _ noun: String) -> String { "\(n) \(noun)\(n == 1 ? "" : "s")" }
@@ -845,6 +861,13 @@ private extension TierResult {
 /// the authoritative scoring runs at win via the checkers.
 struct DailyHUD: View {
     @ObservedObject var game: Game
+    // The chips are type, not board geometry: a low-vision player reads Silver/Gold here, during
+    // the attempt that scores them, so they follow Dynamic Type like the sheet does
+    // (a11y/DailyView.swift:dynamic-type-stops-at-the-sheet). Identity at the default size.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private func f(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .system(size: Theme.scaled(size, for: dynamicTypeSize), weight: weight)
+    }
 
     var body: some View {
         if let c = game.liveChallenge {
@@ -873,7 +896,7 @@ struct DailyHUD: View {
         // the challenge in progress (ux/WF-5:board-hud-omits-challenge-day).
         if c.dayIndex != todayIndex() {
             Text(dayLabel(c.dayIndex))
-                .font(.system(size: 10, weight: .bold))
+                .font(f(10, weight: .bold))
                 .foregroundStyle(Theme.gold)
                 .lineLimit(1).fixedSize()
                 .accessibilityIdentifier("hud.day")
@@ -900,9 +923,9 @@ struct DailyHUD: View {
             // The mark carries the tier's identifier: its label IS the state ("🥇·" / "🥇✓" / "🥇✗"),
             // and the tests that read it no longer have to find it by that literal
             // (bug/Main:scored-surfaces-addressable-only-by-copy).
-            Text("\(medal)\(mark)").font(.system(size: 11, weight: .bold)).foregroundStyle(color)
+            Text("\(medal)\(mark)").font(f(11, weight: .bold)).foregroundStyle(color)
                 .accessibilityIdentifier("hud.chip.\(tier)")
-            Text(label).font(.system(size: 10)).foregroundStyle(.white)
+            Text(label).font(f(10)).foregroundStyle(.white)
                 .lineLimit(oneLine ? 1 : nil)
                 .fixedSize(horizontal: false, vertical: true)   // wrap, never truncate, when stacked
                 .accessibilityIdentifier("hud.chip.\(tier).label")

@@ -23,6 +23,12 @@ private struct RailPillHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
+/// Measured height of the landscape HUD / demo bar, so the board's height budget subtracts what
+/// the bar really takes once Dynamic Type has grown (and possibly stacked) it — see landscapeHudBar.
+private struct HudBarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
 /// The rail content's top edge in the rail's own coordinate space (≤ 0 once scrolled).
 /// iOS 17 only — see ContentView.railAtEnd.
 private struct RailOffsetKey: PreferenceKey {
@@ -154,6 +160,8 @@ struct ContentView: View {
     @State private var resetConfirmArmed = true
     /// Height of the landscape rail's pill stack — see landscapeRail.
     @State private var railContentH: CGFloat = 0
+    @State private var hudBarH: CGFloat = 0          // landscape HUD / demo bar, measured (HudBarHeightKey)
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Height of one rail pill — see landscapeRail.
     @State private var railPillH: CGFloat = 0
     /// Whether the rail is scrolled to its end — the cue's "⌄ more" / "⌃ top" state. Sourced
@@ -199,7 +207,10 @@ struct ContentView: View {
             // Height available to the landscape board (rail · foundations · tableau) once the slim
             // header and any HUD/demo bar are removed. Bounds the rail's ScrollView so no control ever
             // clips off the bottom (which it would on short/notched phones and whenever the HUD shows).
-            let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? 50 : 0
+            // 50 is the default-size estimate the board was tuned on; the bar's fonts follow
+            // Dynamic Type (DailyHUD, demoHeadlineText), so at accessibility sizes the measured
+            // height takes over — never less than 50, so the default geometry is unchanged.
+            let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? max(50, hudBarH) : 0
             // Chrome above the board = topPad 6 + header (~40) + two 12pt VStack gaps ≈ 70; use 72 so
             // the rail's bounded viewport stays clear of the home-indicator zone on short phones.
             let landscapeBoardH = max(150, geo.size.height - 72 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
@@ -225,10 +236,25 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     header
                     if !landscape { toolbar }   // landscape moves the controls into the left rail
-                    if game.demoing || game.demoDoneMessage != nil {
-                        demoBar                // "Show me how to win" status + Stop/Done
-                    } else if game.challengeDay != nil {
-                        DailyHUD(game: game)   // live objectives while playing a challenge
+                    if game.demoing || game.demoDoneMessage != nil || game.challengeDay != nil {
+                        Group {
+                            if game.demoing || game.demoDoneMessage != nil {
+                                demoBar                // "Show me how to win" status + Stop/Done
+                            } else {
+                                DailyHUD(game: game)   // live objectives while playing a challenge
+                            }
+                        }
+                        // Landscape only: the bar's height feeds landscapeBoardH one way (the bar
+                        // is width-sized, never board-sized), so there is no measure→resize loop.
+                        // Portrait's board self-fits under it (latchedBoardH) and needs no measure.
+                        .background {
+                            if landscape {
+                                GeometryReader { g in
+                                    Color.clear.preference(key: HudBarHeightKey.self, value: g.size.height)
+                                }
+                            }
+                        }
+                        .onPreferenceChange(HudBarHeightKey.self) { hudBarH = $0 }
                     }
                     if landscape {
                         // Three columns: controls rail (left) · foundations + free cells · tableau
@@ -1025,7 +1051,9 @@ struct ContentView: View {
     }
     private var demoHeadlineText: some View {
         Text(demoHeadline)
-            .font(.system(size: 12.5, weight: .semibold))
+            // Type, not geometry: follows Dynamic Type like the Daily sheet
+            // (a11y/DailyView.swift:dynamic-type-stops-at-the-sheet). Unchanged at the default size.
+            .font(.system(size: Theme.scaled(12.5, for: dynamicTypeSize), weight: .semibold))
             .foregroundStyle(Color(hex: 0xF4EFE2))
             .accessibilityIdentifier("demo.headline")
     }
