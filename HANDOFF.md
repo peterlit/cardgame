@@ -53,7 +53,7 @@ the player can't reason about, or an unwinnable deal is against the grain of the
 Every command here was run and produced what it says (counts re-verified 2026-09-09).
 
 ```bash
-npm test                    # node --test "tests/**/*.test.mjs" → 167 tests, 167 pass, 0 skipped
+npm test                    # node --test "tests/**/*.test.mjs" → 171 tests, 171 pass, 0 skipped
 ```
 
 Web preview — a python http.server on port 8123 is configured in `.claude/launch.json` (config name
@@ -137,7 +137,7 @@ Things worth knowing before you run one:
 - **Measure the cost afterwards** with [`tools/loop-usage.py`](tools/loop-usage.py) (in-repo, reads
   the raw session transcripts) and write it up. That pattern has produced
   `docs/loop-token-usage.md` plus a feedback doc per version —
-  [`docs/review-loop-0.8.1-feedback.md`](docs/review-loop-0.8.1-feedback.md) is the most recent and
+  [`docs/review-loop-0.10.0-feedback.md`](docs/review-loop-0.10.0-feedback.md) is the most recent and
   the most useful to read first, because the owner maintains these plugins and acts on the feedback.
 - **The QA loop now drives the app through `.qa-loop/driver/` (an XCUITest server + `qa.py` client),
   NOT the MCP simulator-control tool** — that tool needs a per-device human grant on every fresh
@@ -183,7 +183,12 @@ findings — the deal-alert double-tap discard, the export-Replace backup loss, 
 step-back, Dynamic Type on the Daily sheet, a11y state on calendar cells and tier rows, identifiers on
 every scored surface — and left 3 minors + 5 proposals open (`.qa-loop/REPORT.md`, decisions in
 `docs/qa-loop-2026-09-09-decisions.md`, cost/feedback in `docs/qa-loop-0.12.0-feedback.md`). The
-review loop was NOT run on those 22 app commits (`1a63ce2..836434d`) — start it in a fresh session.
+review loop then ran on those 22 app commits (`1a63ce2..836434d`) the same evening: 0 majors in the
+scope itself; 4 seed minors; the fixes spawned a landscape-HUD regression chain (measure → latch →
+cap) that closeout finished. Stopped `thrashing_soft` at the scoped 2-round cap; 3 minors left open
+(`.review-loop/REPORT.md`, residuals in `BACKLOG.md`). Now the landscape board's HUD reserve is
+measured and latched per deal rather than a fixed 50 pt — read the report's WATCH LIST before
+touching `ContentView.swift`'s landscape geometry.
 
 **Recent history worth skimming:** the 2026-09-07 skeptical review (`docs/skeptical-review-2026-09-07.md`)
 and the pass that addressed it — the pool builder now publishes under a fail-closed contract, the

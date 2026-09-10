@@ -1,124 +1,45 @@
 {
   "round": 2,
-  "round_start_sha": "5826564d9244c45081e14b267c496500ca9de2a0",
-  "max_rounds": 5,
+  "round_start_sha": "1fa9402f1f7bea8ae8a1103ae1deb99a5f43d4c3",
+  "max_rounds": 2,
   "token_budget": null,
   "findings": [
     {
-      "id": "builder/build-month.mjs:extend-selects-nDays-not-slots",
-      "claim": "--extend can never publish. selectMonth fills `nDays` slots (build-month.mjs:198) and selectMonthBalanced returns as soon as `chosen.length >= nDays` (:242); the extend path never tells the selector it only needs `slotsToFill` days (:318 computes it but only feeds the underfill check at :322). So `fresh` comes back with nDays entries, `pool.days` becomes existing+nDays, and the candidate validator at :349 kills the run. Verified by running it: `--select-only --no-flawless-gate --extend --days 65` against the shipped 61-day pool exits with `FAILING CLOSED: candidate invalid \u2014 126 days, expected 65`. The pool runs out 2026-09-30 and --extend is the only sanctioned way to add days, so the reseed the whole R8 contract exists to make safe is currently impossible; it also burns the full solver budget picking 65 days to use 4.",
-      "evidence": {},
-      "severity": "blocker",
-      "region": "tools/solver/build-month.mjs:190-275,364-380",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Verified independently: selectMonth/selectMonthBalanced take `want` and extend passes slotsToFill (:371,:375). A scratch extend of a COPY of data/daily-pool.json to 65 days published in 0.35s \u2014 65 days, first 61 byte-identical to the shipped pool, all 65 seeds distinct. Real pool and .cache untouched. But the companion fix for the novelty-history finding introduced a hard 23-day ceiling on any extension; see builder/build-month.mjs:extend-cap-starvation. Extend still cannot add a month.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "builder/build-month.mjs:extend-ignores-published-objective-history",
-      "claim": "An extension only excludes published SEEDS (`publishedSeeds`, :317) \u2014 it does not seed the objective-novelty counters (`used`/`idUses`/`keyUses`, :197) from the already-published days. selectMonth therefore starts from a clean slate and can re-issue an exact (silver, gold) challenge pair a published day already used, violating the builder's own `never repeat an exact challenge` rule (:191) across the seam. Measured on the 126-day candidate the extend run produced: 4 of the 65 fresh days repeat a published pair verbatim (e.g. day 86 = day-N's {no-undo, big-move N=5}; day 95 = {max-run N=2, cells-le N=0}). `spread()` is also applied only to `fresh`, so the published/new boundary can put the same family on consecutive dates. Whoever fixes the blocker above must fix this too, or the reseeded month silently reruns August's puzzles.",
-      "evidence": {},
-      "severity": "major",
-      "region": "tools/solver/build-month.mjs:174-212,241-244,415-421",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Verified: prior.pairs hard-bars published (silver,gold) pairs in the selector (:244) and again on the candidate bytes (:416-421); idUses/keyUses seeded from published days (:208-212), with publishedSilverKeys back-translating `moves` per factor (d.par is present on every published day, checked); spread() takes the last published day as seam (:283). Scratch 65-day extend: 0 new-vs-published pair repeats. Two residuals, deliberately not raised as separate findings: (a) new-vs-NEW exact pairs inside one extension are still only penalised -60 and the bytes re-check compares new days against published only \u2014 a fresh 61-day build produced 0 dups, so the penalty holds in practice; (b) the SHIPPED pool already carries one violation this bug caused (days 3 and 60 are both suit-balance:N=4 | cells-le:N=0), unfixable under the verbatim-preservation contract. The cost of this fix is the new blocker.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "builder/build-month.mjs:corrupt-pool-parses-as-absent",
-      "claim": "The publishing gate treats an UNREADABLE existing pool as no pool at all: `try { existing = JSON.parse(...) } catch { existing = null }` (:288) then `existingDays = existing?.days?.length ? ... : null` (:289). A truncated, half-written or hand-mistyped data/daily-pool.json makes every guard at :291-:306 pass, and a bare `node build-month.mjs` overwrites 61 published days with a brand-new generation, exiting 0 \u2014 precisely the clobber the R8 contract was written to prevent, just through the one door left open. A file that exists but will not parse should REFUSE, not fall through to fresh mode.",
-      "evidence": {},
-      "severity": "major",
-      "region": "tools/solver/build-month.mjs:315-330",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Verified in code: an existing non-empty file that fails JSON.parse refuses (:322), and a parsed value without an Array days[] refuses (:325); only a whitespace-empty file still counts as absent, which is correct. Covered by a real test (tests/builder.test.mjs:257) that also asserts the corrupt file is left byte-identical. Full node suite 156/156.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/builder.test.mjs:every-case-is-a-refusal",
-      "claim": "All five builder tests run with a deliberately missing cache and assert only that the run FAILS (REFUSING / FAILING CLOSED, exit != 0). Not one asserts that the builder can still successfully publish anything \u2014 no test ever reaches the write path, the candidate validator's happy case, or the extend merge. That is exactly why the blocker above shipped green: the `--extend with nothing certified` test (builder.test.mjs:1828) dies at the underfill check long before the day-count bug can show. A test that only proves the tool refuses is satisfied by a tool that always refuses.",
-      "evidence": {},
-      "severity": "major",
-      "region": "tests/builder.test.mjs:77-135",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Three positive cases now reach the write path, the candidate validator's happy case and the extend merge, against the tracked .cache/month-certs-0.jsonl (confirmed git-tracked, so a clean checkout has it). 156/156 in ~5s. The remaining gap \u2014 no test extends by a month-sized amount \u2014 is carried as evidence on builder/build-month.mjs:extend-cap-starvation rather than re-raised here.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/CausewayTests:wipes-the-host-app-real-userdefaults",
-      "claim": "CausewayModelTests and SolutionReplayTests delete causeway.game / causeway.daily / causeway.wins / causeway.autoplay / causeway.autofinishmode from `UserDefaults.standard` in both setUp and tearDown. The target's TEST_HOST is Causeway.app, so the test bundle is injected into the app process and that IS the shipping app's container. On the simulator this is harmless; on the physical-device test run that is still an open owner item, running the unit tests permanently destroys the owner's real win history, daily medals and in-progress game with no backup. SolutionReplayTests additionally writes graded records for all 61 pool days into that store mid-run before deleting it. Inject a UserDefaults suite (or snapshot/restore the five keys) instead of clearing the shared one.",
-      "evidence": {},
-      "severity": "major",
-      "region": "ios/Causeway/CausewayTests/CausewayModelTests.swift:6-36",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "Independently sentinel-verified on DB9F4F54, not taken on the implementer's word: I hashed Library/Preferences/com.whimsicaldistractions.Causeway.plist in the app data container before a run and after, and the three causeway.* values (including a 1299-byte causeway.game blob) came back byte-identical; 11/11 passed. Prefix-scan snapshot covers every key the app writes \u2014 grep confirms all app UserDefaults keys are causeway.*-prefixed and nothing uses register(defaults:), so no registration-domain value can be promoted into the persistent domain by the restore. CausewayUITests touches no defaults, so no collateral. Residual worth knowing but not re-raised: the snapshot lives only in test-process memory, so a host-app crash between setUp and tearDown still destroys the owner's real history on a device run \u2014 an injected UserDefaults suite would be crash-safe.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "web/index.html:failed-pool-fetch-permanently-disables-automation",
-      "claim": "dailyRulesPending() is `challengeDay!=null && !dailyPool` (index.html:748) and the fetch's failure path only calls refreshDailyBtn() (:1442) \u2014 there is no retry and no timeout. A player who relaunches onto a restored daily attempt while offline (or behind a hung CDN) loses autoplay (:750), the auto-finish cascade (:1038) AND the manual Finish button (:1053, which refreshFinishBtn hides) for the entire session, with nothing on screen saying why the button vanished. The safe-by-default choice is right; the permanence and the silence are not \u2014 the gate needs a retry, or the Finish button needs to stay visible and explain itself.",
+      "id": "security/DailyView.swift:export-filename-locale",
+      "claim": "exportFilename builds a fixed-format timestamp on a bare DateFormatter with no locale/calendar pinned. On a device whose region uses a non-Gregorian calendar (Buddhist/Japanese/Persian) or Arabic-Indic digits, the backup filename's year and digits change wholesale; and under a 12-hour region setting a fixed 'HH' pattern is not guaranteed to stay 24-hour, so exports at 01:30:05 and 13:30:05 on the same day can produce the SAME name - reopening exactly the system 'Replace Existing Items?' path this fix exists to eliminate (bug/WF-11:export-replace-destroys-existing-backup, which trashed the old backup and wrote no new one, leaving zero backups).",
       "evidence": {},
       "severity": "minor",
-      "region": "index.html:1438-1462",
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:516-525",
+      "introduced_by_fix": true,
+      "fix_risk": true,
+      "note": "Round 2: untouched by 1fa5df6 (diff is ContentView.swift + one new UI test file only). Round-1 verdict stands; the three ExportFilenameTests methods pass in the round-2 scoped run.",
+      "current_status": "fixed",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "a11y/DailyView.swift:dynamic-type-stops-at-the-sheet",
+      "claim": "The ux/WF-5 Dynamic Type fix routed every font on the Daily SHEET through Theme.scaled, but the two surfaces the player actually reads WHILE PLAYING were left on fixed point sizes in the same round: DailyHUD.objChip's objective label is a hard .system(size: 10) and its medal mark .system(size: 11), and ContentView's demo-bar headline is a hard .system(size: 12.5). A low-vision player at Accessibility XXXL can read what Gold requires on the sheet and then cannot read the same objective in the in-game HUD, which is the only place it is shown during the attempt that scores it.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:890-910",
       "introduced_by_fix": false,
       "fix_risk": true,
+      "note": "Round 2: untouched by 1fa5df6. RegressionBoardHudDynamicTypeTests (both methods) and RegressionDailyHudStacksTests pass in the round-2 scoped run.",
       "current_status": "fixed",
-      "note": "loadDailyPool retries on both network failure and !r.ok, backoff 1s..30s capped, and each arrival re-runs reconcile -> scorePendingDaily -> refreshDailyBtn/refreshFinishBtn -> runAutoplay/maybeAutoFinish through the unchanged handler, so the gate reopens. The finding's disjunction (retry OR explain the hidden Finish button) is satisfied by the retry. Note the .catch also swallows a throw from inside the success handler and reschedules; that self-heals within a second, and a permanently-404 pool retries every 30s for the tab's life \u2014 acceptable for a small static file.",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -128,84 +49,23 @@
         {
           "round": 1,
           "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "web/index.html:post-win-undo-inflates-the-displayed-clock",
-      "claim": "The R3 undo fix diverges from its iOS twin on what elapsed time MEANS. iOS GameClock banks seconds at stop() and re-anchors on resume, so overlay-staring time is excluded; the web keeps a single `startTime` anchor and computes `Math.floor((Date.now()-startTime)/1000)` (index.html:1264, :550), and undo just restarts the display interval (:803). Sit on the win overlay for ten minutes, close it, undo, and the HUD resumes ten minutes ahead of the time actually played; a re-win's overlay reports that inflated figure, and a reload in between persists it as elapsedSecs. The persisted best is accidentally protected (wins[] min-merges against the correct first-win time at :1267), so this is display + save drift, not a corrupted record \u2014 but the two platforms now measure the same play differently and the string-pin drift guards cannot see it.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "index.html:799-806,1259-1270",
-      "introduced_by_fix": false,
-      "fix_risk": true,
-      "current_status": "fixed",
-      "note": "recordWin stamps winStopAt (:1267); undo shifts startTime forward by Date.now()-winStopAt and clears it (:804); deal() and restoreGame() both reset winStopAt (:532,:601), so no stale stamp survives a new board. Parity checked against the iOS twin: Game.undo does `if started && !clock.isRunning { startTimer() }` (Game.swift:521) and GameClock.start re-anchors runStart on top of `banked` (GameClock.swift:33-39), which is arithmetically the same exclusion. Second and later undos are no-ops because timerId is live. The two new guards are exact-text pins, not behavioural tests \u2014 they will catch deletion of either line, but nothing executes the arithmetic; acceptable given the extraction harness does not lift the clock.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
         },
         {
-          "round": 1,
+          "round": 2,
           "status": "fixed"
         }
       ]
     },
     {
-      "id": "web/index.html:deferred-win-overlay-never-updates",
-      "claim": "A win banked while the pool is pending shows \"your medals will be recorded when the daily data loads\" (index.html:1284). When the fetch lands a second later, scorePendingDaily() grades and merges (:1641-1650) but only re-renders the Daily sheet if it happens to be open (`if(dailyView!=null) renderDaily();`) \u2014 the win overlay the player is looking at keeps the promise text forever and never names the medals earned. The player has to dismiss it and reopen Daily to find out what they won.",
+      "id": "a11y/DailyView.swift:calendar-date-has-no-scale-floor",
+      "claim": "The calendar cell's DATE was newly routed through Theme.scaled but, unlike every other scaled label on this sheet, was given no .lineLimit(1)/.minimumScaleFactor. calCols is 7 flexible columns with 4pt spacing, so on a 393pt-wide sheet each column is roughly 46pt, while Theme.scaled(12, .accessibility5) on the caption1 curve is roughly 44pt - a two-digit date ('31') is wider than its own column. The fix that exists to stop calendar markers clipping at accessibility sizes leaves the date itself with no horizontal escape.",
       "evidence": {},
       "severity": "minor",
-      "region": "index.html:1667-1678",
-      "introduced_by_fix": false,
-      "fix_risk": true,
+      "region": "ios/Causeway/Causeway/Views/DailyView.swift:710-735",
+      "introduced_by_fix": true,
+      "fix_risk": false,
+      "note": "VERIFIED FIXED. DailyView.swift:735-736 is now `Text(\"\\(day)\").font(f(12, weight: .medium)).lineLimit(1).minimumScaleFactor(0.7)`, the same floor every other scaled label on this sheet carries. At AX5 the ~44 pt two-digit date can shrink to ~31 pt, inside the ~46 pt column, so it neither truncates nor widens the 7-column grid. Genuinely not mutant-killable, as the implementer said (the cell combines its children for accessibility, so no XCUITest can observe the glyph's width); accepted on the code read plus green RegressionCalendarMarkerAccessibilitySizeTests, RegressionDailyCalendarTests and RegressionDailySheetDynamicTypeTests in the full-target run.",
       "current_status": "fixed",
-      "note": "scorePendingDaily swaps res into pendingWin and clears dailyDeferred, then re-runs onWin() only while the overlay carries .show (:1674-1676). Ordering is right: dailyStore is merged and saved before onWin recomputes the on-time streak. Re-entrancy is safe (onWin's recordWin() is a no-op under the winRecorded latch), and deal()/restoreGame()/undo() all null pendingWin so a dismissed-then-new-board case can't redraw a stale overlay.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "builder/build-month.mjs:rebuild-gate-keyed-on-a-version-no-client-reads",
-      "claim": "The --rebuild gate refuses unless POOL_VERSION changed (:305), on the stated grounds that \"clients drop their daily history on the generation change\" (:296). They do not: POOL_VERSION is 4, while the web store gate is `g.version===3` (index.html loadDaily) and iOS DailyStore's is `private let version = 3` \u2014 two independent numbers with no coupling. Bumping POOL_VERSION to 5 satisfies the builder and changes nothing on either client, so every player's day-N medals keep applying to a completely different day-N challenge. Only the parenthetical in the error string stands between that and shipping; the guard should check (or the doc should stop claiming) the client coupling.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "tools/solver/build-month.mjs:309-320,351-357",
-      "introduced_by_fix": false,
-      "fix_risk": true,
-      "current_status": "fixed",
-      "note": "The finding was an either/or (make the guard check the coupling, or stop claiming it). The doc comment at :312-316 and the refusal message at :352-357 now state that bumping POOL_VERSION is necessary-but-not-sufficient and that neither client reads it; BACKLOG.md carries the missing coupling as a named open item. Accepting the implementer's proportionality argument: --rebuild is not the sanctioned reseed path.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/GameClockTests:wall-clock-upper-bounds-can-flake",
-      "claim": "testBlockedRunLoopStillMeasuresWallTime sleeps 2.3s and asserts `elapsed <= 3`; the clock truncates with Int(), so any 0.7s of scheduler overshoot on a Mac running several simulator sessions in parallel (which this one explicitly does) turns a correct clock red. The suite also spends ~5.7s of its 8.2s runtime in Thread.sleep. Loosen the upper bound (or drive the measurement through an injected now-provider) so the fast model suite cannot go red for being descheduled.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/CausewayTests/GameClockTests.swift:9-20",
-      "introduced_by_fix": false,
-      "current_status": "fixed",
-      "note": "VERIFIED. GameClock.swift:32 adds `var now: () -> Date = { Date() }` and all three reads are substituted (start :38, set :58, current :75); no other Date() read remains in the file (pause/resume/reset go through stop()/start(), so they inherit the seam). Production default is the real clock and is unreachable from app code: grep of ios/Causeway/Causeway finds no assignment to `.now` anywhere (only DispatchTime.now() call sites in Game/DailyView/ContentView), so the seam is test-only in practice. The rewritten tests are not tautologies: with `now` injected, a delivery-counting clock (the R9 regression class) reads 0 against XCTAssertEqual(clock.elapsed, 2) in testZeroTimerDeliveriesStillMeasuresWallTime (GameClockTests.swift:26-33), and the pause test still fails a leak because pauseForBackground must bank at stop() to make elapsed == atPause+1 after resume (:56-72). Full-suite evidence: all 5 GameClockTests passed at 0.001s each (was ~5.7s of Thread.sleep). Parity pins are unaffected \u2014 ios-parity.test.mjs:481-487 matches only `func pauseForBackground()` / `func resumeFromBackground()` / the ContentView scene hook, none of which moved; npm test 157/157, 0 skipped. FULL-SUITE (closeout, sim DB9F4F54): xcodebuild both targets -> CausewayTests 11/11 in 2.75s, CausewayUITests 21/21 in 517s, TEST SUCCEEDED, 0 failures, 0 skipped; npm test 157/157, 0 skipped.",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -227,14 +87,44 @@
       ]
     },
     {
-      "id": "builder/build-month.mjs:extend-cap-starvation",
-      "claim": "Seeding the per-family novelty counters from the published pool also feeds `capped()`, whose ceiling is the cap loop's maximum of 12 (:269). The 61 published days already spend 9 of the 12 slots on five silver families (rank-rush, end-bias, max-run, suit-balance, moves, cells-le at 9 each; no-undo at 7), leaving exactly 23 usable silver slots in total. So --extend now fails closed at ANY extension larger than 23 days, forever, no matter how many candidates are certified \u2014 and the failure message misdirects the operator to `widen --candidates or raise --budget` (:381), neither of which can ever help. Measured on a scratch copy of the real pool: --extend --days 92 (a normal 31-day month) prints 'FAILING CLOSED: only 23 of 31 days could be filled'; --days 84 succeeds with 23 new, --days 85 fails. Deleting only the prior-seeding loop at :208-212 from a scratch copy of the script makes --days 92 publish all 31 new days, which isolates the cause. The pool runs out 2026-09-30 and --extend is the only sanctioned reseed path, so the R8 contract still cannot deliver the next month; the fix must separate the SCORING counters (which should inherit history) from the CAP counters (which must scale with total pool size, or the cap loop must run past 12).",
+      "id": "tests/index.html:web-demo-step-back-has-no-behavioural-coverage",
+      "claim": "The web half of ux/WF-6:demo-has-no-step-back is a real refactor - deal() was split so that board layout moved into a new layoutBoard(), and demoStepBack() re-simulates the line from move 0 - yet nothing in the 167-test node suite executes either function. The only guard is a source-text pin in tests/ios-parity.test.mjs that string-matches two lines of the iOS source and two of the web source. An off-by-one in demoStepBack's target, a wrong board from layoutBoard, or a future caller passing an unnormalised seed to layoutBoard (deal() applies >>>0 before calling; layoutBoard itself does not) would all ship green, while the identical iOS logic IS covered by two real behavioural tests in SolutionReplayTests.",
       "evidence": {},
-      "severity": "blocker",
-      "region": "tools/solver/build-month.mjs:204-275",
+      "severity": "minor",
+      "region": "index.html:1600-1616",
+      "introduced_by_fix": true,
+      "fix_risk": false,
+      "note": "VERIFIED FIXED, and the coverage is real rather than nominal. tests/web-demo.test.mjs lifts the SHIPPED declarations (layoutBoard, applyDemoToken, demoStepBack and their deps) out of index.html by name via extractDecl - which throws loudly if a declaration is renamed, deleted, indented out of column 0, or duplicated (web-extract.mjs:88-97) - into a sandbox whose four stubs I checked against the originals: setMoves (index.html:1264) is DOM-only and mutates no state, and render/updateDemoBar/restartDeal are counted, so the abort path at index.html:1612 cannot pass silently (asserted at web-demo.test.mjs:206,239). The oracle is independent: layoutBoard is compared against tests/engine.mjs `deal` (engine.mjs:34-48), a separately maintained implementation, not against index.html itself. Mutation: all 5 web mutants killed (w1 off-by-one target, w2 wrong seed, w3 column sizes swapped, w4 banner re-entry demoStarted, w5 move-0 guard) - each is exactly the class of defect the finding said would ship green. npm test 171/171, 0 skipped.",
+      "current_status": "fixed",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/round-1-mutants.json:manifest-never-ran",
+      "claim": "The round's mutation manifest cannot execute: m1-drop-locale and m2-drop-calendar use \"replacement\": \"\", which mutate.py rejects (`if not m.get(k)` treats the empty string as missing), and the test_cmd contains a literal `-derivedDataPath <scratch>/dd` that bash parses as I/O redirection. `python3 mutate.py .review-loop/briefs/round-1-mutants.json` exits with \"2 manifest error(s); nothing was run\" \u2014 so the claimed 6/7-killed result was never produced by this manifest and the fixes' test coverage is unverified by mutation.",
+      "evidence": {},
+      "severity": "major",
+      "region": ".review-loop/briefs/round-1-mutants.json:1-20",
       "introduced_by_fix": true,
       "current_status": "fixed",
-      "note": "Independently verified, not on the implementer's word. Scratch copy of data/daily-pool.json + `--select-only --no-flawless-gate --extend --cache .cache/month-certs --days 92`: publishes 92 days in 2.9s; days 0-60 byte-identical to the shipped pool (deepEqual on the parsed array); 92 distinct seeds; 0 new-vs-published (silver,gold) pair repeats and 0 new-vs-new repeats computed with the builder's own canonical variantKey (my first pass used JSON template interpolation on the param OBJECT and reported 22 false repeats -- the canonical key says 0); 0 consecutive same-family dates across the whole 92, so spread()'s seam still holds. Real data/daily-pool.json and .cache untouched (git status clean apart from .review-loop). The cap DOES still bind within the run: fresh silver families came out 5/5/5/5/5/4/2, which is exactly selectMonthBalanced saturating at cap=5 (7 silver families, cap 3 caps the run at 21 and cap 4 at 28, both < 31) -- so the run-local capUses is the binding constraint, not the novelty score, and a run cannot pick 31 of one family. Whole-pool silver distribution after the extension is 14/14/14/13/14/9/14 over 92 days, i.e. the run-local cap did not skew the pool. Fresh builds are bit-identical in behaviour to before (prior=null means capUses and idUses bump in lockstep). Residual, not raised: the cap ceiling of 12 still bounds a SINGLE run at 7 silver families x 12 = 84 new days, and past that the :381 message misdirects again -- unreachable for the month-at-a-time use case and pre-existing for fresh builds. The +31 test at tests/builder.test.mjs:107 is the right size and REAL_CACHE ('.cache/month-certs') globs all 8 shards, all git-tracked, so a clean checkout has them.",
+      "note": "VERIFIED by running the committed artifact VERBATIM in one go (no split, no scratch copy): `python3 mutate.py .review-loop/briefs/round-1-mutants.json` -> killed=6, survived=1, errors=0, mismatches=0, exit 0, with m2-drop-calendar the expected survivor and m1/m3/m4/m5/m6/m7 all killed. That is exactly the count round 1 claimed, now produced by the file as committed: the two empty replacements carry inert comment lines, the derivedDataPath is absolute, m6's original tracks the round-2 latch/cap text, timeout is 1800s. One residual to know, not a defect: mutate.py has no 'scope' key - it runs the single test_cmd for every mutant - so the per-mutant `scope` fields are documentation only and a kill is attributable to the whole command, not the named test.",
       "first_seen_round": 1,
       "status_history": [
         {
@@ -248,15 +138,40 @@
       ]
     },
     {
-      "id": "parity/index.html:clock-counts-background-time",
-      "claim": "The clock fix aligned the post-win-undo case but the platforms still measure the same play differently in a far more common one: iOS explicitly pauses the clock when the scene leaves .active (ContentView.swift:249-256 -> GameClock.pauseForBackground, documented as policy at GameClock.swift:17-19), while the web keeps its single startTime anchor running and only calls saveGame() on visibilitychange (index.html:2178). Switch tabs for ten minutes mid-game on the web and those ten minutes are added to the HUD, to the win overlay's reported time, and to the persisted best in wins[seed]; on iOS they are excluded. Nothing tests the divergence \u2014 the round-1 drift guards pin the undo lines only.",
+      "id": "docs/HANDOFF.md:stale-unit-test-count",
+      "claim": "ExportFilenameTests adds 3 unit tests (verified: CausewayTests now runs 17, not 14) but HANDOFF.md and CLAUDE.md still assert 14, which is the number the next session will 'verify before claiming' against and treat a 17 as unexplained drift.",
       "evidence": {},
       "severity": "minor",
-      "region": "index.html:2170-2195",
-      "introduced_by_fix": false,
+      "region": "HANDOFF.md:70-80",
+      "introduced_by_fix": true,
+      "current_status": "partial",
+      "note": "PARTIAL - one stale count survives, in the file's most authoritative block. HANDOFF.md:56 sits inside '## 3. Verified commands', whose own preamble at :53 reads 'Every command here was run and produced what it says (counts re-verified 2026-09-09)', and it still says `npm test  # node --test \"tests/**/*.test.mjs\" -> 167 tests, 167 pass, 0 skipped`. I ran it: 171 tests, 171 pass, 0 skipped. So the next session performing CLAUDE.md's 'verify before you claim' step still hits a mismatch and still has to treat it as unexplained drift - this finding's exact failure mode, just relocated four lines up the page from where it was fixed. Everything else checks out against my own measurements: HANDOFF.md:73-74/:160 and CLAUDE.md:45/:48 now say 17 unit / 72 methods / 75 executions / npm 171; `grep -c 'func test'` gives exactly 17 in CausewayTests/ and 72 in CausewayUITests/; my runs executed 17 unit and 75 UI executions with CausewayUITestsLaunchTests/testLaunch running 4 times, which is precisely the '+3' the new HANDOFF.md:160-161 parenthetical explains. Remaining fix: one number on HANDOFF.md:56 (167 -> 171, twice).",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "partial"
+        }
+      ]
+    },
+    {
+      "id": "ux/ContentView.swift:hud-height-rescales-landscape-board",
+      "claim": "The new HudBarHeightKey feeds the bar's MEASURED height straight into landscapeBoardH (ContentView.swift:213-216), which feeds heightCardW (:225) - so any change in the bar's height rescales every card on the landscape board. The bar's height is not stable during play: demoHeadline embeds game.demoProgress (\"0 / 118\" -> \"10 / 118\", ContentView.swift:1103 / Game.swift:147), which changes the headline's width on demo moves and flips its wrap in the stacked ViewThatFits branch, and DailyHUD's chip marks change (\"\\u00b7\" -> \"\\u2713\"/\"\\u2717\") during a challenge. Unlike the tableau's card count, this new input has no latch, so it reopens the per-move landscape board rescale that shrinkLatchCount exists to prevent (ux/WF-12:landscape-board-rescales-every-move, ContentView.swift:123,359).",
+      "evidence": {},
+      "severity": "major",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:207-258",
+      "introduced_by_fix": true,
       "fix_risk": true,
       "current_status": "fixed",
-      "note": "Verified by tracing every ordering, not just the happy path. Freeze guard `if(timerId)` (index.html:2191) is the exact twin of iOS `guard runStart != nil` (GameClock.swift:61) and the resume guard `else if(hiddenAt)` twins `guard pausedInBackground` (GameClock.swift:67), so a clock the PLAYER stopped is not restarted by a tab return. Orderings checked: (a) hide mid-game -> freeze -> saveGame writes the frozen elapsed (:552) -> return shifts the anchor and restarts; (b) autoplay/auto-finish win in a hidden tab -> recordWin folds the hidden stretch out BEFORE computing secs (:1274 precedes :1278) and clears hiddenAt, so the later return is a no-op; (c) hide with the win overlay up -> timerId already null -> hiddenAt not set -> the round-1 winStopAt shift at :812 still covers the whole dwell, hidden or not, so the two mechanisms cannot double-count or fight; (d) restored-in-a-hidden-tab freezes at :607 with hiddenAt == the anchor instant, so elapsed round-trips unchanged; (e) pagehide from a hidden tab uses the frozen value. Critically, no automated path can silently UNFREEZE the clock: the three `if(!startTime){ startTime=...; startTimer(); }` sites (:761, :819, :965) are all guarded by an already-set startTime during a cascade, and runAutoplay (:756) / canOfferFinish (:1062) both require startTime, so a cascade continuing in a hidden tab never restarts the display timer. No TDZ hazard: `let hiddenAt` at :1265 is read by saveGame/restoreGame/deal, and there is no top-level executable statement between :460 and :1265. Residual divergence deliberately not raised: iOS pauses on ANY non-.active phase (ContentView.swift:253-258), so control centre / app switcher counts as background there, while the web only reacts to document.hidden -- there is no faithful web equivalent of .inactive and using blur would be worse. The iOS half of the new drift guard is a name-pin only (a gutted pauseForBackground body would pass), but GameClockTests.testBackgroundPauseFreezesAndResumeContinues and testResumeDoesNotRestartAClockTheGameStopped execute the real semantic, so the combination is adequate; the four web pins are exact-line and will fail on any edit.",
+      "note": "VERIFIED. ContentView.swift:175 adds hudBarLatchH; :236 the landscape reserve is min(cap, max(50, hudBarH, hudBarLatchH)) so it is monotone within a deal+geometry; :292 the latch only ever grows; resets at :366 (geo.size), :387 (dealGeneration), :402 (moveCount==0). Behaviourally proven, not just structurally: RegressionLandscapeHudLatchTests.testDemoBarHeightFlipsInLandscapeDoNotRescaleTheBoard passes and its own precondition asserts the paused bar is >8pt taller than the playing bar, so the flip really happens and all 52 card widths stay identical across Pause/Resume/Pause/3xPrev. Mutation: r2m1-latch-follows-live and r2m2-reserve-ignores-latch both KILLED (round-2 manifest ran verbatim, killed=3 survived=0 errors=0 mismatches=0). Default-size geometry unregressed: max(50,...) is unchanged when the measure never exceeds 50, and RegressionDailyHudStacksTests / RegressionBoardHudDynamicTypeTests / SmokeLandscapeTests / RegressionLandscapeDealAlertTests / RegressionRailCueFlipsAtEndTests / RegressionRestoredBoardShrinkLatchTests all pass. The latch's own staleness across a Dynamic Type change is filed separately as ux/ContentView.swift:hud-latch-survives-dynamic-type-change.",
       "first_seen_round": 1,
       "status_history": [
         {
@@ -270,14 +185,37 @@
       ]
     },
     {
-      "id": "tests/builder.test.mjs:cap-variety-never-asserted",
-      "claim": "Nothing in the suite asserts the per-family cap the builder exists to enforce. Both publish tests check day count, distinct seeds and pair non-repeats only (builder.test.mjs:98-104, :125-134) -- neither counts how many days share a silver or gold family. capped() is now the sole mechanism keeping a tier from reading as one idea (build-month.mjs:201-203, :220), and this round just changed its counter source; a future change that neuters it (e.g. `capped` made to always return false, the obvious wrong response to the next starvation report) would publish 31 days of a single family and the suite would stay green -- exactly the shape of failure that let the round-1 blocker ship.",
+      "id": "ux/ContentView.swift:hud-reserve-clamp-has-no-fallback",
+      "claim": "The measured-bar compensation is capped: landscapeBoardH = max(150, geo.height - 84 - bar) (ContentView.swift:216), so once the bar exceeds about geo.height-234 (~168 pt on a 402 pt landscape window) the board stops shrinking and the VStack overflows again, pushing the rail's bottom off-screen - the exact bug the change exists to fix. The tallest configurations are untested: DailyHUD grows a 4th row (hud.day, DailyView.swift:897-902) when a CATCH-UP day is played, and the demo bar in landscape is not covered at any text size (RegressionFlawlessDemoBarHeightTests is portrait-only; the new test only rotates the today-HUD path).",
       "evidence": {},
       "severity": "minor",
-      "region": "tests/builder.test.mjs:93-135",
-      "introduced_by_fix": false,
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:207-216",
+      "introduced_by_fix": true,
+      "fix_risk": true,
       "current_status": "fixed",
-      "note": "VERIFIED. assertFamilyCap (builder.test.mjs:29-42) counts per TIER per family, which matches capped()'s key `tier + ':' + o.id` (build-month.mjs:220), and the ceiling 12 is exactly selectMonthBalanced's max cap (build-month.mjs:277) so it cannot flake. Slices are right: whole pool for the fresh publish (31 days, :120), fresh slice only for --extend (:151), which is correct under the round-2 fix that stops charging published days to the cap. Mutation re-run by the reviewer: python3 mutate.py closeout-mutants.json -> killed 1, survived 0, errors 0. I also reproduced the mutant by hand in a throwaway worktree with .cache copied in and read the actual failure text: '--extend fresh days: silver family \"rank-rush\" fills 22 of 31 selected days \u2014 the per-family cap (max 12) is not being enforced' \u2014 so the killer really is the new assertion, not an incidental one. Residual (not filed as a finding): only the --extend test kills the mutant; the fresh-publish assertion stayed green, and at ceiling 12 vs real headroom ~5 the pins detect total cap collapse but not a weakening (e.g. deleting the cap=3..12 tightening search and always using 12).",
+      "note": "VERIFIED. ContentView.swift:234 landscapeBarCap = max(60, geo.h - 72 - 12 - 150); :282-285 an over-cap bar is wrapped in a ScrollView bounded to the cap. Checked the arithmetic rather than trusting it: with the cap taken, content = 6(topPad) + header + 12 + cap + 12 + 150 = geo.h + header - 54, and `header` (ContentView.swift:741-757) is built entirely from FIXED point sizes (22/11/12/18), so it is ~40pt at every Dynamic Type setting and the sum fits with ~12pt to spare - the 72 chrome constant does not go stale at accessibility sizes. No oscillation: the HudBarHeightKey GeometryReader (:271-277) sits on the bar's own background, and inside a vertical ScrollView the content is still measured at its ideal height, so the predicate at :282 cannot flap. testFlawlessDemoBarAtAX5LandscapeIsCappedAndTheRailStaysOnScreen and testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen both pass; mutation r2m3-no-cap-fallback KILLED. Caveats filed separately: ux/ContentView.swift:capped-hudbar-scroll-has-no-cue and tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "ux/ContentView.swift:hud-latch-survives-dynamic-type-change",
+      "claim": "hudBarLatchH is reset only on geo.size change, dealGeneration and moveCount==0 (ContentView.swift:366,387,402) - never on dynamicTypeSize. The bar's height is a direct function of dynamicTypeSize (DailyHUD and demoHeadlineText at ContentView.swift:1092 both scale), so a player who tries Accessibility XXXL mid-deal and then turns text size back down keeps the AX5-sized reserve for the rest of the deal: on a 393pt-tall landscape window the reserve stays pinned at the ~159pt cap instead of the ~50pt the small bar now needs, and the board is held at its 150pt floor with cards ~40% narrower than they should be, until a new deal or two rotations. Round 1's unlatched max(50, hudBarH) recovered immediately; the latch is what makes the wrong size stick.",
+      "evidence": {},
+      "severity": "major",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:360-403",
+      "introduced_by_fix": true,
+      "fix_risk": true,
+      "current_status": "fixed",
+      "note": "VERIFIED FIXED. ContentView.swift:387-395 adds `.onChange(of: dynamicTypeSize) { _, _ in latchedBoardH = 0; hudBarLatchH = 0 }` on the OUTER view (outside the GeometryReader that closes at :375), so it is present in both orientations and is not torn down with the portrait board's GeometryReader. Inert at the default size, as required: no `initial:` argument and DynamicTypeSize is Equatable, so the closure runs only on an actual Settings-driven change - no flash and no extra layout pass for a player who never touches text size. It cannot loop, because zeroing only RELAXES constraints: latchedBoardH is re-seeded by the existing `.onChange(of: liveH, initial: true)` at :348-350 from the new measure, hudBarLatchH by `.onPreferenceChange(HudBarHeightKey)` at :296-299, and the bar is width-sized and feeds landscapeBoardH one way (:268-270), so there is no measure->resize cycle. Zeroing rather than `= hudBarH` (what the geo.size handler at :372 does) is the right call for exactly the stated reason: hudBarLatchH is a maximum and hudBarH still carries the old-font height for one frame. Residual, benign: for that one frame landscapeHudBar (:236) falls back to max(50, stale hudBarH) - a transient over-reserve corrected by the next preference update, identical to the already-shipped dealGeneration path at :402. shrinkLatchCount is correctly left alone (a card count, size-independent). Full CausewayUITests target green on this commit, including RegressionBoardHudDynamicTypeTests, RegressionRestoredBoardShrinkLatchTests and RegressionLandscapeHudLatchTests.",
       "first_seen_round": 2,
       "status_history": [
         {
@@ -291,19 +229,63 @@
       ]
     },
     {
-      "id": "tests/GameClockTests:real-clock-default-untested",
-      "claim": "Every GameClockTests case is constructed through makeClock(), which overwrites `now` with the fake, so after this closeout NO test in either target exercises the production default `now = { Date() }`. Freeze that default (or wire it to the wrong clock) and all 5 unit tests plus all 21 UI tests stay green while the shipped HUD timer sits at 0:00 for an entire game and every recorded win banks 0 seconds \u2014 the deleted Thread.sleep tests were the only coverage of the real-clock path.",
+      "id": "ux/ContentView.swift:capped-hudbar-scroll-has-no-cue",
+      "claim": "The new capped bar (ContentView.swift:282-285) is a bare ScrollView with .frame(height: landscapeBarCap) and nothing else: no scroll cue, no trimmed viewport, no VoiceOver affordance. iOS hides scroll indicators at rest, and the cap is an arbitrary pixel height, so the fold can land exactly on a control boundary - which is precisely the pair of defects this file already documents and fixed for the rail (ux/WF-12:rail-hides-howtoplay, ux/WF-12:rail-more-hint-inert, ContentView.swift:572-585). At AX5 landscape the demo bar's Stop pill sits below the fold - the new test itself has to swipe to reach it (RegressionLandscapeHudLatchTests.swift:152) - so a low-vision player sees a truncated bar with no indication that Prev/Next/Pause/Stop exist below it.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:278-293",
+      "introduced_by_fix": true,
+      "fix_risk": true,
+      "current_status": "partial",
+      "note": "PARTIAL, and I accept it as partial rather than fixed - but three things the implementer's summary glosses. (1) Only the 'no scroll cue' half is touched. The 'fold lands on a control boundary' half - the second of the two defects this same file already fixed for the rail by TRIMMING the viewport to cut a pill in half (ContentView.swift:594-607) - is completely unaddressed for the bar: :284 is still a bare `.frame(height: landscapeBarCap)`, so at AX5 the cut can still fall exactly on a control edge and render a 0-4 pt sliver of Prev/Next, the precise appearance that made the rail's controls read as absent. (2) The cue itself is weak: `.scrollIndicators(.visible)` does not pin iOS indicators on - they still fade at rest - so the durable cue is really only the one-shot `.scrollIndicatorsFlash(onAppear: true)` at the moment the branch at :282 flips to the ScrollView. Compare the rail's cue at :686-690, which is a persistent, tappable, VoiceOver-labelled control. (3) SUSPECTED (I did not instrument VoiceOver): the `.accessibilityHint` at :290 is attached to a ScrollView that is an accessibility CONTAINER, not an element, so VoiceOver likely has nothing to focus that would ever speak it - in which case the claimed VoiceOver affordance is inert and the low-vision case is no better off than before. What I did rule out is the opposite regression: the full UI target is green and RegressionLandscapeHudLatchTests still resolves `app.buttons[\"demo.stop\"]` inside the scroll (:151-154), so the hint did NOT collapse the ScrollView into a single combined element and hide the controls. ACTION OUTSTANDING: the implementer justifies the punt by saying the full rail-style cue was 'punted to BACKLOG with a sketch', but `git diff 1fa5df6..HEAD -- BACKLOG.md prompts.md` is EMPTY - neither file is touched by 6d21ba0. Per this repo's convention the trailing 'review-loop record' commit is where that lands (87ef9b6 is the precedent); if it does not, the deferred work and its sketch exist nowhere on disk.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "partial"
+        }
+      ]
+    },
+    {
+      "id": "tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap",
+      "claim": "CHANGES claims the cap fallback is 'covered at both tallest configurations (Flawless demo bar and catch-up 4-row HUD, AX5 landscape)', but testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen (RegressionLandscapeHudLatchTests.swift:161-171) never queries board.hudbar.scroll: it asserts only that the rail bottom/header are on screen and hud.day is hittable, which passes identically whether the catch-up HUD is over the cap and scrolling or comfortably under it. So the catch-up half of the claim is untested for the cap path, and if that HUD is under the cap the test is a no-op guard against exactly the regression it is named for.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:159-171",
+      "introduced_by_fix": true,
+      "fix_risk": false,
+      "current_status": "fixed",
+      "note": "VERIFIED FIXED. RegressionLandscapeHudLatchTests.swift:174-178 now waits on `app.scrollViews[\"board.hudbar.scroll\"]` and asserts hud.day is drawn inside that scroll's frame, so the catch-up method no longer passes with the cap fallback deleted. Two independent confirmations: (a) the real test passes in my full-target run, which settles the empirical question the finding raised - the catch-up HUD at AX5 landscape IS over the cap; (b) mutant i1-cap-fallback-off-catchup-only (`if landscape && hudBarH > landscapeBarCap` -> `if false`) is killed by a test_cmd that targets ONLY testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen, so the kill is attributable to this method alone. NOTE on that kill's provenance: the manifest silences xcodebuild output (`>/dev/null 2>&1`), so a compile failure would present identically to a test failure; the conclusion does not rest on it, since I read the assertion and watched it pass against unmutated code, and `if false` makes board.hudbar.scroll unconditionally absent. The second half of this finding's old note - the slack cap bound in the sibling method - is NOT fixed and is carried forward as tests/RegressionLandscapeHudLatchTests.swift:cap-assertion-slack so it is not lost behind this 'fixed'.",
+      "first_seen_round": 2,
+      "status_history": [
+        {
+          "round": 2,
+          "status": "open"
+        },
+        {
+          "round": 2,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/RegressionLandscapeHudLatchTests.swift:cap-assertion-slack",
+      "claim": "The only numeric assertion on the landscape bar cap is slack by at least 12 pt, so it cannot fail for the regression it names. RegressionLandscapeHudLatchTests.swift:149 asserts `scroll.frame.height <= window.frame.height - 150 - 72`, i.e. window.height - 222, while the shipped cap (ContentView.swift:227,234) is `geo.size.height - 72 - 12 - 150` = geo.height - 234, and geo.size.height is the safe-area-inset GeometryReader height, never larger than window.frame.height. Deleting the `- 12` inter-element gap from the cap - which would eat the board's 150 pt floor, exactly what the assertion's failure message claims to catch - produces a bar height equal to the bound and still passes a LessThanOrEqual. The test that carries the cap's only numeric guard therefore ships green through a real cap regression.",
       "evidence": [
-        "ios/Causeway/Causeway/Model/GameClock.swift:32",
-        "ios/Causeway/CausewayTests/GameClockTests.swift:14-18",
-        "ios/Causeway/CausewayTests/GameClockTests.swift:21,36,48,73,80",
-        "ios/Causeway/CausewayUITests/RegressionAccessibilityIdentifiersTests.swift:51-53"
+        "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:149",
+        "ios/Causeway/Causeway/Views/ContentView.swift:227",
+        "ios/Causeway/Causeway/Views/ContentView.swift:234"
       ],
       "severity": "minor",
-      "region": "ios/Causeway/CausewayTests/GameClockTests.swift:14-33",
+      "region": "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:145-150",
       "introduced_by_fix": true,
+      "fix_risk": false,
       "current_status": "open",
-      "note": "CONFIRMED by reading, not run: makeClock() (GameClockTests.swift:14-18) sets clock.now on every instance and all five tests use it. The UI side cannot cover the gap either \u2014 the only UI test touching the clock readout asserts app.staticTexts[\"stat.time\"].exists (RegressionAccessibilityIdentifiersTests.swift:51-53), never its value, and a repo-wide grep of CausewayUITests for a time value (\"N:NN\" literals, DealFormat) finds only comments. Cheap fix, test-only, no shipped behavior change: one assertion that the default seam reads the real clock, e.g. XCTAssertLessThan(abs(GameClock().now().timeIntervalSinceNow), 1) \u2014 or a single retained sleep-based smoke test with a loose lower bound only (the flake came from the UPPER bounds).",
+      "note": "CONFIRMED by arithmetic on both sites; carried out of the note on tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap so it survives that finding's 'fixed'. Introduced by round 2's cap test, untouched by the closeout commit. Cheap fix: derive the bound from the same numbers the view uses (subtract the 12 pt gap too) and assert against the scroll's own container height rather than the window's, or drop the numeric assertion and keep only the structural one, so it stops implying a guard it does not provide.",
       "first_seen_round": 2,
       "status_history": [
         {
@@ -313,22 +295,22 @@
       ]
     }
   ],
-  "scope": "6c248b8..a0dd4a4 -- :!prompts.md",
+  "scope": "1a63ce2..836434d",
   "usage": {
     "0": {
-      "reviewer": 113752
+      "reviewer": 200853
     },
     "1": {
-      "implementer": 94508,
-      "reviewer": 79827
+      "implementer": 75017,
+      "reviewer": 101862
     },
     "2": {
-      "implementer": 108208,
-      "reviewer": 115953
+      "implementer": 201783,
+      "reviewer": 176990
     }
   },
   "round_shas": {
-    "1": "a0dd4a4267cbe32051ccfb40695927414aca7d73",
-    "2": "5826564d9244c45081e14b267c496500ca9de2a0"
+    "1": "f72bf7cfd32f328067ea6da0bc12bab26cb35b11",
+    "2": "1fa9402f1f7bea8ae8a1103ae1deb99a5f43d4c3"
   }
 }

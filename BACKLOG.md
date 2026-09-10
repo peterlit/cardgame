@@ -990,3 +990,26 @@ Report: `.qa-loop/REPORT.md`. Decisions: `docs/qa-loop-2026-09-09-decisions.md`.
   provisioner deletes other sessions' devices; the MCP control tool's per-device grant blocks autonomous
   runs (ship the driver); `notes-rotate` archives the largest section (it archived the driver section
   three times).
+
+### review-loop residuals — qa-loop rounds 1–2 scope, 2026-09-09 (stopped thrashing_soft at round 2)
+Full report: `.review-loop/REPORT.md` (read its WATCH LIST — the landscape HUD reserve is now
+measured + latched + capped, a behaviour change two same-family agents agreed on). Open:
+- **RL-5 — capped landscape HUD bar has only a weak cue** (`ContentView.swift` ~:278-293,
+  `board.hudbar.scroll`). Closeout added `.scrollIndicators(.visible)` +
+  `.scrollIndicatorsFlash(onAppear:)` + an `accessibilityHint`, but indicators still fade at
+  rest, the fold can land on a control boundary (a 0–4 pt sliver of Prev/Next), and the hint is
+  on a ScrollView *container* VoiceOver may never focus. Sketch (the implementer's): wrap `bar`
+  in a `ScrollViewReader` with top/end anchors, subtract a 24 pt cue row from `landscapeBarCap`,
+  render a tappable "⌄ more / ⌃ top" row below the ScrollView reusing the rail's
+  label/hint/isButton/accessibilityAction pattern (~:686-690), and trim the viewport to cut a
+  pill in half like the rail does (~:594-607). Only reachable at accessibility text sizes in
+  landscape.
+- **RL-6 — cap assertion is 12 pt slack** (`RegressionLandscapeHudLatchTests.swift:149`):
+  asserts `scroll.height <= window.height - 222` while the cap is `geo.height - 234`; deleting
+  the 12 pt gap from the cap still passes. Derive the bound from the view's numbers (or assert
+  against the scroll's container, or drop the numeric half and keep the structural one).
+- **RL-7 — no test can observe a mid-deal Dynamic Type change** (the closeout's
+  `.onChange(of: dynamicTypeSize)` zeroing `latchedBoardH` + `hudBarLatchH`, and the calendar
+  date's `.minimumScaleFactor(0.7)`): both verified by reading + affected classes green only.
+  If a launch-argument override for `dynamicTypeSize` ever exists in `QAFixtures`, add the
+  toggle test.

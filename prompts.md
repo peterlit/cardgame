@@ -912,3 +912,20 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     `.qa-loop/REPORT.md`, `docs/qa-loop-2026-09-09-decisions.md` (18 decisions),
     `docs/qa-loop-0.12.0-feedback.md`. The review loop was deliberately not run in this session.
 
+
+97. Run the review loop on the qa-loop rounds 1–2 app commits (`1a63ce2..836434d`), and give
+    feedback on the loop at the end. Scoped run, `review-loop-tools` 0.10.0, max 2 rounds +
+    closeout, fully unattended (the thrashing_soft "raise max_rounds?" question took the default:
+    abort + closeout). Seed: 0 blockers / 0 majors / 4 minors in the scope — the qa-loop's own
+    fixes held up; the reviewer ran parity, unit and 5 UI classes before saying so. Round 1 fixed
+    the export-filename locale pin (+3 unit tests) and made the in-game HUD/demo headline follow
+    Dynamic Type, but the unrequested `HudBarHeightKey` it added rescaled every card on a demo
+    step (the very WF-12 bug the scope had just fixed) and its mutation manifest could not run.
+    Round 2 latched the HUD reserve per deal and capped it with a scrolling fallback; the reviewer
+    found the latch survived a Dynamic Type change. Closeout: re-seed both latches on
+    `dynamicTypeSize`, indicators + hint on the capped bar (partial), calendar-date scale floor,
+    a real behavioural node test for web `layoutBoard`/`demoStepBack` (5/5 mutants killed), docs
+    counts. Full suites at closeout: node 171/171, Swift unit 17/17, UI 75/75 executions (72
+    methods), 0 skipped. Open: 3 minors (see BACKLOG). Cost: 756 K reported subagent tokens over
+    7 dispatches (~4–7× that billed). Report: `.review-loop/REPORT.md`; feedback on the plugin
+    in `docs/review-loop-0.10.0-feedback.md`.
