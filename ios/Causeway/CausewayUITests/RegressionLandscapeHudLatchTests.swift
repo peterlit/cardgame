@@ -168,6 +168,14 @@ final class RegressionLandscapeHudLatchTests: XCTestCase {
         rotateToLandscape(app)
         assertBoardChromeOnScreen(app, state: "catch-up HUD, AX5 landscape")
         XCTAssertTrue(QA.wait(3) { day.exists && day.isHittable }, "landscape AX5: hud.day is not on screen")
+        // This HUD is over the cap too, so it must be the SCROLLING kind — otherwise this test
+        // passes identically with the cap fallback deleted and covers nothing of it
+        // (tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap).
+        let scroll = app.scrollViews["board.hudbar.scroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 3),
+                      "the catch-up HUD at AX5 landscape did not fall back to the capped ScrollView")
+        XCTAssertTrue(day.frame.minY >= scroll.frame.minY - 0.5 && day.frame.maxY <= scroll.frame.maxY + 0.5,
+                      "hud.day (\(day.frame)) is drawn outside the capped bar (\(scroll.frame))")
     }
 
     // MARK: - helpers

@@ -70,8 +70,8 @@ project is `ios/Causeway/Causeway.xcodeproj`, scheme `Causeway`, bundle id
 xcodebuild build -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination 'generic/platform=iOS Simulator'
 
-# ALL tests — CausewayTests (14 Swift unit tests, seconds) + CausewayUITests (67 UI test
-# methods / 70 executions, ~30 min serially; run class groups so no single xcodebuild call
+# ALL tests — CausewayTests (17 Swift unit tests, seconds) + CausewayUITests (72 UI test
+# methods / 75 executions, ~30 min serially; run class groups so no single xcodebuild call
 # exceeds a 10-min tool timeout) → 0 skipped
 xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway \
   -destination "id=<UDID>" -parallel-testing-enabled NO -derivedDataPath <scratch>/dd
@@ -157,8 +157,9 @@ Things worth knowing before you run one:
 
 ## 6. Where things stand (2026-09-09)
 
-**Green.** `npm test` 167/167; iOS `CausewayTests` 14 unit + `CausewayUITests` 70 executions (67
-methods), zero skips anywhere, all ARMED (no XCTSkip guards) — verified at `0cd71fa`. `main` is clean.
+**Green.** `npm test` 171/171; iOS `CausewayTests` 17 unit + `CausewayUITests` 75 executions (72
+methods — the launch test runs once per UI configuration, hence +3), zero skips anywhere, all ARMED
+(no XCTSkip guards) — counts as of 2026-09-09 after the review loop. `main` is clean.
 
 **The pool expires on 2026-09-30.** `data/daily-pool.json` holds 61 certified days from the
 2026-08-01 epoch. After that date there are no daily challenges at all, on either platform. The owner

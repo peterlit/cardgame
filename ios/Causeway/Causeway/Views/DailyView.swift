@@ -729,7 +729,11 @@ struct DailyView: View {
             let markerH: CGFloat = dynamicTypeSize.isAccessibilitySize
                 ? ceil(Theme.scaled(11, for: dynamicTypeSize) * 1.25) : 6
             VStack(spacing: 2) {
+                // Same floor as every other scaled label on this sheet: at AX5 a two-digit date
+                // (~44 pt) is wider than its ~46 pt column, and unlike the marker below it had no
+                // horizontal escape (a11y/DailyView.swift:calendar-date-has-no-scale-floor).
                 Text("\(day)").font(f(12, weight: .medium))
+                    .lineLimit(1).minimumScaleFactor(0.7)
                     .foregroundStyle(avail ? Color.primary : Color.secondary.opacity(0.5))
                 // A flawless day shows a ⭐ in the marker slot (flawless implies all three tiers), so
                 // it never overlaps the date; other days show the earned-tier dots.

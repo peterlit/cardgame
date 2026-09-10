@@ -282,6 +282,12 @@ struct ContentView: View {
                             if landscape && hudBarH > landscapeBarCap {
                                 ScrollView(.vertical) { bar }
                                     .frame(height: landscapeBarCap)
+                                    // The fold is pixel-arbitrary and iOS hides indicators at rest,
+                                    // so flash them when the capped bar appears and keep them
+                                    // enabled — the cue that Prev/Next/Pause/Stop continue below.
+                                    .scrollIndicators(.visible)
+                                    .scrollIndicatorsFlash(onAppear: true)
+                                    .accessibilityHint("Scrolls; more of the bar is below")
                                     .accessibilityIdentifier("board.hudbar.scroll")
                             } else {
                                 bar
@@ -377,6 +383,15 @@ struct ContentView: View {
                 game.clock.pauseForBackground()
                 game.persist()   // capture latest board + elapsed before eviction
             }
+        }
+        .onChange(of: dynamicTypeSize) { _, _ in
+            // Text size changed mid-deal (Settings round-trip): both height latches were measured
+            // for the OLD fonts. hudBarLatchH in particular is a maximum, so seeding it from the
+            // still-old hudBarH would pin an AX5-sized reserve after the player turned text back
+            // down — board stuck at its 150 pt floor until a new deal or two rotations
+            // (ux/ContentView.swift:hud-latch-survives-dynamic-type-change). Zero both and let the
+            // next measure re-seed them, exactly as a deal boundary does.
+            latchedBoardH = 0; hudBarLatchH = 0
         }
         .onChange(of: game.dealGeneration) { _, _ in
             // New deal (any path — New game, Replay, demo Stop/Done, Daily play, deal alert):
