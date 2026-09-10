@@ -161,6 +161,18 @@ struct ContentView: View {
     /// Height of the landscape rail's pill stack — see landscapeRail.
     @State private var railContentH: CGFloat = 0
     @State private var hudBarH: CGFloat = 0          // landscape HUD / demo bar, measured (HudBarHeightKey)
+    // Landscape bar-height latch — the LARGEST hudBarH seen this deal in this geometry, the
+    // landscape twin of latchedBoardH. The measured bar feeds landscapeBoardH and so cardW, and
+    // it is not stable during play: the demo headline embeds the move counter ("9 / 118" →
+    // "10 / 118") and its suffix ("…" while playing, " (paused)" once paused), and DailyHUD's
+    // chip marks change mid-challenge — any of which can flip a wrap in the stacked bar.
+    // Unlatched, every such flip rescaled all 52 cards up AND down (the pulse shrinkLatchCount
+    // exists to prevent, arriving through the bar). Holding the maximum keeps the board's
+    // shrink monotone within a deal. Reset to 0 on every deal boundary (the bar may change
+    // kind or vanish with the new deal) and re-seeded from the live measure whenever the
+    // container size changes (rotation): the latch is only meaningful for the geometry it was
+    // measured in, and the bar's own wobble never changes the root size.
+    @State private var hudBarLatchH: CGFloat = 0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Height of one rail pill — see landscapeRail.
     @State private var railPillH: CGFloat = 0
@@ -210,10 +222,19 @@ struct ContentView: View {
             // 50 is the default-size estimate the board was tuned on; the bar's fonts follow
             // Dynamic Type (DailyHUD, demoHeadlineText), so at accessibility sizes the measured
             // height takes over — never less than 50, so the default geometry is unchanged.
-            let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil) ? max(50, hudBarH) : 0
             // Chrome above the board = topPad 6 + header (~40) + two 12pt VStack gaps ≈ 70; use 72 so
             // the rail's bounded viewport stays clear of the home-indicator zone on short phones.
-            let landscapeBoardH = max(150, geo.size.height - 72 - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
+            let landscapeChromeH: CGFloat = 72
+            // The board never sizes below 150 pt (rail · foundations · a 30 pt-card tableau), so
+            // the bar can take at most what is left above that floor. A bar taller than this
+            // (a 🌟 Flawless headline or a catch-up day's 4-row HUD at the largest accessibility
+            // sizes) used to push the whole VStack past the window and the rail's bottom pill
+            // off-screen; now the bar is held at the cap and scrolls inside it (see the bar
+            // below), so the board keeps its floor and every rail pill stays reachable.
+            let landscapeBarCap: CGFloat = max(60, geo.size.height - landscapeChromeH - 12 - 150)
+            let landscapeHudBar: CGFloat = landscape && (game.challengeDay != nil || game.demoing || game.demoDoneMessage != nil)
+                ? min(landscapeBarCap, max(50, hudBarH, hudBarLatchH)) : 0
+            let landscapeBoardH = max(150, geo.size.height - landscapeChromeH - (landscapeHudBar > 0 ? landscapeHudBar + 12 : 0))
             let cardW: CGFloat = {
                 guard landscape else { return portraitCardW }
                 // Size for the tallest column seen THIS DEAL (min 8 so a fresh 7-card deal nearly
@@ -237,7 +258,7 @@ struct ContentView: View {
                     header
                     if !landscape { toolbar }   // landscape moves the controls into the left rail
                     if game.demoing || game.demoDoneMessage != nil || game.challengeDay != nil {
-                        Group {
+                        let bar = Group {
                             if game.demoing || game.demoDoneMessage != nil {
                                 demoBar                // "Show me how to win" status + Stop/Done
                             } else {
@@ -254,7 +275,22 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        .onPreferenceChange(HudBarHeightKey.self) { hudBarH = $0 }
+                        Group {
+                            // Over the cap the bar cannot be given its height without the board
+                            // losing its floor: bound it and let IT scroll (the content's own
+                            // measure is unchanged inside the ScrollView, so this cannot oscillate).
+                            if landscape && hudBarH > landscapeBarCap {
+                                ScrollView(.vertical) { bar }
+                                    .frame(height: landscapeBarCap)
+                                    .accessibilityIdentifier("board.hudbar.scroll")
+                            } else {
+                                bar
+                            }
+                        }
+                        .onPreferenceChange(HudBarHeightKey.self) { h in
+                            hudBarH = h
+                            hudBarLatchH = max(hudBarLatchH, h)
+                        }
                     }
                     if landscape {
                         // Three columns: controls rail (left) · foundations + free cells · tableau
@@ -327,7 +363,7 @@ struct ContentView: View {
             // immediately, and the chrome wobble the latch exists for never changes the root
             // size, so unlatching here can't cause pulsing. shrinkLatchCount is
             // size-independent (a card count), so it stays.
-            .onChange(of: geo.size) { _, _ in latchedBoardH = 0 }
+            .onChange(of: geo.size) { _, _ in latchedBoardH = 0; hudBarLatchH = hudBarH }
             .onPreferenceChange(DropZonesKey.self) { dropZones = $0 }
             .foregroundStyle(Theme.ink)
         }
@@ -348,7 +384,7 @@ struct ContentView: View {
             // HUD, Finish pill) may not exist on the new one. moveCount can't mark this
             // boundary: a deal→deal hop with no move in between writes 0 over 0 and onChange
             // (value comparison) never fires.
-            shrinkLatchCount = 0; latchedBoardH = 0
+            shrinkLatchCount = 0; latchedBoardH = 0; hudBarLatchH = 0
         }
         .onAppear {
             // Seed the count latch from the board as it stands. A game RESTORED at launch arrives
@@ -363,7 +399,7 @@ struct ContentView: View {
         }
         .onChange(of: game.moveCount) { _, count in
             // Maintain the portrait shrink latches (every board mutation changes moveCount).
-            if count == 0 { shrinkLatchCount = 0; latchedBoardH = 0 }   // full undo to move 0: re-latch both
+            if count == 0 { shrinkLatchCount = 0; latchedBoardH = 0; hudBarLatchH = 0 }   // full undo to move 0: re-latch all three
             else { shrinkLatchCount = max(shrinkLatchCount, game.tableau.map(\.count).max() ?? 0) }
             // Self-heal a drag whose card was torn down mid-gesture by an async autoplay step
             // (its view — and gesture — vanish, so onEnded never fires, leaving `drag` stuck at
