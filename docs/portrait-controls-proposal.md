@@ -1,8 +1,8 @@
 # Proposal — the portrait control buttons (iOS)
 
 **Status: proposal, 2026-09-13. Nothing implemented.** Mockups are on the design canvas
-<https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882> (six phone artboards: the
-current layout, Option A in three states, Options B and C). The artboards are generated from the
+<https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882> (nine phone artboards: the
+current layout, Option A in three states, Option A2 in three states, Options B and C). The artboards are generated from the
 app's real values by [`tools/design/portrait-controls-gen.mjs`](../tools/design/portrait-controls-gen.mjs)
 (pill style, palette and card geometry lifted from `ContentView.swift`, `Theme.swift` and
 `SummerBackground.swift`), so the canvas can be re-seeded after edits. Landscape is untouched — the
@@ -53,6 +53,19 @@ rail keeps its flat list so the helper is orientation-aware. `RegressionAccessib
 counts "nine toolbar pills" and would need the More step. `pill` / `FlowLayout` stay for the
 Daily HUD's capsules.
 
+## Option A2 — Deck + permanent toggle row (owner's request, 2026-09-13)
+
+The owner liked A but wants Auto-play and Auto-finish readily accessible. A2 keeps the deck bar
+and adds a **permanent second tier above it**: two equal-width pills in the bar's material,
+`Auto-play [On]` and `Auto-finish [Ask]`, the state in a small badge so a glance reads it and a
+tap cycles it exactly as today. More then holds only Wins and How to play. Finish, when offered,
+rises as a third tier above the toggles; nothing below it moves.
+
+Cost: ~46 pt more of the bottom than A (bar 60 + row 38 + gaps), still ~14 pt less than the
+three-row toolbar it replaces, and both tiers sit on sand the tableau rarely reaches. Everything
+is under the thumb. Test implications shrink to `toolbar.wins` / `toolbar.howtoplay` needing the
+More step; `toolbar.autoplay` / `toolbar.autofinish` stay directly hittable.
+
 ## Option B — Two rows (conservative)
 
 Everything stays at the top, in two fixed-height rows:
@@ -74,7 +87,7 @@ Finish still has to squeeze in.
 
 ## Recommendation
 
-**A.** It is the portrait equivalent of what the rail already does in landscape — one ordered set
+**A2** once the owner has reviewed it (A with the toggles surfaced). **A** otherwise. It is the portrait equivalent of what the rail already does in landscape — one ordered set
 of actions with a single primary — and it is the only option that puts Undo under the thumb and
 gives the board its height back. If the menu for the two auto settings feels like a step too far,
 B is the fallback: same hierarchy, same fixed rhythm, top placement kept.

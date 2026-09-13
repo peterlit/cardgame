@@ -945,3 +945,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     identifier implications in `docs/portrait-controls-proposal.md`, generator kept in
     `tools/design/`. Canvas: https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882
 
+
+99. "I like option A except that I also want the Auto-play and Auto-finish controls to be readily
+    accessible. Perhaps make them a permanent second row of buttons like the 'Finish the deal'
+    button? Can you sketch that for my review?" Sketched as Option A2 on the same canvas: a
+    permanent tier of two equal-width toggle pills (`Auto-play [On]`, `Auto-finish [Ask]`, state
+    in a badge) above the deck bar, Finish rising as a third tier when offered, More reduced to
+    Wins + How to play. Three artboards (normal, Finish offered, More open); doc and generator
+    updated. Still a proposal — awaiting the owner's verdict before any implementation.
+

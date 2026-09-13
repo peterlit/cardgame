@@ -115,8 +115,11 @@ const current = shell('Current', `
 // ---------- A · Deck (bottom bar in the thumb zone) ----------
 const deckItem = (t, icon, {primary=false, disabled=false} = {}) =>
   `<div style="flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:52px;border-radius:14px;color:${primary?GOLDTXT:CREAM};background:${primary?GOLD:'transparent'};${primary?'box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);':''}${disabled?'opacity:.4;':''}"><span style="display:flex">${icon}</span><span style="font:600 11px system-ui,-apple-system,sans-serif;letter-spacing:.1px">${t}</span></div>`;
-const deckBar = (finish = false) => `<div style="position:absolute;left:${PAD+2}px;right:${PAD+2}px;bottom:14px;display:flex;flex-direction:column;align-items:center;gap:8px">
+const togglePill = (t, v) => `<div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:7px;height:38px;border-radius:999px;background:rgba(42,59,68,.46);color:${CREAM};box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);font:600 13px system-ui,-apple-system,sans-serif;white-space:nowrap"><span>${t}</span><span style="padding:2px 8px;border-radius:999px;background:rgba(244,239,226,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);font-weight:700;font-size:12px">${v}</span></div>`;
+const toggleRow = () => `<div style="display:flex;gap:8px;width:100%">${togglePill('Auto-play','On')}${togglePill('Auto-finish','Ask')}</div>`;
+const deckBar = (finish = false, toggles = false) => `<div style="position:absolute;left:${PAD+2}px;right:${PAD+2}px;bottom:14px;display:flex;flex-direction:column;align-items:center;gap:8px">
   ${finish ? `<div style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:999px;background:${GOLD};color:${GOLDTXT};box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 4px 12px rgba(58,43,0,.18);font:700 14px system-ui,-apple-system,sans-serif">${I.flag}Finish the deal</div>` : ''}
+  ${toggles ? toggleRow() : ''}
   <div style="display:flex;gap:2px;width:100%;padding:4px;box-sizing:border-box;border-radius:20px;background:rgba(42,59,68,.46);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 6px 18px rgba(42,59,68,.18);backdrop-filter:blur(10px)">
     ${deckItem('New game', I.plus, {primary:true})}${deckItem('Undo', I.undo, {disabled:true})}${deckItem('Replay', I.replay)}${deckItem('Daily', I.cal)}${deckItem('More', I.more)}
   </div>
@@ -153,6 +156,22 @@ const optionAMenu = shell('Option A · More menu', `
   ${deckBar()}
 `);
 
+// ---------- A2 · Deck + permanent toggle row (owner's request, 2026-09-13) ----------
+const optionA2 = shell('Option A2 · Toggle row', `${header(dealLine())}${upper()}${tableau()}${deckBar(false, true)}`);
+const optionA2Finish = shell('Option A2 · Finish offered', `${header(dealLine())}${upper()}${tableau()}${deckBar(true, true)}`);
+const optionA2Menu = shell('Option A2 · More menu', `
+  ${header(dealLine())}
+  ${upper()}
+  ${tableau()}
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,.06)"></div>
+  <div style="position:absolute;right:${PAD+6}px;bottom:130px;width:250px;border-radius:14px;background:rgba(248,246,240,.96);box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;backdrop-filter:blur(20px)">
+    ${menuRow('Wins', '', I.trophy)}
+    <div style="height:1px;background:rgba(0,0,0,.08);margin-left:16px"></div>
+    ${menuRow('How to play', '', I.help)}
+  </div>
+  ${deckBar(false, true)}
+`);
+
 // ---------- B · Two rows (actions + status strip, stays at the top) ----------
 const seg = (t, icon, {primary=false, disabled=false, first=false, last=false} = {}) =>
   `<div style="flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:5px;height:36px;font:600 13px system-ui,-apple-system,sans-serif;color:${primary?GOLDTXT:CREAM};background:${primary?GOLD:'transparent'};border-radius:${first?'999px 0 0 999px':last?'0 999px 999px 0':'0'};${disabled?'opacity:.4;':''}">${icon}${t}</div>`;
@@ -185,7 +204,7 @@ const optionC = shell('Option C · Grid', `
   ${tableau()}
 `);
 
-const out = { 'Current.dc.html': current, 'Main.dc.html': optionA, 'DeckFinish.dc.html': optionAFinish, 'DeckMenu.dc.html': optionAMenu, 'OptionB.dc.html': optionB, 'OptionC.dc.html': optionC };
+const out = { 'Current.dc.html': current, 'Main.dc.html': optionA, 'DeckFinish.dc.html': optionAFinish, 'DeckMenu.dc.html': optionAMenu, 'DeckToggles.dc.html': optionA2, 'DeckTogglesFinish.dc.html': optionA2Finish, 'DeckTogglesMenu.dc.html': optionA2Menu, 'OptionB.dc.html': optionB, 'OptionC.dc.html': optionC };
 for (const [f, s] of Object.entries(out)) writeFileSync(new URL(f, import.meta.url), s);
 
 const row = (files, y) => files.map((file, i) => ({ file, x: i * 480, y, w: W, h: H }));
@@ -195,14 +214,18 @@ const canvas = {
     { file: 'Main.dc.html', title: 'Option A · Deck (recommended)', x: 560, y: 0, w: W, h: H },
     { file: 'DeckFinish.dc.html', title: 'Option A · Finish offered', x: 1040, y: 0, w: W, h: H },
     { file: 'DeckMenu.dc.html', title: 'Option A · More menu', x: 1520, y: 0, w: W, h: H },
-    { file: 'OptionB.dc.html', title: 'Option B · Two rows', x: 560, y: 1000, w: W, h: H },
-    { file: 'OptionC.dc.html', title: 'Option C · Grid', x: 1040, y: 1000, w: W, h: H },
+    { file: 'DeckToggles.dc.html', title: 'Option A2 · Toggle row', x: 560, y: 1000, w: W, h: H },
+    { file: 'DeckTogglesFinish.dc.html', title: 'Option A2 · Finish offered', x: 1040, y: 1000, w: W, h: H },
+    { file: 'DeckTogglesMenu.dc.html', title: 'Option A2 · More menu', x: 1520, y: 1000, w: W, h: H },
+    { file: 'OptionB.dc.html', title: 'Option B · Two rows', x: 560, y: 2000, w: W, h: H },
+    { file: 'OptionC.dc.html', title: 'Option C · Grid', x: 1040, y: 2000, w: W, h: H },
   ],
   annotations: [
     { id: 'why', x: 0, y: 1000, w: 440, text: 'What the current toolbar gets wrong\n\n• Ten pills of ten widths wrap 4 / 4 / 1, leaving "How to play" orphaned on its own row.\n• Actions (New game, Undo, Replay), settings (Auto-play, Auto-finish), pages (Daily, Wins, How to play) and a readout (Deal #) all wear the same pill, so nothing reads as more important than anything else.\n• Finish appears mid-flow and reflows every pill after it.\n• The most-used control, Undo, sits at the top of the screen while the thumb zone below the tableau is empty.\n\nLandscape already solves this with a single ordered column; portrait needs the equivalent.' },
+    { id: 'a2-note', x: 0, y: 1000, w: 440, text: 'Option A2 · Deck + toggle row (owner\'s request, 2026-09-13)\n\nOption A with Auto-play and Auto-finish as a PERMANENT second tier above the bar: two equal-width pills in the bar\'s own material, the state in a small badge (On / Ask) so a glance reads it and a tap cycles it, exactly as today. More now holds only Wins and How to play.\n\nFinish, when offered, rises as a third tier above the toggles — nothing below it moves.\n\nCost: ~46 pt more of the bottom than A (bar 60 + row 38 + gaps), still ~14 pt less than the three-row toolbar it replaces, and the tiers sit on sand the tableau rarely reaches. Everything is under the thumb.' },
     { id: 'a-note', x: 560, y: -250, w: 900, text: 'Option A · Deck — recommended\n\nThe three play actions plus Daily move into a bottom bar that sits on the sand band, under the thumb. New game keeps its gold. Settings and the two reference pages go behind More, where iOS Menu rows show their state (Auto-play ✓ On, Auto-finish Ask). Deal # becomes a small readout under the subtitle. Finish, when offered, rises as a gold pill above the bar so nothing else moves.\n\nGains ~60 pt of board height in portrait. Tradeoff: the two auto settings are one tap further away, and the bar covers part of the sand.' },
-    { id: 'b-note', x: 560, y: 1880, w: 420, text: 'Option B · Two rows\n\nEverything stays at the top, but in two fixed-height rows: a segmented control for New game / Undo / Replay / Daily, then a quiet status strip — chips for Deal / Auto-play / Auto-finish on the left, a More button (Wins, How to play) on the right. Finish, when offered, appears as a full-width gold bar under the strip. Least disruptive to existing tests and muscle memory; saves ~30 pt.' },
-    { id: 'c-note', x: 1040, y: 1880, w: 420, text: 'Option C · Grid\n\nThe same ten pills, snapped to a 4-column grid with equal cells (wide cells span two). Nothing changes but rhythm. Honest but weakest: still three rows of same-weight buttons, and Finish still has to squeeze in when it is offered.' },
+    { id: 'b-note', x: 560, y: 2880, w: 420, text: 'Option B · Two rows\n\nEverything stays at the top, but in two fixed-height rows: a segmented control for New game / Undo / Replay / Daily, then a quiet status strip — chips for Deal / Auto-play / Auto-finish on the left, a More button (Wins, How to play) on the right. Finish, when offered, appears as a full-width gold bar under the strip. Least disruptive to existing tests and muscle memory; saves ~30 pt.' },
+    { id: 'c-note', x: 1040, y: 2880, w: 420, text: 'Option C · Grid\n\nThe same ten pills, snapped to a 4-column grid with equal cells (wide cells span two). Nothing changes but rhythm. Honest but weakest: still three rows of same-weight buttons, and Finish still has to squeeze in when it is offered.' },
   ],
   launch: { view: 'canvas' },
 };
