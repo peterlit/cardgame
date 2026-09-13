@@ -38,7 +38,7 @@ final class SmokeNoviceTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["FOUNDATIONS · A↑ / K↓"].exists, "the foundations heading is missing")
         XCTAssertTrue(app.staticTexts["FREE CELLS"].exists, "the FREE CELLS heading is missing")
 
-        app.buttons["toolbar.howtoplay"].tap()
+        QA.openHowToPlay(app)
         XCTAssertTrue(app.navigationBars["How to play"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Goal"].exists && app.staticTexts["Controls"].exists, "Goal / Controls sections missing")
         XCTAssertTrue(contains(app, "Each suit has two foundations — an up pile (A, 2, 3 …) and a down pile (K, Q, J …)"),
@@ -112,7 +112,7 @@ final class SmokeNoviceTests: XCTestCase {
     /// TC-10.1 — How to play carries every section a novice needs.
     func testTC10_1_RulesSheetHasEverySection() throws {
         let app = QA.launch()
-        app.buttons["toolbar.howtoplay"].tap()
+        QA.openHowToPlay(app)
         XCTAssertTrue(app.navigationBars["How to play"].waitForExistence(timeout: 5))
         for title in ["Goal", "The catch", "Tableau", "Free cells", "Controls"] {
             XCTAssertTrue(app.staticTexts[title].exists, "rules section missing: \(title)")

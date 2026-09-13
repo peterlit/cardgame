@@ -12,15 +12,17 @@
 //  bottom); header + Moves/Time/Won still visible; both group labels present; 52 card.*
 //  elements; nothing — pill, label or card — outside the window frame.
 //
-//  Selector notes: the nine toolbar ids (ContentView.landscapeRail reuses the portrait
+//  Selector notes: the seven rail ids (ContentView.landscapeRail reuses the portrait deck's
 //  ids), "stat.moves"/"stat.time"/"stat.won", "card.<S><rank>", the two group labels.
 //
 import XCTest
 
 final class SmokeLandscapeTests: XCTestCase {
 
-    private let rail = ["toolbar.newgame", "toolbar.undo", "toolbar.replay", "toolbar.autoplay",
-                        "toolbar.autofinish", "toolbar.deal", "toolbar.daily", "toolbar.wins", "toolbar.howtoplay"]
+    // A2 (2026-09-13): the rail's pills in rail order. Deal # is a header chip in both
+    // orientations; Wins / How to play are behind More.
+    private let rail = ["toolbar.newgame", "toolbar.undo", "toolbar.replay", "toolbar.daily",
+                        "toolbar.autoplay", "toolbar.autofinish", "toolbar.more"]
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -40,7 +42,7 @@ final class SmokeLandscapeTests: XCTestCase {
         let window = app.windows.firstMatch
         XCTAssertTrue(window.waitForExistence(timeout: 5))
         XCTAssertTrue(QA.wait(5) { window.frame.width > window.frame.height }, "rotation to landscape never took effect")
-        XCTAssertTrue(QA.wait(5) { app.buttons["toolbar.howtoplay"].exists && app.buttons["toolbar.howtoplay"].frame.midX < window.frame.width / 4 },
+        XCTAssertTrue(QA.wait(5) { app.buttons["toolbar.more"].exists && app.buttons["toolbar.more"].frame.midX < window.frame.width / 4 },
                       "the toolbar did not reflow into a LEFT rail")
 
         let pills = rail.map { app.buttons[$0] }
@@ -56,7 +58,7 @@ final class SmokeLandscapeTests: XCTestCase {
         }
         XCTAssertGreaterThan(w, 90, "rail pills are unexpectedly narrow (\(w) pt)")
         for i in 1..<pills.count {
-            XCTAssertGreaterThan(pills[i].frame.minY, pills[i - 1].frame.minY, "rail order differs from the portrait order at \(rail[i])")
+            XCTAssertGreaterThan(pills[i].frame.minY, pills[i - 1].frame.minY, "rail order is wrong at \(rail[i])")
         }
 
         XCTAssertTrue(app.staticTexts["Causeway"].exists, "the header title is gone in landscape")

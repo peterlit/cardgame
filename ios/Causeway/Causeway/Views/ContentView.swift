@@ -128,7 +128,7 @@ struct ContentView: View {
     // Portrait board-height latch — the same monotone-within-a-deal contract as
     // shrinkLatchCount, in the other direction: the SMALLEST portrait board height seen this
     // deal. The height feeding portraitFitCardW is card-size-independent but NOT constant:
-    // the toolbar's FlowLayout can gain/drop a whole row when the Finish pill appears
+    // the portrait deck gains/drops its Finish tier when the board becomes finishable
     // mid-deal, and the demo bar's wrapping headline changes per step — unlatched, that
     // wobble would rescale a shrunk board up AND down (exactly the pulse shrinkLatchCount
     // exists to prevent, arriving through the height input). Holding the minimum keeps the
@@ -255,8 +255,9 @@ struct ContentView: View {
                 SummerBackground().equatable()   // never changes; skip re-rasterizing its blur layers
 
                 VStack(alignment: .leading, spacing: 12) {
-                    header
-                    if !landscape { toolbar }   // landscape moves the controls into the left rail
+                    header(landscape: landscape)
+                    // The controls: landscape's left rail (below), portrait's bottom deck (after
+                    // the board) — docs/portrait-controls-proposal.md, Option A2.
                     if game.demoing || game.demoDoneMessage != nil || game.challengeDay != nil {
                         let bar = Group {
                             if game.demoing || game.demoDoneMessage != nil {
@@ -314,7 +315,7 @@ struct ContentView: View {
                         // column forces a shrink, foundations, free cells and tableau all rescale
                         // together (a split-size board reads wrong and makes matchedGeometryEffect
                         // flights jump sizes mid-flight). This outer GeometryReader spans exactly
-                        // those two areas, and everything above it (header/toolbar/HUD) is
+                        // those two areas, and everything above/below it (header/HUD/deck) is
                         // card-size-independent, so portraitFitCardW is a one-shot pure function of
                         // its height — no measure→resize feedback loop. Card-size-independent is
                         // not constant, though (Finish pill row, demo headline wrap), so the
@@ -350,6 +351,7 @@ struct ContentView: View {
                                 latchedBoardH = latchedBoardH > 0 ? min(latchedBoardH, h) : h
                             }
                         }
+                        portraitDeck
                     }
                 }
                 .padding(.horizontal, outerPad)
@@ -579,8 +581,9 @@ struct ContentView: View {
         return [cost, tail].compactMap { $0 }.joined(separator: " ")
     }
 
-    /// Landscape LEFT rail — the toolbar controls as a narrow vertical column of full-width pills,
-    /// so the top of the screen is freed for a taller board. Same actions as the portrait `toolbar`.
+    /// Landscape LEFT rail — the controls as a narrow vertical column of full-width pills, so the
+    /// top of the screen is freed for a taller board. Same actions and ids as the portrait deck,
+    /// in the deck's vocabulary (icons, state badges, More) — docs/portrait-controls-proposal.md.
     /// Scrolls inside `boardH` so the bottom controls stay reachable on short phones / while the HUD
     /// bar is showing (the rail holds no cards, so scrolling can't fight a card drag).
     private func landscapeRail(boardH: CGFloat) -> some View {
@@ -617,9 +620,9 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 ScrollView(.vertical, showsIndicators: true) {   // indicator flags the rare short-phone/HUD scroll
                     VStack(spacing: spacing) {
-                        // Same "toolbar.*" identifiers as the portrait toolbar: only one of the two
+                        // Same "toolbar.*" identifiers as the portrait deck: only one of the two
                         // hierarchies exists at a time, so UI tests address either orientation uniformly.
-                        railPill("New game", primary: true) { requestReset(.newGame) }
+                        railPill("New game", systemImage: "plus", primary: true) { requestReset(.newGame) }
                             .accessibilityIdentifier("toolbar.newgame")
                             .background(GeometryReader { g in
                                 Color.clear.preference(key: RailPillHeightKey.self, value: g.size.height)
@@ -630,27 +633,30 @@ struct ContentView: View {
                             .accessibilityIdentifier("toolbar.undo")
                         railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
                             .accessibilityIdentifier("toolbar.replay")
-                        railPill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-                            .accessibilityIdentifier("toolbar.autoplay")
-                        railPill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
-                            .accessibilityIdentifier("toolbar.autofinish")
-                        if game.canOfferFinish {
-                            railPill("Finish", primary: true) { requestFinish() }
-                                .accessibilityIdentifier("toolbar.finish")
-                        }
-                        railPill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                            dealText = "\(game.seed)"; showDeal = true
-                        }
-                        .accessibilityIdentifier("toolbar.deal")
                         if !game.pool.isEmpty {
-                            railPill("Daily") { showDaily = true }
+                            railPill("Daily", systemImage: "calendar") { showDaily = true }
                                 .accessibilityIdentifier("toolbar.daily")
                         }
-                        railPill("Wins") { showWins = true }
-                            .accessibilityIdentifier("toolbar.wins")
-                        railPill("How to play") { showRules = true }
-                            .accessibilityIdentifier("toolbar.howtoplay")
-                            .id("rail.last")
+                        // The two settings, state in a badge (same tier as the portrait deck).
+                        // No tier gaps in the rail: the overflow fold below assumes one uniform
+                        // pill pitch, and a gap view would move the cut onto a pill boundary.
+                        railPill("Auto-play", badge: game.autoplayOn ? "On" : "Off") { game.autoplayOn.toggle() }
+                            .accessibilityLabel(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off")
+                            .accessibilityIdentifier("toolbar.autoplay")
+                        railPill("Auto-finish", badge: game.autoFinishMode.label) { game.cycleAutoFinishMode() }
+                            .accessibilityLabel("Auto-finish: \(game.autoFinishMode.label)")
+                            .accessibilityIdentifier("toolbar.autofinish")
+                        Menu { moreMenuItems } label: {
+                            railPillLabel("More", systemImage: "ellipsis", primary: false, badge: nil)
+                        }
+                        .accessibilityLabel("More")
+                        .accessibilityIdentifier("toolbar.more")
+                        .id(game.canOfferFinish ? "rail.more" : "rail.last")
+                        if game.canOfferFinish {
+                            railPill("Finish the deal", systemImage: "flag.fill", primary: true) { requestFinish() }
+                                .accessibilityIdentifier("toolbar.finish")
+                                .id("rail.last")
+                        }
                     }
                     .background(GeometryReader { g in
                         Color.clear
@@ -705,23 +711,26 @@ struct ContentView: View {
         .accessibilityIdentifier("toolbar.rail.more")
     }
     /// A rail button — like `pill` but filled to the rail width, left-aligned, compact.
-    private func railPill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                if let systemImage { Image(systemName: systemImage).font(.system(size: 11, weight: .bold)) }
-                Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.65)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10).padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Capsule().fill(primary ? Theme.gold : Color(hex: 0x2A3B44).opacity(0.46)))
-            .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
-        }
+    private func railPill(_ title: String, systemImage: String? = nil, primary: Bool = false, badge: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) { railPillLabel(title, systemImage: systemImage, primary: primary, badge: badge) }
         // NO .buttonStyle(.plain) here — the plain style preserves the explicit near-white label
         // color when the button is DISABLED, which over the faded capsule rendered the disabled
         // Undo as a blank white pill. The default style greys a disabled label (like the portrait
-        // toolbar's pill), keeping it legible.
+        // deck's cells), keeping it legible.
+    }
+    /// The rail pill's face — shared with the More menu's label, which is a Menu, not a Button.
+    private func railPillLabel(_ title: String, systemImage: String?, primary: Bool, badge: String?) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage { Image(systemName: systemImage).font(.system(size: 11, weight: .bold)).accessibilityHidden(true) }
+            Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.65)
+            Spacer(minLength: 0)
+            if let badge { stateBadge(badge, size: 11) }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Capsule().fill(primary ? Theme.gold : Color(hex: 0x2A3B44).opacity(0.46)))
+        .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
     }
     /// Landscape middle column — foundations (up/down rows) with the free cells directly beneath,
     /// so both sit to the left of the tableau and the tableau owns the remaining width.
@@ -746,15 +755,25 @@ struct ContentView: View {
 
     // MARK: header + toolbar
 
-    private var header: some View {
+    /// The title block, the deal readout and the three stats. The deal readout (`toolbar.deal`)
+    /// left the toolbar with the A2 controls redesign (docs/portrait-controls-proposal.md): in
+    /// portrait it sits under the subtitle and the stats align to the TOP, so the extra line
+    /// never pushes them down; in landscape the header has spare width, not height — every
+    /// point of header there is board — so the chip sits beside the title and the header keeps
+    /// its two-line height.
+    private func header(landscape: Bool) -> some View {
         // While a demo line plays (or its completion banner shows), the board's move count is the
         // APP'S, not the player's — showing it against the stopped clock reads as a perfect
         // zero-second game. Blank both readouts for the demo's duration; Won stays (it's real).
         let demoActive = game.demoing || game.demoDoneMessage != nil
-        return HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Causeway").font(.system(size: 22, weight: .bold, design: .serif))
-                Text("build each suit from both ends").font(.system(size: 11)).opacity(0.65)
+        return HStack(alignment: landscape ? .bottom : .top) {
+            HStack(alignment: .bottom, spacing: 22) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Causeway").font(.system(size: 22, weight: .bold, design: .serif))
+                    Text("build each suit from both ends").font(.system(size: 11)).opacity(0.65)
+                    if !landscape { dealChip.padding(.top, 6) }
+                }
+                if landscape { dealChip.padding(.bottom, 1) }
             }
             Spacer()
             stat("Moves", demoActive ? "—" : "\(game.moveCount)", id: "stat.moves")
@@ -773,37 +792,136 @@ struct ContentView: View {
                 .accessibilityIdentifier(id)   // the VALUE carries the id, so tests read it directly
         }
     }
-
-    private var toolbar: some View {
-        FlowLayout(spacing: 8) {
-            pill("New game", primary: true) { requestReset(.newGame) }
-                .accessibilityIdentifier("toolbar.newgame")
-            pill("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
-                .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
-                .accessibilityIdentifier("toolbar.undo")
-            pill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
-                .accessibilityIdentifier("toolbar.replay")
-            pill(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off") { game.autoplayOn.toggle() }
-                .accessibilityIdentifier("toolbar.autoplay")
-            pill("Auto-finish: \(game.autoFinishMode.label)") { game.cycleAutoFinishMode() }
-                .accessibilityIdentifier("toolbar.autofinish")
-            if game.canOfferFinish {
-                pill("Finish", primary: true) { requestFinish() }
-                    .accessibilityIdentifier("toolbar.finish")
+    /// The deal readout — a low-contrast chip on the header, not a control-weight pill: it is a
+    /// readout first (the number a FreeCell player quotes) and the deal dialog's entry second.
+    private var dealChip: some View {
+        // A String first: Text's own interpolation would format the seed with grouping
+        // separators ("Deal #34,900"), and a deal number is an identifier, not a quantity.
+        let title = "Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")"
+        return Button { dealText = "\(game.seed)"; showDeal = true } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).accessibilityHidden(true)
             }
-            pill("Deal #\(game.seed)\(game.winStore.isWon(game.seed) ? " ✓" : "")") {
-                dealText = "\(game.seed)"; showDeal = true
-            }
-            .accessibilityIdentifier("toolbar.deal")
-            if !game.pool.isEmpty {
-                pill("Daily") { showDaily = true }
-                    .accessibilityIdentifier("toolbar.daily")
-            }
-            pill("Wins") { showWins = true }
-                .accessibilityIdentifier("toolbar.wins")
-            pill("How to play") { showRules = true }
-                .accessibilityIdentifier("toolbar.howtoplay")
+            .font(.system(size: 12, weight: .semibold))
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background(Capsule().fill(Color(hex: 0x2A3B44).opacity(0.12)))
+            .overlay(Capsule().strokeBorder(Color(hex: 0x2A3B44).opacity(0.18), lineWidth: 1))
+            .foregroundStyle(Theme.ink)
         }
+        .accessibilityIdentifier("toolbar.deal")
+    }
+
+    // MARK: portrait deck (Option A2) — the controls at the foot of the screen, under the thumb
+
+    /// Portrait's controls, stacked at the bottom where the thumb rests
+    /// (docs/portrait-controls-proposal.md, Option A2): the Finish pill while the board is
+    /// finishable, a PERMANENT tier with the two auto settings (the owner wants them one tap
+    /// away, never behind a menu), and the deck bar with the play actions. Wins and How to play
+    /// live behind More. This sits INSIDE the board VStack after the board's GeometryReader, so
+    /// the board self-fits above it exactly as it did under the old three-row toolbar
+    /// (latchedBoardH: the Finish tier is the one piece that comes and goes, and the latch
+    /// already treats such chrome as a per-deal minimum).
+    private var portraitDeck: some View {
+        VStack(spacing: 8) {
+            if game.canOfferFinish {
+                finishPill
+            }
+            HStack(spacing: 8) {
+                togglePill("Auto-play", state: game.autoplayOn ? "On" : "Off") { game.autoplayOn.toggle() }
+                    .accessibilityLabel(game.autoplayOn ? "Auto-play: On" : "Auto-play: Off")
+                    .accessibilityIdentifier("toolbar.autoplay")
+                togglePill("Auto-finish", state: game.autoFinishMode.label) { game.cycleAutoFinishMode() }
+                    .accessibilityLabel("Auto-finish: \(game.autoFinishMode.label)")
+                    .accessibilityIdentifier("toolbar.autofinish")
+            }
+            HStack(spacing: 2) {
+                deckItem("New game", systemImage: "plus", primary: true) { requestReset(.newGame) }
+                    .accessibilityIdentifier("toolbar.newgame")
+                deckItem("Undo", systemImage: "arrow.uturn.backward") { withAnimation { game.undo() } }
+                    .disabled(!game.canUndo).opacity(game.canUndo ? 1 : 0.4)
+                    .accessibilityIdentifier("toolbar.undo")
+                deckItem("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }
+                    .accessibilityIdentifier("toolbar.replay")
+                if !game.pool.isEmpty {
+                    deckItem("Daily", systemImage: "calendar") { showDaily = true }
+                        .accessibilityIdentifier("toolbar.daily")
+                }
+                Menu { moreMenuItems } label: { deckLabel("More", systemImage: "ellipsis", primary: false) }
+                    .accessibilityLabel("More")
+                    .accessibilityIdentifier("toolbar.more")
+            }
+            .padding(4)
+            .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(hex: 0x2A3B44).opacity(0.46)))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+        }
+        .padding(.horizontal, 2)
+        .padding(.bottom, 2)
+    }
+    /// The menu behind More — the two reference pages. Same ids in both orientations; tests
+    /// reach them through QAFixtures.openWins / openHowToPlay.
+    @ViewBuilder private var moreMenuItems: some View {
+        Button { showWins = true } label: { Label("Wins", systemImage: "trophy") }
+            .accessibilityIdentifier("toolbar.wins")
+        Button { showRules = true } label: { Label("How to play", systemImage: "questionmark.circle") }
+            .accessibilityIdentifier("toolbar.howtoplay")
+    }
+    /// A deck-bar cell: icon over an 11 pt label, equal width with its siblings.
+    private func deckItem(_ title: String, systemImage: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) { deckLabel(title, systemImage: systemImage, primary: primary) }
+            .accessibilityLabel(title)
+    }
+    private func deckLabel(_ title: String, systemImage: String, primary: Bool) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage).font(.system(size: 14, weight: .bold)).accessibilityHidden(true)
+                .frame(height: 17)   // fixed: a short glyph (ellipsis) must not pull its label up
+            Text(title).font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(primary ? Theme.gold : .clear))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(primary ? 0.35 : 0), lineWidth: 1))
+        .foregroundStyle(primary ? Color(hex: 0x3A2B00) : Color(hex: 0xF4EFE2))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+    /// A setting pill: the name, then the state in a small badge so a glance reads it and a tap
+    /// cycles it. The accessibility label is set by the caller ("Auto-finish: Ask") so VoiceOver
+    /// and the UI tests read one string, not "Auto-finish, Ask".
+    private func togglePill(_ title: String, state: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                stateBadge(state, size: 12)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background(Capsule().fill(Color(hex: 0x2A3B44).opacity(0.46)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            .foregroundStyle(Color(hex: 0xF4EFE2))
+        }
+    }
+    private func stateBadge(_ state: String, size: CGFloat) -> some View {
+        Text(state).font(.system(size: size, weight: .bold))
+            .padding(.horizontal, size < 12 ? 6 : 8)
+            .frame(height: size < 12 ? 14 : 18)   // fixed so a badge never grows its pill
+            .background(Capsule().fill(Color(hex: 0xF4EFE2).opacity(0.18)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.3), lineWidth: 1))
+    }
+    /// The manual Finish: rises above the toggle tier (portrait) / docks at the foot of the rail
+    /// (landscape) while the board is finishable; nothing else moves when it comes or goes.
+    private var finishPill: some View {
+        Button { requestFinish() } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "flag.fill").font(.system(size: 12, weight: .bold)).accessibilityHidden(true)
+                Text("Finish the deal").font(.system(size: 14, weight: .bold))
+            }
+            .padding(.horizontal, 18).padding(.vertical, 9)
+            .background(Capsule().fill(Theme.gold))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.35), lineWidth: 1))
+            .foregroundStyle(Color(hex: 0x3A2B00))
+            .shadow(color: Color(hex: 0x3A2B00).opacity(0.18), radius: 6, y: 3)
+        }
+        .accessibilityIdentifier("toolbar.finish")
     }
     private func pill(_ title: String, systemImage: String? = nil, primary: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -951,7 +1069,13 @@ struct ContentView: View {
                     .modifier(ShakeEffect(shakes: shakeTrigger, amplitude: shakeSpot == .cell(i) ? 4 : 0))
                     .gesture(cardGesture(for: .cell(i), canDrag: !game.demoing))
             } else {
+                // An empty cell is a real element with a stable id: VoiceOver names it, and the
+                // UI tests drop onto it by id instead of a device point that moves with the chrome
+                // (RegressionPortraitTallColumnTests, after the 2026-09-13 deck moved the row).
                 SlotView(width: cardW)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Empty free cell \(i + 1)")
+                    .accessibilityIdentifier("cell.\(i)")
             }
         }
         .background(dropZone(.cell(i)))

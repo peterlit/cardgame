@@ -7,8 +7,8 @@
 //  Verified FIXED in qa-loop round 2 (build 9ab79f1).
 //
 //  FIXED contract this test guards (Views/ContentView.swift, landscapeRail / railCue):
-//   - With the daily HUD and a live Finish pill the landscape rail holds 10 pills in a
-//     207 pt viewport, so Daily / Wins / How to play start below the fold. The "⌄ more"
+//   - With the daily HUD and a live Finish pill the landscape rail holds 8 pills (A2, 2026-09-13;
+//     10 before) in a 207 pt viewport, so More / Finish start below the fold. The "⌄ more"
 //     cue under the viewport is a REAL rail-width control (toolbar.rail.more, label
 //     "More controls"): one tap scrolls the rail to its end and makes the hidden pills
 //     hittable, and the cue flips to "Back to the top of the controls". Before the fix
@@ -66,19 +66,19 @@ final class RegressionLandscapeRailMoreCueTests: XCTestCase {
         XCTAssertGreaterThan(cue.frame.width, 60,
                              "the cue shrank back to a glyph-sized target (\(cue.frame.width) pt wide)")
 
-        let howToPlay = app.buttons["toolbar.howtoplay"]
-        XCTAssertTrue(howToPlay.exists, "the rail lost its How to play pill entirely")
-        XCTAssertFalse(howToPlay.isHittable,
-                       "precondition: How to play must START below the fold (else the cue has nothing to prove): \(howToPlay.frame)")
+        // A2 (2026-09-13): the rail's last pill is Finish (More sits just above it); How to
+        // play is a More menu item. The contract is unchanged: the cue reveals the foot of the rail.
+        let finish = app.buttons["toolbar.finish"], more = app.buttons["toolbar.more"]
+        XCTAssertTrue(finish.exists, "the rail lost its Finish pill entirely")
+        XCTAssertFalse(finish.isHittable,
+                       "precondition: Finish must START below the fold (else the cue has nothing to prove): \(finish.frame)")
 
         cue.tap()
-        XCTAssertTrue(QA.wait(5) { howToPlay.isHittable },
-                      "tapping the cue did not scroll the rail — How to play is still unreachable in one tap")
+        XCTAssertTrue(QA.wait(5) { finish.isHittable && more.isHittable },
+                      "tapping the cue did not scroll the rail — the foot of the rail is still unreachable in one tap")
         XCTAssertTrue(QA.wait(3) { cue.label == "Back to the top of the controls" },
                       "the cue did not flip to its 'top' state after scrolling to the end: '\(cue.label)'")
 
-        howToPlay.tap()
-        XCTAssertTrue(app.navigationBars["How to play"].waitForExistence(timeout: 5),
-                      "How to play did not open from the revealed pill")
+        QA.openHowToPlay(app)
     }
 }

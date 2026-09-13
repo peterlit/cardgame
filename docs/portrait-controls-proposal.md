@@ -1,6 +1,7 @@
 # Proposal — the portrait control buttons (iOS)
 
-**Status: proposal, 2026-09-13. Nothing implemented.** Mockups are on the design canvas
+**Status: A2 chosen and IMPLEMENTED on iOS, 2026-09-13** (portrait deck + the rail in A2's dress;
+see the "Shipped" section at the end). The rest of this file is the proposal as it was reviewed. Mockups are on the design canvas
 <https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882> (twelve artboards: the
 current layout, Option A in three states, Option A2 in three states, landscape today vs. the rail
 in A2's dress, Options B and C). The artboards are generated from the
@@ -116,3 +117,31 @@ Finish still has to squeeze in.
 of actions with a single primary — and it is the only option that puts Undo under the thumb and
 gives the board its height back. If the menu for the two auto settings feels like a step too far,
 B is the fallback: same hierarchy, same fixed rhythm, top placement kept.
+
+## Shipped (2026-09-13)
+
+The owner picked A2 in portrait and the rail in A2's dress in landscape, with the two auto
+settings kept independent. `ContentView.swift`:
+
+- `header(landscape:)` — the deal readout is a chip (`toolbar.deal`): under the subtitle in
+  portrait (stats top-aligned), beside the title in landscape (header height unchanged).
+- `portraitDeck` — inside the board `VStack` after the board's `GeometryReader`, so the board
+  self-fits above it: Finish pill (`toolbar.finish`, while `canOfferFinish`) → toggle tier
+  (`toolbar.autoplay` / `toolbar.autofinish`, accessibility labels stay "Auto-play: On" /
+  "Auto-finish: Ask") → deck bar (`toolbar.newgame` gold · `toolbar.undo` · `toolbar.replay` ·
+  `toolbar.daily` · `toolbar.more`, a `Menu` holding `toolbar.wins` and `toolbar.howtoplay`).
+- `landscapeRail` — same ids, rail order New game · Undo · Replay · Daily · Auto-play · Auto-finish
+  · More · Finish; state badges via `stateBadge`; no tier gaps (the overflow fold assumes one
+  uniform pill pitch). `FlowLayout` and the old `toolbar` are gone.
+- Tests: `QAFixtures.openWins` / `openHowToPlay` / `moreItem` go through More; the rail-overflow
+  tests use Finish as the pill below the fold; the identifier inventory lists eight board
+  controls plus the two menu items; the parity pin names `deckItem`. Web `index.html` is
+  unchanged (the rules are in sync; the toolbar is presentation).
+
+**Measured, not the proposal's estimate:** on an iPhone 16 Pro the portrait chrome above and
+below the board is ~190 pt against ~172 pt for the old three-row toolbar — A2 costs the board
+about 18 pt, not the "14 pt less" the sketch claimed (the chip line and the tier gaps were not
+in that arithmetic). It is invisible at default text sizes: portrait cards are width-limited
+(45 pt) and only shrink once a column passes ~12 cards. Landscape's header is unchanged, and
+the rail is two pills shorter.
+

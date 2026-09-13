@@ -73,7 +73,7 @@ final class SmokeDealEntryTests: XCTestCase {
         XCTAssertTrue(QA.waitGone(confirm, timeout: 3))
 
         // Route B — the Wins screen's Play, double-tapped.
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
         let winsField = app.textFields["wins.dealentry.field"]
         winsField.tap()

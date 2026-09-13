@@ -40,7 +40,7 @@ final class RegressionFoundationRowLabelsTests: XCTestCase {
                       "the foundations heading no longer names the row directions — labels on screen: \(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "FOUNDATIONS")).allElementsBoundByIndex.map { $0.label })")
         XCTAssertTrue(app.staticTexts["FREE CELLS"].exists, "the FREE CELLS heading is gone (upper area restructured?)")
 
-        app.buttons["toolbar.howtoplay"].tap()
+        QA.openHowToPlay(app)
         XCTAssertTrue(app.navigationBars["How to play"].waitForExistence(timeout: 5), "the rules sheet did not open")
         let clause = "On the board the TOP foundation row is the up pile and the row beneath it is the down pile"
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", clause)).firstMatch.waitForExistence(timeout: 5),

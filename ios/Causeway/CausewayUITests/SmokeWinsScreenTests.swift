@@ -29,7 +29,7 @@ final class SmokeWinsScreenTests: XCTestCase {
     /// line, and Done back to the board.
     func testTC9_1_WinsEmptyState() throws {
         let app = QA.launch()
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5), "the Wins sheet did not open")
         XCTAssertTrue(app.staticTexts["Play a deal"].exists, "the Play a deal row is missing")
         let field = app.textFields["wins.dealentry.field"]
@@ -57,7 +57,7 @@ final class SmokeWinsScreenTests: XCTestCase {
         let body = "Your \(liveMoves) move\(liveMoves == "1" ? "" : "s") and your time will be discarded. This game is not a challenge, so there is no way back to it."
 
         // (a) typed deal → Play
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
         let field = app.textFields["wins.dealentry.field"]
         field.tap()
@@ -74,7 +74,7 @@ final class SmokeWinsScreenTests: XCTestCase {
         XCTAssertEqual(moves.label, liveMoves, "Keep playing must preserve Moves exactly")
 
         // (b) range chip → row → Play that deal
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
         let chip = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "500001")).firstMatch
         XCTAssertTrue(chip.waitForExistence(timeout: 3), "no range chip for the seeded win")

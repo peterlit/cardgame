@@ -50,9 +50,11 @@ final class RegressionPortraitTallColumnTests: XCTestCase {
     /// shrinks uniformly instead of clipping).
     func testTallPortraitColumnBottomCardStaysHittable() throws {
 
-        let app = XCUIApplication()
-        XCUIDevice.shared.orientation = .portrait   // contract is portrait-only
-        app.launch()
+        // State-controlled launch (no saved game): a raw XCUIApplication().launch() inherited
+        // whatever the previous test class left on the device, and a live game there turned
+        // the Deal # ▸ Play below into a "Play that deal?" confirmation the script never
+        // answered — the "fresh deal starts at Moves 0" precondition then failed by order.
+        let app = QA.launch()   // portrait; the contract is portrait-only
 
         // --- pin deal #10004 via the Deal # alert (TC-7.1 entry path) ------------
         let dealPill = app.buttons["toolbar.deal"]
@@ -73,13 +75,14 @@ final class RegressionPortraitTallColumnTests: XCTestCase {
         // --- grow column 0 to 16 cards: TC-2.6's verified move list --------------
         // Sources are card identifiers (frames re-resolved per step, so the mid-
         // script board shrink can't desync the drags). Targets are the exposed
-        // bottom card being stacked onto, except two coordinate fallbacks
-        // (free cell 1 and column 1's strip — no identifiers; device points,
-        // iPhone 17 Pro portrait: cell 1 at (274,296), column centres x = 28,
-        // 77, 126, 175, 224, 272, 321, 370).
+        // bottom card being stacked onto, or an empty free cell by its `cell.<i>`
+        // id, except ONE coordinate fallback (column 1's strip — no identifier;
+        // device points, iPhone 17 Pro portrait, column centres x = 28, 77, 126,
+        // 175, 224, 272, 321, 370; the strip's drop frame runs to the tableau's
+        // bottom, so y = 600 stays inside it under the 2026-09-13 deck layout).
         let script: [(from: String, to: Target, what: String)] = [
             ("card.H10", .card("card.C11"),   "10♥ c6→c0 onto J♣ (col0=8)"),
-            ("card.H4",  .point(274, 296),    "4♥ c7→free cell 1"),
+            ("card.H4",  .card("cell.0"),     "4♥ c7→free cell 1"),   // the empty slot's own id (cell.<i>)
             ("card.S9",  .card("card.H10"),   "9♠ c7→c0 (9)"),
             ("card.D11", .point(77, 600),     "J♦ c6→c1"),
             ("card.H12", .card("card.C13"),   "Q♥ c6→c7 onto K♣"),

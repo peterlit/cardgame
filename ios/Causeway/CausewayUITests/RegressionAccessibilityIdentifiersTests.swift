@@ -8,7 +8,8 @@
 //
 //  FIXED contract this test guards:
 //   - The app ships stable accessibility identifiers for every control a test (or
-//     VoiceOver) has to address: the nine toolbar pills, the three header stat
+//     VoiceOver) has to address: the toolbar controls (A2: eight on the board, two behind
+//     More), the three header stat
 //     VALUES, all 52 cards, and the Daily sheet's own controls. Before the fix the
 //     source contained zero accessibilityIdentifier modifiers, so every query fell
 //     back to visible label text and every card interaction to raw device points.
@@ -44,10 +45,16 @@ final class RegressionAccessibilityIdentifiersTests: XCTestCase {
                       "the board's identifiers are gone — see ContentView.toolbar")
 
         for id in ["toolbar.newgame", "toolbar.undo", "toolbar.replay", "toolbar.autoplay",
-                   "toolbar.autofinish", "toolbar.deal", "toolbar.daily", "toolbar.wins",
-                   "toolbar.howtoplay"] {
+                   "toolbar.autofinish", "toolbar.deal", "toolbar.daily", "toolbar.more"] {
             XCTAssertTrue(app.buttons[id].exists, "missing toolbar identifier: \(id)")
         }
+        // A2 (2026-09-13): Wins and How to play live behind More; the ids survive on the menu items.
+        let wins = QA.moreItem(app, "toolbar.wins", label: "Wins")
+        XCTAssertTrue(wins.exists, "missing More menu item: toolbar.wins")
+        XCTAssertTrue(app.buttons["toolbar.howtoplay"].exists || app.buttons["How to play"].exists,
+                      "missing More menu item: toolbar.howtoplay")
+        app.buttons["toolbar.newgame"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // dismiss the menu
+        XCTAssertTrue(QA.wait(3) { !wins.exists }, "the More menu did not dismiss")
         for id in ["stat.moves", "stat.time", "stat.won"] {
             XCTAssertTrue(app.staticTexts[id].exists, "missing header stat identifier: \(id)")
         }
@@ -85,8 +92,7 @@ final class RegressionAccessibilityIdentifiersTests: XCTestCase {
         app.buttons["Done"].tap()
 
         // Round 2 (bug/Main:scored-surfaces-addressable-only-by-copy): the Wins entry row.
-        XCTAssertTrue(app.buttons["toolbar.wins"].waitForExistence(timeout: 5))
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.textFields["wins.dealentry.field"].waitForExistence(timeout: 5),
                       "missing Wins deal-entry field identifier")
         XCTAssertTrue(app.buttons["wins.dealentry.play"].exists, "missing Wins deal-entry Play identifier")

@@ -716,13 +716,13 @@ test('the Daily calendar names the day it will play and answers a locked tap (no
 test('board reset controls confirm only when there is a live game to lose (no web↔iOS drift)', () => {
   const html = norm(readFileSync(join(REPO, 'index.html'), 'utf8'));
   const content = read('Views/ContentView.swift');
-  // iOS: both pills (portrait toolbar + landscape rail) route through requestReset, which is the
+  // iOS: both controls (portrait deck + landscape rail) route through requestReset, which is the
   // only place the state gate lives.
-  assert.ok(content.includes(norm('pill("New game", primary: true) { requestReset(.newGame) }')),
+  assert.ok(content.includes(norm('deckItem("New game", systemImage: "plus", primary: true) { requestReset(.newGame) }')),
     'portrait New game pill no longer routes through requestReset');
-  assert.ok(content.includes(norm('pill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
+  assert.ok(content.includes(norm('deckItem("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
     'portrait Replay pill no longer routes through requestReset');
-  assert.ok(content.includes(norm('railPill("New game", primary: true) { requestReset(.newGame) }')),
+  assert.ok(content.includes(norm('railPill("New game", systemImage: "plus", primary: true) { requestReset(.newGame) }')),
     'landscape New game pill no longer routes through requestReset');
   assert.ok(content.includes(norm('railPill("Replay", systemImage: "arrow.clockwise") { requestReset(.replay) }')),
     'landscape Replay pill no longer routes through requestReset');

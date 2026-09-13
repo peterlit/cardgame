@@ -54,7 +54,7 @@ final class RegressionRailCueFlipsAtEndTests: XCTestCase {
     /// tap returns to the top, and a swipe inside the viewport flips it too.
     func testRailCueFlipsToTopAtEndAndSecondTapReturnsToTop() throws {
         // Aug 15's own challenge parked at move 78: daily HUD + a live Finish pill = the
-        // 10-pill rail that overflows the landscape viewport (same fixture as
+        // 8-pill rail (A2; 10 before) that overflows the landscape viewport (same fixture as
         // RegressionLandscapeRailMoreCueTests).
         let app = QA.launch(game: QA.day14Silver)
         let prompt = app.alerts["Ready to finish"]
@@ -73,7 +73,7 @@ final class RegressionRailCueFlipsAtEndTests: XCTestCase {
         let cue = app.buttons["toolbar.rail.more"]
         let newGame = app.buttons["toolbar.newgame"]
         let undo = app.buttons["toolbar.undo"]
-        let howToPlay = app.buttons["toolbar.howtoplay"]
+        let howToPlay = app.buttons["toolbar.finish"]   // A2: the rail's last pill (How to play is behind More)
         XCTAssertTrue(cue.waitForExistence(timeout: 5), "the rail has no overflow cue (toolbar.rail.more)")
         XCTAssertEqual(cue.label, atTop, "precondition: the cue starts in its 'more' state")
         XCTAssertTrue(newGame.isHittable, "precondition: New game is on screen at the top of the rail")

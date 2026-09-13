@@ -190,6 +190,15 @@ cap) that closeout finished. Stopped `thrashing_soft` at the scoped 2-round cap;
 measured and latched per deal rather than a fixed 50 pt — read the report's WATCH LIST before
 touching `ContentView.swift`'s landscape geometry.
 
+**2026-09-13 — the controls redesign (Option A2).** Portrait no longer has a top toolbar: the
+controls are a bottom deck (`ContentView.portraitDeck`: Finish pill · Auto-play / Auto-finish
+tier · New game · Undo · Replay · Daily · More) and Deal # is a header chip; landscape keeps the
+rail, restyled to match (icons, state badges, More, Finish last). Wins and How to play are behind
+More in BOTH orientations — UI tests reach them through `QAFixtures.openWins` /
+`openHowToPlay`, and the rail-overflow tests key on `toolbar.finish` as the pill below the fold.
+Same `toolbar.*` ids otherwise, plus `toolbar.more`. Design record and measured cost:
+`docs/portrait-controls-proposal.md`; mockups on the design canvas linked there.
+
 **Recent history worth skimming:** the 2026-09-07 skeptical review (`docs/skeptical-review-2026-09-07.md`)
 and the pass that addressed it — the pool builder now publishes under a fail-closed contract, the
 attempt lifecycle got one replacement gate, the Swift unit-test target landed, and two review-loop

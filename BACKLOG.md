@@ -1014,15 +1014,15 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
   If a launch-argument override for `dynamicTypeSize` ever exists in `QAFixtures`, add the
   toggle test.
 
-## 2026-09-13 — portrait control-button redesign (proposal, awaiting the owner's pick)
-- **PC-1 — portrait toolbar redesign.** Three directions on the design canvas, written up in
-  `docs/portrait-controls-proposal.md`; owner leans Option A; sketched A2 on request (A + a permanent
-  Auto-play / Auto-finish toggle tier above the bar), awaiting review. Decided: the two auto
-  settings stay independent (no merge). Landscape: keep the rail; an optional A2-dress
-  harmonisation (icons, badges, More, Deal # beside the title) is sketched on the canvas. Implementing A touches: `ContentView.toolbar`
-  → a bottom bar + `Menu`, header deal chip, Finish placement, the portrait height budget
-  (`portraitFitCardW` / `latchedBoardH`), and the UI tests that address `toolbar.autoplay` /
-  `toolbar.autofinish` / `toolbar.wins` / `toolbar.howtoplay` directly (need a "tap More first in
-  portrait" fixture) plus `RegressionAccessibilityIdentifiersTests`' nine-pill count. Landscape
-  rail unchanged. Web `index.html` toolbar is out of scope unless the owner wants parity there.
-
+## 2026-09-13 — portrait control-button redesign (Option A2 SHIPPED on iOS)
+- **PC-1 — DONE.** A2 in portrait (bottom deck: Finish pill, permanent Auto-play / Auto-finish
+  tier, New game · Undo · Replay · Daily · More bar) and the landscape rail in A2's dress
+  (icons, state badges, More, Finish docked last, Deal # beside the title). Write-up and the
+  measured height cost in `docs/portrait-controls-proposal.md` ("Shipped"). The two auto settings
+  stay independent by the owner's decision.
+- **PC-2 — web toolbar parity (open, owner's call).** `index.html` still has the flat
+  ten-button toolbar. The rules are in sync (nothing here touched them); the presentation is
+  not. Port the deck / rail hierarchy to the web if the two should look alike.
+- **PC-3 — Dynamic Type on the deck (open, minor).** The deck's labels (11 pt) and the toggle
+  badges are fixed-size like the pills they replace; the board is geometry, but the deck is
+  chrome and could follow `Theme.scaled` as the HUD does.

@@ -43,8 +43,7 @@ final class RegressionDealEntryRangeTests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launch()
 
-        XCTAssertTrue(app.buttons["toolbar.wins"].waitForExistence(timeout: 5))
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5),
                       "Wins sheet did not open")
 

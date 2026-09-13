@@ -17,7 +17,7 @@
 //  rail's bottom edge (its "more" cue when it overflows, else its last pill) stays inside the window.
 //
 //  Selector notes: "hud.chip.gold.label", "demo.headline", "daily.play", "daily.demo.bronze",
-//  "toolbar.rail.more", "toolbar.howtoplay". Dynamic Type is set with the
+//  "toolbar.rail.more", "toolbar.more". Dynamic Type is set with the
 //  `-UIPreferredContentSizeCategoryName` launch argument (per-launch; never simctl ui content_size).
 //
 import XCTest
@@ -68,7 +68,7 @@ final class RegressionBoardHudDynamicTypeTests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(QA.wait(5) { window.frame.width > window.frame.height }, "rotation to landscape never took effect")
         XCTAssertTrue(QA.wait(3) { gold.exists && gold.frame.height > baseH * 1.6 }, "landscape AX5: the Gold chip label lost its size")
-        let cue = big.buttons["toolbar.rail.more"], last = big.buttons["toolbar.howtoplay"]
+        let cue = big.buttons["toolbar.rail.more"], last = big.buttons["toolbar.more"]
         XCTAssertTrue(QA.wait(3) { cue.exists || last.exists }, "landscape AX5: neither the rail cue nor its last pill is on screen")
         let railBottom = cue.exists ? cue : last
         XCTAssertLessThanOrEqual(railBottom.frame.maxY, window.frame.maxY + 0.5,

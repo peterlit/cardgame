@@ -201,13 +201,13 @@ Xcode's own instrumentation inflates memory (`:4-8`).
 
 | View | File | Role |
 |---|---|---|
-| `ContentView` | `Views/ContentView.swift` (534) | board, toolbar/rail, drag system, demo bar, win overlay, sheet hosting |
+| `ContentView` | `Views/ContentView.swift` (534) | board, portrait deck / landscape rail, drag system, demo bar, win overlay, sheet hosting |
 | `DailyHUD` | same file (`:361`) | live objectives chips over the board |
 | `ClockStat` | same file (`:524`) | the isolated time label |
 | `CardView`, `SlotView` | `Views/CardView.swift` (105) | stateless card face and empty slot; **width is the only sizing input** |
 | `DailyView` | `Views/DailyView.swift` (407) | Challenges screen: streaks, day card, calendar, backup section |
 | `WinsView` | `Views/WinsView.swift` (96) | deal entry, range chips, drill-down |
-| `FlowLayout`, `RulesView` | `Views/Extras.swift` (86) | wrapping toolbar `Layout`; How-to-play + About |
+| `RulesView` | `Views/Extras.swift` | How-to-play + About (the wrapping-toolbar `FlowLayout` went with the 2026-09-13 controls redesign) |
 | `SummerBackground` | `Views/SummerBackground.swift` (127) | the vector scene; `Equatable` for render skipping |
 | `MemoryHUD` | `Views/MemoryHUD.swift` (35) | debug overlay, unreachable while the flag is false |
 | `Theme` | `Theme.swift` (43) | palette, `Color(hex:)`, `cardAspect = (92/66)*1.2 ≈ 1.673` |
@@ -217,9 +217,15 @@ Xcode's own instrumentation inflates memory (`:4-8`).
 `ContentView.body` computes card size from `GeometryReader` before building anything
 (`:43-75`), then branches:
 
-- **Portrait** — `header → toolbar → HUD/demo bar → upperArea (foundations left, free cells right) →
-  tableau`. Card width is simply `(width - padding - gaps) / 8`.
-- **Landscape** — three side-by-side columns: a scrolling controls **rail**, then
+- **Portrait** — `header (title · deal chip · stats) → HUD/demo bar → upperArea (foundations left,
+  free cells right) → tableau → deck` (2026-09-13, Option A2 of
+  [`docs/portrait-controls-proposal.md`](../portrait-controls-proposal.md)): the controls sit at
+  the FOOT of the screen — a Finish pill while the board is finishable, a permanent tier with the
+  two auto settings, and a bottom bar with New game · Undo · Replay · Daily · More (Wins, How to
+  play). Card width is simply `(width - padding - gaps) / 8`; the board self-fits between the
+  header and the deck.
+- **Landscape** — three side-by-side columns: a scrolling controls **rail** (the deck's actions as
+  one column, same ids, same vocabulary — icons, state badges, More; Finish docks at its foot), then
   foundations-with-free-cells-beneath, then the tableau. Card width is
   `min(widthBound, heightBound)` where the width bound counts 12 card-widths
   (4 foundation + 8 tableau) and the height bound sizes to the current tallest column with a floor of

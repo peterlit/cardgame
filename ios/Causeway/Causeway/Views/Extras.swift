@@ -1,38 +1,5 @@
 import SwiftUI
 
-/// Simple wrapping flow layout so the toolbar pills flow onto as many rows as
-/// needed instead of overflowing / hiding off-screen.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
-        let maxW = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, widest: CGFloat = 0
-        for s in subviews {
-            let sz = s.sizeThatFits(.unspecified)
-            if x > 0, x + sz.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
-            x += sz.width + spacing
-            rowH = max(rowH, sz.height)
-            widest = max(widest, x - spacing)
-        }
-        return CGSize(width: min(maxW, widest), height: y + rowH)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
-        let maxW = bounds.width
-        var x: CGFloat = bounds.minX, y: CGFloat = bounds.minY, rowH: CGFloat = 0
-        for s in subviews {
-            let sz = s.sizeThatFits(.unspecified)
-            if x > bounds.minX, x - bounds.minX + sz.width > maxW {
-                x = bounds.minX; y += rowH + spacing; rowH = 0
-            }
-            s.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(sz))
-            x += sz.width + spacing
-            rowH = max(rowH, sz.height)
-        }
-    }
-}
-
 /// How-to-play rules (ported from the web prototype).
 struct RulesView: View {
     @Environment(\.dismiss) private var dismiss

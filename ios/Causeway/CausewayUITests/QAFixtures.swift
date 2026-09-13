@@ -105,6 +105,30 @@ enum QA {
                       "the Daily sheet did not open")
     }
 
+    /// The A2 controls (2026-09-13) keep Wins and How to play behind the deck's More menu
+    /// (`toolbar.more`) in BOTH orientations. Open the menu and return the item — by its
+    /// identifier when the menu surfaces it, else by its label.
+    static func moreItem(_ app: XCUIApplication, _ id: String, label: String) -> XCUIElement {
+        let more = app.buttons["toolbar.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "no toolbar.more control")
+        more.tap()
+        let byId = app.buttons[id]
+        if byId.waitForExistence(timeout: 2) { return byId }
+        let byLabel = app.buttons[label]
+        XCTAssertTrue(byLabel.waitForExistence(timeout: 3), "the More menu did not show \(label)")
+        return byLabel
+    }
+    /// More ▸ Wins (waits for the Wins sheet's title).
+    static func openWins(_ app: XCUIApplication) {
+        moreItem(app, "toolbar.wins", label: "Wins").tap()
+        XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5), "the Wins sheet did not open")
+    }
+    /// More ▸ How to play (waits for the sheet's title).
+    static func openHowToPlay(_ app: XCUIApplication) {
+        moreItem(app, "toolbar.howtoplay", label: "How to play").tap()
+        XCTAssertTrue(app.navigationBars["How to play"].waitForExistence(timeout: 5), "How to play did not open")
+    }
+
     /// Scroll the (open) Daily sheet until calendar cell `daily.cal.<idx>` is hittable and return it.
     /// Scrolls TOWARD the cell, never toward a landmark (RegressionDailyCalendarTests, R10).
     static func scrollToCalendarCell(_ app: XCUIApplication, _ idx: Int) -> XCUIElement {

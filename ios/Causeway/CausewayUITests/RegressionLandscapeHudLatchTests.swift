@@ -24,7 +24,7 @@
 //  (its "more" cue or last pill), the header and Stop / the HUD stay inside the window.
 //
 //  Selector notes: card.<S><rank>, demo.headline, demo.start (Start/Pause/Resume), demo.next,
-//  demo.prev, demo.stop, hud.day, hud.chip.gold.label, toolbar.rail.more, toolbar.howtoplay,
+//  demo.prev, demo.stop, hud.day, hud.chip.gold.label, toolbar.rail.more, toolbar.more,
 //  stat.moves, board.hudbar.scroll (the capped bar's ScrollView). Dynamic Type via the
 //  `-UIPreferredContentSizeCategoryName` launch argument (per-launch).
 //
@@ -184,7 +184,7 @@ final class RegressionLandscapeHudLatchTests: XCTestCase {
     /// Moves stat are inside the window.
     private func assertBoardChromeOnScreen(_ app: XCUIApplication, state: String) {
         let window = app.windows.firstMatch
-        let cue = app.buttons["toolbar.rail.more"], last = app.buttons["toolbar.howtoplay"]
+        let cue = app.buttons["toolbar.rail.more"], last = app.buttons["toolbar.more"]
         XCTAssertTrue(QA.wait(3) { cue.exists || last.exists }, "\(state): neither the rail cue nor its last pill is on screen")
         let railBottom = cue.exists ? cue : last
         XCTAssertLessThanOrEqual(railBottom.frame.maxY, window.frame.maxY + 0.5,

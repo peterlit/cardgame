@@ -969,3 +969,25 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
      landscape artboards on the same canvas. Recommendation: keep the rail; the harmonised dress
      is optional. Doc, generator and backlog updated.
 
+
+102. "Let's go for A2 in portrait and A2 rail in A2 dress in landscape. Run a multi-provider
+     review loop that uses Opus for skeptical review and also qwen3-coder:30b, OpenAI Astra, and
+     the best available Gemini model. Collect usage data where you can and generate a feedback
+     report on this latest version of the review loop." Implemented on iOS (`ContentView.swift`):
+     `header(landscape:)` with the deal chip (under the subtitle in portrait, beside the title in
+     landscape), `portraitDeck` (Finish pill → Auto-play / Auto-finish tier → New game · Undo ·
+     Replay · Daily · More bar, More = a Menu with Wins and How to play), the rail in the same
+     vocabulary (icons, `stateBadge`, More, Finish docked last; no tier gaps so the overflow fold
+     keeps one pill pitch); `FlowLayout` and the old `toolbar` removed. Tests: `QAFixtures.openWins`
+     / `openHowToPlay` / `moreItem`, the rail-overflow pair keyed on Finish, the identifier
+     inventory, the landscape smoke's rail list, the parity pin on `deckItem`; empty free cells
+     gained `cell.<i>` ids (VoiceOver: "Empty free cell 1") so the tall-column test drops by id
+     instead of a device point the deck had moved; that test and the two discard-confirm tests now
+     launch through `QA.launch()` — raw launches inherited the previous class's live game and
+     failed by order once the run was split into groups. Measured on device:
+     the portrait chrome is ~190 pt vs ~172 pt before (the sketch's "14 pt less" was wrong; the
+     board is width-limited so nothing visibly shrinks). Web untouched (presentation, not rules).
+     Verified: node 171/171, Swift unit 17/17, full UI suite in five class groups (see the commit).
+     Then the review loop (panel: codex `gpt-6-astra`, gemini default model, ollama
+     `qwen3-coder:30b`; chair Opus) — its own entry follows.
+

@@ -32,7 +32,7 @@ final class RegressionPluralGrammarTests: XCTestCase {
     func testWinsCountLineInflectsForOneAndForMany() throws {
         let oneWin = #"{"500001":{"moves":90,"secs":120,"date":808012800}}"#
         var app = QA.launch(wins: oneWin)
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5), "the Wins sheet did not open")
         XCTAssertTrue(app.staticTexts["1 deal solved · 1 range"].waitForExistence(timeout: 3),
                       "the singular count line is wrong — on screen: \(countLines(app))")
@@ -41,7 +41,7 @@ final class RegressionPluralGrammarTests: XCTestCase {
 
         let twoWins = #"{"500001":{"moves":90,"secs":120,"date":808012800},"700001":{"moves":95,"secs":130,"date":808012800}}"#
         app = QA.launch(wins: twoWins)
-        app.buttons["toolbar.wins"].tap()
+        QA.openWins(app)
         XCTAssertTrue(app.navigationBars["Deals won"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["2 deals solved · 2 ranges"].waitForExistence(timeout: 3),
                       "the plural count line is wrong (blanket singularisation?) — on screen: \(countLines(app))")

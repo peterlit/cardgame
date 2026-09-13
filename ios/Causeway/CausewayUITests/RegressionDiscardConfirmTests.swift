@@ -48,9 +48,10 @@ final class RegressionDiscardConfirmTests: XCTestCase {
     /// before throwing a live game away, and only then.
     func testBoardResetPillsConfirmOnlyWhenAGameIsLive() throws {
 
-        let app = XCUIApplication()
-        XCUIDevice.shared.orientation = .portrait
-        app.launch()
+        // State-controlled launch: both tests here start from an UNTOUCHED board, and a raw
+        // XCUIApplication().launch() inherited whatever the previous test class left on the
+        // device (a live game made "an untouched board must not ask" fail by order).
+        let app = QA.launch()
 
         let moves = app.staticTexts["stat.moves"]
         XCTAssertTrue(moves.waitForExistence(timeout: 5))
@@ -95,9 +96,10 @@ final class RegressionDiscardConfirmTests: XCTestCase {
     /// must route through the same confirmation the board pills use.
     func testDealNumberPlayConfirmsBeforeDiscardingALiveGame() throws {
 
-        let app = XCUIApplication()
-        XCUIDevice.shared.orientation = .portrait
-        app.launch()
+        // State-controlled launch: both tests here start from an UNTOUCHED board, and a raw
+        // XCUIApplication().launch() inherited whatever the previous test class left on the
+        // device (a live game made "an untouched board must not ask" fail by order).
+        let app = QA.launch()
 
         let moves = app.staticTexts["stat.moves"]
         XCTAssertTrue(moves.waitForExistence(timeout: 5))
