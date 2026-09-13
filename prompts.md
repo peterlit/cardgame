@@ -929,3 +929,19 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     methods), 0 skipped. Open: 3 minors (see BACKLOG). Cost: 756 K reported subagent tokens over
     7 dispatches (~4–7× that billed). Report: `.review-loop/REPORT.md`; feedback on the plugin
     in `docs/review-loop-0.10.0-feedback.md`.
+
+
+98. Propose a more aesthetically pleasing layout/design for the control buttons in portrait mode
+    (landscape may change but need not — the owner likes it). Looked, not guessed: built the app on
+    a private simulator and screenshotted portrait; the `FlowLayout` toolbar wraps 4 / 4 / 1 with
+    "How to play" orphaned, ten same-weight pills mixing actions, settings, pages and a readout,
+    Finish reflowing the row when it appears, Undo at the top of the screen with the thumb zone
+    empty. Drafted three genuinely different directions as phone artboards on a design canvas,
+    generated from the app's real pill/palette/card values: **A · Deck** (bottom bar in the thumb
+    zone — New game · Undo · Replay · Daily · More, settings and reference pages in an iOS Menu,
+    Deal # as a header chip, Finish rising above the bar; ~60 pt of board back), **B · Two rows**
+    (segmented actions + a quiet status strip, top placement kept), **C · Grid** (same pills on a
+    4-column grid). Recommended A, B as fallback. Nothing implemented; write-up with the test
+    identifier implications in `docs/portrait-controls-proposal.md`, generator kept in
+    `tools/design/`. Canvas: https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882
+

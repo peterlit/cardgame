@@ -1013,3 +1013,14 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
   date's `.minimumScaleFactor(0.7)`): both verified by reading + affected classes green only.
   If a launch-argument override for `dynamicTypeSize` ever exists in `QAFixtures`, add the
   toggle test.
+
+## 2026-09-13 — portrait control-button redesign (proposal, awaiting the owner's pick)
+- **PC-1 — portrait toolbar redesign.** Three directions on the design canvas, written up in
+  `docs/portrait-controls-proposal.md`; recommendation is Option A (bottom "deck" bar + More
+  menu), fallback B (two fixed rows at the top). Implementing A touches: `ContentView.toolbar`
+  → a bottom bar + `Menu`, header deal chip, Finish placement, the portrait height budget
+  (`portraitFitCardW` / `latchedBoardH`), and the UI tests that address `toolbar.autoplay` /
+  `toolbar.autofinish` / `toolbar.wins` / `toolbar.howtoplay` directly (need a "tap More first in
+  portrait" fixture) plus `RegressionAccessibilityIdentifiersTests`' nine-pill count. Landscape
+  rail unchanged. Web `index.html` toolbar is out of scope unless the owner wants parity there.
+
