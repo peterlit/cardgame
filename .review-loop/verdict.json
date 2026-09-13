@@ -1,16 +1,16 @@
 {
-  "round": 2,
+  "round": 1,
   "blockers_open": 0,
-  "majors_open": 1,
+  "majors_open": 0,
   "minors_open": 5,
-  "closed": 3,
-  "new": 3,
+  "closed": 0,
+  "new": 1,
   "reopened": 0,
   "promoted": 0,
   "demoted": 0,
-  "net": 0,
-  "tokens": 210941,
-  "cumulative_tokens": 588673,
-  "decision": "thrashing_soft",
-  "reason": "thrashing signals with mitigating progress AT max_rounds \u2014 the only coherent continue is RAISING max_rounds; ask: abort, or raise max_rounds and run one more round"
+  "net": -1,
+  "tokens": 73327,
+  "cumulative_tokens": 237153,
+  "decision": "converged",
+  "reason": "no open blockers or majors; none newly introduced"
 }

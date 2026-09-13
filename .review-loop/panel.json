@@ -1,8 +1,27 @@
 {
   "rounds": "seed+final",
   "lanes": [
-    { "name": "codex",  "type": "codex",  "model": "gpt-6-astra",     "timeout_s": 900, "max_diff_tokens": 32000 },
-    { "name": "gemini", "type": "gemini",                              "timeout_s": 900, "max_diff_tokens": 32000 },
-    { "name": "ollama", "type": "ollama", "model": "qwen3-coder:30b", "timeout_s": 1500, "max_diff_tokens": 24000, "num_ctx_max": 65536 }
+    {
+      "name": "codex",
+      "type": "codex",
+      "model": "gpt-6-astra",
+      "timeout_s": 900,
+      "max_diff_tokens": 32000
+    },
+    {
+      "name": "gemini",
+      "type": "gemini",
+      "timeout_s": 900,
+      "max_diff_tokens": 32000,
+      "model": "gemini-3.7-flash"
+    },
+    {
+      "name": "ollama",
+      "type": "ollama",
+      "model": "qwen3-coder:30b",
+      "timeout_s": 1500,
+      "max_diff_tokens": 24000,
+      "num_ctx_max": 65536
+    }
   ]
 }

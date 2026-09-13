@@ -1000,3 +1000,27 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
      `fa2de2e..bc4c59f` (the A2 commit). Also owed to the fresh session: usage capture and the
      0.13.0 feedback report.
 
+103. "Run the review loop on scope fa2de2e..bc4c59f with the panel in .review-loop/panel.json
+     (codex gpt-6-astra, gemini, ollama qwen3-coder:30b); skeptical reviewer pinned to Opus.
+     Re-probe the gemini lane first and pin it to the best Pro model the CLI offers. Record every
+     dispatch's usage, measure the run with tools/loop-usage.py, write
+     docs/review-loop-0.13.0-feedback.md; commit report, ledger and feedback; update prompts,
+     BACKLOG and HANDOFF." Fresh session (0.0 MB at the gate). The gemini re-probe found the key on
+     Google's free tier: no Pro model answers (`gemini-2.5-pro` 404 "no longer available to new
+     users", `gemini-3.1-pro-preview` free limit 0), so the lane was pinned to the newest flash
+     that answered; even then each flash model's daily quota died after one 32 K-token diff
+     prompt — gemini contributed to the seed pass only (5 candidates on `gemini-3.7-flash`, after
+     3.8-flash exhausted) and errored twice in the final pass. Loop: panel seed (16 candidates →
+     verifier kept 3: codex 1/1, gemini 2/5 demoted, ollama 0/10) → Opus seed review (5 minors, 0
+     majors, 3 of them the panel's) → round 1 (one `fix_risk` minor: the Finish tier's ~43 pt
+     one-way `latchedBoardH` cost; the implementer declined the "reserve the row" fix with a cost
+     argument, the reviewer accepted it and opened a text finding because the rationale
+     understated the trigger set) → **converged at round 1** → panel final (11 candidates, 2
+     duplicates of open rows, 9 rejected: nothing beyond the chair) → closeout fixed 3 (strict
+     More-menu id tripwire with a 3-mutant proof, static rail Menu ids, doc sweeps + PC-4 wording),
+     accepted 1 wontfix, left 1 partial (TESTCASES.md case steps). Full suites at closeout: node
+     171, Swift unit 17, UI 75 executions, 0 skipped. Measured 2.99 M effective tokens (1.98 M
+     subagents = 4.7× the ledger's 419,585; orchestrator 1.01 M) in 1.5 h. Feedback doc written
+     in the 0.10.0 style — ten items, the gemini free-tier trap and the ollama 0/20 noise at the
+     top. BACKLOG: RL-A2-1..4; HANDOFF §5/§6 updated. Simulator created and deleted.
+

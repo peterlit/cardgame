@@ -1039,3 +1039,29 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
   reserving the row unconditionally (the safe alternative) would charge EVERY deal those 43 pt,
   and unlatching on the flip reintroduces the up-and-down rescale pulse. Revisit only if the
   owner prefers the always-reserved row.
+
+## 2026-09-13 — review-loop v0.13.0 (panel) on the A2 scope — converged round 1
+Report `.review-loop/REPORT.md`; cost and plugin feedback `docs/review-loop-0.13.0-feedback.md`.
+Six minors, 0 majors; 3 fixed, 2 wontfix (PC-4 above, and the `QA.moreItem` 2 s wait — proven to
+short-circuit because SwiftUI Menu items do surface their ids on iOS 26.5), 1 partial. Shipped
+behavior change from the loop: the landscape rail's More `Menu` now has a static `.id("rail.more")`
+and the Finish pill `.id("rail.finish")` (commit `488313d`) — the cue picks the scroll target at
+tap time instead of the Menu changing identity when the board becomes finishable.
+- **RL-A2-1 — `.qa-loop/TESTCASES.md` case steps still describe the deleted toolbar (open,
+  minor, text only).** The screen map was rewritten for A2, but the steps the QA loop drives were
+  not swept: line 77 says "Tap How to play" as a board step (it is behind More now, no
+  More-menu step); 272–273 place the Finish pill "in the toolbar (portrait row 2 between
+  Auto-finish and Deal #)" (it is the top tier of the foot deck; Deal # is a header chip); 357
+  puts the daily HUD "directly under the toolbar". A driver following them files phantom
+  failures. Sweep the steps against `ContentView.swift`'s deck/rail before the next QA loop.
+- **RL-A2-2 — nothing pins the rail Menu's static identity (open, low).** Both rail classes
+  pass, but no test or mutant reproduces "open the More menu, make the board finishable, the
+  menu stays open". A future conditional `.id()` on the Menu would regress silently.
+- **RL-A2-3 — the strict-id proof is portrait-only (open, low).** `RegressionAccessibilityIdentifiersTests`
+  asserts `toolbar.wins` / `toolbar.howtoplay` by id through the portrait deck's More; no strict
+  run exists through the landscape rail's Menu.
+- **RL-A2-4 — the gemini panel lane needs a paid tier (open, owner's call).** On the free-tier
+  `GEMINI_API_KEY` no Pro model answers (2.5 Pro retired for new users, 3.1 Pro has a free limit of
+  0) and each flash model's daily quota is spent by one diff prompt: the lane ran once in two
+  passes. `.review-loop/panel.json` is pinned to `gemini-3.7-flash` until the key changes.
+

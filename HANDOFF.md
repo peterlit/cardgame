@@ -131,14 +131,23 @@ the account — but check they are present before promising a loop.
 Things worth knowing before you run one:
 
 - **Start a loop in a fresh session.** The same plumbing costs ~3× more in a large-context session; a
-  hook warns you. The last run measured 4.32 M effective tokens for 17 findings.
+  hook warns you. The 2026-09-13 run (v0.13.0, with the panel) measured 2.99 M effective tokens
+  for 6 findings; the 2026-09-09 run 5.15 M for 12.
 - **Loop state is versioned** (`.review-loop/`, `.qa-loop/` are tracked; only `.qa-loop/evidence/` is
   ignored). Archive a finished loop before starting a new one — the skill's `archive` verb does it.
 - **Measure the cost afterwards** with [`tools/loop-usage.py`](tools/loop-usage.py) (in-repo, reads
   the raw session transcripts) and write it up. That pattern has produced
   `docs/loop-token-usage.md` plus a feedback doc per version —
-  [`docs/review-loop-0.10.0-feedback.md`](docs/review-loop-0.10.0-feedback.md) is the most recent and
+  [`docs/review-loop-0.13.0-feedback.md`](docs/review-loop-0.13.0-feedback.md) is the most recent and
   the most useful to read first, because the owner maintains these plugins and acts on the feedback.
+- **The review loop has a multi-provider panel** (`.review-loop/panel.json`: codex `gpt-6-astra`,
+  gemini, ollama `qwen3-coder:30b`; consent lives outside the repo under
+  `~/.config/review-loop-tools/consent/`). Traps: the `GEMINI_API_KEY` is Google's free tier —
+  no Pro model answers and a flash model's daily quota is gone after one diff prompt, so expect
+  the gemini lane to run once per day at best; the lanes' timeouts exceed the Bash tool's 10-min
+  ceiling, so run `panel_review.py run` detached (`nohup … &`) and poll its log; `read_guard`
+  blocks any command whose *text* contains an xcodebuild test invocation, even a heredoc writing
+  it to a file — use the Write tool for that.
 - **The QA loop now drives the app through `.qa-loop/driver/` (an XCUITest server + `qa.py` client),
   NOT the MCP simulator-control tool** — that tool needs a per-device human grant on every fresh
   simulator, which an autonomous run cannot get. `bash .qa-loop/driver/start.sh <udid>` builds and
@@ -197,7 +206,13 @@ rail, restyled to match (icons, state badges, More, Finish last). Wins and How t
 More in BOTH orientations — UI tests reach them through `QAFixtures.openWins` /
 `openHowToPlay`, and the rail-overflow tests key on `toolbar.finish` as the pill below the fold.
 Same `toolbar.*` ids otherwise, plus `toolbar.more`. Design record and measured cost:
-`docs/portrait-controls-proposal.md`; mockups on the design canvas linked there.
+`docs/portrait-controls-proposal.md`; mockups on the design canvas linked there. The review loop
+(v0.13.0 with the panel) ran on that commit the same day and **converged at round 1**: 6 minors,
+0 majors; closeout made the rail's More `Menu` id static (`rail.more` / `rail.finish`, commit
+`488313d`), tightened the identifier tripwire (`QA.moreItem(strictID:)`, mutation-proven), and
+swept the docs. Kept as a deliberate wontfix for the owner's ruling: **PC-4**, the Finish tier's
+~43 pt one-way `latchedBoardH` cost in portrait. Residue in `BACKLOG.md` (RL-A2-1..4);
+`.review-loop/REPORT.md` has the WATCH LIST.
 
 **Recent history worth skimming:** the 2026-09-07 skeptical review (`docs/skeptical-review-2026-09-07.md`)
 and the pass that addressed it — the pool builder now publishes under a fail-closed contract, the

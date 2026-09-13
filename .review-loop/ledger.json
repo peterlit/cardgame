@@ -1,316 +1,212 @@
 {
-  "round": 2,
-  "round_start_sha": "1fa9402f1f7bea8ae8a1103ae1deb99a5f43d4c3",
+  "round": 1,
+  "round_start_sha": "773edccfa680b50fdfd496e63a5e695fcaeb06dc",
   "max_rounds": 2,
   "token_budget": null,
   "findings": [
     {
-      "id": "security/DailyView.swift:export-filename-locale",
-      "claim": "exportFilename builds a fixed-format timestamp on a bare DateFormatter with no locale/calendar pinned. On a device whose region uses a non-Gregorian calendar (Buddhist/Japanese/Persian) or Arabic-Indic digits, the backup filename's year and digits change wholesale; and under a 12-hour region setting a fixed 'HH' pattern is not guaranteed to stay 24-hour, so exports at 01:30:05 and 13:30:05 on the same day can produce the SAME name - reopening exactly the system 'Replace Existing Items?' path this fix exists to eliminate (bug/WF-11:export-replace-destroys-existing-backup, which trashed the old backup and wrote no new one, leaving zero backups).",
+      "id": "tests/RegressionAccessibilityIdentifiersTests.swift:more-menu-id-tripwire-weakened",
+      "claim": "The accessibility-identifier regression test now passes even if the More menu's Wins/How-to-play identifiers are removed: QA.moreItem falls back to matching by visible label when the identifier doesn't surface within 2s, and the test's own assertion for How to play explicitly accepts a label match.",
       "evidence": {},
       "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/DailyView.swift:516-525",
-      "introduced_by_fix": true,
-      "fix_risk": true,
-      "note": "Round 2: untouched by 1fa5df6 (diff is ContentView.swift + one new UI test file only). Round-1 verdict stands; the three ExportFilenameTests methods pass in the round-2 scoped run.",
-      "current_status": "fixed",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "a11y/DailyView.swift:dynamic-type-stops-at-the-sheet",
-      "claim": "The ux/WF-5 Dynamic Type fix routed every font on the Daily SHEET through Theme.scaled, but the two surfaces the player actually reads WHILE PLAYING were left on fixed point sizes in the same round: DailyHUD.objChip's objective label is a hard .system(size: 10) and its medal mark .system(size: 11), and ContentView's demo-bar headline is a hard .system(size: 12.5). A low-vision player at Accessibility XXXL can read what Gold requires on the sheet and then cannot read the same objective in the in-game HUD, which is the only place it is shown during the attempt that scores it.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/DailyView.swift:890-910",
-      "introduced_by_fix": false,
-      "fix_risk": true,
-      "note": "Round 2: untouched by 1fa5df6. RegressionBoardHudDynamicTypeTests (both methods) and RegressionDailyHudStacksTests pass in the round-2 scoped run.",
-      "current_status": "fixed",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "fixed"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "a11y/DailyView.swift:calendar-date-has-no-scale-floor",
-      "claim": "The calendar cell's DATE was newly routed through Theme.scaled but, unlike every other scaled label on this sheet, was given no .lineLimit(1)/.minimumScaleFactor. calCols is 7 flexible columns with 4pt spacing, so on a 393pt-wide sheet each column is roughly 46pt, while Theme.scaled(12, .accessibility5) on the caption1 curve is roughly 44pt - a two-digit date ('31') is wider than its own column. The fix that exists to stop calendar markers clipping at accessibility sizes leaves the date itself with no horizontal escape.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/DailyView.swift:710-735",
-      "introduced_by_fix": true,
-      "fix_risk": false,
-      "note": "VERIFIED FIXED. DailyView.swift:735-736 is now `Text(\"\\(day)\").font(f(12, weight: .medium)).lineLimit(1).minimumScaleFactor(0.7)`, the same floor every other scaled label on this sheet carries. At AX5 the ~44 pt two-digit date can shrink to ~31 pt, inside the ~46 pt column, so it neither truncates nor widens the 7-column grid. Genuinely not mutant-killable, as the implementer said (the cell combines its children for accessibility, so no XCUITest can observe the glyph's width); accepted on the code read plus green RegressionCalendarMarkerAccessibilitySizeTests, RegressionDailyCalendarTests and RegressionDailySheetDynamicTypeTests in the full-target run.",
-      "current_status": "fixed",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/index.html:web-demo-step-back-has-no-behavioural-coverage",
-      "claim": "The web half of ux/WF-6:demo-has-no-step-back is a real refactor - deal() was split so that board layout moved into a new layoutBoard(), and demoStepBack() re-simulates the line from move 0 - yet nothing in the 167-test node suite executes either function. The only guard is a source-text pin in tests/ios-parity.test.mjs that string-matches two lines of the iOS source and two of the web source. An off-by-one in demoStepBack's target, a wrong board from layoutBoard, or a future caller passing an unnormalised seed to layoutBoard (deal() applies >>>0 before calling; layoutBoard itself does not) would all ship green, while the identical iOS logic IS covered by two real behavioural tests in SolutionReplayTests.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "index.html:1600-1616",
-      "introduced_by_fix": true,
-      "fix_risk": false,
-      "note": "VERIFIED FIXED, and the coverage is real rather than nominal. tests/web-demo.test.mjs lifts the SHIPPED declarations (layoutBoard, applyDemoToken, demoStepBack and their deps) out of index.html by name via extractDecl - which throws loudly if a declaration is renamed, deleted, indented out of column 0, or duplicated (web-extract.mjs:88-97) - into a sandbox whose four stubs I checked against the originals: setMoves (index.html:1264) is DOM-only and mutates no state, and render/updateDemoBar/restartDeal are counted, so the abort path at index.html:1612 cannot pass silently (asserted at web-demo.test.mjs:206,239). The oracle is independent: layoutBoard is compared against tests/engine.mjs `deal` (engine.mjs:34-48), a separately maintained implementation, not against index.html itself. Mutation: all 5 web mutants killed (w1 off-by-one target, w2 wrong seed, w3 column sizes swapped, w4 banner re-entry demoStarted, w5 move-0 guard) - each is exactly the class of defect the finding said would ship green. npm test 171/171, 0 skipped.",
-      "current_status": "fixed",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/round-1-mutants.json:manifest-never-ran",
-      "claim": "The round's mutation manifest cannot execute: m1-drop-locale and m2-drop-calendar use \"replacement\": \"\", which mutate.py rejects (`if not m.get(k)` treats the empty string as missing), and the test_cmd contains a literal `-derivedDataPath <scratch>/dd` that bash parses as I/O redirection. `python3 mutate.py .review-loop/briefs/round-1-mutants.json` exits with \"2 manifest error(s); nothing was run\" \u2014 so the claimed 6/7-killed result was never produced by this manifest and the fixes' test coverage is unverified by mutation.",
-      "evidence": {},
-      "severity": "major",
-      "region": ".review-loop/briefs/round-1-mutants.json:1-20",
-      "introduced_by_fix": true,
-      "current_status": "fixed",
-      "note": "VERIFIED by running the committed artifact VERBATIM in one go (no split, no scratch copy): `python3 mutate.py .review-loop/briefs/round-1-mutants.json` -> killed=6, survived=1, errors=0, mismatches=0, exit 0, with m2-drop-calendar the expected survivor and m1/m3/m4/m5/m6/m7 all killed. That is exactly the count round 1 claimed, now produced by the file as committed: the two empty replacements carry inert comment lines, the derivedDataPath is absolute, m6's original tracks the round-2 latch/cap text, timeout is 1800s. One residual to know, not a defect: mutate.py has no 'scope' key - it runs the single test_cmd for every mutant - so the per-mutant `scope` fields are documentation only and a kill is attributable to the whole command, not the named test.",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "docs/HANDOFF.md:stale-unit-test-count",
-      "claim": "ExportFilenameTests adds 3 unit tests (verified: CausewayTests now runs 17, not 14) but HANDOFF.md and CLAUDE.md still assert 14, which is the number the next session will 'verify before claiming' against and treat a 17 as unexplained drift.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "HANDOFF.md:70-80",
-      "introduced_by_fix": true,
-      "current_status": "partial",
-      "note": "PARTIAL - one stale count survives, in the file's most authoritative block. HANDOFF.md:56 sits inside '## 3. Verified commands', whose own preamble at :53 reads 'Every command here was run and produced what it says (counts re-verified 2026-09-09)', and it still says `npm test  # node --test \"tests/**/*.test.mjs\" -> 167 tests, 167 pass, 0 skipped`. I ran it: 171 tests, 171 pass, 0 skipped. So the next session performing CLAUDE.md's 'verify before you claim' step still hits a mismatch and still has to treat it as unexplained drift - this finding's exact failure mode, just relocated four lines up the page from where it was fixed. Everything else checks out against my own measurements: HANDOFF.md:73-74/:160 and CLAUDE.md:45/:48 now say 17 unit / 72 methods / 75 executions / npm 171; `grep -c 'func test'` gives exactly 17 in CausewayTests/ and 72 in CausewayUITests/; my runs executed 17 unit and 75 UI executions with CausewayUITestsLaunchTests/testLaunch running 4 times, which is precisely the '+3' the new HANDOFF.md:160-161 parenthetical explains. Remaining fix: one number on HANDOFF.md:56 (167 -> 171, twice).",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "partial"
-        }
-      ]
-    },
-    {
-      "id": "ux/ContentView.swift:hud-height-rescales-landscape-board",
-      "claim": "The new HudBarHeightKey feeds the bar's MEASURED height straight into landscapeBoardH (ContentView.swift:213-216), which feeds heightCardW (:225) - so any change in the bar's height rescales every card on the landscape board. The bar's height is not stable during play: demoHeadline embeds game.demoProgress (\"0 / 118\" -> \"10 / 118\", ContentView.swift:1103 / Game.swift:147), which changes the headline's width on demo moves and flips its wrap in the stacked ViewThatFits branch, and DailyHUD's chip marks change (\"\\u00b7\" -> \"\\u2713\"/\"\\u2717\") during a challenge. Unlike the tableau's card count, this new input has no latch, so it reopens the per-move landscape board rescale that shrinkLatchCount exists to prevent (ux/WF-12:landscape-board-rescales-every-move, ContentView.swift:123,359).",
-      "evidence": {},
-      "severity": "major",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:207-258",
-      "introduced_by_fix": true,
-      "fix_risk": true,
-      "current_status": "fixed",
-      "note": "VERIFIED. ContentView.swift:175 adds hudBarLatchH; :236 the landscape reserve is min(cap, max(50, hudBarH, hudBarLatchH)) so it is monotone within a deal+geometry; :292 the latch only ever grows; resets at :366 (geo.size), :387 (dealGeneration), :402 (moveCount==0). Behaviourally proven, not just structurally: RegressionLandscapeHudLatchTests.testDemoBarHeightFlipsInLandscapeDoNotRescaleTheBoard passes and its own precondition asserts the paused bar is >8pt taller than the playing bar, so the flip really happens and all 52 card widths stay identical across Pause/Resume/Pause/3xPrev. Mutation: r2m1-latch-follows-live and r2m2-reserve-ignores-latch both KILLED (round-2 manifest ran verbatim, killed=3 survived=0 errors=0 mismatches=0). Default-size geometry unregressed: max(50,...) is unchanged when the measure never exceeds 50, and RegressionDailyHudStacksTests / RegressionBoardHudDynamicTypeTests / SmokeLandscapeTests / RegressionLandscapeDealAlertTests / RegressionRailCueFlipsAtEndTests / RegressionRestoredBoardShrinkLatchTests all pass. The latch's own staleness across a Dynamic Type change is filed separately as ux/ContentView.swift:hud-latch-survives-dynamic-type-change.",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "ux/ContentView.swift:hud-reserve-clamp-has-no-fallback",
-      "claim": "The measured-bar compensation is capped: landscapeBoardH = max(150, geo.height - 84 - bar) (ContentView.swift:216), so once the bar exceeds about geo.height-234 (~168 pt on a 402 pt landscape window) the board stops shrinking and the VStack overflows again, pushing the rail's bottom off-screen - the exact bug the change exists to fix. The tallest configurations are untested: DailyHUD grows a 4th row (hud.day, DailyView.swift:897-902) when a CATCH-UP day is played, and the demo bar in landscape is not covered at any text size (RegressionFlawlessDemoBarHeightTests is portrait-only; the new test only rotates the today-HUD path).",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:207-216",
-      "introduced_by_fix": true,
-      "fix_risk": true,
-      "current_status": "fixed",
-      "note": "VERIFIED. ContentView.swift:234 landscapeBarCap = max(60, geo.h - 72 - 12 - 150); :282-285 an over-cap bar is wrapped in a ScrollView bounded to the cap. Checked the arithmetic rather than trusting it: with the cap taken, content = 6(topPad) + header + 12 + cap + 12 + 150 = geo.h + header - 54, and `header` (ContentView.swift:741-757) is built entirely from FIXED point sizes (22/11/12/18), so it is ~40pt at every Dynamic Type setting and the sum fits with ~12pt to spare - the 72 chrome constant does not go stale at accessibility sizes. No oscillation: the HudBarHeightKey GeometryReader (:271-277) sits on the bar's own background, and inside a vertical ScrollView the content is still measured at its ideal height, so the predicate at :282 cannot flap. testFlawlessDemoBarAtAX5LandscapeIsCappedAndTheRailStaysOnScreen and testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen both pass; mutation r2m3-no-cap-fallback KILLED. Caveats filed separately: ux/ContentView.swift:capped-hudbar-scroll-has-no-cue and tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap.",
-      "first_seen_round": 1,
-      "status_history": [
-        {
-          "round": 1,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "ux/ContentView.swift:hud-latch-survives-dynamic-type-change",
-      "claim": "hudBarLatchH is reset only on geo.size change, dealGeneration and moveCount==0 (ContentView.swift:366,387,402) - never on dynamicTypeSize. The bar's height is a direct function of dynamicTypeSize (DailyHUD and demoHeadlineText at ContentView.swift:1092 both scale), so a player who tries Accessibility XXXL mid-deal and then turns text size back down keeps the AX5-sized reserve for the rest of the deal: on a 393pt-tall landscape window the reserve stays pinned at the ~159pt cap instead of the ~50pt the small bar now needs, and the board is held at its 150pt floor with cards ~40% narrower than they should be, until a new deal or two rotations. Round 1's unlatched max(50, hudBarH) recovered immediately; the latch is what makes the wrong size stick.",
-      "evidence": {},
-      "severity": "major",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:360-403",
-      "introduced_by_fix": true,
-      "fix_risk": true,
-      "current_status": "fixed",
-      "note": "VERIFIED FIXED. ContentView.swift:387-395 adds `.onChange(of: dynamicTypeSize) { _, _ in latchedBoardH = 0; hudBarLatchH = 0 }` on the OUTER view (outside the GeometryReader that closes at :375), so it is present in both orientations and is not torn down with the portrait board's GeometryReader. Inert at the default size, as required: no `initial:` argument and DynamicTypeSize is Equatable, so the closure runs only on an actual Settings-driven change - no flash and no extra layout pass for a player who never touches text size. It cannot loop, because zeroing only RELAXES constraints: latchedBoardH is re-seeded by the existing `.onChange(of: liveH, initial: true)` at :348-350 from the new measure, hudBarLatchH by `.onPreferenceChange(HudBarHeightKey)` at :296-299, and the bar is width-sized and feeds landscapeBoardH one way (:268-270), so there is no measure->resize cycle. Zeroing rather than `= hudBarH` (what the geo.size handler at :372 does) is the right call for exactly the stated reason: hudBarLatchH is a maximum and hudBarH still carries the old-font height for one frame. Residual, benign: for that one frame landscapeHudBar (:236) falls back to max(50, stale hudBarH) - a transient over-reserve corrected by the next preference update, identical to the already-shipped dealGeneration path at :402. shrinkLatchCount is correctly left alone (a card count, size-independent). Full CausewayUITests target green on this commit, including RegressionBoardHudDynamicTypeTests, RegressionRestoredBoardShrinkLatchTests and RegressionLandscapeHudLatchTests.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "ux/ContentView.swift:capped-hudbar-scroll-has-no-cue",
-      "claim": "The new capped bar (ContentView.swift:282-285) is a bare ScrollView with .frame(height: landscapeBarCap) and nothing else: no scroll cue, no trimmed viewport, no VoiceOver affordance. iOS hides scroll indicators at rest, and the cap is an arbitrary pixel height, so the fold can land exactly on a control boundary - which is precisely the pair of defects this file already documents and fixed for the rail (ux/WF-12:rail-hides-howtoplay, ux/WF-12:rail-more-hint-inert, ContentView.swift:572-585). At AX5 landscape the demo bar's Stop pill sits below the fold - the new test itself has to swipe to reach it (RegressionLandscapeHudLatchTests.swift:152) - so a low-vision player sees a truncated bar with no indication that Prev/Next/Pause/Stop exist below it.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:278-293",
-      "introduced_by_fix": true,
-      "fix_risk": true,
-      "current_status": "partial",
-      "note": "PARTIAL, and I accept it as partial rather than fixed - but three things the implementer's summary glosses. (1) Only the 'no scroll cue' half is touched. The 'fold lands on a control boundary' half - the second of the two defects this same file already fixed for the rail by TRIMMING the viewport to cut a pill in half (ContentView.swift:594-607) - is completely unaddressed for the bar: :284 is still a bare `.frame(height: landscapeBarCap)`, so at AX5 the cut can still fall exactly on a control edge and render a 0-4 pt sliver of Prev/Next, the precise appearance that made the rail's controls read as absent. (2) The cue itself is weak: `.scrollIndicators(.visible)` does not pin iOS indicators on - they still fade at rest - so the durable cue is really only the one-shot `.scrollIndicatorsFlash(onAppear: true)` at the moment the branch at :282 flips to the ScrollView. Compare the rail's cue at :686-690, which is a persistent, tappable, VoiceOver-labelled control. (3) SUSPECTED (I did not instrument VoiceOver): the `.accessibilityHint` at :290 is attached to a ScrollView that is an accessibility CONTAINER, not an element, so VoiceOver likely has nothing to focus that would ever speak it - in which case the claimed VoiceOver affordance is inert and the low-vision case is no better off than before. What I did rule out is the opposite regression: the full UI target is green and RegressionLandscapeHudLatchTests still resolves `app.buttons[\"demo.stop\"]` inside the scroll (:151-154), so the hint did NOT collapse the ScrollView into a single combined element and hide the controls. ACTION OUTSTANDING: the implementer justifies the punt by saying the full rail-style cue was 'punted to BACKLOG with a sketch', but `git diff 1fa5df6..HEAD -- BACKLOG.md prompts.md` is EMPTY - neither file is touched by 6d21ba0. Per this repo's convention the trailing 'review-loop record' commit is where that lands (87ef9b6 is the precedent); if it does not, the deferred work and its sketch exist nowhere on disk.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "partial"
-        }
-      ]
-    },
-    {
-      "id": "tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap",
-      "claim": "CHANGES claims the cap fallback is 'covered at both tallest configurations (Flawless demo bar and catch-up 4-row HUD, AX5 landscape)', but testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen (RegressionLandscapeHudLatchTests.swift:161-171) never queries board.hudbar.scroll: it asserts only that the rail bottom/header are on screen and hud.day is hittable, which passes identically whether the catch-up HUD is over the cap and scrolling or comfortably under it. So the catch-up half of the claim is untested for the cap path, and if that HUD is under the cap the test is a no-op guard against exactly the regression it is named for.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:159-171",
-      "introduced_by_fix": true,
-      "fix_risk": false,
-      "current_status": "fixed",
-      "note": "VERIFIED FIXED. RegressionLandscapeHudLatchTests.swift:174-178 now waits on `app.scrollViews[\"board.hudbar.scroll\"]` and asserts hud.day is drawn inside that scroll's frame, so the catch-up method no longer passes with the cap fallback deleted. Two independent confirmations: (a) the real test passes in my full-target run, which settles the empirical question the finding raised - the catch-up HUD at AX5 landscape IS over the cap; (b) mutant i1-cap-fallback-off-catchup-only (`if landscape && hudBarH > landscapeBarCap` -> `if false`) is killed by a test_cmd that targets ONLY testCatchUpDayHudAtAX5LandscapeKeepsTheRailOnScreen, so the kill is attributable to this method alone. NOTE on that kill's provenance: the manifest silences xcodebuild output (`>/dev/null 2>&1`), so a compile failure would present identically to a test failure; the conclusion does not rest on it, since I read the assertion and watched it pass against unmutated code, and `if false` makes board.hudbar.scroll unconditionally absent. The second half of this finding's old note - the slack cap bound in the sibling method - is NOT fixed and is carried forward as tests/RegressionLandscapeHudLatchTests.swift:cap-assertion-slack so it is not lost behind this 'fixed'.",
-      "first_seen_round": 2,
-      "status_history": [
-        {
-          "round": 2,
-          "status": "open"
-        },
-        {
-          "round": 2,
-          "status": "fixed"
-        }
-      ]
-    },
-    {
-      "id": "tests/RegressionLandscapeHudLatchTests.swift:cap-assertion-slack",
-      "claim": "The only numeric assertion on the landscape bar cap is slack by at least 12 pt, so it cannot fail for the regression it names. RegressionLandscapeHudLatchTests.swift:149 asserts `scroll.frame.height <= window.frame.height - 150 - 72`, i.e. window.height - 222, while the shipped cap (ContentView.swift:227,234) is `geo.size.height - 72 - 12 - 150` = geo.height - 234, and geo.size.height is the safe-area-inset GeometryReader height, never larger than window.frame.height. Deleting the `- 12` inter-element gap from the cap - which would eat the board's 150 pt floor, exactly what the assertion's failure message claims to catch - produces a bar height equal to the bound and still passes a LessThanOrEqual. The test that carries the cap's only numeric guard therefore ships green through a real cap regression.",
-      "evidence": [
-        "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:149",
-        "ios/Causeway/Causeway/Views/ContentView.swift:227",
-        "ios/Causeway/Causeway/Views/ContentView.swift:234"
+      "region": "ios/Causeway/CausewayUITests/RegressionAccessibilityIdentifiersTests.swift:48-58",
+      "source": "panel:codex",
+      "sources": [
+        "panel:codex"
       ],
-      "severity": "minor",
-      "region": "ios/Causeway/CausewayUITests/RegressionLandscapeHudLatchTests.swift:145-150",
-      "introduced_by_fix": true,
-      "fix_risk": false,
-      "current_status": "open",
-      "note": "CONFIRMED by arithmetic on both sites; carried out of the note on tests/RegressionLandscapeHudLatchTests.swift:catchup-case-never-asserts-the-cap so it survives that finding's 'fixed'. Introduced by round 2's cap test, untouched by the closeout commit. Cheap fix: derive the bound from the same numbers the view uses (subtract the 12 pt gap too) and assert against the scroll's own container height rather than the window's, or drop the numeric assertion and keep only the structural one, so it stops implying a guard it does not provide.",
-      "first_seen_round": 2,
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Closeout verified: QAFixtures.swift:114-121 adds strictID (default false) which asserts byId.waitForExistence(5) and returns the id element with no label fallback; the tripwire passes strictID: true for Wins and asserts toolbar.howtoplay by waitForExistence, the `|| app.buttons[\"How to play\"]` disjunct is gone. Ran the class on 2F77A1A8: passed in 31.6s, and the run log shows both ids resolving on the first ~1s poll (t=8.16 wait -> t=9.19 toolbar.wins; t=9.39 wait -> t=10.43 toolbar.howtoplay), so the strict path resolves on the real identifier, not on a label. Mutation re-run pending. Mutation manifest re-run at HEAD (split verbatim into 2 parts, foreground): strip-wins-id KILLED, strip-howtoplay-id KILLED, control-comment-only SURVIVED \u2014 3/3 match, errors 0, so the kill count is verified, not asserted.",
+      "first_seen_round": 0,
       "status_history": [
         {
-          "round": 2,
+          "round": 0,
           "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/QAFixtures.swift:more-menu-id-wait",
+      "claim": "SwiftUI Menus on iOS do not reliably surface a child Button's accessibilityIdentifier to XCUITest, which is why QAFixtures.moreItem waits 2s for the id before falling back to the label; this adds wasted wait time across the ~9 test files that open the More menu.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/CausewayUITests/QAFixtures.swift:107-126",
+      "source": "panel:gemini",
+      "sources": [
+        "panel:gemini"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "wontfix",
+      "note": "The wait itself is unchanged; the implementer's argument is that it never times out, and the run log bears that out: in RegressionAccessibilityIdentifiersTests both toolbar.wins and toolbar.howtoplay resolved on the first ~1.03s XCUITest poll, i.e. the id IS surfaced by the Menu and waitForExistence(2) short-circuits. The residual ~1s per call is XCUITest's poll interval, not the fallback, so removing the wait would save nothing. Declining accepted. Residual edge (not worth a fix): the strict proof was taken in portrait only; no landscape (rail Menu) strict run exists.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "wontfix"
+        }
+      ]
+    },
+    {
+      "id": "state/ContentView.swift:rail-more-dynamic-id",
+      "claim": "The landscape rail's More Menu carried a dynamic `.id(game.canOfferFinish ? \"rail.more\" : \"rail.last\")` that changes identity when the board becomes finishable; if that flip happens while the More menu is open (e.g. via a background autoplay move), SwiftUI recreating the view's identity risks dismissing the open menu.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:649-690",
+      "source": "panel:gemini",
+      "sources": [
+        "panel:gemini"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified on the code: ContentView.swift:654 is now the unconditional .id(\"rail.more\") on the Menu and :660 gives the conditional Finish pill .id(\"rail.finish\"), so no view's identity depends on canOfferFinish any more (the Finish pill is created/destroyed by the `if` regardless). The cue picks the end anchor at tap time (:685-686), and since Finish is the rail's last child when present and More when absent, the scroll target is the same element the old \"rail.last\" resolved to \u2014 no behavior change. No duplicate .id() is introduced (old code never had one either). Layout-neutral as claimed: .id() adds no view to the VStack, so railContentH/the fold arithmetic are byte-identical; the rejected sentinel would indeed have added one 6 pt spacing. Declining the sentinel is correct. Runtime: both rail classes pass on 2F77A1A8 \u2014 RegressionLandscapeRailMoreCueTests (18.7s) scrolls the rail to its end via the cue with Finish live (exercising scrollTo(\"rail.finish\")) and then opens the rail's More menu and lands on the How-to-play sheet; RegressionRailCueFlipsAtEndTests (14.6s) round-trips the cue both ways with Finish live. RESIDUAL (not worth a fix): nothing pins the staticness \u2014 no test and no mutant reproduces the open-menu-during-canOfferFinish-flip dismissal, so a future edit could re-introduce a conditional .id() on the Menu silently.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "docs/qa-loop:stale-toolbar-screen-map",
+      "claim": "Three checked-in reference docs still describe the deleted portrait toolbar, so the next QA loop drives the app off a stale map and reports phantom failures.",
+      "evidence": {},
+      "severity": "minor",
+      "region": ".qa-loop/TESTCASES.md:25-45",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "partial",
+      "note": "Core fixed and verified: TESTCASES.md's screen map is rewritten for A2 (portrait deck / landscape rail / More menu ids, all matching ContentView.swift:841-884 and 619-693), app.md #7 is marked gone with its number kept, ios/README.md:80 no longer lists FlowLayout. EDGE STILL OPEN \u2014 the case STEPS the QA loop actually executes were not swept and still describe the deleted toolbar: (a) TESTCASES.md:272-273 states the Finish pill appears 'in the toolbar (portrait row 2 between Auto-finish and Deal #)' \u2014 under A2 it is its own tier at the TOP of the foot deck (ContentView.swift:843-845) and Deal # is a header chip (ContentView.swift:816), so a driver checking TC-4.2's stated position files a phantom failure; (b) TESTCASES.md:77 'Tap How to play' as a board step, with no More-menu step, in the smoke case TC-1.1 \u2014 there is no board-level How to play control any more; (c) TESTCASES.md:357 'the three-line stacked HUD sits directly under the toolbar'. Text-only, no shipped behavior.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
+        }
+      ]
+    },
+    {
+      "id": "layout/ContentView.swift:finish-tier-latch-cost",
+      "claim": "The Finish pill is now its own tier inside portraitDeck's VStack(spacing: 8), so the deck grows ~43 pt (pill ~35 + spacing 8) the first time game.canOfferFinish goes true in a deal. That shrinks the board GeometryReader's liveH by the same amount and permanently drops latchedBoardH (a per-deal MINIMUM, never restored). Undo back out of the finishable state and the board keeps sizing its cards against the 43 pt-smaller height for the rest of the deal. This is NEW cost: under the removed FlowLayout toolbar the Finish pill joined an existing wrap row (9 pills wrapped 4/4/1, 10 wrapped 4/4/2 \u2014 same three rows), so it usually cost the latch nothing. Visible only when the height bound is binding (a tall column has already forced a shrink): the cards stay one shrink step smaller than the space allows. Nothing clips \u2014 the tableau's inner GeometryReader still gets the true height.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:313-355",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "fix_risk": "Changes portrait card sizing \u2014 any fix must not reintroduce the up-AND-down rescale pulse latchedBoardH exists to prevent. The safe shape is to make the Finish tier occupy its height UNCONDITIONALLY (reserve the row with an invisible placeholder when !canOfferFinish) so the deck height is constant within a deal and the latch has nothing to absorb; do NOT simply unlatch on canOfferFinish flips.",
+      "current_status": "wontfix",
+      "note": "Round 1: decline ACCEPTED on the merits. The mechanism is unchanged in the code (portraitDeck:834-838 still gates finishPill on canOfferFinish; latchedBoardH:325/349-352 still holds the per-deal minimum) \u2014 the round changed only the doc comment and BACKLOG, which is what a wontfix should look like. The three alternatives all cost more than the defect: (a) unconditional reserve charges every portrait deal ~43 pt, and because canOfferFinish CAN flip repeatedly the alternative of unlatching on the falling edge is a genuine repeatable up/down pulse, not a one-shot correction \u2014 the fix_risk stands; (b) folding Finish into the toggle tier contradicts the owner's decided A2 layout and is not an implementer's call; (c) latching the reservation after first appearance is a no-op, the 43 pt is already spent at that moment. Symptom stays bounded: one shrink step, no clipping. BUT the recorded rationale is wrong about how narrow the trigger is \u2014 see docs/ContentView.swift:finish-tier-trade-understated, which must be corrected before the owner rules on PC-4.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "wontfix"
+        }
+      ]
+    },
+    {
+      "id": "docs/ContentView.swift:finish-tier-trade-understated",
+      "claim": "The code comment and BACKLOG PC-4 rationale the owner will rule on understate the trigger set for the Finish-tier latch cost (claimed undo-only, and that 'the remaining play is normally the finish itself').",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:824-840",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified on the current text: ContentView.swift:830-834 now says 'finishable and then NOT finishable again ... undo OR from any forward move that breaks the cascade: canOfferFinish is a pure function of position and, unlike maybeAutoFinish, has no autoFinishTierCost() guard', names the live-tier daily / Auto-finish Off / 'Not yet' paths, and the 'remaining play is normally the finish itself' clause is gone. BACKLOG.md:1032-1037 carries the same corrected trigger set. Matches Game.swift's actual guards as cited in the original finding.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
         }
       ]
     }
   ],
-  "scope": "1a63ce2..836434d",
+  "scope": "fa2de2e..bc4c59f",
+  "panel": {
+    "0": {
+      "codex": {
+        "filed": 1,
+        "confirmed": 1,
+        "demoted": 0,
+        "rejected": 0
+      },
+      "gemini": {
+        "filed": 5,
+        "confirmed": 0,
+        "demoted": 2,
+        "rejected": 3
+      },
+      "ollama": {
+        "filed": 10,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 10
+      }
+    },
+    "final": {
+      "codex": {
+        "filed": 1,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 0,
+        "duplicate": 1
+      },
+      "ollama": {
+        "filed": 10,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 9,
+        "duplicate": 1
+      }
+    }
+  },
   "usage": {
     "0": {
-      "reviewer": 200853
+      "panel-verifier": 58941,
+      "reviewer": 104885
     },
     "1": {
-      "implementer": 75017,
-      "reviewer": 101862
-    },
-    "2": {
-      "implementer": 201783,
-      "reviewer": 176990
+      "implementer": 88993,
+      "reviewer": 114606,
+      "panel-verifier": 52160
     }
   },
   "round_shas": {
-    "1": "f72bf7cfd32f328067ea6da0bc12bab26cb35b11",
-    "2": "1fa9402f1f7bea8ae8a1103ae1deb99a5f43d4c3"
+    "1": "773edccfa680b50fdfd496e63a5e695fcaeb06dc"
   }
 }
