@@ -1026,3 +1026,12 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
 - **PC-3 — Dynamic Type on the deck (open, minor).** The deck's labels (11 pt) and the toggle
   badges are fixed-size like the pills they replace; the board is geometry, but the deck is
   chrome and could follow `Theme.scaled` as the HUD does.
+- **PC-4 — Finish tier costs the portrait board ~43 pt once per deal (open, owner's call).**
+  Under the old FlowLayout toolbar the Finish pill joined the last wrap row for free; as A2's own
+  tier it takes ~43 pt (pill + spacing) off the board's height the first time `canOfferFinish`
+  goes true, and `latchedBoardH` holds that as the deal's minimum. Visible only on a deal that
+  is made finishable, undone, and played on with a height-bound (tall) column: cards stay one
+  shrink step smaller than the space allows; nothing clips. Reviewed 2026-09-13 and kept as is:
+  reserving the row unconditionally (the safe alternative) would charge EVERY deal those 43 pt,
+  and unlatching on the flip reintroduces the up-and-down rescale pulse. Revisit only if the
+  owner prefers the always-reserved row.

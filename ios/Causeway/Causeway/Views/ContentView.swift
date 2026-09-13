@@ -819,9 +819,18 @@ struct ContentView: View {
     /// finishable, a PERMANENT tier with the two auto settings (the owner wants them one tap
     /// away, never behind a menu), and the deck bar with the play actions. Wins and How to play
     /// live behind More. This sits INSIDE the board VStack after the board's GeometryReader, so
-    /// the board self-fits above it exactly as it did under the old three-row toolbar
-    /// (latchedBoardH: the Finish tier is the one piece that comes and goes, and the latch
-    /// already treats such chrome as a per-deal minimum).
+    /// the board self-fits above it. The Finish tier is the one piece that comes and goes, and
+    /// it is NOT free the way it was under the old FlowLayout toolbar (where it joined the last
+    /// wrap row): its first appearance in a deal takes ~43 pt (pill + spacing) off the board
+    /// height, which latchedBoardH then holds as that deal's minimum — so a deal made
+    /// finishable, undone, and played on with a height-bound column keeps cards one shrink
+    /// step smaller than the space allows. Deliberate trade (review-loop 2026-09-13,
+    /// BACKLOG PC-4): reserving the row unconditionally would charge EVERY deal those 43 pt
+    /// to cover that narrow path, and canOfferFinish means auto-finish would already win, so
+    /// the remaining play is normally the finish itself. The one-way shrink is the same
+    /// per-deal monotone contract shrinkLatchCount already imposes on column-count changes;
+    /// do not unlatch on canOfferFinish flips — that is the up-AND-down pulse the latch exists
+    /// to prevent.
     private var portraitDeck: some View {
         VStack(spacing: 8) {
             if game.canOfferFinish {
