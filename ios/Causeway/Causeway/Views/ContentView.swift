@@ -651,11 +651,13 @@ struct ContentView: View {
                         }
                         .accessibilityLabel("More")
                         .accessibilityIdentifier("toolbar.more")
-                        .id(game.canOfferFinish ? "rail.more" : "rail.last")
+                        .id("rail.more")   // STATIC: a conditional .id() on a Menu re-creates it — and can
+                                           // drop its open presentation — when canOfferFinish flips
+                                           // off the autoplay timer. The cue picks the end target instead.
                         if game.canOfferFinish {
                             railPill("Finish the deal", systemImage: "flag.fill", primary: true) { requestFinish() }
                                 .accessibilityIdentifier("toolbar.finish")
-                                .id("rail.last")
+                                .id("rail.finish")
                         }
                     }
                     .background(GeometryReader { g in
@@ -679,7 +681,9 @@ struct ContentView: View {
                     railCue(atEnd: atEnd, height: cueH) { toEnd in
                         railAtEnd = toEnd   // flip the cue at once; the geometry confirms it as the scroll lands
                         withAnimation(.easeOut(duration: 0.25)) {
-                            proxy.scrollTo(toEnd ? "rail.last" : "rail.first", anchor: toEnd ? .bottom : .top)
+                            // The last pill is Finish while the board is finishable, else More.
+                            let last = game.canOfferFinish ? "rail.finish" : "rail.more"
+                            proxy.scrollTo(toEnd ? last : "rail.first", anchor: toEnd ? .bottom : .top)
                         }
                     }
                 }
@@ -823,11 +827,14 @@ struct ContentView: View {
     /// it is NOT free the way it was under the old FlowLayout toolbar (where it joined the last
     /// wrap row): its first appearance in a deal takes ~43 pt (pill + spacing) off the board
     /// height, which latchedBoardH then holds as that deal's minimum — so a deal made
-    /// finishable, undone, and played on with a height-bound column keeps cards one shrink
-    /// step smaller than the space allows. Deliberate trade (review-loop 2026-09-13,
-    /// BACKLOG PC-4): reserving the row unconditionally would charge EVERY deal those 43 pt
-    /// to cover that narrow path, and canOfferFinish means auto-finish would already win, so
-    /// the remaining play is normally the finish itself. The one-way shrink is the same
+    /// finishable and then NOT finishable again, with a height-bound column, keeps cards one
+    /// shrink step smaller than the space allows. That flip-back comes from undo OR from any
+    /// forward move that breaks the cascade: canOfferFinish is a pure function of position
+    /// and, unlike maybeAutoFinish, has no autoFinishTierCost() guard — so on a daily whose
+    /// finish would spend a live tier, with Auto-finish Off, or after "Not yet", Finish stays
+    /// up while play continues and a burying move drops it. Deliberate trade (review-loop
+    /// 2026-09-13, BACKLOG PC-4): reserving the row unconditionally would charge EVERY deal
+    /// those 43 pt to cover that path. The one-way shrink is the same
     /// per-deal monotone contract shrinkLatchCount already imposes on column-count changes;
     /// do not unlatch on canOfferFinish flips — that is the up-AND-down pulse the latch exists
     /// to prevent.

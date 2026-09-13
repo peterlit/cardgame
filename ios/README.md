@@ -77,7 +77,7 @@ Causeway/Causeway/
     DailyView.swift        Challenges screen: streaks, day card, calendar, backup
     WinsView.swift         deal-number entry, range chips + drill-down detail
     SummerBackground.swift original sun-&-summer background (vector, Equatable)
-    Extras.swift           FlowLayout + How-to-play / About sheet
+    Extras.swift           How-to-play / About sheet
     MemoryHUD.swift        debug memory overlay (off in release)
   Assets.xcassets/         AppIcon (opaque 1024) + AccentColor
 tools/make_icon.swift      app-icon generator (standalone macOS script, not in the target)

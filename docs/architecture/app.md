@@ -527,10 +527,10 @@ by the foundation ranks), and rejection of a completed board.
    `.common` means the clock stops ticking during UIKit tracking (e.g. scrolling the Wins sheet), so
    `elapsed` under-counts wall time. Combined with the tick-count model, this is backlog **L4** —
    iOS time and web time are different quantities.
-7. **`FlowLayout` measures and places against different widths** — `sizeThatFits` wraps against
-   `proposal.width`, `placeSubviews` against `bounds.width` (`Views/Extras.swift:8-33`). If SwiftUI
-   proposes a width that differs from the final bounds, row breaks can disagree between passes.
-   Latent, not currently observed.
+7. **Gone — `FlowLayout` measured and placed against different widths** (`sizeThatFits` wrapped
+   against `proposal.width`, `placeSubviews` against `bounds.width`). Latent, never observed, and
+   moot since the 2026-09-13 controls redesign deleted the wrapping toolbar and the type with it;
+   the number is kept so older notes that cite it still resolve.
 8. **Accessibility is absent.** Backlog **M7**: no VoiceOver labels or actions, all type is fixed
    `.system(size:)` so Dynamic Type is ignored, and cards are tap-gesture views rather than buttons.
 9. **Known scoring quirk.** `WinStore.merge` and `record` take `min(moves)` and `min(secs)`

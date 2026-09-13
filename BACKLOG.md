@@ -1029,9 +1029,13 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
 - **PC-4 — Finish tier costs the portrait board ~43 pt once per deal (open, owner's call).**
   Under the old FlowLayout toolbar the Finish pill joined the last wrap row for free; as A2's own
   tier it takes ~43 pt (pill + spacing) off the board's height the first time `canOfferFinish`
-  goes true, and `latchedBoardH` holds that as the deal's minimum. Visible only on a deal that
-  is made finishable, undone, and played on with a height-bound (tall) column: cards stay one
-  shrink step smaller than the space allows; nothing clips. Reviewed 2026-09-13 and kept as is:
+  goes true, and `latchedBoardH` holds that as the deal's minimum. Visible on a deal that is
+  made finishable and then not finishable again, with a height-bound (tall) column: cards stay
+  one shrink step smaller than the space allows; nothing clips. The flip-back is undo OR any
+  forward move that breaks the cascade — `canOfferFinish` has no `autoFinishTierCost()` guard
+  (only `maybeAutoFinish` does), so on a daily whose finish would spend a live Silver/Gold tier,
+  with Auto-finish Off, or after "Not yet", Finish stays up while play continues, and a burying
+  move drops it with no undo involved. Reviewed 2026-09-13 and kept as is:
   reserving the row unconditionally (the safe alternative) would charge EVERY deal those 43 pt,
   and unlatching on the flip reintroduces the up-and-down rescale pulse. Revisit only if the
   owner prefers the always-reserved row.

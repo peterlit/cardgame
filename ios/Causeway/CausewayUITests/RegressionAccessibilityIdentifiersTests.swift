@@ -48,10 +48,11 @@ final class RegressionAccessibilityIdentifiersTests: XCTestCase {
                    "toolbar.autofinish", "toolbar.deal", "toolbar.daily", "toolbar.more"] {
             XCTAssertTrue(app.buttons[id].exists, "missing toolbar identifier: \(id)")
         }
-        // A2 (2026-09-13): Wins and How to play live behind More; the ids survive on the menu items.
-        let wins = QA.moreItem(app, "toolbar.wins", label: "Wins")
+        // A2 (2026-09-13): Wins and How to play live behind More; the ids survive on the menu
+        // items. strictID: this is the tripwire, so a label match must NOT rescue a stripped id.
+        let wins = QA.moreItem(app, "toolbar.wins", label: "Wins", strictID: true)
         XCTAssertTrue(wins.exists, "missing More menu item: toolbar.wins")
-        XCTAssertTrue(app.buttons["toolbar.howtoplay"].exists || app.buttons["How to play"].exists,
+        XCTAssertTrue(app.buttons["toolbar.howtoplay"].waitForExistence(timeout: 5),
                       "missing More menu item: toolbar.howtoplay")
         app.buttons["toolbar.newgame"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // dismiss the menu
         XCTAssertTrue(QA.wait(3) { !wins.exists }, "the More menu did not dismiss")

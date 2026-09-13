@@ -25,14 +25,20 @@ If a case flips mid-run, say so in the result instead of filing it.
 
 ## Screen map (confirmed live)
 
-- **Main / board.** Header (title + Moves/Time/Won). Toolbar pills (wrap via
-  FlowLayout): `New game` (gold/primary), `Undo` (disabled+40% opacity when no
-  history), `Replay`, `Auto-play: On/Off`, `Auto-finish: Ask/On/Off`,
-  `Deal #<seed>` (shows a `✓` when that seed is already won), `Daily`, `Wins`,
-  `How to play`. A `Finish` (gold) pill appears only when `game.canOfferFinish`.
-  Below: FOUNDATIONS (up row + down row, 4 suits) on the left, FREE CELLS (3) on
-  the right, then 8 tableau columns. `Daily` pill is only present when the pool is
-  non-empty (it is here).
+- **Main / board.** Header (title + tagline, the `Deal #<seed> ›` chip under them —
+  `✓` when that seed is already won — and Moves/Time/Won). Controls (A2 redesign,
+  2026-09-13; the wrapping FlowLayout toolbar is gone). **Portrait:** a deck at the
+  FOOT of the screen — a `Finish the deal` (gold) pill only when `game.canOfferFinish`,
+  then a permanent tier with the two toggles `Auto-play: On/Off` and
+  `Auto-finish: Ask/On/Off` (state in a badge), then the deck bar `New game`
+  (gold/primary), `Undo` (disabled+40% opacity when no history), `Replay`, `Daily`,
+  `More`. **Landscape:**
+  the same set as a vertical rail of pills on the left (`toolbar.rail.more` cue when it
+  overflows). **Both:** `Wins` and `How to play` live behind the `More` menu
+  (`toolbar.more` → `toolbar.wins` / `toolbar.howtoplay`); the same `toolbar.*` ids
+  address either orientation. Board: FOUNDATIONS (up row + down row, 4 suits) on the
+  left, FREE CELLS (3) on the right, then 8 tableau columns. `Daily` is only present
+  when the pool is non-empty (it is here).
 - **Deal alert** ("Play a deal"): text field prefilled with current seed,
   numberPad keyboard (digits only — no minus/letters), buttons `Play` / `Cancel`
   (Random was removed on purpose 2026-08-16; range 1–1,000,000 is validated, not clamped).

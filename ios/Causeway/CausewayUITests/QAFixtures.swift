@@ -107,12 +107,20 @@ enum QA {
 
     /// The A2 controls (2026-09-13) keep Wins and How to play behind the deck's More menu
     /// (`toolbar.more`) in BOTH orientations. Open the menu and return the item — by its
-    /// identifier when the menu surfaces it, else by its label.
-    static func moreItem(_ app: XCUIApplication, _ id: String, label: String) -> XCUIElement {
+    /// identifier when the menu surfaces it, else by its label. `strictID` drops the label
+    /// fallback: RegressionAccessibilityIdentifiersTests (the identifier tripwire) sets it so a
+    /// stripped id fails THERE, legibly, instead of passing on the label. The strict run proves
+    /// the id path resolves, so the id wait below short-circuits for everyone else.
+    static func moreItem(_ app: XCUIApplication, _ id: String, label: String,
+                         strictID: Bool = false) -> XCUIElement {
         let more = app.buttons["toolbar.more"]
         XCTAssertTrue(more.waitForExistence(timeout: 5), "no toolbar.more control")
         more.tap()
         let byId = app.buttons[id]
+        if strictID {
+            XCTAssertTrue(byId.waitForExistence(timeout: 5), "the More menu did not surface \(id)")
+            return byId
+        }
         if byId.waitForExistence(timeout: 2) { return byId }
         let byLabel = app.buttons[label]
         XCTAssertTrue(byLabel.waitForExistence(timeout: 3), "the More menu did not show \(label)")
