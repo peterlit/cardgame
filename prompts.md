@@ -991,3 +991,12 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
      Then the review loop (panel: codex `gpt-6-astra`, gemini default model, ollama
      `qwen3-coder:30b`; chair Opus) — its own entry follows.
 
+     *Gate outcome (same request):* the loop-cost hook flagged this 18 MB session (~3× plumbing
+     cost); the owner chose a **fresh session** for the loop. Remote-lane consent (codex + gemini
+     may see the diff) is recorded in the machine-local consent file; the owner is adding
+     `GEMINI_API_KEY` to the shell profile (the gemini CLI had no login). Panel lanes committed in
+     `.review-loop/panel.json`: codex `gpt-6-astra` (smoke ok), gemini (CLI default = best Pro;
+     confirm at the fresh session's probe), ollama `qwen3-coder:30b`. Scope for the loop:
+     `fa2de2e..bc4c59f` (the A2 commit). Also owed to the fresh session: usage capture and the
+     0.13.0 feedback report.
+
