@@ -1,8 +1,9 @@
 # Proposal — the portrait control buttons (iOS)
 
 **Status: proposal, 2026-09-13. Nothing implemented.** Mockups are on the design canvas
-<https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882> (nine phone artboards: the
-current layout, Option A in three states, Option A2 in three states, Options B and C). The artboards are generated from the
+<https://claude.ai/code/artifact/4e97ce19-249a-4426-9466-138264440882> (twelve artboards: the
+current layout, Option A in three states, Option A2 in three states, landscape today vs. the rail
+in A2's dress, Options B and C). The artboards are generated from the
 app's real values by [`tools/design/portrait-controls-gen.mjs`](../tools/design/portrait-controls-gen.mjs)
 (pill style, palette and card geometry lifted from `ContentView.swift`, `Theme.swift` and
 `SummerBackground.swift`), so the canvas can be re-seeded after edits. Landscape is untouched — the
@@ -65,6 +66,30 @@ Cost: ~46 pt more of the bottom than A (bar 60 + row 38 + gaps), still ~14 pt le
 three-row toolbar it replaces, and both tiers sit on sand the tableau rarely reaches. Everything
 is under the thumb. Test implications shrink to `toolbar.wins` / `toolbar.howtoplay` needing the
 More step; `toolbar.autoplay` / `toolbar.autofinish` stay directly hittable.
+
+### Decided 2026-09-13: Auto-play and Auto-finish stay two independent settings
+
+The owner asked whether auto-play should imply auto-finish. Assessment: no — auto-play only sends
+provably safe cards (never changes what the board can reach), while auto-finish ends the game
+with a greedy cascade that the daily tier guard already has to withhold; the default of
+Auto-play On + Auto-finish Ask encodes that distinction, and Ask (with "Not yet") is the state
+the daily flow leans on. A one-control alternative (a three-position ladder Off / Safe moves /
+Safe moves + finish) was offered; the owner chose to **keep the behaviour as is**.
+
+## Landscape — keep the rail, optionally in A2's dress
+
+Height is the scarce dimension in landscape (402 pt on an iPhone 16 Pro; the rail exists because
+moving the toolbar off the top is what made the board fit). A2's bottom deck would cost ~110 pt
+there — a quarter of the board — so the rail stays. It already *is* A2 turned on its side: one
+ordered column, one gold primary.
+
+Sketched beside today's rail: the same rail in A2's vocabulary — icons on the play actions, state
+badges on the toggles, Wins / How to play behind More, Deal # as a chip **beside** the title
+(the landscape header has spare width, not height; under the subtitle it would cost the board
+26 pt). Seven pills instead of nine, so the rail no longer overflows on short phones or with the
+Daily HUD showing (the WF-12 / RL-5 family and the rail's "more" cue would become moot for
+default text sizes). Finish, when offered, docks gold at the foot of the rail. Nothing in A2
+*requires* a landscape change; this is a harmonisation the owner can take or leave.
 
 ## Option B — Two rows (conservative)
 

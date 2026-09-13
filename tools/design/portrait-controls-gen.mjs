@@ -204,7 +204,77 @@ const optionC = shell('Option C · Grid', `
   ${tableau()}
 `);
 
-const out = { 'Current.dc.html': current, 'Main.dc.html': optionA, 'DeckFinish.dc.html': optionAFinish, 'DeckMenu.dc.html': optionAMenu, 'DeckToggles.dc.html': optionA2, 'DeckTogglesFinish.dc.html': optionA2Finish, 'DeckTogglesMenu.dc.html': optionA2Menu, 'OptionB.dc.html': optionB, 'OptionC.dc.html': optionC };
+// ---------- Landscape (874×402, iPhone 16 Pro): today's rail vs the rail in A2's vocabulary ----------
+const LW = 874, LH = 402, SAFE = 59, RAIL = 118;
+const LCARD_W = 44, LCARD_H = Math.round(LCARD_W * (92 / 66) * 1.2), LOVER = Math.round(LCARD_H * 0.34);
+const lface = (label, top) => {
+  const rank = label.slice(0, -1), suit = label.slice(-1), col = isRed(label) ? RED : BLK;
+  return `<div style="position:absolute;left:0;top:${top}px;width:${LCARD_W}px;height:${LCARD_H}px;box-sizing:border-box;background:linear-gradient(#F8F2E2,#F3ECD9);border:1px solid #000;border-radius:${Math.round(LCARD_W*0.11)}px;box-shadow:0 1px 1px rgba(0,0,0,.28);color:${col};font:700 15px/1 system-ui,-apple-system,sans-serif;padding:3px 3px 0 3px;display:flex;justify-content:space-between;align-items:flex-start;letter-spacing:-.5px"><span>${rank}</span><span style="font-size:16px">${suit}</span></div>`;
+};
+const lcolumn = cards => `<div style="position:relative;width:${LCARD_W}px;height:${LCARD_H + LOVER * (cards.length - 1)}px">${cards.map((c, i) => lface(c, i * LOVER)).join('')}</div>`;
+const ltableau = () => `<div style="display:flex;gap:${GAP}px">${deal.map(lcolumn).join('')}</div>`;
+const lghost = (t, dim) => `<div style="width:${LCARD_W}px;height:${LCARD_H}px;box-sizing:border-box;border:1.5px solid rgba(255,255,255,.55);border-radius:${Math.round(LCARD_W*0.11)}px;background:rgba(255,255,255,.14);color:${dim};font:700 13px Georgia,'Times New Roman',serif;padding:3px 4px;display:flex;flex-direction:column;justify-content:space-between"><span>${t.r}</span><span style="align-self:center;font-size:18px;margin-bottom:10px">${t.s}</span></div>`;
+const lfRow = r => `<div style="display:flex;gap:${GAP}px">${suits.map(s => lghost({r, s}, s==='♥'||s==='♦' ? 'rgba(176,71,56,.45)' : 'rgba(42,59,68,.45)')).join('')}</div>`;
+const lupper = () => `<div style="display:flex;flex-direction:column;gap:${GAP}px">${label('FOUNDATIONS')}${lfRow('A')}${lfRow('K')}<div style="height:4px"></div>${label('FREE CELLS')}<div style="display:flex;gap:${GAP}px">${[0,1,2].map(()=>`<div style="width:${LCARD_W}px;height:${LCARD_H}px;box-sizing:border-box;border:1.5px solid rgba(255,255,255,.55);border-radius:${Math.round(LCARD_W*0.11)}px;background:rgba(255,255,255,.14)"></div>`).join('')}</div></div>`;
+// railPill: 12/600, icon 11 bold, pad 6×10, left-aligned, full rail width, spacing 6
+const railPill = (t, {primary=false, icon='', disabled=false, badge=''} = {}) =>
+  `<div style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:999px;background:${primary?GOLD:'rgba(42,59,68,.46)'};color:${primary?GOLDTXT:CREAM};box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);font:600 12px system-ui,-apple-system,sans-serif;white-space:nowrap;${disabled?'opacity:.4;':''}">${icon}<span>${t}</span>${badge?`<span style="margin-left:auto;padding:1px 6px;border-radius:999px;background:rgba(244,239,226,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);font-weight:700;font-size:11px">${badge}</span>`:''}</div>`;
+const railToday = () => `<div style="display:flex;flex-direction:column;gap:6px;width:${RAIL}px">
+  ${railPill('New game',{primary:true})}${railPill('Undo',{icon:svg('<path d="M6 3 3 6l3 3"/><path d="M3 6h6a4 4 0 0 1 0 8H6"/>',11),disabled:true})}${railPill('Replay',{icon:svg('<path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2v3h-3"/>',11)})}
+  ${railPill('Auto-play: On')}${railPill('Auto-finish: Ask')}${railPill('Deal #408843')}${railPill('Daily')}${railPill('Wins')}${railPill('How to play')}
+</div>`;
+const railA2 = (finish=false) => `<div style="display:flex;flex-direction:column;gap:6px;width:${RAIL}px">
+  ${railPill('New game',{primary:true,icon:svg('<path d="M8 3v10M3 8h10"/>',11)})}${railPill('Undo',{icon:svg('<path d="M6 3 3 6l3 3"/><path d="M3 6h6a4 4 0 0 1 0 8H6"/>',11),disabled:true})}${railPill('Replay',{icon:svg('<path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2v3h-3"/>',11)})}${railPill('Daily',{icon:svg('<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 7h11M5.5 2v3M10.5 2v3"/>',11)})}
+  <div style="height:4px"></div>
+  ${railPill('Auto-play',{badge:'On'})}${railPill('Auto-finish',{badge:'Ask'})}
+  <div style="height:4px"></div>
+  ${railPill('More',{icon:svg('<circle cx="3.5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="12.5" cy="8" r="1" fill="currentColor"/>',11)})}
+  ${finish?`<div style="flex:1 1 0"></div>${railPill('Finish the deal',{primary:true,icon:svg('<path d="M3.5 14V2.5h8l-2 3 2 3h-8"/>',11)})}`:''}
+</div>`;
+const lheader = (extra='') => `<div style="display:flex;justify-content:space-between;align-items:flex-end;color:${INK}">
+  <div style="display:flex;align-items:flex-end;gap:22px"><div style="display:flex;flex-direction:column"><div style="font:700 22px Georgia,'Times New Roman',serif">Causeway</div><div style="font:400 11px system-ui,-apple-system,sans-serif;opacity:.65">build each suit from both ends</div></div>${extra?extra.replace('margin-top:6px','margin-bottom:-2px'):''}</div>
+  <div style="display:flex;gap:14px">${stat('Moves','0')}${stat('Time','0:00')}${stat('Won','0')}</div>
+</div>`;
+const lbg = () => `<div style="position:absolute;inset:0;overflow:hidden;background:linear-gradient(#FFD777 0%,#FDE6A2 42%,#FDF1D2 72%,#FBF4DC 100%)">
+  <div style="position:absolute;left:50%;top:58%;width:${LW*1.2}px;height:${LW*1.2}px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,246,214,.9),rgba(251,212,95,0) 70%)"></div>
+  <div style="position:absolute;left:50%;top:58%;width:${LW*0.56}px;height:${LW*0.56}px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,#FFF3CC,#FAC74B)"></div>
+  <div style="position:absolute;left:14%;top:8%;width:150px;height:50px;border-radius:999px;background:#fff;opacity:.9;filter:blur(7px)"></div>
+  <div style="position:absolute;left:0;right:0;top:72%;bottom:0;background:linear-gradient(#A3DBC8,#82CBB6);border-radius:50% 50% 0 0/10px 10px 0 0"></div>
+  <div style="position:absolute;left:0;right:0;top:85%;bottom:0;background:linear-gradient(#F4DEA8,#E9CE8F);border-radius:50% 50% 0 0/8px 8px 0 0"></div>
+</div>`;
+const lshell = (rail, extra='') => `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    a { color: ${GOLDTXT}; } a:hover { color: #6B4F00; }
+  </style>
+</helmet>
+<div style="position:relative;width:${LW}px;height:${LH}px;overflow:hidden;background:#FDE6A2;color:${INK}">
+  ${lbg()}
+  <div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;padding:8px ${SAFE+PAD}px 0">
+    ${lheader(extra)}
+    <div style="display:flex;gap:10px;align-items:flex-start;flex:1 1 0;min-height:0">
+      ${rail}
+      ${lupper()}
+      <div style="flex:1 1 0;display:flex;justify-content:flex-end">${ltableau()}</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>`;
+const landToday = lshell(railToday());
+const landA2 = lshell(railA2(), dealLine());
+const landA2Finish = lshell(railA2(true), dealLine());
+
+const out = { 'Current.dc.html': current, 'Main.dc.html': optionA, 'DeckFinish.dc.html': optionAFinish, 'DeckMenu.dc.html': optionAMenu, 'DeckToggles.dc.html': optionA2, 'DeckTogglesFinish.dc.html': optionA2Finish, 'DeckTogglesMenu.dc.html': optionA2Menu, 'LandscapeToday.dc.html': landToday, 'LandscapeA2.dc.html': landA2, 'LandscapeA2Finish.dc.html': landA2Finish, 'OptionB.dc.html': optionB, 'OptionC.dc.html': optionC };
 for (const [f, s] of Object.entries(out)) writeFileSync(new URL(f, import.meta.url), s);
 
 const row = (files, y) => files.map((file, i) => ({ file, x: i * 480, y, w: W, h: H }));
@@ -217,15 +287,19 @@ const canvas = {
     { file: 'DeckToggles.dc.html', title: 'Option A2 · Toggle row', x: 560, y: 1000, w: W, h: H },
     { file: 'DeckTogglesFinish.dc.html', title: 'Option A2 · Finish offered', x: 1040, y: 1000, w: W, h: H },
     { file: 'DeckTogglesMenu.dc.html', title: 'Option A2 · More menu', x: 1520, y: 1000, w: W, h: H },
-    { file: 'OptionB.dc.html', title: 'Option B · Two rows', x: 560, y: 2000, w: W, h: H },
-    { file: 'OptionC.dc.html', title: 'Option C · Grid', x: 1040, y: 2000, w: W, h: H },
+    { file: 'LandscapeToday.dc.html', title: 'Landscape · today', x: 560, y: 2000, w: LW, h: LH },
+    { file: 'LandscapeA2.dc.html', title: 'Landscape · rail in A2 dress', x: 1520, y: 2000, w: LW, h: LH },
+    { file: 'LandscapeA2Finish.dc.html', title: 'Landscape · Finish offered', x: 2480, y: 2000, w: LW, h: LH },
+    { file: 'OptionB.dc.html', title: 'Option B · Two rows', x: 560, y: 2600, w: W, h: H },
+    { file: 'OptionC.dc.html', title: 'Option C · Grid', x: 1040, y: 2600, w: W, h: H },
   ],
   annotations: [
     { id: 'why', x: 0, y: 1000, w: 440, text: 'What the current toolbar gets wrong\n\n• Ten pills of ten widths wrap 4 / 4 / 1, leaving "How to play" orphaned on its own row.\n• Actions (New game, Undo, Replay), settings (Auto-play, Auto-finish), pages (Daily, Wins, How to play) and a readout (Deal #) all wear the same pill, so nothing reads as more important than anything else.\n• Finish appears mid-flow and reflows every pill after it.\n• The most-used control, Undo, sits at the top of the screen while the thumb zone below the tableau is empty.\n\nLandscape already solves this with a single ordered column; portrait needs the equivalent.' },
     { id: 'a2-note', x: 0, y: 1000, w: 440, text: 'Option A2 · Deck + toggle row (owner\'s request, 2026-09-13)\n\nOption A with Auto-play and Auto-finish as a PERMANENT second tier above the bar: two equal-width pills in the bar\'s own material, the state in a small badge (On / Ask) so a glance reads it and a tap cycles it, exactly as today. More now holds only Wins and How to play.\n\nFinish, when offered, rises as a third tier above the toggles — nothing below it moves.\n\nCost: ~46 pt more of the bottom than A (bar 60 + row 38 + gaps), still ~14 pt less than the three-row toolbar it replaces, and the tiers sit on sand the tableau rarely reaches. Everything is under the thumb.' },
+    { id: 'land-note', x: 0, y: 2000, w: 440, text: 'Landscape\n\nHeight is the scarce dimension here (402 pt; the rail exists because moving the toolbar off the top is what made the board fit). A2\'s bottom deck would cost ~110 pt of that — a quarter of the board — so the rail stays. It already IS A2 turned on its side: one ordered column, one gold primary.\n\nRight: the same rail in A2\'s dress, so both orientations read as one design — icons on the play actions, state badges on the toggles, Wins / How to play behind More, Deal # beside the title (the header has spare width here, not height — under the subtitle it would cost the board 26 pt). Seven pills instead of nine, so the rail no longer overflows on short phones or with the Daily HUD showing (the WF-12 / RL-5 family). Finish, when offered, docks gold at the foot of the rail.\n\nOr keep it exactly as today — nothing in A2 requires a landscape change.' },
     { id: 'a-note', x: 560, y: -250, w: 900, text: 'Option A · Deck — recommended\n\nThe three play actions plus Daily move into a bottom bar that sits on the sand band, under the thumb. New game keeps its gold. Settings and the two reference pages go behind More, where iOS Menu rows show their state (Auto-play ✓ On, Auto-finish Ask). Deal # becomes a small readout under the subtitle. Finish, when offered, rises as a gold pill above the bar so nothing else moves.\n\nGains ~60 pt of board height in portrait. Tradeoff: the two auto settings are one tap further away, and the bar covers part of the sand.' },
-    { id: 'b-note', x: 560, y: 2880, w: 420, text: 'Option B · Two rows\n\nEverything stays at the top, but in two fixed-height rows: a segmented control for New game / Undo / Replay / Daily, then a quiet status strip — chips for Deal / Auto-play / Auto-finish on the left, a More button (Wins, How to play) on the right. Finish, when offered, appears as a full-width gold bar under the strip. Least disruptive to existing tests and muscle memory; saves ~30 pt.' },
-    { id: 'c-note', x: 1040, y: 2880, w: 420, text: 'Option C · Grid\n\nThe same ten pills, snapped to a 4-column grid with equal cells (wide cells span two). Nothing changes but rhythm. Honest but weakest: still three rows of same-weight buttons, and Finish still has to squeeze in when it is offered.' },
+    { id: 'b-note', x: 560, y: 3480, w: 420, text: 'Option B · Two rows\n\nEverything stays at the top, but in two fixed-height rows: a segmented control for New game / Undo / Replay / Daily, then a quiet status strip — chips for Deal / Auto-play / Auto-finish on the left, a More button (Wins, How to play) on the right. Finish, when offered, appears as a full-width gold bar under the strip. Least disruptive to existing tests and muscle memory; saves ~30 pt.' },
+    { id: 'c-note', x: 1040, y: 3480, w: 420, text: 'Option C · Grid\n\nThe same ten pills, snapped to a 4-column grid with equal cells (wide cells span two). Nothing changes but rhythm. Honest but weakest: still three rows of same-weight buttons, and Finish still has to squeeze in when it is offered.' },
   ],
   launch: { view: 'canvas' },
 };

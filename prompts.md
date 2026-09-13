@@ -954,3 +954,18 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
     Wins + How to play. Three artboards (normal, Finish offered, More open); doc and generator
     updated. Still a proposal — awaiting the owner's verdict before any implementation.
 
+
+100. "Should we merge auto-play and auto-finish? As in, should auto-play also mean auto-finish?"
+     Answered from the model code, not opinion: auto-play sends only provably safe cards and never
+     changes the reachable outcome; auto-finish ends the game with a greedy cascade the daily tier
+     guard already withholds; Ask + "Not yet" is what the daily flow leans on. Not as an
+     implication; a three-position ladder (Off / Safe moves / Safe moves + finish) offered as the
+     honest merge. Owner: "I want the behavior as is."
+
+101. "How would A2 look in landscape? Or do you propose the landscape to keep as it is today?"
+     Height is scarce in landscape, so a bottom deck would cost a quarter of the board — the rail
+     stays. Sketched today's rail beside the same rail in A2's dress (icons, state badges, More,
+     Deal # beside the title so the header height is unchanged, Finish docked at the foot); three
+     landscape artboards on the same canvas. Recommendation: keep the rail; the harmonised dress
+     is optional. Doc, generator and backlog updated.
+

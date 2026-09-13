@@ -1017,7 +1017,9 @@ measured + latched + capped, a behaviour change two same-family agents agreed on
 ## 2026-09-13 — portrait control-button redesign (proposal, awaiting the owner's pick)
 - **PC-1 — portrait toolbar redesign.** Three directions on the design canvas, written up in
   `docs/portrait-controls-proposal.md`; owner leans Option A; sketched A2 on request (A + a permanent
-  Auto-play / Auto-finish toggle tier above the bar), awaiting review. Implementing A touches: `ContentView.toolbar`
+  Auto-play / Auto-finish toggle tier above the bar), awaiting review. Decided: the two auto
+  settings stay independent (no merge). Landscape: keep the rail; an optional A2-dress
+  harmonisation (icons, badges, More, Deal # beside the title) is sketched on the canvas. Implementing A touches: `ContentView.toolbar`
   → a bottom bar + `Menu`, header deal chip, Finish placement, the portrait height budget
   (`portraitFitCardW` / `latchedBoardH`), and the UI tests that address `toolbar.autoplay` /
   `toolbar.autofinish` / `toolbar.wins` / `toolbar.howtoplay` directly (need a "tap More first in
