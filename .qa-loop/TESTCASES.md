@@ -1000,7 +1000,7 @@ Steps: `tapid daily.cal.4` → `labels any daily.demo`; repeat for `daily.cal.5`
   on those days (universal Silver family `moves` / `no-undo` → no distinct silver line); the Silver
   *objective row* must still be present on the card. In the pinned reachable range 0…14 this holds
   for Aug 5, 6, 10 (idx 4, 5, 9) and nowhere else. Aug 3 and Aug 4 show all **four** pills in a 2x2 grid.
-  A reachable day missing 🥉, 🥇 or 🌟 IS a bug (all 61 days carry those lines).
+  A reachable day missing 🥉, 🥇 or 🌟 IS a bug (all 92 days carry those lines).
 
 ## WF-14 — ⏰ Same-day recognition (Both)
 

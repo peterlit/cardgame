@@ -135,7 +135,7 @@ cards remain") before it can be a real objective. Removed for now.
 ```
 node tools/solver/build-month.mjs [--candidates 320] [--days 31] [--budget 100000]
                                   [--jobs 8] [--sample-seed 20260801] [--out data/daily-pool.json]
-                                  [--cache .cache/month-certs] [--select-only]
+                                  [--cache .cache/month-certs] [--select-only] [--extend]
 ```
 
 *(Replaces the old append-only `build-pool.mjs`, which is deleted along with the "IDs > 10,000"
@@ -149,9 +149,35 @@ appending JSONL to its own cache file. An interrupted run resumes where it stopp
 
 **Phase 2 — choose the month for maximum variety.** A greedy fill takes, at each step, the
 `(seed, gold, silver)` triple that adds the most new variety: an unused family scores far above an
-unused parameter of a family already used, an exact challenge is never repeated, and a rare
-certification (one only a few candidates support) is preferred, since rare material is hardest to
-place. The chosen days are then reordered so no two consecutive dates share a family.
+unused parameter of a family already used, and a rare certification (one only a few candidates
+support) is preferred, since rare material is hardest to place. The chosen days are then reordered
+so no two consecutive dates share a family.
+
+**An exact `(silver, gold)` pair is never repeated — a hard ban, not a preference.** Since commit
+`07aa37c` the selector refuses a pair already placed in the same run, and an `--extend` run also
+refuses any pair already published; both checks re-run on the bytes about to ship. One exception is
+history: before the ban was hard, the published pool shipped days 3 and 60 (Aug 4 / Sep 30 2026) with
+the same `suit-balance{N:4}` + `cells-le{N:0}`. That pair is **grandfathered** — published days are
+never re-validated against each other, only the days being added are checked against them — and it
+must never be re-picked: changing either day's bytes would invalidate every player's banked day-3 /
+day-60 medals. Do not "fix" the guard to cover the whole pool; it would go red on published data.
+
+**Extending the calendar (`--extend`).** The pool is extended in place, never rebuilt: `--extend`
+loads the published `--out` file, keeps every existing day byte-for-byte (it fails closed if any
+would change, and on a same-version rebuild), and selects only the `--days <total> − published`
+new days, drawing from the committed certification cache so `--select-only` needs no new
+certification (~5 min). The October 2026 extension was exactly:
+
+```bash
+NODE_OPTIONS= node tools/solver/build-month.mjs --select-only --extend --days 92
+# bake the lines in four stripes (parallel), then fold them into the published file
+for w in 0 1 2 3; do NODE_OPTIONS= node tools/solver/build-solutions.mjs --stripe $w/4 --out .cache/sol-$w.json & done; wait
+NODE_OPTIONS= node tools/solver/build-solutions.mjs --merge .cache/sol-0.json .cache/sol-1.json .cache/sol-2.json .cache/sol-3.json
+cp data/daily-pool.json data/daily-solutions.json ios/Causeway/Causeway/   # the iOS copies must stay byte-identical
+```
+
+November is the same with `--days 122`; the month-boundary and iOS-parity tests
+(`tests/solutions.test.mjs`, `tests/ios-parity.test.mjs`) fail on a partial month or a stale copy.
 
 Certification is **~90-150 s/seed** at `--budget 100000` — most of it the *unsupported* variants
 exhausting their node budget — so a 320-candidate month is roughly an hour on 8 cores. Building is
@@ -168,8 +194,12 @@ seed-dependent, and mid-rank `rank-rush` deadlines are unreachable by constructi
 
 ```bash
 node --test tests/solver.test.mjs                 # unit + search tests
-node tools/solver/build-month.mjs --candidates 320 --jobs 8   # rebuild the seeded month
+node tools/solver/build-month.mjs --select-only --extend --days <total>   # append a month (see §5)
 ```
+
+Never rebuild the seeded pool (`build-month.mjs` without `--extend`): the published days are the
+keys to every player's banked medals, and the builder refuses a same-version rebuild for that reason.
+`--candidates`/`--jobs` only matter when new seeds must be *certified* (a fresh cache).
 
 The solver imports the deal/RNG from the shared engine (`tests/engine.mjs`), so its deals are
 byte-identical to the app's on both platforms.

@@ -50,10 +50,10 @@ the player can't reason about, or an unwinnable deal is against the grain of the
 
 ## 3. Verified commands
 
-Every command here was run and produced what it says (counts re-verified 2026-09-09).
+Every command here was run and produced what it says (counts re-verified 2026-09-20).
 
 ```bash
-npm test                    # node --test "tests/**/*.test.mjs" → 171 tests, 171 pass, 0 skipped
+npm test                    # node --test "tests/**/*.test.mjs" → 173 tests, 173 pass, 0 skipped
 ```
 
 Web preview — a python http.server on port 8123 is configured in `.claude/launch.json` (config name
@@ -166,7 +166,7 @@ Things worth knowing before you run one:
 
 ## 6. Where things stand (2026-09-09)
 
-**Green.** `npm test` 171/171; iOS `CausewayTests` 17 unit + `CausewayUITests` 75 executions (72
+**Green.** `npm test` 173/173 (as of 2026-09-20; the iOS counts below are from 2026-09-09); iOS `CausewayTests` 17 unit + `CausewayUITests` 75 executions (72
 methods — the launch test runs once per UI configuration, hence +3), zero skips anywhere, all ARMED
 (no XCTSkip guards) — counts as of 2026-09-09 after the review loop. `main` is clean.
 

@@ -3,7 +3,10 @@
 > **2026-09-20 — October appended.** `days[61..91]` (Oct 1–31 2026) were added with
 > `build-month.mjs --extend`, so the pool now runs 2026-08-01..2026-10-31 (92 days); every
 > published August/September day is byte-identical, no (Silver, Gold) pair repeats across the seam,
-> and every new day is flawless-certified with all four demo lines baked. Where the notes below say
+> and every new day is flawless-certified with bronze, gold and flawless lines baked. A distinct silver
+> line is baked on the 24 new days whose Silver constrains the search; the other 7 (Oct 2, 4, 6, 9, 13,
+> 27, 30 — universal `moves`/`no-undo` Silvers, already satisfied by the bronze line) bake none and
+> show three how-to-win pills by design, exactly as the 16 such August/September days do. Where the notes below say
 > "two months" or "61 days", read three months / 92 days.
 
 > ## ⚠ 2026-08-30 REBUILD — read this first

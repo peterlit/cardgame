@@ -42,7 +42,7 @@ about. That is the tiebreaker for design questions.
 
 ## Verify before you claim
 
-- `npm test` → 171 tests, 0 skipped (as of 2026-09-09, after the review loop).
+- `npm test` → 173 tests, 0 skipped (as of 2026-09-20, after the October-pool review loop).
 - iOS: `xcodebuild test -project ios/Causeway/Causeway.xcodeproj -scheme Causeway
   -destination "id=<UDID>" -parallel-testing-enabled NO` runs BOTH targets — `CausewayTests`
   (17 Swift unit tests, seconds) and `CausewayUITests` (72 UI test methods / 75 executions,

@@ -310,15 +310,16 @@ flowchart LR
 
 - **`build-month.mjs`** draws candidate seeds from 500 001–1 000 000, certifies each against all 63
   `(family, parameter)` variants in parallel worker processes (resumable through a JSONL cache under
-  `.cache/`), then chooses the calendar's 61 days greedily for maximum variety — each pick gated on
-  `certifyFlawless` proving one line earns both of that day's tiers. Output: 61 records of
+  `.cache/`), then chooses the calendar's days greedily for maximum variety — each pick gated on
+  `certifyFlawless` proving one line earns both of that day's tiers. Output: 92 records (August–October
+  2026; October was appended with `--extend`, which keeps every published day byte-identical) of
   `{seed, par, silver:{id,param}, gold:{id,param}}`, plus the cached certifications
   `{seed, winnable, par, supports:[{id,param,par}]}`.
 - **`build-solutions.mjs`** bakes replayable winning lines per seed — bronze always, gold always, and
   silver only when that day's Silver is a *constraining* objective. Each line is double-validated:
   re-simulated from the raw deal to prove it wins, then re-checked against the **runtime** objective
-  checker from `tests/daily.mjs`. Result: 31 bronze + 31 gold + 23 silver (the 8 missing silvers
-  are days whose Silver is universal, and so already satisfied by the bronze line).
+  checker from `tests/daily.mjs`. Result: 92 bronze + 92 gold + 92 flawless + 69 silver (the 23
+  missing silvers are days whose Silver is universal, and so already satisfied by the bronze line).
 - **Soundness by construction.** For every gating objective, the move generator never emits a
   violating move (`tools/solver/solve.mjs:27-50`), so any win found already obeys the constraint —
   there are no false-positive certifications. A search that exhausts its budget returns `'unknown'`,

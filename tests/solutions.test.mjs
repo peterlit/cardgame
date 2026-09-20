@@ -117,4 +117,12 @@ test('the pool is three seeded months drawn from the daily seed range', () => {
   }
   const seeds = new Set(pool.days.map(d => d.seed));
   assert.equal(seeds.size, pool.days.length, 'a seed is used on more than one day');
+  // The calendar grids (index.html calMonthRange / DailyView) expose whole civil months, so the pool
+  // must start on the 1st and END on the last day of a month — a partial extension (e.g. --days 100)
+  // would ship a month of dead cells. Independent of the literal length pinned above.
+  const [ey, em, ed] = pool.epoch.split('-').map(Number);
+  assert.equal(ed, 1, `epoch ${pool.epoch} must be the first day of a month`);
+  const dayAfterLast = new Date(Date.UTC(ey, em - 1, ed + pool.days.length));
+  assert.equal(dayAfterLast.getUTCDate(), 1,
+    `pool ends on ${new Date(dayAfterLast - 864e5).toISOString().slice(0, 10)}, not the last day of a civil month`);
 });

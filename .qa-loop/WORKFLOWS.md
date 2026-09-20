@@ -147,9 +147,9 @@ Each has a stable ID and a reasonable-effort expectation.
   Surfaces: the 🌟 Flawless streak card; the "🌟 Flawless — Both objectives in one run" how-to-win
   pill on the day card, gated by `game.hasFlawlessLine(c.seed)`; the 🌟 calendar marker (which
   replaces the tier dots, since flawless implies all three); and the 🌟 line on the win overlay.
-  Every one of the 61 seeded days has a certified flawless line, so the pill must appear on every day
+  Every one of the 92 seeded days has a certified flawless line, so the pill must appear on every day
   the calendar actually EXPOSES — **dayIndex 0…todayIndex (0…14 under this loop's pin; 0…39 on the
-  real clock on 2026-09-09)**; later days are future and not selectable, so "all 61" is a data
+  real clock on 2026-09-09)**; later days are future and not selectable, so "all 92" is a data
   claim, not something you can walk in-app. A reachable day whose
   pill is missing is a gate bug, and a pill that plays a line which does NOT end flawless is worse.
   Expectation: the pill is discoverable and its demo is watchable; the 🌟 marker does not jitter the
@@ -194,7 +194,8 @@ pinned by the deal number and the calendar's playable past days.
 - **Deterministic start:** the app is uninstalled and reinstalled each round, so every pass begins
   with zero stats, zero wins, and no daily records. Never test on leftover state.
 - **Pool schema (changed):** `data/daily-pool.json` is **version 4**, `epoch = 2026-08-01`
-  (= dayIndex 0), `days[0…60]` covering **Aug 1 – Sep 30 2026**, seeds in [500001, 1000000].
+  (= dayIndex 0), `days[0…91]` covering **Aug 1 – Oct 31 2026** (October appended 2026-09-20;
+  Aug/Sep days unchanged), seeds in [500001, 1000000].
   There is no `seeds` array and no `preSeeds` array any more. **The pre-epoch sandbox is gone** —
   `dailyChallenge(-1, pool)` returns `null` and the calendar starts at Aug 1.
 - **Today's daily:** `dayIndex = daysFromCivil(y,m,d) - daysFromCivil(2026,8,1)` — pinned via the
@@ -213,17 +214,19 @@ pinned by the deal number and the calendar's playable past days.
 
   The remaining families — `moves`, `no-undo`, `cells-le`, `before-ace`, `suit-top-first`,
   `suit-balance` — also appear across days 0…28; enumerate with the node one-liner above rather
-  than guessing. Family frequencies in the 61-day pool: `end-bias` 17, `suit-balance` 13,
-  `cells-le` 12, `rank-rush`/`split-at`/`max-run`/`moves`/`ends-first`/`before-ace`/`suit-top-first` 9
-  each, `no-undo` 7, `big-move` 6, `suit-sprint` 4.
+  than guessing. Family frequencies (silver + gold slots) in the 92-day pool: `end-bias` 27,
+  `suit-balance` 20, `cells-le` 18, `rank-rush`/`split-at`/`max-run`/`moves`/`ends-first`/
+  `before-ace`/`suit-top-first` 14 each, `no-undo` 9, `big-move` 7, `suit-sprint` 5.
 - **Solution lines (corrected by the round-0 audit).** `data/daily-solutions.json` keys **bronze /
-  silver / gold / flawless**. **All 61 days carry bronze, gold and flawless** — so the 🥉, 🥇 and 🌟
-  how-to-win pills appear on every day. **`silver` is present on 45 of 61 days only**: it is absent
-  exactly on the 16 days whose Silver objective is a "universal" family (`moves` / `no-undo`), where
+  silver / gold / flawless**. **All 92 days carry bronze, gold and flawless** — so the 🥉, 🥇 and 🌟
+  how-to-win pills appear on every day. **`silver` is present on 69 of 92 days only**: it is absent
+  exactly on the 23 days whose Silver objective is a "universal" family (`moves` / `no-undo`), where
   `solutionLine` falls back to bronze and `hasSilverLine` is false, so `DailyView.swift:203` does not
   render the 🥈 pill at all. **A missing Silver pill on one of those days is CORRECT, not a bug.**
   In dayIndex 0…39 those days are **Aug 5, 6, 10, 16, 21, 23, 26, Sep 6 and Sep 8** (idx 4, 5, 9, 15,
-  20, 22, 25, 36, 38; re-verified 2026-09-09 against `data/daily-solutions.json`). On the other days
+  20, 22, 25, 36, 38); beyond that, Sep 10, 12, 14, 15, 24, 27, 29 (idx 40, 42, 44, 45, 54, 57, 59)
+  and Oct 2, 4, 6, 9, 13, 27, 30 (idx 62, 64, 66, 69, 73, 87, 90) — re-verified 2026-09-20 against
+  `data/daily-solutions.json`. On the other days
   the Silver line is distinct and must actually satisfy that day's Silver objective.
 - **Free play (pinnable):** for a repeatable board use **Deal #…** with an explicit number rather
   than New Game's random deal. Default to the current day's daily deal number so free-play and daily
