@@ -170,10 +170,14 @@ Things worth knowing before you run one:
 methods — the launch test runs once per UI configuration, hence +3), zero skips anywhere, all ARMED
 (no XCTSkip guards) — counts as of 2026-09-09 after the review loop. `main` is clean.
 
-**The pool expires on 2026-09-30.** `data/daily-pool.json` holds 61 certified days from the
-2026-08-01 epoch. After that date there are no daily challenges at all, on either platform. The owner
-has explicitly **deferred** seeding more; the tooling to do it is `tools/solver/` and
-[`docs/solver.md`](docs/solver.md). This is the single most time-sensitive item in the repo.
+**The pool expires on 2026-10-31.** `data/daily-pool.json` holds 92 certified days from the
+2026-08-01 epoch (October was appended 2026-09-20 with `node tools/solver/build-month.mjs
+--select-only --extend --days 92`, from the committed certification cache — ~5 min, no new
+certification needed; then `build-solutions.mjs` in four stripes and a copy of both JSON files into
+`ios/Causeway/Causeway/`). After that date there are no daily challenges at all, on either platform.
+Extending is the same three-step recipe with `--days 122`; the tooling is `tools/solver/` and
+[`docs/solver.md`](docs/solver.md). Note: this shell exports a `NODE_OPTIONS` preload that is
+missing on disk — run node tools with `NODE_OPTIONS=` cleared or they die before `main`.
 
 **Blocked on the owner, and required before an App Store submission** (see
 [`docs/shipping-readiness.md`](docs/shipping-readiness.md)): a Support URL, a hosted Privacy Policy

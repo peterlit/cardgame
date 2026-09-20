@@ -245,8 +245,8 @@ date (`isOnTime`); it has its own strict streak and is never earned by replaying
 the epoch **2026-08-01** (`tests/daily.mjs`). Day *D* reads `pool.days[D]`, which names that day's
 seed, its par, and both objectives with their parameters. There is **no runtime RNG**: the offline
 generator (`tools/solver/build-month.mjs`) chose all of it, maximising variety across the month.
-**August and September 2026** are seeded (61 days, indices 0-60) — days outside them resolve to
-`null`.
+**August, September and October 2026** are seeded (92 days, indices 0-91; October was appended with
+`--extend` on 2026-09-20) — days outside them resolve to `null`.
 
 **Objective catalogue** — 13 parameterised families (`tests/daily.mjs`). A family's *grade* is a
 function of its parameter, so the same id can be a Silver or a Gold:
@@ -293,8 +293,8 @@ flowchart LR
         BS["build-solutions.mjs"]
     end
 
-    Pool[("data/daily-pool.json<br/>61 days")]
-    Sol[("data/daily-solutions.json<br/>61 seeds x tiers")]
+    Pool[("data/daily-pool.json<br/>92 days")]
+    Sol[("data/daily-solutions.json<br/>92 seeds x tiers")]
 
     Rules --> Solve
     Solve --> BP

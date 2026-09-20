@@ -76,7 +76,8 @@ test('--extend with nothing certified fails closed and leaves every published da
   const dir = mkdtempSync(join(tmpdir(), 'causeway-builder-'));
   const out = join(dir, 'pool.json');
   writeFileSync(out, realPool);
-  const r = runBuilder(['--select-only', '--extend', '--cache', join(dir, 'no-such-cache'), '--days', '92', '--out', out]);
+  const want = JSON.parse(realPool).days.length + 31;   // one more month than is published
+  const r = runBuilder(['--select-only', '--extend', '--cache', join(dir, 'no-such-cache'), '--days', String(want), '--out', out]);
   assert.notEqual(r.status, 0);
   assert.match(r.out, /FAILING CLOSED/);
   assert.equal(readFileSync(out, 'utf8'), realPool, 'extension failure must not touch the published days');
@@ -155,7 +156,8 @@ test('--extend refuses to shrink or stand still: --days must exceed the publishe
   const dir = mkdtempSync(join(tmpdir(), 'causeway-builder-'));
   const out = join(dir, 'pool.json');
   writeFileSync(out, realPool);
-  const r = runBuilder(['--select-only', '--extend', '--cache', join(dir, 'no-such-cache'), '--days', '61', '--out', out]);
+  const published = String(JSON.parse(realPool).days.length);   // --days == what is already published
+  const r = runBuilder(['--select-only', '--extend', '--cache', join(dir, 'no-such-cache'), '--days', published, '--out', out]);
   assert.notEqual(r.status, 0);
   assert.match(r.out, /REFUSING.*raise --days/s);
   assert.equal(readFileSync(out, 'utf8'), realPool);

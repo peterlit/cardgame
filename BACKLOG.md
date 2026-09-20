@@ -608,8 +608,9 @@ All 15 open auto-routed findings of `.qa-loop/briefs/round-1-impl-brief.json` we
   the structurally impossible pairings with no search. The month builder gates every greedy pick on
   it. Regenerating a month therefore costs one joint search per pick (plus retries) on top of
   phase 1 — cheap next to certification itself.
-- **Two months are seeded** (Aug 1 – Sep 30 2026, `days[0..60]`, epoch unchanged). Seeding October
-  means re-running `build-month.mjs --days 92` and extending `days[]`; the epoch stays put.
+- **Two months are seeded** (Aug 1 – Sep 30 2026, `days[0..60]`, epoch unchanged). ~~Seeding October
+  means re-running `build-month.mjs --days 92` and extending `days[]`; the epoch stays put.~~
+  DONE 2026-09-20: October appended with `--extend --days 92` (see the 2026-09-20 section).
 - **History was nuked again** (daily store v2 → v3, both platforms). Any future rebuild that must
   PRESERVE history is a migration, not a rebuild — the day index is the key, and re-picking days
   invalidates it.
@@ -1065,3 +1066,15 @@ tap time instead of the Menu changing identity when the board becomes finishable
   0) and each flash model's daily quota is spent by one diff prompt: the lane ran once in two
   passes. `.review-loop/panel.json` is pinned to `gemini-3.7-flash` until the key changes.
 
+## 2026-09-20 — October seeded (pool extended to 92 days)
+`data/daily-pool.json` now runs 2026-08-01..2026-10-31 (`days[0..91]`), extended with
+`build-month.mjs --select-only --extend --days 92` from the committed cache; solutions baked for
+all 31 new seeds (31 flawless lines); iOS bundle copies synced. **The pool now expires
+2026-10-31.** November is the same recipe with `--days 122`; the cache still holds 127 unused
+winnable candidates and `tests/builder.test.mjs` proves a further 31-day extension fills from it.
+- **DONE:** the "Seeding October" note in the 2026-08-30 section; the `RegressionDailyCalendarTests`
+  pool-end time bomb (2026-08-31 section) was already defused when every UI test pinned its clock.
+- **Open, low:** the certification cache will need a phase-1 top-up (`--candidates 320` or more,
+  ~1 h on 8 cores) around December — rarity-driven selection has been drawing down the scarce
+  families (`ends-first`, `big-move`, `suit-sprint`) first, so variety in a fourth/fifth extension
+  will fall before the candidate count does.

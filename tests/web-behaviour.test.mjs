@@ -220,7 +220,7 @@ test('index.html civilOf: day 0 is 2026-08-01 and the index walks the civil cale
 
 test('index.html calMonthRange spans exactly the seeded pool, so no month of dead cells is reachable', () => {
   const web = loadWeb();
-  web.set({ dailyPool: new Array(61).fill({}) });     // the shipped pool: 2026-08-01..2026-09-30
+  web.set({ dailyPool: new Array(61).fill({}) });     // a two-month pool fixture: 2026-08-01..2026-09-30
   assert.deepEqual(web.calMonthRange(), { min: AUG, max: SEP });
   web.set({ dailyPool: new Array(31).fill({}) });     // a one-month pool collapses to one month
   assert.deepEqual(web.calMonthRange(), { min: AUG, max: AUG });

@@ -47,5 +47,5 @@ about. That is the tiebreaker for design questions.
   -destination "id=<UDID>" -parallel-testing-enabled NO` runs BOTH targets — `CausewayTests`
   (17 Swift unit tests, seconds) and `CausewayUITests` (72 UI test methods / 75 executions,
   ~30 min; split into class groups if one xcodebuild call would exceed 10 min) → 0 skipped. Create your own simulator; parallel sessions on this Mac delete each other's.
-- The daily pool runs out **2026-09-30** (`data/daily-pool.json`, 61 days from 2026-08-01). Reseeding
-  is deferred by the owner's decision, not forgotten.
+- The daily pool runs out **2026-10-31** (`data/daily-pool.json`, 92 days from 2026-08-01). Extend it
+  with `build-month.mjs --extend --days <total>` (see `docs/solver.md` §5); never rebuild.

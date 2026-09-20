@@ -28,8 +28,8 @@ import { certify, VARIANTS, variantKey, isGold, isDailyEligible,
          certifyFlawless, contradiction, moveToken } from './solve.mjs';
 import { gradeOf, labelOf } from '../../tests/daily.mjs';
 
-const POOL_VERSION = 4;          // v4: every day FLAWLESS-certified; Aug+Sep 2026 in one file
-const EPOCH = '2026-08-01';      // day 0; the pool now covers August AND September 2026
+const POOL_VERSION = 4;          // v4: every day FLAWLESS-certified; Aug-Oct 2026 in one file
+const EPOCH = '2026-08-01';      // day 0; the pool now covers August through October 2026 (--extend)
 const MIN_SEED = 500001;         // daily deals live in the upper half of the deal space...
 const MAX_SEED = 1000000;        // ...and never exceed the app's deal-number ceiling.
 // Universal Silvers need no certification. `moves` is listed once per multiplier so the month can
@@ -300,7 +300,7 @@ function spread(chosen, seam) {
   return out;
 }
 
-// Day index -> "Aug 07" / "Sep 12", read off the pool epoch (the calendar now spans two months).
+// Day index -> "Aug 07" / "Oct 12", read off the pool epoch (the calendar spans several months).
 function dayLabel(i) {
   const [y, m, d] = EPOCH.split('-').map(Number);
   const t = new Date(Date.UTC(y, m - 1, d + i));

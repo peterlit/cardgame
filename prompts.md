@@ -1024,3 +1024,23 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
      in the 0.10.0 style — ten items, the gemini free-tier trap and the ollama 0/20 noise at the
      top. BACKLOG: RL-A2-1..4; HANDOFF §5/§6 updated. Simulator created and deleted.
 
+104. "Fill the daily challenges for the month of October. Run review loop and generate feedback."
+     The pool was due to run dry on 2026-09-30. Extended it in place with the sanctioned path:
+     `node tools/solver/build-month.mjs --select-only --extend --days 92` against the committed
+     certification cache (224 candidates, 219 winnable) — no new certification needed, ~5 min
+     wall-clock, all of it the flawless gate's joint searches (cached to
+     `.cache/flawless-certs.jsonl`, +125 lines). Result: `days[61..91]` = Oct 1-31, every
+     published Aug/Sep day byte-identical, 0 published (Silver, Gold) pair repeats, 0 adjacent
+     family clashes, 9 Gold / 7 Silver families and 51 distinct challenges across the 31 new
+     days. Baked the demo lines with `build-solutions.mjs` in four stripes (+31 seeds: 31 gold,
+     24 silver, 31 flawless, 0 warnings) and copied both JSON files into the iOS bundle. Two
+     builder tests had hard-coded the 61/92 day counts instead of reading the published pool
+     (they now derive them, so the next extension does not trip them); `solutions.test.mjs`
+     pins 92; docs/HANDOFF/CLAUDE/BACKLOG/overview/daily-challenges moved from "two months, 61
+     days, expires 09-30" to "three months, 92 days, expires 2026-10-31". Trap found on the way:
+     this shell exports a `NODE_OPTIONS --require` preload that no longer exists on disk, so
+     every `node` dies before `main` until `NODE_OPTIONS=` is cleared — recorded in HANDOFF.
+     Verified: node 171/171, Swift unit 17/17 (SolutionReplayTests replays all 92 days through
+     the iOS rules), daily/demo UI classes green on a private simulator. Cache headroom after
+     this: 127 unused winnable candidates, and the builder test proves a further 31-day
+     extension (November) still fills from it without new certification.

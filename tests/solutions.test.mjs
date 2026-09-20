@@ -107,10 +107,10 @@ test('every baked line WINS its deal, and Silver/Gold lines satisfy their object
   assert.equal(silverChecked, expectedSilver, `expected ${expectedSilver} certified-silver lines`);
 });
 
-test('the pool is two seeded months drawn from the daily seed range', () => {
-  assert.equal(pool.version, 4, 'pool schema version should be 4 (flawless-certified, two months)');
+test('the pool is three seeded months drawn from the daily seed range', () => {
+  assert.equal(pool.version, 4, 'pool schema version should be 4 (flawless-certified; extended in place, epoch fixed)');
   assert.equal(pool.epoch, '2026-08-01');
-  assert.equal(pool.days.length, 61, 'August + September 2026 are seeded in full and nothing else is');
+  assert.equal(pool.days.length, 92, 'August + September + October 2026 are seeded in full and nothing else is');
   for (const d of pool.days) {
     assert.ok(d.seed >= pool.minSeed && d.seed <= pool.maxSeed, `seed ${d.seed} outside the daily range`);
     assert.ok(d.seed <= 1000000, `seed ${d.seed} exceeds the app's deal-number ceiling`);
