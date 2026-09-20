@@ -4,7 +4,7 @@ Written 2026-09-04 at commit `5573947`, by the assistant that had been working o
 successor with a different account and no inherited memory. Everything below was **verified against
 the working tree**, not recalled — where a fact has an expiry (a date, a count, a "current"), it
 says so. Since 2026-09-09 this file is kept current as a standing rule (§1.5); last full
-re-verification **2026-09-09**.
+re-verification **2026-09-20** (all three suites, by the review-loop closeout reviewer).
 
 The repo's own docs cover the product ([`README.md`](README.md)), the architecture
 ([`docs/architecture/overview.md`](docs/architecture/overview.md)) and the outstanding work
@@ -164,11 +164,11 @@ Things worth knowing before you run one:
   bug in its own output — as a *justification for a test skip* ("the grid shows this month only") —
   twelve hours before it arrived as a user bug report.
 
-## 6. Where things stand (2026-09-09)
+## 6. Where things stand (2026-09-20)
 
 **Green.** `npm test` 173/173 (as of 2026-09-20; the iOS counts below are from 2026-09-09); iOS `CausewayTests` 17 unit + `CausewayUITests` 75 executions (72
 methods — the launch test runs once per UI configuration, hence +3), zero skips anywhere, all ARMED
-(no XCTSkip guards) — counts as of 2026-09-09 after the review loop. `main` is clean.
+(no XCTSkip guards) — counts as of 2026-09-20 after the review loop. `main` is clean.
 
 **The pool expires on 2026-10-31.** `data/daily-pool.json` holds 92 certified days from the
 2026-08-01 epoch (October was appended 2026-09-20 with `node tools/solver/build-month.mjs
@@ -178,6 +178,15 @@ certification needed; then `build-solutions.mjs` in four stripes and a copy of b
 Extending is the same three-step recipe with `--days 122`; the tooling is `tools/solver/` and
 [`docs/solver.md`](docs/solver.md). Note: this shell exports a `NODE_OPTIONS` preload that is
 missing on disk — run node tools with `NODE_OPTIONS=` cleared or they die before `main`.
+
+**The 2026-09-20 review loop on the October extension** (`.review-loop/REPORT.md`, feedback in
+`docs/review-loop-0.13.0-feedback-oct-pool.md`) converged at round 1: 9 findings, all fixed. It
+left two guards you will meet at the November append — the iOS JSON copies must be byte-identical
+to `data/` (`tests/ios-parity.test.mjs`) and the pool must end on a month boundary
+(`tests/solutions.test.mjs`) — and one behavior change in the builder: a (Silver, Gold) pair may
+not repeat within a run (the shipped day-3/day-60 repeat is grandfathered; never widen the check to
+published days). Panel lesson: pathspec-excluding large files from the scope makes every external
+lane file "file X was never updated" — tell the verifier what was excluded.
 
 **Blocked on the owner, and required before an App Store submission** (see
 [`docs/shipping-readiness.md`](docs/shipping-readiness.md)): a Support URL, a hosted Privacy Policy

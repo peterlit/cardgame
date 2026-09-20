@@ -1,22 +1,18 @@
 {
   "round": 1,
-  "round_start_sha": "773edccfa680b50fdfd496e63a5e695fcaeb06dc",
+  "round_start_sha": "e409698920023188d824fff9572e9ae5816fa7a7",
   "max_rounds": 2,
   "token_budget": null,
   "findings": [
     {
-      "id": "tests/RegressionAccessibilityIdentifiersTests.swift:more-menu-id-tripwire-weakened",
-      "claim": "The accessibility-identifier regression test now passes even if the More menu's Wins/How-to-play identifiers are removed: QA.moreItem falls back to matching by visible label when the identifier doesn't surface within 2s, and the test's own assertion for How to play explicitly accepts a label match.",
+      "id": "parity/daily-pool.json:no-ios-copy-drift-guard",
+      "claim": "Nothing verifies that ios/Causeway/Causeway/daily-pool.json and daily-solutions.json match data/*.json; both suites stay green while the two platforms ship calendars of different lengths.",
       "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/CausewayUITests/RegressionAccessibilityIdentifiersTests.swift:48-58",
-      "source": "panel:codex",
-      "sources": [
-        "panel:codex"
-      ],
+      "severity": "major",
+      "region": "tests/ios-parity.test.mjs:22-36",
       "introduced_by_fix": false,
       "current_status": "fixed",
-      "note": "Closeout verified: QAFixtures.swift:114-121 adds strictID (default false) which asserts byId.waitForExistence(5) and returns the id element with no label fallback; the tripwire passes strictID: true for Wins and asserts toolbar.howtoplay by waitForExistence, the `|| app.buttons[\"How to play\"]` disjunct is gone. Ran the class on 2F77A1A8: passed in 31.6s, and the run log shows both ids resolving on the first ~1s poll (t=8.16 wait -> t=9.19 toolbar.wins; t=9.39 wait -> t=10.43 toolbar.howtoplay), so the strict path resolves on the real identifier, not on a label. Mutation re-run pending. Mutation manifest re-run at HEAD (split verbatim into 2 parts, foreground): strip-wins-id KILLED, strip-howtoplay-id KILLED, control-comment-only SURVIVED \u2014 3/3 match, errors 0, so the kill count is verified, not asserted.",
+      "note": "Verified, not taken on trust: I re-ran the manifest and both drift mutants (one per copy) die. Fail-closed on a MISSING bundle copy too (readFileSync throws). The test lives in tests/ios-parity.test.mjs, which npm test's tests/**/*.test.mjs glob picks up.",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -30,43 +26,14 @@
       ]
     },
     {
-      "id": "tests/QAFixtures.swift:more-menu-id-wait",
-      "claim": "SwiftUI Menus on iOS do not reliably surface a child Button's accessibilityIdentifier to XCUITest, which is why QAFixtures.moreItem waits 2s for the id before falling back to the label; this adds wasted wait time across the ~9 test files that open the More menu.",
+      "id": "docs/daily-challenges.md:four-lines-claim-false",
+      "claim": "The October banner claimed every new day bakes all four demo lines; 7 of the 31 October days bake no silver line, so a QA pass would hunt a nonexistent bug.",
       "evidence": {},
       "severity": "minor",
-      "region": "ios/Causeway/CausewayUITests/QAFixtures.swift:107-126",
-      "source": "panel:gemini",
-      "sources": [
-        "panel:gemini"
-      ],
-      "introduced_by_fix": false,
-      "current_status": "wontfix",
-      "note": "The wait itself is unchanged; the implementer's argument is that it never times out, and the run log bears that out: in RegressionAccessibilityIdentifiersTests both toolbar.wins and toolbar.howtoplay resolved on the first ~1.03s XCUITest poll, i.e. the id IS surfaced by the Menu and waitForExistence(2) short-circuits. The residual ~1s per call is XCUITest's poll interval, not the fallback, so removing the wait would save nothing. Declining accepted. Residual edge (not worth a fix): the strict proof was taken in portrait only; no landscape (rail Menu) strict run exists.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "wontfix"
-        }
-      ]
-    },
-    {
-      "id": "state/ContentView.swift:rail-more-dynamic-id",
-      "claim": "The landscape rail's More Menu carried a dynamic `.id(game.canOfferFinish ? \"rail.more\" : \"rail.last\")` that changes identity when the board becomes finishable; if that flip happens while the More menu is open (e.g. via a background autoplay move), SwiftUI recreating the view's identity risks dismissing the open menu.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:649-690",
-      "source": "panel:gemini",
-      "sources": [
-        "panel:gemini"
-      ],
+      "region": "docs/daily-challenges.md:1-12",
       "introduced_by_fix": false,
       "current_status": "fixed",
-      "note": "Verified on the code: ContentView.swift:654 is now the unconditional .id(\"rail.more\") on the Menu and :660 gives the conditional Finish pill .id(\"rail.finish\"), so no view's identity depends on canOfferFinish any more (the Finish pill is created/destroyed by the `if` regardless). The cue picks the end anchor at tap time (:685-686), and since Finish is the rail's last child when present and More when absent, the scroll target is the same element the old \"rail.last\" resolved to \u2014 no behavior change. No duplicate .id() is introduced (old code never had one either). Layout-neutral as claimed: .id() adds no view to the VStack, so railContentH/the fold arithmetic are byte-identical; the rejected sentinel would indeed have added one 6 pt spacing. Declining the sentinel is correct. Runtime: both rail classes pass on 2F77A1A8 \u2014 RegressionLandscapeRailMoreCueTests (18.7s) scrolls the rail to its end via the cue with Finish live (exercising scrollTo(\"rail.finish\")) and then opens the rail's More menu and lands on the How-to-play sheet; RegressionRailCueFlipsAtEndTests (14.6s) round-trips the cue both ways with Finish live. RESIDUAL (not worth a fix): nothing pins the staticness \u2014 no test and no mutant reproduces the open-menu-during-canOfferFinish-flip dismissal, so a future edit could re-introduce a conditional .id() on the Menu silently.",
+      "note": "Verified by recount, not by claim. data/daily-solutions.json keyed by seed: bronze 92, gold 92, flawless 92, silver 69; the 23 silver-less days are exactly the 23 days whose pool silver.id is in {moves,no-undo} (0 mismatches). October (idx 61..91) holds 7 of them - 2026-10-02, 04, 06, 09, 13, 27, 30 - so 24 of 31 new days bake a distinct silver, and 16 of the 23 are Aug/Sep. docs/daily-challenges.md:6-9 now says exactly that, with the same seven dates. No residual four-lines claim elsewhere in the file (grep 'four' -> only unrelated Flawless/rank copy).",
       "first_seen_round": 0,
       "status_history": [
         {
@@ -80,69 +47,119 @@
       ]
     },
     {
-      "id": "docs/qa-loop:stale-toolbar-screen-map",
-      "claim": "Three checked-in reference docs still describe the deleted portrait toolbar, so the next QA loop drives the app off a stale map and reports phantom failures.",
+      "id": "docs/architecture/overview.md:stale-61-prose",
+      "claim": "The build-solutions prose said '31 bronze + 31 gold + 23 silver (8 missing silvers)' and build-month '61 days', numbers that match no generation of the shipped data.",
       "evidence": {},
       "severity": "minor",
-      "region": ".qa-loop/TESTCASES.md:25-45",
-      "source": "chair",
-      "sources": [
-        "chair"
-      ],
-      "introduced_by_fix": false,
-      "current_status": "partial",
-      "note": "Core fixed and verified: TESTCASES.md's screen map is rewritten for A2 (portrait deck / landscape rail / More menu ids, all matching ContentView.swift:841-884 and 619-693), app.md #7 is marked gone with its number kept, ios/README.md:80 no longer lists FlowLayout. EDGE STILL OPEN \u2014 the case STEPS the QA loop actually executes were not swept and still describe the deleted toolbar: (a) TESTCASES.md:272-273 states the Finish pill appears 'in the toolbar (portrait row 2 between Auto-finish and Deal #)' \u2014 under A2 it is its own tier at the TOP of the foot deck (ContentView.swift:843-845) and Deal # is a header chip (ContentView.swift:816), so a driver checking TC-4.2's stated position files a phantom failure; (b) TESTCASES.md:77 'Tap How to play' as a board step, with no More-menu step, in the smoke case TC-1.1 \u2014 there is no board-level How to play control any more; (c) TESTCASES.md:357 'the three-line stacked HUD sits directly under the toolbar'. Text-only, no shipped behavior.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "partial"
-        }
-      ]
-    },
-    {
-      "id": "layout/ContentView.swift:finish-tier-latch-cost",
-      "claim": "The Finish pill is now its own tier inside portraitDeck's VStack(spacing: 8), so the deck grows ~43 pt (pill ~35 + spacing 8) the first time game.canOfferFinish goes true in a deal. That shrinks the board GeometryReader's liveH by the same amount and permanently drops latchedBoardH (a per-deal MINIMUM, never restored). Undo back out of the finishable state and the board keeps sizing its cards against the 43 pt-smaller height for the rest of the deal. This is NEW cost: under the removed FlowLayout toolbar the Finish pill joined an existing wrap row (9 pills wrapped 4/4/1, 10 wrapped 4/4/2 \u2014 same three rows), so it usually cost the latch nothing. Visible only when the height bound is binding (a tall column has already forced a shrink): the cards stay one shrink step smaller than the space allows. Nothing clips \u2014 the tableau's inner GeometryReader still gets the true height.",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:313-355",
-      "source": "chair",
-      "sources": [
-        "chair"
-      ],
-      "introduced_by_fix": false,
-      "fix_risk": "Changes portrait card sizing \u2014 any fix must not reintroduce the up-AND-down rescale pulse latchedBoardH exists to prevent. The safe shape is to make the Finish tier occupy its height UNCONDITIONALLY (reserve the row with an invisible placeholder when !canOfferFinish) so the deck height is constant within a deal and the latch has nothing to absorb; do NOT simply unlatch on canOfferFinish flips.",
-      "current_status": "wontfix",
-      "note": "Round 1: decline ACCEPTED on the merits. The mechanism is unchanged in the code (portraitDeck:834-838 still gates finishPill on canOfferFinish; latchedBoardH:325/349-352 still holds the per-deal minimum) \u2014 the round changed only the doc comment and BACKLOG, which is what a wontfix should look like. The three alternatives all cost more than the defect: (a) unconditional reserve charges every portrait deal ~43 pt, and because canOfferFinish CAN flip repeatedly the alternative of unlatching on the falling edge is a genuine repeatable up/down pulse, not a one-shot correction \u2014 the fix_risk stands; (b) folding Finish into the toggle tier contradicts the owner's decided A2 layout and is not an implementer's call; (c) latching the reservation after first appearance is a no-op, the 43 pt is already spent at that moment. Symptom stays bounded: one shrink step, no clipping. BUT the recorded rationale is wrong about how narrow the trigger is \u2014 see docs/ContentView.swift:finish-tier-trade-understated, which must be corrected before the owner rules on PC-4.",
-      "first_seen_round": 0,
-      "status_history": [
-        {
-          "round": 0,
-          "status": "open"
-        },
-        {
-          "round": 1,
-          "status": "wontfix"
-        }
-      ]
-    },
-    {
-      "id": "docs/ContentView.swift:finish-tier-trade-understated",
-      "claim": "The code comment and BACKLOG PC-4 rationale the owner will rule on understate the trigger set for the Finish-tier latch cost (claimed undo-only, and that 'the remaining play is normally the finish itself').",
-      "evidence": {},
-      "severity": "minor",
-      "region": "ios/Causeway/Causeway/Views/ContentView.swift:824-840",
-      "source": "chair",
-      "sources": [
-        "chair"
-      ],
+      "region": "docs/architecture/overview.md:308-330",
       "introduced_by_fix": false,
       "current_status": "fixed",
-      "note": "Verified on the current text: ContentView.swift:830-834 now says 'finishable and then NOT finishable again ... undo OR from any forward move that breaks the cascade: canOfferFinish is a pure function of position and, unlike maybeAutoFinish, has no autoFinishTierCost() guard', names the live-tier daily / Auto-finish Off / 'Not yet' paths, and the 'remaining play is normally the finish itself' clause is gone. BACKLOG.md:1032-1037 carries the same corrected trigger set. Matches Game.swift's actual guards as cited in the original finding.",
+      "note": "Recounted from data/daily-solutions.json: 92 bronze + 92 gold + 92 flawless + 69 silver, 23 missing silvers - byte-for-byte what the new prose asserts. build-month line now says 92 records, Aug-Oct 2026, October via --extend. grep for '\\b61\\b' in docs/architecture/overview.md returns nothing, so no stale sibling survived.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "docs/solver.md:extend-recipe-undocumented",
+      "claim": "solver.md's usage block omitted --extend and \u00a76 still prescribed a full rebuild, which the builder now refuses - a reader following the doc would hit a REFUSING exit or, worse, re-key every published day.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "docs/solver.md:133-210",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Every flag in the new recipe exists and behaves as described, checked against source not claim: build-month.mjs accepts --extend (:353-365) and --select-only gates certifyAll (:375); slotsToFill = nDays - existingDays.length (:386) matches '--days <total> - published'; the published-bytes check is real (:428-434) and the same-version rebuild refusal is real (:366-373). build-solutions.mjs accepts --stripe W/N (:116,:124) and --merge (:101-112) with --out defaulting through arg() (:38-41). The --days 122 November figure is consistent with the month-boundary test (checked separately). Unmentioned: --rebuild exists as an escape hatch and the usage block still does not list it, but \u00a76's 'never rebuild' prose covers the intent - not worth a finding.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "docs/qa-loop-workflows.md:stale-pool-contract",
+      "claim": "The QA pool contract still described days[0..60] to Sep 30, silver on 45 of 61, and 61-day family frequencies, so a QA pass would flag correct behaviour on the October days as bugs.",
+      "evidence": {},
+      "severity": "minor",
+      "region": ".qa-loop/WORKFLOWS.md:145-230",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Every figure recounted independently and all match. Family frequencies over silver+gold slots: end-bias 27, suit-balance 20, cells-le 18, rank-rush/split-at/max-run/moves/ends-first/before-ace/suit-top-first 14 each, no-undo 9, big-move 7, suit-sprint 5 - sums to 184 = 92*2, exactly WORKFLOWS.md:217-220. The universal-Silver index list (idx 4,5,9,15,20,22,25,36,38,40,42,44,45,54,57,59,62,64,66,69,73,87,90) is the complete measured set, 23 entries, no extras or omissions. days[0..91] ends 2026-10-31 (computed from epoch). minSeed/maxSeed 500001/1000000 still true (actual seeds 514195..993123). TESTCASES.md:1003 61->92 correct, and its 'reachable range 0..14 -> idx 4,5,9 and nowhere else' still holds. The dated '0..38 / 0..39 on the real clock on 2026-09-09' phrases are self-dating, not stale.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "builder/build-month.mjs:within-run-pair-repeat",
+      "claim": "The never-repeat rule was only a score penalty within one run, so two days selected in the same run could ship the identical (Silver, Gold) pair (as days 3 and 60 already do) and the fail-closed validation never compared fresh days with each other.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tools/solver/build-month.mjs:230-274, 428-445",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "fix_risk": "Hardening the within-run rule changes the selector predicate and therefore the content of every future generated month; the shipped fix is forward-looking only and leaves published bytes alone.",
+      "note": "Fix matches the prescribed shape and I checked the two things that could have gone wrong: (1) the extend test still fills 31 open slots from the real 92-day pool and asserts every published day verbatim, so the grandfathered day-3/60 repeat still ships (seenPairs is seeded from published days but the loop starts at base, so published days are never checked against each other); (2) no starvation - a 62-day extension still fills. The declared survivor (validator pair check) is honest defense-in-depth: with the selector ban in place no input can reach that line, so it is unkillable by construction, not an untested behaviour. Residual, filed separately: docs/solver.md still states the invariant unconditionally.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/solutions.test.mjs:no-month-boundary-pin",
+      "claim": "Nothing asserted the pool ends on a civil month boundary, so a partial extension (--days 100) would ship a calendar month of dead cells with the suite green.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "tests/solutions.test.mjs:110-128",
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "source": "panel (notes_for_chair, round-0-panel.verified.json)",
+      "note": "Behaviour confirmed by running the assertion verbatim against synthetic lengths in a throwaway file (not the real pool): epoch 2026-08-01 with length 91 -> REJECT ('pool ends on 2026-10-30'), 92 -> ACCEPT, 100 -> REJECT ('2026-11-08'), 122 -> ACCEPT, 61 -> ACCEPT, 62 -> REJECT; a non-first epoch (2026-08-15) -> REJECT. Both claimed rejections and both claimed acceptances hold. Caveat worth knowing, not a defect: the boundary asserts sit after the literal assert.equal(pool.days.length, 92) at :113 in the same test, so on a 122-day pool :113 fires first; the comment's 'Independent of the literal length pinned above' is true of the arithmetic but the assertion is unreachable until someone updates :113. That is precisely the sequence the guard is meant to police (bump the literal for a partial month -> boundary assert catches it), so it still works - just not as a standalone tripwire.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "docs/solver.md:no-repeat-claim-vs-grandfathered-days",
+      "claim": "solver.md said an exact challenge is never repeated while the shipped pool repeats one pair on days 3 and 60, so a reader could 'fix' the guard to cover the whole pool and turn published data red.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "docs/solver.md:160-180",
+      "introduced_by_fix": false,
       "first_seen_round": 1,
       "status_history": [
         {
@@ -153,23 +170,46 @@
           "round": 1,
           "status": "fixed"
         }
-      ]
+      ],
+      "current_status": "fixed",
+      "note": "Data and code both confirm the new prose. data/daily-pool.json days[3] and days[60] are the ONLY exact (silver,gold) duplicate in 92 days, both suit-balance{N:4} + cells-le{N:0}, and idx 3/60 are indeed 2026-08-04 / 2026-09-30. The two-layer ban is real: selector skips prior-published and within-run pairs (build-month.mjs:256-257,273) and the pre-publish byte check re-runs it (:439-443) starting at base = existingDays.length (:428), which is exactly the 'published days are never re-validated against each other' the doc states. The warning not to widen the guard is correct - in fresh mode base is 0 and the loop would fail on days 3/60."
+    },
+    {
+      "id": "docs/HANDOFF.md:stale-node-test-count",
+      "claim": "HANDOFF and CLAUDE.md asserted 171 node tests after the commit added two, so the next session's 'verify before you claim' step hits an unexplained mismatch.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "HANDOFF.md:50-60",
+      "introduced_by_fix": false,
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ],
+      "current_status": "fixed",
+      "note": "Measured: NODE_OPTIONS= npm test -> tests 173, pass 173, fail 0, skipped 0. All three sites now read 173 and are dated 2026-09-20. Swift unit target measured 17 executed / 0 failures / 0 skipped, matching HANDOFF.md:73-74 and CLAUDE.md:46-47. Full iOS suite also run this dispatch on udid 7B1ED0F9 in six class groups covering all 45 UI classes: CausewayUITests 75 executions / 0 failures / 0 skips (15+13+11+8+16+12), six ** TEST SUCCEEDED **, no XCTSkip anywhere - so HANDOFF.md:169 and CLAUDE.md:46-47 (72 methods / 75 executions, 17 unit) are accurate as of 2026-09-20, not just as of 2026-09-09."
     }
   ],
-  "scope": "fa2de2e..bc4c59f",
+  "scope": "026fff0..e409698 -- :!prompts.md :!data/daily-solutions.json :!ios/Causeway/Causeway/daily-solutions.json :!.cache/flawless-certs.jsonl",
   "panel": {
     "0": {
       "codex": {
         "filed": 1,
-        "confirmed": 1,
+        "confirmed": 0,
         "demoted": 0,
-        "rejected": 0
+        "rejected": 1
       },
       "gemini": {
-        "filed": 5,
+        "filed": 6,
         "confirmed": 0,
-        "demoted": 2,
-        "rejected": 3
+        "demoted": 0,
+        "rejected": 6
       },
       "ollama": {
         "filed": 10,
@@ -183,30 +223,37 @@
         "filed": 1,
         "confirmed": 0,
         "demoted": 0,
-        "rejected": 0,
-        "duplicate": 1
+        "rejected": 1,
+        "duplicate": 0
+      },
+      "gemini": {
+        "filed": 4,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 4,
+        "duplicate": 0
       },
       "ollama": {
         "filed": 10,
         "confirmed": 0,
         "demoted": 0,
-        "rejected": 9,
-        "duplicate": 1
+        "rejected": 10,
+        "duplicate": 0
       }
     }
   },
   "usage": {
     "0": {
-      "panel-verifier": 58941,
-      "reviewer": 104885
+      "panel-verifier": 50070,
+      "reviewer": 99320
     },
     "1": {
-      "implementer": 88993,
-      "reviewer": 114606,
-      "panel-verifier": 52160
+      "implementer": 100736,
+      "reviewer": 135918,
+      "panel-verifier": 56395
     }
   },
   "round_shas": {
-    "1": "773edccfa680b50fdfd496e63a5e695fcaeb06dc"
+    "1": "e409698920023188d824fff9572e9ae5816fa7a7"
   }
 }

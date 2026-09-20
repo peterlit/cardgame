@@ -1,3 +1,3 @@
 | Round | Blockers | Majors | Minors | Closed | New | Reopened | Promoted | Net | Tokens | Decision |
 |-------|----------|--------|--------|--------|-----|----------|----------|-----|--------|----------|
-| 1 | 0 | 0 | 7 | 2 | 2 | 0 | 0 | +0 | 119547 | converged |
+| 1 | 0 | 0 | 5 | 0 | 1 | 0 | 0 | -1 | 73327 | converged |

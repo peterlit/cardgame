@@ -1044,3 +1044,26 @@ the bottom. Kept up to date as new instructions come in (paraphrased, one line e
      the iOS rules), daily/demo UI classes green on a private simulator. Cache headroom after
      this: 127 unused winnable candidates, and the builder test proves a further 31-day
      extension (November) still fills from it without new certification.
+
+105. (Same request as #104, second half: "Run review loop and generate feedback.") Ran
+     `review-loop-tools` 0.13.0 on scope `026fff0..e409698` (prompts.md, the two 220 KB solution
+     files and the certificate cache excluded by pathspec) with the standing panel (codex
+     gpt-6-astra, gemini-3.7-flash, ollama qwen3-coder:30b; consent of 2026-09-13). Panel seed: 17
+     candidates → verifier kept 0 (both codex filings and three gemini "blockers" said the
+     solution files were never updated — they were excluded from the diff view, not from the
+     commit). Chair seed: 1 major (nothing pins the iOS bundle copies of the pool/solutions to
+     `data/` — both suites stay green on a stale bundle) + 6 minors. Round 1: implementer fixed
+     the major (byte-identity test in `tests/ios-parity.test.mjs`) and the fix_risk minor
+     (`build-month.mjs` now hard-bans a (Silver, Gold) pair repeated within one run and validates
+     fresh days against each other; the shipped day-3/day-60 repeat is grandfathered); reviewer
+     re-ran the 5-mutant manifest (5/5 matched), proved no starvation at `--days 154`, opened 2
+     doc minors → **converged at round 1**. Panel final: 15 candidates, 0 kept (ollama now 0/40
+     over two runs). Closeout fixed all 7 minors (docs/solver.md `--extend` recipe + grandfathered
+     pair, daily-challenges/overview/QA-contract figures recounted, a whole-civil-month assertion
+     in `tests/solutions.test.mjs`, 171→173 in HANDOFF/CLAUDE) and the closeout reviewer ran every
+     suite: node 173/173, Swift unit 17/17, UI 75/75, 0 skipped. Measured 3.22 M effective tokens
+     (2.12 M subagents = 4.8× the ledger's 442,439; orchestrator 1.11 M) in 1 h 10 min; the
+     extension itself cost 0.53 M before the loop. Feedback in
+     `docs/review-loop-0.13.0-feedback-oct-pool.md` — top items: the pathspec-exclude blind spot,
+     `panel_review.py run` accepting an empty diff as a clean pass, the single-slot phase marker
+     vs parallel dispatches. Simulator created and deleted.

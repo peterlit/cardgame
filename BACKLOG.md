@@ -780,7 +780,9 @@ closeout). Full state is versioned under `.review-loop/`. Four items outlive the
   Wins sheet on both platforms (`WinsView.swift:87,108`; web `winsPlay`). The comment at
   `index.html:1863` claiming the Daily sheet has guarded this "since round 0" is false. Fix shape:
   route those through `confirmReset()`/`hasLiveGame()` the way `ContentView.requestReset` does.
-- **`RegressionDailyCalendarTests` pool-end time bomb.** `testPlayButtonNamesTheSelectedDay` guards
+- ~~**`RegressionDailyCalendarTests` pool-end time bomb.**~~ **DEFUSED** (every UI test pins its clock
+  via `launchPinned()`; re-confirmed by the 2026-09-20 closeout reviewer). Original text:
+  `testPlayButtonNamesTheSelectedDay` guards
   the pool's start (`yesterday >= 2026-08-01`) but not its end; `daily-pool.json` seeds 61 days
   (2026-08-01..09-30), so from 2026-10-02 the yesterday cell is unavailable and the test hard-fails
   blaming the calendar grid. Round 3 also widened the locked-note assertion to an OR, so after
@@ -1078,3 +1080,18 @@ winnable candidates and `tests/builder.test.mjs` proves a further 31-day extensi
   ~1 h on 8 cores) around December — rarity-driven selection has been drawing down the scarce
   families (`ends-first`, `big-move`, `suit-sprint`) first, so variety in a fourth/fifth extension
   will fall before the candidate count does.
+
+## 2026-09-20 — review-loop v0.13.0 (panel) on the October extension — converged round 1
+Report `.review-loop/REPORT.md`; cost and plugin feedback `docs/review-loop-0.13.0-feedback-oct-pool.md`.
+Nine findings (1 major, 8 minors), all fixed; 0 open, 0 wontfix. Panel: 32 candidates over two
+passes, 0 kept (ollama 0/40 across the two 0.13.0 runs — consider disabling the lane). Shipped
+behavior change from the loop: `build-month.mjs` now hard-bans a (Silver, Gold) pair repeated
+within one selection run and validates fresh days against each other (`07aa37c`); the published
+day-3/day-60 repeat is grandfathered and must never be re-picked (`docs/solver.md`). New guards:
+`tests/ios-parity.test.mjs` pins both iOS JSON copies byte-identical to `data/`;
+`tests/solutions.test.mjs` requires the pool to end on a civil month boundary. Suites: node 173,
+Swift unit 17, UI 75 executions, 0 skipped.
+- **Nothing left open by the loop.** Two reviewer notes, not findings: the month-boundary
+  assertion sits after the literal `92` pin in the same test (bites only once the literal is
+  bumped — intended); and nobody has played an October day yet — spot-check one in the app before
+  Oct 1 (see the report's WATCH LIST).

@@ -1,0 +1,212 @@
+{
+  "round": 1,
+  "round_start_sha": "773edccfa680b50fdfd496e63a5e695fcaeb06dc",
+  "max_rounds": 2,
+  "token_budget": null,
+  "findings": [
+    {
+      "id": "tests/RegressionAccessibilityIdentifiersTests.swift:more-menu-id-tripwire-weakened",
+      "claim": "The accessibility-identifier regression test now passes even if the More menu's Wins/How-to-play identifiers are removed: QA.moreItem falls back to matching by visible label when the identifier doesn't surface within 2s, and the test's own assertion for How to play explicitly accepts a label match.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/CausewayUITests/RegressionAccessibilityIdentifiersTests.swift:48-58",
+      "source": "panel:codex",
+      "sources": [
+        "panel:codex"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Closeout verified: QAFixtures.swift:114-121 adds strictID (default false) which asserts byId.waitForExistence(5) and returns the id element with no label fallback; the tripwire passes strictID: true for Wins and asserts toolbar.howtoplay by waitForExistence, the `|| app.buttons[\"How to play\"]` disjunct is gone. Ran the class on 2F77A1A8: passed in 31.6s, and the run log shows both ids resolving on the first ~1s poll (t=8.16 wait -> t=9.19 toolbar.wins; t=9.39 wait -> t=10.43 toolbar.howtoplay), so the strict path resolves on the real identifier, not on a label. Mutation re-run pending. Mutation manifest re-run at HEAD (split verbatim into 2 parts, foreground): strip-wins-id KILLED, strip-howtoplay-id KILLED, control-comment-only SURVIVED \u2014 3/3 match, errors 0, so the kill count is verified, not asserted.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "tests/QAFixtures.swift:more-menu-id-wait",
+      "claim": "SwiftUI Menus on iOS do not reliably surface a child Button's accessibilityIdentifier to XCUITest, which is why QAFixtures.moreItem waits 2s for the id before falling back to the label; this adds wasted wait time across the ~9 test files that open the More menu.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/CausewayUITests/QAFixtures.swift:107-126",
+      "source": "panel:gemini",
+      "sources": [
+        "panel:gemini"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "wontfix",
+      "note": "The wait itself is unchanged; the implementer's argument is that it never times out, and the run log bears that out: in RegressionAccessibilityIdentifiersTests both toolbar.wins and toolbar.howtoplay resolved on the first ~1.03s XCUITest poll, i.e. the id IS surfaced by the Menu and waitForExistence(2) short-circuits. The residual ~1s per call is XCUITest's poll interval, not the fallback, so removing the wait would save nothing. Declining accepted. Residual edge (not worth a fix): the strict proof was taken in portrait only; no landscape (rail Menu) strict run exists.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "wontfix"
+        }
+      ]
+    },
+    {
+      "id": "state/ContentView.swift:rail-more-dynamic-id",
+      "claim": "The landscape rail's More Menu carried a dynamic `.id(game.canOfferFinish ? \"rail.more\" : \"rail.last\")` that changes identity when the board becomes finishable; if that flip happens while the More menu is open (e.g. via a background autoplay move), SwiftUI recreating the view's identity risks dismissing the open menu.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:649-690",
+      "source": "panel:gemini",
+      "sources": [
+        "panel:gemini"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified on the code: ContentView.swift:654 is now the unconditional .id(\"rail.more\") on the Menu and :660 gives the conditional Finish pill .id(\"rail.finish\"), so no view's identity depends on canOfferFinish any more (the Finish pill is created/destroyed by the `if` regardless). The cue picks the end anchor at tap time (:685-686), and since Finish is the rail's last child when present and More when absent, the scroll target is the same element the old \"rail.last\" resolved to \u2014 no behavior change. No duplicate .id() is introduced (old code never had one either). Layout-neutral as claimed: .id() adds no view to the VStack, so railContentH/the fold arithmetic are byte-identical; the rejected sentinel would indeed have added one 6 pt spacing. Declining the sentinel is correct. Runtime: both rail classes pass on 2F77A1A8 \u2014 RegressionLandscapeRailMoreCueTests (18.7s) scrolls the rail to its end via the cue with Finish live (exercising scrollTo(\"rail.finish\")) and then opens the rail's More menu and lands on the How-to-play sheet; RegressionRailCueFlipsAtEndTests (14.6s) round-trips the cue both ways with Finish live. RESIDUAL (not worth a fix): nothing pins the staticness \u2014 no test and no mutant reproduces the open-menu-during-canOfferFinish-flip dismissal, so a future edit could re-introduce a conditional .id() on the Menu silently.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    },
+    {
+      "id": "docs/qa-loop:stale-toolbar-screen-map",
+      "claim": "Three checked-in reference docs still describe the deleted portrait toolbar, so the next QA loop drives the app off a stale map and reports phantom failures.",
+      "evidence": {},
+      "severity": "minor",
+      "region": ".qa-loop/TESTCASES.md:25-45",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "partial",
+      "note": "Core fixed and verified: TESTCASES.md's screen map is rewritten for A2 (portrait deck / landscape rail / More menu ids, all matching ContentView.swift:841-884 and 619-693), app.md #7 is marked gone with its number kept, ios/README.md:80 no longer lists FlowLayout. EDGE STILL OPEN \u2014 the case STEPS the QA loop actually executes were not swept and still describe the deleted toolbar: (a) TESTCASES.md:272-273 states the Finish pill appears 'in the toolbar (portrait row 2 between Auto-finish and Deal #)' \u2014 under A2 it is its own tier at the TOP of the foot deck (ContentView.swift:843-845) and Deal # is a header chip (ContentView.swift:816), so a driver checking TC-4.2's stated position files a phantom failure; (b) TESTCASES.md:77 'Tap How to play' as a board step, with no More-menu step, in the smoke case TC-1.1 \u2014 there is no board-level How to play control any more; (c) TESTCASES.md:357 'the three-line stacked HUD sits directly under the toolbar'. Text-only, no shipped behavior.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "partial"
+        }
+      ]
+    },
+    {
+      "id": "layout/ContentView.swift:finish-tier-latch-cost",
+      "claim": "The Finish pill is now its own tier inside portraitDeck's VStack(spacing: 8), so the deck grows ~43 pt (pill ~35 + spacing 8) the first time game.canOfferFinish goes true in a deal. That shrinks the board GeometryReader's liveH by the same amount and permanently drops latchedBoardH (a per-deal MINIMUM, never restored). Undo back out of the finishable state and the board keeps sizing its cards against the 43 pt-smaller height for the rest of the deal. This is NEW cost: under the removed FlowLayout toolbar the Finish pill joined an existing wrap row (9 pills wrapped 4/4/1, 10 wrapped 4/4/2 \u2014 same three rows), so it usually cost the latch nothing. Visible only when the height bound is binding (a tall column has already forced a shrink): the cards stay one shrink step smaller than the space allows. Nothing clips \u2014 the tableau's inner GeometryReader still gets the true height.",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:313-355",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "fix_risk": "Changes portrait card sizing \u2014 any fix must not reintroduce the up-AND-down rescale pulse latchedBoardH exists to prevent. The safe shape is to make the Finish tier occupy its height UNCONDITIONALLY (reserve the row with an invisible placeholder when !canOfferFinish) so the deck height is constant within a deal and the latch has nothing to absorb; do NOT simply unlatch on canOfferFinish flips.",
+      "current_status": "wontfix",
+      "note": "Round 1: decline ACCEPTED on the merits. The mechanism is unchanged in the code (portraitDeck:834-838 still gates finishPill on canOfferFinish; latchedBoardH:325/349-352 still holds the per-deal minimum) \u2014 the round changed only the doc comment and BACKLOG, which is what a wontfix should look like. The three alternatives all cost more than the defect: (a) unconditional reserve charges every portrait deal ~43 pt, and because canOfferFinish CAN flip repeatedly the alternative of unlatching on the falling edge is a genuine repeatable up/down pulse, not a one-shot correction \u2014 the fix_risk stands; (b) folding Finish into the toggle tier contradicts the owner's decided A2 layout and is not an implementer's call; (c) latching the reservation after first appearance is a no-op, the 43 pt is already spent at that moment. Symptom stays bounded: one shrink step, no clipping. BUT the recorded rationale is wrong about how narrow the trigger is \u2014 see docs/ContentView.swift:finish-tier-trade-understated, which must be corrected before the owner rules on PC-4.",
+      "first_seen_round": 0,
+      "status_history": [
+        {
+          "round": 0,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "wontfix"
+        }
+      ]
+    },
+    {
+      "id": "docs/ContentView.swift:finish-tier-trade-understated",
+      "claim": "The code comment and BACKLOG PC-4 rationale the owner will rule on understate the trigger set for the Finish-tier latch cost (claimed undo-only, and that 'the remaining play is normally the finish itself').",
+      "evidence": {},
+      "severity": "minor",
+      "region": "ios/Causeway/Causeway/Views/ContentView.swift:824-840",
+      "source": "chair",
+      "sources": [
+        "chair"
+      ],
+      "introduced_by_fix": false,
+      "current_status": "fixed",
+      "note": "Verified on the current text: ContentView.swift:830-834 now says 'finishable and then NOT finishable again ... undo OR from any forward move that breaks the cascade: canOfferFinish is a pure function of position and, unlike maybeAutoFinish, has no autoFinishTierCost() guard', names the live-tier daily / Auto-finish Off / 'Not yet' paths, and the 'remaining play is normally the finish itself' clause is gone. BACKLOG.md:1032-1037 carries the same corrected trigger set. Matches Game.swift's actual guards as cited in the original finding.",
+      "first_seen_round": 1,
+      "status_history": [
+        {
+          "round": 1,
+          "status": "open"
+        },
+        {
+          "round": 1,
+          "status": "fixed"
+        }
+      ]
+    }
+  ],
+  "scope": "fa2de2e..bc4c59f",
+  "panel": {
+    "0": {
+      "codex": {
+        "filed": 1,
+        "confirmed": 1,
+        "demoted": 0,
+        "rejected": 0
+      },
+      "gemini": {
+        "filed": 5,
+        "confirmed": 0,
+        "demoted": 2,
+        "rejected": 3
+      },
+      "ollama": {
+        "filed": 10,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 10
+      }
+    },
+    "final": {
+      "codex": {
+        "filed": 1,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 0,
+        "duplicate": 1
+      },
+      "ollama": {
+        "filed": 10,
+        "confirmed": 0,
+        "demoted": 0,
+        "rejected": 9,
+        "duplicate": 1
+      }
+    }
+  },
+  "usage": {
+    "0": {
+      "panel-verifier": 58941,
+      "reviewer": 104885
+    },
+    "1": {
+      "implementer": 88993,
+      "reviewer": 114606,
+      "panel-verifier": 52160
+    }
+  },
+  "round_shas": {
+    "1": "773edccfa680b50fdfd496e63a5e695fcaeb06dc"
+  }
+}
