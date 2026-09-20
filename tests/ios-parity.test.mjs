@@ -19,6 +19,23 @@ const norm = s => s.replace(/\s+/g, ' ').trim();
 const IOS = join(REPO, 'ios/Causeway/Causeway');
 const read = p => norm(readFileSync(join(IOS, p), 'utf8'));
 
+// ---- the daily data itself: the iOS app bundles COPIES of data/*.json ----------------------------
+// Every Node test reads data/ and every Swift test reads the bundle, and the Swift suite never pins
+// the pool's length (SolutionReplayTests asserts against g.pool.count — self-referential). So a
+// data/ pool extended to 92 days with the bundle left at 61 passed BOTH suites green; the only
+// guard was a console NOTE from build-month.mjs. Byte identity is the contract: the copies are
+// produced by `cp`, so any difference at all means someone forgot the sync or hand-edited a copy.
+test('the iOS bundle ships byte-identical copies of the daily pool and solutions (no web↔iOS drift)', () => {
+  for (const name of ['daily-pool.json', 'daily-solutions.json']) {
+    const canonical = readFileSync(join(REPO, 'data', name));
+    const bundled = readFileSync(join(IOS, name));
+    assert.ok(canonical.length > 0, `data/${name} is empty`);
+    assert.ok(canonical.equals(bundled),
+      `ios/Causeway/Causeway/${name} differs from data/${name} (${bundled.length} vs ${canonical.length} bytes) — ` +
+      'cp data/daily-pool.json data/daily-solutions.json ios/Causeway/Causeway/ (docs/solver.md)');
+  }
+});
+
 function pin(file, label, snippets) {
   test(`iOS ${label} matches canonical logic (no web↔iOS drift)`, () => {
     const src = read(file);

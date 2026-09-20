@@ -227,6 +227,11 @@ function selectMonth(recs, capPerFamily, want, prior) {
     return s;
   };
 
+  // Exact (silver, gold) pairs placed by THIS run. The -60 novelty penalty made a within-run repeat
+  // unlikely, not impossible: the published pool's days 3 and 60 (Aug 4 / Sep 30) shipped the same
+  // suit-balance{N:4} + cells-le{N:0} because a penalty is a preference and the published-pair
+  // check below only looked across the seam. The rule is one rule, so both sets are hard bans.
+  const runPairs = new Set();
   const used = new Set(), chosen = [], rejected = new Set();
   for (let slot = 0; slot < want; slot++) {
     // Take the most-varied triple that is also FLAWLESS-certified; a triple that fails the gate is
@@ -249,6 +254,7 @@ function selectMonth(recs, capPerFamily, want, prior) {
             // discourages repeats, but "never repeat an exact challenge" across the seam is a
             // rule, not a preference.
             if (prior?.pairs.has(pairKey(s, g))) continue;
+            if (runPairs.has(pairKey(s, g))) continue;
             if (rejected.has(fkey(rec.seed, s, g))) continue;
             const score = gs + novelty('silver', s);
             if (!best || score > best.score) best = { score, rec, gold: g, silver: s };
@@ -264,6 +270,7 @@ function selectMonth(recs, capPerFamily, want, prior) {
       bump(idUses, 'gold:' + best.gold.id); bump(keyUses, best.gold.key);
       bump(idUses, 'silver:' + best.silver.id); bump(keyUses, best.silver.key);
       bump(capUses, 'gold:' + best.gold.id); bump(capUses, 'silver:' + best.silver.id);
+      runPairs.add(pairKey(best.silver, best.gold));
       chosen.push(best); placed = true;
     }
   }
@@ -418,23 +425,27 @@ for (const [i, d] of check.days.entries()) {
   if (!d.silver?.id || !d.gold?.id || !Number.isFinite(d.par)) fail(`day ${i} is incomplete`);
   if (d.silver.id === d.gold.id) fail(`day ${i} pairs family ${d.gold.id} with itself`);
 }
+const base = has('extend') ? existingDays.length : 0;
 if (has('extend')) {
   for (const [i, d] of existingDays.entries()) {
     if (JSON.stringify(check.days[i]) !== JSON.stringify(d))
       fail(`published day ${i} changed — extension must preserve every published (seed, objectives) verbatim`);
   }
-  // The never-repeat rule, enforced on the BYTES about to ship, not just inside the selector.
-  const pubPairs = new Set(existingDays.map(d => pairKey(d.silver, d.gold)));
-  for (let i = existingDays.length; i < check.days.length; i++) {
-    if (pubPairs.has(pairKey(check.days[i].silver, check.days[i].gold)))
-      fail(`day ${i} repeats a published (silver, gold) challenge pair verbatim`);
-  }
+}
+// The never-repeat rule, enforced on the BYTES about to ship, not just inside the selector: a fresh
+// day may not re-issue a published pair, nor another fresh day's. Published days are history — they
+// are never re-validated against each other (days 3 and 60 already share a pair, and an extension
+// must ship them byte-for-byte), only against the days being added now.
+const seenPairs = new Set((has('extend') ? existingDays : []).map(d => pairKey(d.silver, d.gold)));
+for (let i = base; i < check.days.length; i++) {
+  const k = pairKey(check.days[i].silver, check.days[i].gold);
+  if (seenPairs.has(k)) fail(`day ${i} repeats a (silver, gold) challenge pair verbatim`);
+  seenPairs.add(k);
 }
 renameSync(candidatePath, out);
 
 const ids = new Set(), keys = new Set();
 for (const c of fresh) { ids.add(c.gold.id); ids.add(c.silver.id); keys.add(c.gold.key); keys.add(c.silver.key); }
-const base = has('extend') ? existingDays.length : 0;
 console.log(`\n${has('extend') ? 'extension' : 'month'} written to ${out}: ${pool.days.length} days total, ` +
             `${fresh.length} new (${ids.size} distinct objective families, ${keys.size} distinct challenges among them)`);
 for (let i = 0; i < fresh.length; i++) {

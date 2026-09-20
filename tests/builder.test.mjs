@@ -25,6 +25,18 @@ const canon = o => JSON.stringify(o, (k, v) =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 const pairOf = d => canon([d.silver.id, d.silver.param, d.gold.id, d.gold.param]);
+// "An exact challenge is never repeated" (docs/solver.md) is one rule, and it binds the days
+// selected in ONE run as much as the seam: the published pool's days 3 and 60 shipped the same
+// (Silver, Gold) pair because the within-run rule was only a score penalty (R1 minor:
+// within-run-pair-repeat). Those two are history; every run from now on is held to the rule.
+const assertNoPairRepeat = (days, label) => {
+  const seen = new Map();
+  days.forEach((d, i) => {
+    const p = pairOf(d);
+    assert.ok(!seen.has(p), `${label}: days ${seen.get(p)} and ${i} ship the identical (silver, gold) challenge ${p}`);
+    seen.set(p, i);
+  });
+};
 // The per-family variety cap (closeout: cap-variety-never-asserted). selectMonthBalanced tops out
 // at capPerFamily = 12 (build-month.mjs), and capped() is the only mechanism keeping a tier from
 // reading as one idea. The cap governs the days selected by THIS run (an extension's published
@@ -119,6 +131,38 @@ test('the builder can still PUBLISH: a fresh select-only run against the real ca
     assert.notEqual(d.silver.id, d.gold.id, 'a day must never pair a family with itself');
   }
   assertFamilyCap(pool.days, 'fresh publish');
+  assertNoPairRepeat(pool.days, 'fresh publish');
+});
+
+test('a run whose material forces a repeated (silver, gold) pair FAILS CLOSED rather than shipping it twice', () => {
+  // Reproduction of the day-3/day-60 hole with a cache that leaves the selector no honest choice:
+  // seven eligible seeds that each certify exactly ONE Gold (cells-le{N:0}) and no Silver-grade
+  // variant, so the only Silvers are the universal ones — five `moves` caps (one per factor, all
+  // distinct at par 100) and no-undo. Six distinct pairs exist; a seventh day can only repeat one.
+  // Before the fix the selector took the -60 penalty and published the repeat with exit 0.
+  const seeds = readFileSync(join(REPO, '.cache/month-certs-0.jsonl'), 'utf8').trim().split('\n')
+    .slice(0, 7).map(l => JSON.parse(l).seed);           // real candidates, so the builder's list admits them
+  assert.equal(seeds.length, 7);
+  const dir = mkdtempSync(join(tmpdir(), 'causeway-builder-'));
+  writeFileSync(join(dir, 'certs-0.jsonl'), seeds.map(seed => JSON.stringify(
+    { seed, winnable: true, par: 100, supports: [{ id: 'cells-le', param: { N: 0 }, par: 100 }] })).join('\n') + '\n');
+  const cache = join(dir, 'certs');
+  // Positive control first: six days DO fill from this material, with six distinct pairs — so the
+  // refusal below is the never-repeat rule, not a fixture the selector cannot read.
+  const ok6 = join(dir, 'six.json');
+  const r6 = runBuilder(['--select-only', '--no-flawless-gate', '--cache', cache, '--days', '6', '--out', ok6]);
+  assert.equal(r6.status, 0, 'six distinct pairs must publish:\n' + r6.out);
+  const six = JSON.parse(readFileSync(ok6, 'utf8')).days;
+  assert.equal(six.length, 6);
+  assertNoPairRepeat(six, 'six-day control');
+  // The seventh slot has nothing but a repeat to offer: the SELECTOR must refuse it (so the run
+  // fails closed as under-filled), and no pool may be written.
+  const out7 = join(dir, 'seven.json');
+  const r7 = runBuilder(['--select-only', '--no-flawless-gate', '--cache', cache, '--days', '7', '--out', out7]);
+  assert.notEqual(r7.status, 0, 'a forced repeat must not publish:\n' + r7.out);
+  assert.match(r7.out, /FAILING CLOSED: only 6 of 7 days could be filled/,
+    'the selector itself must leave the seventh slot empty rather than hand a repeat to the validator');
+  assert.ok(!existsSync(out7), 'no pool may be written when the selection is refused');
 });
 
 test('--extend fills a FULL MONTH of open slots, keeps every published day verbatim, and repeats no published challenge', () => {
@@ -150,6 +194,7 @@ test('--extend fills a FULL MONTH of open slots, keeps every published day verba
     assert.ok(!publishedPairs.has(pairOf(pool.days[i])),
       `fresh day ${i} repeats a published (silver, gold) challenge pair`);
   assertFamilyCap(pool.days.slice(published.length), '--extend fresh days');
+  assertNoPairRepeat(pool.days.slice(published.length), '--extend fresh days');
 });
 
 test('--extend refuses to shrink or stand still: --days must exceed the published count', () => {
